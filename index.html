@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.3 | 30.03.2026 | Takvim, Email Doğrulama, Şirket Kaydı, Çakışma Kontrolü -->
+<!-- PoCHub v1.3.1 | 30.03.2026 | Takvim, Email Doğrulama, Şirket Kaydı, Çakışma Kontrolü -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.3</title>
+<title>PoCHub.co — v1.3.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -115,7 +115,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.3';
+const VERSION = 'v1.3.1';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 const firebaseConfig = {
@@ -537,14 +537,15 @@ async function renderHome() {
     ]);
     const vals = [evSnap.size, userSnap.size, pocSnap.size, prodSnap.size];
     el('home-stats')?.querySelectorAll('.stat-card div:first-child').forEach((x,i)=>x.textContent=vals[i]);
-  } catch(e) {}
+  } catch(e) { console.error('Stats hatası:', e); }
 
   // Tüm etkinlikleri çek — hem takvim hem liste için
   let allEvents = [];
   try {
-    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published'), orderBy('eventDate')));
+    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published')));
     allEvents = snap.docs.map(d => ({...d.data(), id:d.id}));
-  } catch(e) {}
+    allEvents.sort((a,b) => (a.eventDate?.seconds||0) - (b.eventDate?.seconds||0));
+  } catch(e) { console.error('Etkinlik yükleme hatası:', e); }
 
   // Kategori listesi
   const cats = [...new Set(allEvents.map(e=>e.category).filter(Boolean))];
@@ -681,30 +682,32 @@ async function renderHome() {
   }
 
   // İlk yükleme — yaklaşan etkinlikler
+  console.log('PoCHub: allEvents yüklendi, sayı:', allEvents.length);
   renderHomeEventList(allEvents.slice(0,6), 'Yaklaşan Etkinlikler');
   renderCalendar(calYear, calMonth);
 
-  // Ay değişince listeyi güncelle
-  const origPrev = el('cal-prev').onclick;
-  ['cal-prev','cal-next'].forEach(id => {
-    const btn = el(id);
-    if (!btn) return;
-    const orig = btn.cloneNode(true);
-    btn.replaceWith(orig);
-    el(id).addEventListener('click', async () => {
-      if (id==='cal-prev') { calMonth--; if(calMonth<0){calMonth=11;calYear++;} }
-      else { calMonth++; if(calMonth>11){calMonth=0;calYear++;} }
-      await renderCalendar(calYear, calMonth);
-      // O ayın etkinliklerini göster
-      const months2 = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-      const monthEvs = allEvents.filter(e => {
-        if (!e.eventDate?.toDate) return false;
-        const d = e.eventDate.toDate();
-        return d.getFullYear()===calYear && d.getMonth()===calMonth;
-      });
-      renderHomeEventList(monthEvs, months2[calMonth]+' '+calYear+' Etkinlikleri');
+  // Ay değişince listeyi güncelle — temiz listener
+  const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  
+  async function changeMonth(delta) {
+    calMonth += delta;
+    if (calMonth < 0) { calMonth = 11; calYear--; }
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    await renderCalendar(calYear, calMonth);
+    const monthEvs = allEvents.filter(e => {
+      if (!e.eventDate?.toDate) return false;
+      const d = e.eventDate.toDate();
+      return d.getFullYear()===calYear && d.getMonth()===calMonth;
     });
-  });
+    if (monthEvs.length > 0) {
+      renderHomeEventList(monthEvs, MONTHS_TR[calMonth]+' '+calYear+' Etkinlikleri');
+    } else {
+      renderHomeEventList([], MONTHS_TR[calMonth]+' '+calYear+' — Etkinlik Yok');
+    }
+  }
+
+  el('cal-prev').addEventListener('click', () => changeMonth(-1));
+  el('cal-next').addEventListener('click', () => changeMonth(1));
 }
 
 /* loadHomeEvents — renderHome içine taşındı */
@@ -813,9 +816,11 @@ async function loadEventsList() {
   if (!listEl) return;
   listEl.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
   try {
-    let q = query(collection(db,'public_events'), where('status','==','published'), orderBy('eventDate'));
+    let q = query(collection(db,'public_events'), where('status','==','published'));
     const snap = await getDocs(q);
     let docs = snap.docs.map(d => ({...d.data(), id:d.id}));
+    // Client-side sırala (eventDate'e göre)
+    docs.sort((a,b) => (a.eventDate?.seconds||0) - (b.eventDate?.seconds||0));
 
     // Filtrele
     const search = el('ev-search')?.value?.toLowerCase()||'';
@@ -1096,7 +1101,7 @@ async function loadCustTab() {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
 
   if (CUR_CUST_TAB === 'requests') {
-    const snap = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid)));
     if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Henüz PoC talebiniz yok.<br><br><button class="btn-p btn-sm" onclick="go(\'catalog\')">Katalogdan PoC Başlat</button></div>'; return; }
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">PoC Taleplerim</h2>
     <table><thead><tr><th>Ürün / Başlık</th><th>Vendor</th><th>Lokasyon</th><th>Durum</th><th>Tarih</th><th></th></tr></thead><tbody>
@@ -1121,7 +1126,7 @@ async function loadCustTab() {
   }
 
   else if (CUR_CUST_TAB === 'registrations') {
-    const snap = await getDocs(query(collection(db,'registrations'), where('userId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'registrations'), where('userId','==',CUR_USER.uid)));
     if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>Henüz etkinlik kaydınız yok.<br><br><button class="btn-p btn-sm" onclick="go(\'events\')">Etkinlikleri Gör</button></div>'; return; }
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Etkinlik Kayıtlarım</h2>
     <table><thead><tr><th>Etkinlik</th><th>Durum</th><th>Kayıt Tarihi</th></tr></thead><tbody>
@@ -1132,7 +1137,7 @@ async function loadCustTab() {
   }
 
   else if (CUR_CUST_TAB === 'offers') {
-    const snap = await getDocs(query(collection(db,'offers'), where('customerId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'offers'), where('customerId','==',CUR_USER.uid)));
     if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">💰</div>Henüz teklif almadınız.</div>'; return; }
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Teklifler</h2>
     ${snap.docs.map(d=>{const o={...d.data(),id:d.id};
@@ -1208,7 +1213,7 @@ async function loadVendTab() {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
 
   if (CUR_VEND_TAB === 'requests') {
-    const snap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid)));
     if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Henüz PoC talebi yok.<br><small style="color:#5a6278">Müşteriler katalogdan ürünlerinize talep oluşturunca burada görünür.</small></div>'; return; }
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">PoC Talepleri</h2>
     ${snap.docs.map(d=>{const r={...d.data(),id:d.id};
@@ -1277,7 +1282,7 @@ async function loadVendTab() {
   }
 
   else if (CUR_VEND_TAB === 'products') {
-    const snap = await getDocs(query(collection(db,'products'), where('vendorId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'products'), where('vendorId','==',CUR_USER.uid)));
     m.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 style="font-size:18px;font-weight:700">Ürünlerim</h2>
       <button class="btn-p btn-sm" id="v-add-prod2">+ Ürün Ekle</button>
@@ -1292,7 +1297,7 @@ async function loadVendTab() {
   }
 
   else if (CUR_VEND_TAB === 'events') {
-    const snap = await getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid)));
     m.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 style="font-size:18px;font-weight:700">Etkinliklerim</h2>
       <button class="btn-p btn-sm" id="v-add-ev2">+ Etkinlik Oluştur</button>
@@ -1307,7 +1312,7 @@ async function loadVendTab() {
   }
 
   else if (CUR_VEND_TAB === 'offers-sent') {
-    const snap = await getDocs(query(collection(db,'offers'), where('vendorId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'offers'), where('vendorId','==',CUR_USER.uid)));
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Gönderilen Teklifler</h2>
     ${snap.empty?'<div class="empty"><div class="empty-icon">💰</div>Henüz teklif göndermediniz.</div>':
     `<table><thead><tr><th>Ürün</th><th>Müşteri</th><th>Tutar</th><th>Kanal Payı</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
@@ -1500,7 +1505,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.3</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.3.1</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -1556,7 +1561,7 @@ async function loadAdmTab() {
   }
 
   else if (CUR_ADM_TAB === 'users') {
-    const snap = await getDocs(query(collection(db,'users'), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'users')));
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Kullanıcılar (${snap.size})</h2>
     <table><thead><tr><th>Ad / E-posta</th><th>Rol</th><th>Şirket</th><th>Kayıt</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const u={...d.data(),id:d.id};
@@ -1575,7 +1580,7 @@ async function loadAdmTab() {
   }
 
   else if (CUR_ADM_TAB === 'products') {
-    const snap = await getDocs(query(collection(db,'products'), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'products')));
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Ürün Yönetimi</h2>
     <table><thead><tr><th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const p={...d.data(),id:d.id};
@@ -1615,7 +1620,7 @@ async function loadAdmTab() {
   }
 
   else if (CUR_ADM_TAB === 'requests') {
-    const snap = await getDocs(query(collection(db,'poc_requests'), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'poc_requests')));
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Tüm PoC Talepleri (${snap.size})</h2>
     <table><thead><tr><th>Başlık</th><th>Müşteri</th><th>Vendor</th><th>Ürün</th><th>Lokasyon</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const r={...d.data(),id:d.id};
@@ -1634,7 +1639,7 @@ async function loadAdmTab() {
   }
 
   else if (CUR_ADM_TAB === 'events') {
-    const snap = await getDocs(query(collection(db,'public_events'), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'public_events')));
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Tüm Etkinlikler (${snap.size})</h2>
     <table><thead><tr><th>Başlık</th><th>Vendor</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const e={...d.data(),id:d.id};
@@ -1657,7 +1662,7 @@ async function loadAdmTab() {
   }
 
   else if (CUR_ADM_TAB === 'offers') {
-    const snap = await getDocs(query(collection(db,'offers'), orderBy('createdAt','desc')));
+    const snap = await getDocs(query(collection(db,'offers')));
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Tüm Teklifler (${snap.size})</h2>
     <table><thead><tr><th>Ürün</th><th>Vendor</th><th>Müşteri</th><th>Tutar</th><th>Kanal Payı</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const o={...d.data(),id:d.id};
