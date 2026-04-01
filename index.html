@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.3.1 | 30.03.2026 | Takvim, Email Doğrulama, Şirket Kaydı, Çakışma Kontrolü -->
+<!-- PoCHub v1.3.2 | 30.03.2026 | Takvim, Email Doğrulama, Şirket Kaydı, Çakışma Kontrolü -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.3.1</title>
+<title>PoCHub.co — v1.3.2</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -115,7 +115,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.3.1';
+const VERSION = 'v1.3.2';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 const firebaseConfig = {
@@ -239,12 +239,28 @@ onAuthStateChanged(auth, async user => {
   if (user) {
     const snap = await getDoc(doc(db, 'users', user.uid));
     CUR_PROFILE = snap.exists() ? snap.data() : null;
-    // Email doğrulama banner
-    if (!user.emailVerified && CUR_PROFILE?.role === 'customer') {
+
+    // Email doğrulama: Firebase Auth veya Firestore flag'i
+    const isVerified = user.emailVerified || CUR_PROFILE?.emailVerified === true;
+
+    if (!isVerified && CUR_PROFILE?.role === 'customer') {
       setTimeout(showVerificationBanner, 500);
     } else {
       const b = document.getElementById('verify-banner');
       if (b) b.remove();
+    }
+
+    // Giriş yapınca role göre panele yönlendir
+    // Sadece ana sayfadaysa yönlendir (başka sayfadaysa müdahale etme)
+    if (CUR_SCREEN === 'home' && CUR_PROFILE?.role) {
+      const roleScreen = {customer:'customer', vendor:'vendor', admin:'admin'};
+      const target = roleScreen[CUR_PROFILE.role];
+      if (target) {
+        CUR_SCREEN = target;
+        buildNav();
+        renderScreen(target);
+        return;
+      }
     }
   } else {
     CUR_PROFILE = null;
@@ -676,7 +692,7 @@ async function renderHome() {
     listEl.querySelectorAll('.ev-reg-home').forEach(b => b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       if (!CUR_USER) { openAuthModal('customer',''); return; }
-      if (!CUR_USER.emailVerified) { showToast('Lütfen önce e-postanızı doğrulayın.','err'); return; }
+      if (!CUR_USER.emailVerified && !CUR_PROFILE?.emailVerified) { showToast('Lütfen önce e-postanızı doğrulayın.','err'); return; }
       registerForEvent(b.dataset.id, b, b.dataset.vendorEmail, b.dataset.vendorName, b.dataset.title);
     }));
   }
@@ -802,7 +818,7 @@ async function openEventDetail(eventId) {
     if (regBtn) {
       regBtn.addEventListener('click', () => {
         if (!CUR_USER) { modal.remove(); openAuthModal('customer',''); return; }
-        if (!CUR_USER.emailVerified) { showToast('Lütfen önce e-postanızı doğrulayın.','err'); return; }
+        if (!CUR_USER.emailVerified && !CUR_PROFILE?.emailVerified) { showToast('Lütfen önce e-postanızı doğrulayın.','err'); return; }
         registerForEvent(eventId, regBtn, e.vendorEmail, e.vendorName, e.title);
       });
     }
@@ -1007,7 +1023,8 @@ function openPocModal(productId, productName, vendorId, vendorName, vendorEmail)
   el('poc-submit').addEventListener('click', async () => {
     const title = el('poc-title')?.value?.trim();
     if (!title) { el('poc-err').innerHTML='<div class="alert alert-err">Başlık zorunludur.</div>'; return; }
-    if (CUR_USER && !CUR_USER.emailVerified) {
+    const isVerifiedForPoc = CUR_USER?.emailVerified || CUR_PROFILE?.emailVerified === true;
+    if (CUR_USER && !isVerifiedForPoc) {
       el('poc-err').innerHTML='<div class="alert alert-err">PoC talebi oluşturmadan önce e-posta adresinizi doğrulamanız gerekmektedir.</div>';
       return;
     }
@@ -1505,7 +1522,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.3.1</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.3.2</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
