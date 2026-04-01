@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.4 | 01.04.2026 | Çoklu Vendor Seçimi, Talep Düzenleme --> 30.03.2026 | Takvim, Email Doğrulama, Şirket Kaydı, Çakışma Kontrolü -->
+<!-- PoCHub v1.6 | 01.04.2026 | Gerçek Zamanlı Mesajlaşma, Teklif Karşılaştırma, Bildirimler --> 01.04.2026 | Kategori Yönetimi, Ülke Listesi, Etkinlik Ürün Seçimi, Çoklu Katalog Seçimi --> 01.04.2026 | Çoklu Vendor Seçimi, Talep Düzenleme --> 30.03.2026 | Takvim, Email Doğrulama, Şirket Kaydı, Çakışma Kontrolü -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.4</title>
+<title>PoCHub.co — v1.6</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -67,6 +67,12 @@ th{background:#1c1f2a;padding:9px 14px;text-align:left;font-size:10.5px;text-tra
 td{padding:11px 14px;border-top:1px solid rgba(255,255,255,.06)}
 tr:hover td{background:rgba(255,255,255,.02)}
 .status-badge{padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap}
+.msg-bubble{max-width:72%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.55;word-break:break-word}
+.msg-mine{background:#3b7cff;color:#fff;border-bottom-right-radius:3px;align-self:flex-end}
+.msg-other{background:#1c1f2a;color:#e9ecf3;border-bottom-left-radius:3px;align-self:flex-start}
+.msg-time{font-size:10px;color:#5a6278;margin-top:3px}
+.notif-dot{width:8px;height:8px;background:#ff4d4d;border-radius:50%;position:absolute;top:2px;right:2px}
+.notif-badge{background:#ff4d4d;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px}
 </style>
 </head>
 <body>
@@ -115,8 +121,76 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.4';
+const VERSION = 'v1.6';
 console.log('PoCHub', VERSION, '| pochub.co');
+
+const ALL_COUNTRIES = [
+  {code:'TR',name:'Türkiye'},
+  {code:'US',name:'Amerika Birleşik Devletleri'},
+  {code:'DE',name:'Almanya'},
+  {code:'GB',name:'Birleşik Krallık'},
+  {code:'FR',name:'Fransa'},
+  {code:'JP',name:'Japonya'},
+  {code:'CN',name:'Çin'},
+  {code:'KR',name:'Güney Kore'},
+  {code:'TW',name:'Tayvan'},
+  {code:'NL',name:'Hollanda'},
+  {code:'SE',name:'İsveç'},
+  {code:'FI',name:'Finlandiya'},
+  {code:'NO',name:'Norveç'},
+  {code:'DK',name:'Danimarka'},
+  {code:'CH',name:'İsviçre'},
+  {code:'AT',name:'Avusturya'},
+  {code:'BE',name:'Belçika'},
+  {code:'IT',name:'İtalya'},
+  {code:'ES',name:'İspanya'},
+  {code:'PT',name:'Portekiz'},
+  {code:'PL',name:'Polonya'},
+  {code:'CZ',name:'Çek Cumhuriyeti'},
+  {code:'HU',name:'Macaristan'},
+  {code:'RO',name:'Romanya'},
+  {code:'GR',name:'Yunanistan'},
+  {code:'IL',name:'İsrail'},
+  {code:'AE',name:'Birleşik Arap Emirlikleri'},
+  {code:'SA',name:'Suudi Arabistan'},
+  {code:'EG',name:'Mısır'},
+  {code:'ZA',name:'Güney Afrika'},
+  {code:'NG',name:'Nijerya'},
+  {code:'IN',name:'Hindistan'},
+  {code:'SG',name:'Singapur'},
+  {code:'AU',name:'Avustralya'},
+  {code:'NZ',name:'Yeni Zelanda'},
+  {code:'CA',name:'Kanada'},
+  {code:'MX',name:'Meksika'},
+  {code:'BR',name:'Brezilya'},
+  {code:'AR',name:'Arjantin'},
+  {code:'CL',name:'Şili'},
+  {code:'CO',name:'Kolombiya'},
+  {code:'RU',name:'Rusya'},
+  {code:'UA',name:'Ukrayna'},
+  {code:'AZ',name:'Azerbaycan'},
+  {code:'KZ',name:'Kazakistan'},
+  {code:'PK',name:'Pakistan'},
+  {code:'BD',name:'Bangladeş'},
+  {code:'LK',name:'Sri Lanka'},
+  {code:'TH',name:'Tayland'},
+  {code:'VN',name:'Vietnam'},
+  {code:'PH',name:'Filipinler'},
+  {code:'ID',name:'Endonezya'},
+  {code:'MY',name:'Malezya'},
+  {code:'HK',name:'Hong Kong'},
+  {code:'IR',name:'İran'},
+  {code:'IQ',name:'Irak'},
+  {code:'JO',name:'Ürdün'},
+  {code:'LB',name:'Lübnan'},
+  {code:'MA',name:'Fas'},
+  {code:'TN',name:'Tunus'},
+  {code:'DZ',name:'Cezayir'},
+  {code:'KE',name:'Kenya'},
+  {code:'GH',name:'Gana'},
+  {code:'ET',name:'Etiyopya'},
+  {code:'TZ',name:'Tanzanya'},
+];
 
 const firebaseConfig = {
   apiKey: "AIzaSyCZ76Ga8DCGAUy33kb0Jk-wEDTHsOzRWDk",
@@ -163,6 +237,207 @@ function statusBadge(s) {
   const [bg,col,lbl] = m[s]||['#1c1f2a','#7c87a0',s];
   return `<span class="status-badge" style="background:${bg};color:${col}">${lbl}</span>`;
 }
+
+
+/* ── VENDOR ETKİNLİK ÜRÜN SEÇİMİ ── */
+function renderEvProdList(prods, modal) {
+  const list = modal ? modal.querySelector('#ev-prod-list') : document.getElementById('ev-prod-list');
+  if (!list) return;
+  if (!prods.length) {
+    list.style.display = 'block';
+    list.innerHTML = '<div style="padding:12px;color:#7c87a0;font-size:12.5px">Onaylı ürün bulunamadı. Önce ürün ekleyip admin onayı alın.</div>';
+    return;
+  }
+  list.style.display = 'block';
+  list.innerHTML = prods.map(p =>
+    `<div class="ev-prod-opt" data-id="${p.id}" data-name="${(p.name||'').replace(/"/g,'')}" data-cat="${p.category||''}"
+      style="padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px"
+      onmouseover="this.style.background='rgba(59,124,255,.1)'"
+      onmouseout="this.style.background=''">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${p.name}</div>
+        <div style="font-size:11.5px;color:#7c87a0">${p.category||'—'} · ${p.country||''}</div>
+      </div>
+      <span style="font-size:10px;background:rgba(34,208,120,.1);color:#22d078;padding:2px 7px;border-radius:4px;font-weight:700">Onaylı</span>
+    </div>`
+  ).join('');
+  list.querySelectorAll('.ev-prod-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const searchEl = list.parentElement.querySelector('#ev-prod-search');
+      const idEl = list.parentElement.querySelector('#ev-prod-id');
+      const nameEl = list.parentElement.querySelector('#ev-prod-name-val');
+      const catEl = list.parentElement.querySelector('#ev-prod-cat-val');
+      if (searchEl) searchEl.value = opt.dataset.name;
+      if (idEl) idEl.value = opt.dataset.id;
+      if (nameEl) nameEl.value = opt.dataset.name;
+      if (catEl) catEl.value = opt.dataset.cat;
+      list.style.display = 'none';
+    });
+  });
+}
+
+function filterVendorProductsInModal(q, prods, modal) {
+  const filtered = q ? prods.filter(p => p.name?.toLowerCase().includes(q.toLowerCase()) || p.category?.toLowerCase().includes(q.toLowerCase())) : prods;
+  renderEvProdList(filtered, modal);
+}
+
+function filterVendorProducts(q) {
+  // Global fallback — modal dışında kullanım için
+}
+
+/* ════════════════════════════════════════
+   MESAJLAŞMA SİSTEMİ (v1.6)
+   Firestore realtime — poc_messages koleksiyonu
+════════════════════════════════════════ */
+let ACTIVE_CHAT_UNSUB = null;
+let ACTIVE_CHAT_POC_ID = null;
+
+function openChatModal(pocId, pocTitle, otherName) {
+  // Önceki listener kapat
+  if (ACTIVE_CHAT_UNSUB) { ACTIVE_CHAT_UNSUB(); ACTIVE_CHAT_UNSUB=null; }
+  ACTIVE_CHAT_POC_ID = pocId;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.id = 'chat-modal';
+  modal.innerHTML = `<div class="modal" style="max-width:580px;padding:0;display:flex;flex-direction:column;height:80vh">
+    <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div>
+        <div style="font-size:14px;font-weight:700">${pocTitle||'PoC Mesajlaşması'}</div>
+        <div style="font-size:12px;color:#7c87a0">${otherName||''} ile</div>
+      </div>
+      <button id="close-chat" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:20px">×</button>
+    </div>
+    <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div class="loading"><div class="spinner"></div>Mesajlar yükleniyor...</div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:8px;flex-shrink:0">
+      <input class="inp" id="chat-input" placeholder="Mesajınızı yazın... (Enter ile gönder)" style="flex:1">
+      <button class="btn-p btn-sm" id="chat-send" style="flex-shrink:0">Gönder</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#close-chat').addEventListener('click', () => {
+    if (ACTIVE_CHAT_UNSUB) { ACTIVE_CHAT_UNSUB(); ACTIVE_CHAT_UNSUB=null; }
+    modal.remove();
+  });
+  modal.addEventListener('click', e => {
+    if (e.target===modal) {
+      if (ACTIVE_CHAT_UNSUB) { ACTIVE_CHAT_UNSUB(); ACTIVE_CHAT_UNSUB=null; }
+      modal.remove();
+    }
+  });
+
+  // Realtime mesaj dinleyici
+  const msgsEl = modal.querySelector('#chat-messages');
+  const msgQuery = query(
+    collection(db, 'poc_messages'),
+    where('pocId','==',pocId),
+    orderBy('createdAt','asc')
+  );
+
+  ACTIVE_CHAT_UNSUB = onSnapshot(msgQuery, snap => {
+    if (snap.empty) {
+      msgsEl.innerHTML = '<div class="empty" style="padding:32px">Henüz mesaj yok. İlk mesajı gönderin.</div>';
+      return;
+    }
+    msgsEl.innerHTML = snap.docs.map(d => {
+      const msg = d.data();
+      const isMine = msg.senderId === CUR_USER?.uid;
+      const time = msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}">
+        <div class="msg-bubble ${isMine?'msg-mine':'msg-other'}">${msg.text}</div>
+        <div class="msg-time" style="text-align:${isMine?'right':'left'}">${msg.senderName||''} · ${time}</div>
+      </div>`;
+    }).join('');
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }, err => {
+    // orderBy index hatası — index olmadan dene
+    ACTIVE_CHAT_UNSUB2(pocId, msgsEl);
+  });
+
+  // Mesaj gönder
+  async function sendChatMsg() {
+    const input = modal.querySelector('#chat-input');
+    const text = input?.value?.trim();
+    if (!text) return;
+    input.value = '';
+    try {
+      await addDoc(collection(db,'poc_messages'), {
+        pocId,
+        senderId: CUR_USER.uid,
+        senderName: CUR_PROFILE?.displayName || CUR_USER.email,
+        senderRole: CUR_PROFILE?.role || '',
+        text,
+        createdAt: serverTimestamp()
+      });
+    } catch(e) {
+      showToast('Mesaj gönderilemedi: '+e.message, 'err');
+    }
+  }
+
+  modal.querySelector('#chat-send')?.addEventListener('click', sendChatMsg);
+  modal.querySelector('#chat-input')?.addEventListener('keydown', e => {
+    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendChatMsg(); }
+  });
+  setTimeout(() => modal.querySelector('#chat-input')?.focus(), 100);
+}
+
+// orderBy olmadan fallback
+async function ACTIVE_CHAT_UNSUB2(pocId, msgsEl) {
+  try {
+    const snap = await getDocs(query(collection(db,'poc_messages'), where('pocId','==',pocId)));
+    const msgs = snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));
+    if (!msgs.length) { msgsEl.innerHTML='<div class="empty" style="padding:32px">Henüz mesaj yok.</div>'; return; }
+    msgsEl.innerHTML = msgs.map(msg => {
+      const isMine = msg.senderId === CUR_USER?.uid;
+      const time = msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}">
+        <div class="msg-bubble ${isMine?'msg-mine':'msg-other'}">${msg.text}</div>
+        <div class="msg-time">${msg.senderName||''} · ${time}</div>
+      </div>`;
+    }).join('');
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  } catch(e) { msgsEl.innerHTML='<div class="empty">Mesajlar yüklenemedi.</div>'; }
+}
+
+/* ── ÜLKE ARAMA ── */
+function filterCountryOpts(q, listId, valId) {
+  const list = document.getElementById(listId);
+  const val = document.getElementById(valId);
+  if (!list) return;
+  const filtered = ALL_COUNTRIES.filter(c =>
+    c.name.toLowerCase().includes(q.toLowerCase()) ||
+    c.code.toLowerCase().includes(q.toLowerCase())
+  );
+  if (!q || !filtered.length) { list.style.display='none'; return; }
+  list.style.display = 'block';
+  list.innerHTML = filtered.slice(0,15).map(c =>
+    `<div class="country-opt" data-code="${c.code}" data-name="${c.name}"
+      style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(255,255,255,.06)"
+      onmouseover="this.style.background='rgba(59,124,255,.1)'"
+      onmouseout="this.style.background=''"
+    >${c.name} <span style="color:#5a6278;font-size:11px">${c.code}</span></div>`
+  ).join('');
+  list.querySelectorAll('.country-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const searchEl = list.previousElementSibling;
+      if (searchEl) searchEl.value = opt.dataset.name + ' (' + opt.dataset.code + ')';
+      if (val) val.value = opt.dataset.code;
+      list.style.display = 'none';
+    });
+  });
+}
+
+// Sayfa tıklamasında ülke listelerini kapat
+document.addEventListener('click', e => {
+  document.querySelectorAll('[id$="-country-list"]').forEach(l => {
+    if (!l.contains(e.target) && !l.previousElementSibling?.contains(e.target)) {
+      l.style.display = 'none';
+    }
+  });
+});
 
 async function sendEmail(toEmail, toName, subject, message, details='') {
   try {
@@ -250,6 +525,8 @@ onAuthStateChanged(auth, async user => {
       if (b) b.remove();
     }
 
+    // Bildirim listener başlat
+    startNotifListener();
     // Giriş yapınca role göre panele yönlendir
     // Sadece ana sayfadaysa yönlendir (başka sayfadaysa müdahale etme)
     if (CUR_SCREEN === 'home' && CUR_PROFILE?.role) {
@@ -270,6 +547,44 @@ onAuthStateChanged(auth, async user => {
   buildNav();
   renderScreen(CUR_SCREEN);
 });
+
+/* ── BİLDİRİM SİSTEMİ ── */
+let NOTIF_COUNT = 0;
+let NOTIF_UNSUB = null;
+
+function startNotifListener() {
+  if (!CUR_USER || !CUR_PROFILE) return;
+  if (NOTIF_UNSUB) NOTIF_UNSUB(); // önceki listener'ı kapat
+
+  const role = CUR_PROFILE.role;
+  let q;
+  if (role === 'customer') {
+    q = query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid), where('status','in',['active','rejected']));
+  } else if (role === 'vendor') {
+    q = query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid), where('status','==','pending'));
+  } else {
+    // Admin — bekleyen ürün onayları
+    q = query(collection(db,'products'), where('status','==','pending'));
+  }
+
+  NOTIF_UNSUB = onSnapshot(q, snap => {
+    NOTIF_COUNT = snap.size;
+    updateNotifBadge();
+  });
+}
+
+function stopNotifListener() {
+  if (NOTIF_UNSUB) { NOTIF_UNSUB(); NOTIF_UNSUB = null; }
+  NOTIF_COUNT = 0;
+}
+
+function updateNotifBadge() {
+  const badge = document.getElementById('notif-badge');
+  if (badge) {
+    badge.textContent = NOTIF_COUNT > 0 ? NOTIF_COUNT : '';
+    badge.style.display = NOTIF_COUNT > 0 ? 'inline' : 'none';
+  }
+}
 
 function buildNav() {
   const tabs = el('ntabs');
@@ -296,11 +611,24 @@ function buildNav() {
     navr.innerHTML = `
       <span style="font-size:12px;color:#7c87a0">${CUR_PROFILE.displayName||CUR_USER.email}</span>
       <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${roleLbl[CUR_PROFILE.role]||''}</span>
+      <div style="position:relative;display:inline-block">
+        <button class="btn-g btn-sm" id="notif-btn" style="position:relative">
+          🔔 <span id="notif-badge" style="display:none;background:#ff4d4d;color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;margin-left:2px"></span>
+        </button>
+      </div>
       <button class="btn-g btn-sm" id="logout-btn">Çıkış</button>`;
     el('logout-btn').addEventListener('click', async () => {
+      stopNotifListener();
       await signOut(auth);
       go('home');
     });
+    el('notif-btn')?.addEventListener('click', () => {
+      const role = CUR_PROFILE.role;
+      if (role==='customer') { go('customer'); CUR_CUST_TAB='requests'; renderCustomer(); }
+      else if (role==='vendor') { go('vendor'); CUR_VEND_TAB='requests'; renderVendor(); }
+      else if (role==='admin') { go('admin'); CUR_ADM_TAB='products'; renderAdmin(); }
+    });
+    updateNotifBadge();
   } else {
     navr.innerHTML = `
       <div style="position:relative">
@@ -936,6 +1264,10 @@ async function renderCatalog() {
   wrap.innerHTML = `<div class="wrap">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
       <h2 style="font-size:20px;font-weight:700">Ürün Kataloğu</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="cat-sel-info" style="font-size:12.5px;color:#7c87a0;display:none"><span id="cat-sel-num" style="color:#3b7cff;font-weight:700">0</span> ürün seçildi</span>
+        <button class="btn-p btn-sm" id="cat-poc-start" style="display:none">Seçilenlerle PoC Başlat →</button>
+      </div>
     </div>
     <div style="display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap">
       <input class="inp" id="cat-search" placeholder="Ürün ara..." style="flex:1;min-width:180px">
@@ -975,20 +1307,65 @@ async function loadCatalog() {
       gridEl.innerHTML = '<div class="empty"><div class="empty-icon">📦</div>Ürün bulunamadı.</div>';
       return;
     }
-    gridEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px">${
-      prods.map(p => `<div class="card" style="display:flex;flex-direction:column">
-        <div style="display:flex;justify-content:space-between;margin-bottom:9px">${cc(p.country||'TR')}<span class="bdg" style="background:#1c1f2a;color:#7c87a0">${p.category||'—'}</span></div>
-        <div style="font-size:14.5px;font-weight:700;margin-bottom:3px">${p.name}</div>
-        <div style="font-size:12px;color:#7c87a0;margin-bottom:8px">${p.vendorName||'—'}</div>
-        <p style="font-size:12px;color:#9ca3af;line-height:1.5;flex:1;margin-bottom:12px">${p.description||''}</p>
-        ${p.specs ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${
-          Object.entries(p.specs).slice(0,4).map(([k,v])=>`<span style="background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:2px 7px;font-size:11px"><span style="color:#7c87a0">${k}:</span> ${v}</span>`).join('')
-        }</div>` : ''}
-        <button class="btn-p btn-sm poc-req-btn" data-id="${p.id}">
-          PoC Talebi Oluştur →
-        </button>
-      </div>`).join('')
-    }</div>`;
+      // Katalog çoklu seçim state
+  const catSelectedIds = new Set();
+  function updateCatSelUI() {
+    const info = document.getElementById('cat-sel-info');
+    const num = document.getElementById('cat-sel-num');
+    const startBtn = document.getElementById('cat-poc-start');
+    if (info) info.style.display = catSelectedIds.size>0?'inline':'none';
+    if (num) num.textContent = catSelectedIds.size;
+    if (startBtn) startBtn.style.display = catSelectedIds.size>0?'inline-block':'none';
+    gridEl.querySelectorAll('.prod-card').forEach(card => {
+      const cb = card.querySelector('.prod-select-cb');
+      card.style.borderColor = cb?.checked ? '#3b7cff' : 'rgba(255,255,255,.08)';
+      card.style.background = cb?.checked ? 'rgba(59,124,255,.04)' : '#0f1117';
+    });
+  }
+
+  gridEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">${
+    prods.map(p => `<div class="card prod-card" data-id="${p.id}" style="display:flex;flex-direction:column;transition:all .15s;cursor:default">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none">
+          <input type="checkbox" class="prod-select-cb" data-id="${p.id}" style="width:15px;height:15px;cursor:pointer;flex-shrink:0">
+          ${cc(p.country||'TR')}
+        </label>
+        <span class="bdg" style="background:#1c1f2a;color:#7c87a0">${p.category||'—'}</span>
+      </div>
+      <div style="font-size:14.5px;font-weight:700;margin-bottom:3px">${p.name}</div>
+      <div style="font-size:12px;color:#7c87a0;margin-bottom:8px">${p.vendorName||'—'}</div>
+      <p style="font-size:12px;color:#9ca3af;line-height:1.5;flex:1;margin-bottom:12px">${p.description||''}</p>
+      ${p.specs?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${
+        Object.entries(p.specs).slice(0,4).map(([k,v])=>`<span style="background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:2px 7px;font-size:11px"><span style="color:#7c87a0">${k}:</span> ${v}</span>`).join('')
+      }</div>` : ''}
+      <button class="btn-p btn-sm poc-req-btn" data-id="${p.id}">
+        PoC Talebi Oluştur →
+      </button>
+    </div>`).join('')
+  }</div>`;
+
+  // Checkbox listener
+  gridEl.querySelectorAll('.prod-select-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) catSelectedIds.add(cb.dataset.id);
+      else catSelectedIds.delete(cb.dataset.id);
+      updateCatSelUI();
+    });
+  });
+
+  // "Seçilenlerle PoC Başlat" butonu
+  const catPocBtn = document.getElementById('cat-poc-start');
+  if (catPocBtn) {
+    catPocBtn.replaceWith(catPocBtn.cloneNode(true)); // listener sıfırla
+    document.getElementById('cat-poc-start')?.addEventListener('click', () => {
+      if (!CUR_USER) { openAuthModal('customer',''); return; }
+      if (CUR_PROFILE?.role !== 'customer') { showToast('PoC talebi için müşteri hesabı gerekli.','err'); return; }
+      // Seçili ilk ürünün kategorisiyle çoklu modal aç
+      const firstProd = prods.find(p => catSelectedIds.has(p.id));
+      openMultiVendorPocModal(firstProd?.id, [...catSelectedIds]);
+    });
+  }
+
     gridEl.querySelectorAll('.poc-req-btn').forEach(b => b.addEventListener('click', () => {
       if (!CUR_USER) { openAuthModal('customer',''); return; }
       if (CUR_PROFILE?.role !== 'customer') { showToast('PoC talebi oluşturmak için müşteri hesabı gerekli.','err'); return; }
@@ -1080,7 +1457,7 @@ function openEditPocModal(pocId, title, requirements, preferredDates, location) 
   });
 }
 
-async function openMultiVendorPocModal(preSelectProductId) {
+async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.id = 'poc-multi-modal';
@@ -1179,18 +1556,23 @@ async function openMultiVendorPocModal(preSelectProductId) {
       modal.querySelector('#poc-step2').style.display='block';
     }));
 
-    // Pre-select varsa
-    if (preSelectProductId) {
-      const preP = allProducts.find(p=>p.id===preSelectProductId);
+    // Pre-select varsa — tek veya çoklu
+    if (preSelectProductId || (preSelectedIds && preSelectedIds.length)) {
+      const refId = preSelectProductId || preSelectedIds[0];
+      const preP = allProducts.find(p=>p.id===refId);
       if (preP) {
         selectedCat = preP.category;
         showProductStep(allProducts.filter(p=>p.category===selectedCat));
         modal.querySelector('#poc-step1').style.display='none';
         modal.querySelector('#poc-step2').style.display='block';
-        // Pre-select ürünü işaretle
+        // Seçili ürünleri işaretle
         setTimeout(() => {
-          const cb = modal.querySelector(`[data-pid="${preSelectProductId}"]`);
-          if (cb) { cb.checked=true; updateSelection(); }
+          const idsToSelect = preSelectedIds?.length ? preSelectedIds : [preSelectProductId];
+          idsToSelect.forEach(id => {
+            const cb = modal.querySelector(`[data-pid="${id}"]`);
+            if (cb) { cb.checked=true; }
+          });
+          updateSelection();
         }, 100);
       }
     }
@@ -1405,6 +1787,7 @@ async function loadCustTab() {
         <td style="color:#7c87a0;font-size:12px">${fmt(r.createdAt)}</td>
         <td><div style="display:flex;gap:6px">
           ${r.status==='pending'?`<button class="edit-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-req="${(r.requirements||'')}" data-dates="${r.preferredDates||''}" data-loc="${r.location||'customer'}">Düzenle</button>`:''}
+          ${(r.status==='active'||r.status==='pending')?`<button class="chat-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-vendor="${(r.vendorName||'')}">💬 Mesaj</button>`:''}
           ${r.status==='pending'?`<button class="cancel-poc-btn btn-red btn-sm" data-id="${d.id}">İptal</button>`:''}
         </div></td>
       </tr>`;
@@ -1422,6 +1805,11 @@ async function loadCustTab() {
     m.querySelectorAll('.edit-poc-btn').forEach(b => b.addEventListener('click', () => {
       openEditPocModal(b.dataset.id, b.dataset.title, b.dataset.req, b.dataset.dates, b.dataset.loc);
     }));
+
+    // Mesaj
+    m.querySelectorAll('.chat-poc-btn').forEach(b => b.addEventListener('click', () => {
+      openChatModal(b.dataset.id, b.dataset.title, b.dataset.vendor);
+    }));
   }
 
   else if (CUR_CUST_TAB === 'registrations') {
@@ -1436,39 +1824,110 @@ async function loadCustTab() {
   }
 
   else if (CUR_CUST_TAB === 'offers') {
+    await loadOffersWithComparison(m);
+  }
+}
+
+async function loadOffersWithComparison(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Teklifler yükleniyor...</div>';
+  try {
     const snap = await getDocs(query(collection(db,'offers'), where('customerId','==',CUR_USER.uid)));
-    if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">💰</div>Henüz teklif almadınız.</div>'; return; }
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Teklifler</h2>
-    ${snap.docs.map(d=>{const o={...d.data(),id:d.id};
-      return `<div class="card" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
-          <div>
-            <div style="font-size:14px;font-weight:700">${o.productName||'—'} — ${o.vendorName||'—'}</div>
-            <div style="font-size:12px;color:#7c87a0;margin-top:3px">${o.details||''}</div>
+    const offers = snap.docs.map(d=>({...d.data(),id:d.id}));
+    offers.sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));
+    if (!offers.length) { m.innerHTML='<div class="empty"><div class="empty-icon">💰</div>Henüz teklif almadınız.</div>'; return; }
+
+    // pocRequestId bazında grupla
+    const grouped = {};
+    offers.forEach(o => {
+      const key = o.pocRequestId || o.id;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(o);
+    });
+
+    let html = '<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Teklifler</h2>';
+
+    Object.entries(grouped).forEach(([pocId, pocOffers]) => {
+      const hasMultiple = pocOffers.length > 1;
+      const minAmount = Math.min(...pocOffers.map(x=>parseFloat(x.amount)||Infinity));
+
+      if (hasMultiple) {
+        html += `<div class="card" style="margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#3b7cff">
+            🔄 ${pocOffers.length} Vendor Karşılaştırması
           </div>
-          ${statusBadge(o.status)}
-        </div>
-        <div style="font-size:28px;font-weight:700;color:${o.status==='accepted'?'#22d078':'#3b7cff'};letter-spacing:-1px;font-family:monospace;margin-bottom:8px">
-          ${o.amount?.toLocaleString('tr-TR')} ${o.currency||'₺'}
-        </div>
-        ${o.status==='pending'?`<div style="display:flex;gap:9px">
-          <button class="btn-gr" data-id="${d.id}" data-vid="${o.vendorId}" data-vemail="${o.vendorEmail||''}" data-vname="${o.vendorName||''}">Kabul Et</button>
-          <button class="btn-red" data-id="${d.id}">Reddet</button>
-        </div>`:''}
-      </div>`;
-    }).join('')}`;
-    m.querySelectorAll('.btn-gr').forEach(b => b.addEventListener('click', async () => {
+          <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr>
+              <th style="background:#1c1f2a;padding:9px 12px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Vendor</th>
+              <th style="background:#1c1f2a;padding:9px 12px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Ürün</th>
+              <th style="background:#1c1f2a;padding:9px 12px;text-align:right;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Tutar</th>
+              <th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Kanal Payı</th>
+              <th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Durum</th>
+              <th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">İşlem</th>
+            </tr></thead>
+            <tbody>
+              ${pocOffers.map(o => {
+                const isLowest = parseFloat(o.amount) === minAmount;
+                return `<tr style="border-top:1px solid rgba(255,255,255,.06);background:${isLowest?'rgba(34,208,120,.04)':''}">
+                  <td style="padding:10px 12px;font-weight:600">
+                    ${o.vendorName||'—'}
+                    ${isLowest?'<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078;margin-left:6px;font-size:10px">En Düşük</span>':''}
+                  </td>
+                  <td style="padding:10px 12px;color:#7c87a0">${o.productName||'—'}</td>
+                  <td style="padding:10px 12px;text-align:right;font-family:monospace;font-weight:700;font-size:14px;color:${isLowest?'#22d078':'#e9ecf3'}">
+                    ${(parseFloat(o.amount)||0).toLocaleString('tr-TR')} ${o.currency||'₺'}
+                  </td>
+                  <td style="padding:10px 12px;text-align:center">${o.hasChannelFee?'<span style="color:#f0a429;font-size:12px">Var</span>':'<span style="color:#22d078;font-size:12px">Yok</span>'}</td>
+                  <td style="padding:10px 12px;text-align:center">${statusBadge(o.status)}</td>
+                  <td style="padding:10px 12px;text-align:center;white-space:nowrap">
+                    ${o.status==='pending'?`
+                      <button class="btn-gr btn-sm offer-accept-btn" data-id="${o.id}" data-vemail="${o.vendorEmail||''}" data-vname="${o.vendorName||''}">Kabul</button>
+                      <button class="btn-red btn-sm offer-reject-btn" data-id="${o.id}" style="margin-left:4px">Red</button>
+                    `:'—'}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table></div>
+        </div>`;
+      } else {
+        const o = pocOffers[0];
+        html += `<div class="card" style="border-color:rgba(59,124,255,.25);margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
+            <div>
+              <div style="font-size:14px;font-weight:700">${o.productName||'—'} — ${o.vendorName||'—'}</div>
+              <div style="font-size:11.5px;color:#7c87a0;margin-top:2px">${o.hasChannelFee?'Kanal payı var':'Kanal payı yok'}${o.details?' · '+o.details:''}</div>
+            </div>
+            ${statusBadge(o.status)}
+          </div>
+          <div style="font-size:30px;font-weight:700;color:${o.status==='accepted'?'#22d078':'#3b7cff'};letter-spacing:-1.5px;font-family:monospace;margin-bottom:10px">
+            ${(parseFloat(o.amount)||0).toLocaleString('tr-TR')} ${o.currency||'₺'}
+          </div>
+          ${o.status==='pending'?`<div style="display:flex;gap:9px">
+            <button class="btn-gr offer-accept-btn" data-id="${o.id}" data-vemail="${o.vendorEmail||''}" data-vname="${o.vendorName||''}" style="padding:10px 18px">Kabul Et</button>
+            <button class="btn-red offer-reject-btn" data-id="${o.id}" style="padding:10px 18px">Reddet</button>
+          </div>`:''}
+        </div>`;
+      }
+    });
+
+    m.innerHTML = html;
+
+    m.querySelectorAll('.offer-accept-btn').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Bu teklifi kabul etmek istiyor musunuz?')) return;
       await updateDoc(doc(db,'offers',b.dataset.id), {status:'accepted'});
       showToast('Teklif kabul edildi!');
-      if (b.dataset.vemail) sendEmail(b.dataset.vemail, b.dataset.vname, 'Teklifiniz Kabul Edildi!',
+      if (b.dataset.vemail) sendEmail(b.dataset.vemail, b.dataset.vname,
+        'Teklifiniz Kabul Edildi! — PoCHub',
         `${CUR_PROFILE?.displayName||CUR_USER.email} teklifinizi kabul etti.`, '');
       loadCustTab();
     }));
-    m.querySelectorAll('.btn-red').forEach(b => b.addEventListener('click', async () => {
+    m.querySelectorAll('.offer-reject-btn').forEach(b => b.addEventListener('click', async () => {
       await updateDoc(doc(db,'offers',b.dataset.id), {status:'rejected'});
       showToast('Teklif reddedildi.');
       loadCustTab();
     }));
+  } catch(e) {
+    m.innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
   }
 }
 
@@ -1531,6 +1990,7 @@ async function loadVendTab() {
         ${r.status==='pending'?`<div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-p btn-sm accept-poc" data-id="${d.id}" data-cemail="${r.customerEmail||''}" data-cname="${r.customerName||''}">Kabul Et & Aktif Yap</button>
           <button class="btn-g btn-sm send-offer-btn" data-id="${d.id}" data-cid="${r.customerId}" data-cemail="${r.customerEmail||''}" data-cname="${r.customerName||''}" data-pname="${r.productName}">Teklif Gönder</button>
+          <button class="btn-g btn-sm vend-chat-btn" data-id="${d.id}" data-title="${(r.title||'').replace(/"/g,'')}" data-cname="${r.customerName||''}" style="color:#22d078;border-color:rgba(34,208,120,.3)">💬 Mesaj</button>
           <button class="btn-red btn-sm reject-poc" data-id="${d.id}" data-cemail="${r.customerEmail||''}" data-cname="${r.customerName||''}">Reddet</button>
         </div>`:''}
       </div>`;
@@ -1552,6 +2012,9 @@ async function loadVendTab() {
     }));
     m.querySelectorAll('.send-offer-btn').forEach(b => b.addEventListener('click', () => {
       openSendOfferModal(b.dataset.id, b.dataset.cid, b.dataset.cemail, b.dataset.cname, b.dataset.pname);
+    }));
+    m.querySelectorAll('.vend-chat-btn').forEach(b => b.addEventListener('click', () => {
+      openChatModal(b.dataset.id, b.dataset.title, b.dataset.cname);
     }));
   }
 
@@ -1691,9 +2154,13 @@ function openAddProductModal() {
     </div>
     <label class="lbl">Ürün Adı *</label><input class="inp" id="pr-name" placeholder="Ürün adı">
     <label class="lbl">Kategori *</label>
-    <select class="inp" id="pr-cat"><option>Firewall</option><option>Storage</option><option>Yedekleme</option><option>Network</option><option>Server</option><option>Güvenlik</option></select>
+    <select class="inp" id="pr-cat"><option value="">Yükleniyor...</option></select>
     <label class="lbl">Menşei Ülke</label>
-    <select class="inp" id="pr-country"><option value="TR">Türkiye (TR)</option><option value="US">Amerika (US)</option><option value="DE">Almanya (DE)</option><option value="GB">İngiltere (GB)</option><option value="JP">Japonya (JP)</option></select>
+    <div style="position:relative;margin-bottom:4px">
+      <input class="inp" id="pr-country-search" placeholder="Ülke ara..." autocomplete="off" oninput="filterCountryOpts(this.value,'pr-country-list','pr-country-val')">
+      <div id="pr-country-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:2px"></div>
+      <input type="hidden" id="pr-country-val" value="TR">
+    </div>
     <label class="lbl">Açıklama</label>
     <textarea class="inp" id="pr-desc" rows="3" placeholder="Ürün açıklaması..." style="resize:none"></textarea>
     <label class="lbl">Destek Modeli</label>
@@ -1703,6 +2170,24 @@ function openAddProductModal() {
   </div>`;
   document.body.appendChild(modal);
   modal.querySelector('#close-prod-modal').addEventListener('click', () => modal.remove());
+
+  // Kategorileri Firestore'dan yükle
+  try {
+    const catSnap = await getDocs(collection(db,'categories'));
+    const cats = catSnap.docs.map(d=>d.data()).sort((a,b)=>(a.order||0)-(b.order||0));
+    const catSel = modal.querySelector('#pr-cat');
+    if (catSel && cats.length) {
+      catSel.innerHTML = cats.map(cat=>`<option value="${cat.name}">${cat.name}</option>`).join('');
+    } else if (catSel) {
+      // Fallback — varsayılan kategoriler
+      catSel.innerHTML = ['Firewall','Storage','Yedekleme','Network','Server','Güvenlik','Yazılım','Diğer']
+        .map(c=>`<option>${c}</option>`).join('');
+    }
+  } catch(e) {
+    const catSel = modal.querySelector('#pr-cat');
+    if (catSel) catSel.innerHTML = ['Firewall','Storage','Yedekleme','Network','Server','Güvenlik']
+      .map(c=>`<option>${c}</option>`).join('');
+  }
   modal.querySelector('#pr-submit').addEventListener('click', async () => {
     const name = modal.querySelector('#pr-name').value.trim();
     if (!name) { modal.querySelector('#pr-err').innerHTML='<div class="alert alert-err">Ürün adı zorunludur.</div>'; return; }
@@ -1714,7 +2199,7 @@ function openAddProductModal() {
         vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
         vendorEmail: CUR_USER.email,
         name, category: modal.querySelector('#pr-cat').value,
-        country: modal.querySelector('#pr-country').value,
+        country: modal.querySelector('#pr-country-val').value || 'TR',
         description: modal.querySelector('#pr-desc').value,
         supportModel: modal.querySelector('#pr-support').value,
         status: 'pending',
@@ -1738,9 +2223,14 @@ function openNewEventModal() {
       <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-ev-modal">×</button>
     </div>
     <label class="lbl">Etkinlik Başlığı *</label><input class="inp" id="ev-title" placeholder="FortiGate 100F — Canlı Demo">
-    <label class="lbl">Ürün Adı</label><input class="inp" id="ev-product" placeholder="Tanıtılacak ürün">
-    <label class="lbl">Kategori</label>
-    <select class="inp" id="ev-cat2"><option>Firewall</option><option>Storage</option><option>Yedekleme</option><option>Network</option><option>Server</option></select>
+    <label class="lbl">Ürün Seç *</label>
+    <div style="position:relative;margin-bottom:4px">
+      <input class="inp" id="ev-prod-search" placeholder="Ürün ara veya listeden seç..." autocomplete="off" oninput="filterVendorProducts(this.value)">
+      <div id="ev-prod-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:220px;overflow-y:auto;z-index:100;margin-top:2px"></div>
+      <input type="hidden" id="ev-prod-id" value="">
+      <input type="hidden" id="ev-prod-name-val" value="">
+      <input type="hidden" id="ev-prod-cat-val" value="">
+    </div>
     <label class="lbl">Tarih *</label><input class="inp" id="ev-date" type="datetime-local">
     <div class="g2">
       <div><label class="lbl">Kapasite</label><input class="inp" id="ev-cap" type="number" value="50"></div>
@@ -1755,6 +2245,31 @@ function openNewEventModal() {
   </div>`;
   document.body.appendChild(modal);
   modal.querySelector('#close-ev-modal').addEventListener('click', () => modal.remove());
+
+  // Vendor'un ürünlerini yükle
+  let vendorProds = [];
+  try {
+    const psnap = await getDocs(query(collection(db,'products'),
+      where('vendorId','==',CUR_USER.uid),
+      where('status','==','active')
+    ));
+    vendorProds = psnap.docs.map(d => ({...d.data(), id:d.id}));
+
+    // İlk yükleme — tüm ürünleri göster
+    renderEvProdList(vendorProds, modal);
+  } catch(e) {
+    console.error('Vendor ürünleri yüklenemedi:', e);
+  }
+
+  modal.querySelector('#ev-prod-search').addEventListener('input', function() {
+    filterVendorProductsInModal(this.value, vendorProds, modal);
+  });
+  modal.querySelector('#ev-prod-search').addEventListener('focus', function() {
+    renderEvProdList(
+      this.value ? vendorProds.filter(p=>p.name?.toLowerCase().includes(this.value.toLowerCase())) : vendorProds,
+      modal
+    );
+  });
   modal.querySelector('#ev-submit').addEventListener('click', async () => {
     const title = modal.querySelector('#ev-title').value.trim();
     const dateVal = modal.querySelector('#ev-date').value;
@@ -1766,8 +2281,9 @@ function openNewEventModal() {
         vendorId: CUR_USER.uid,
         vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
         vendorEmail: CUR_USER.email,
-        title, productName: modal.querySelector('#ev-product').value,
-        category: modal.querySelector('#ev-cat2').value,
+        title, productName: modal.querySelector('#ev-prod-name-val').value || modal.querySelector('#ev-prod-search').value,
+        productId: modal.querySelector('#ev-prod-id').value,
+        category: modal.querySelector('#ev-prod-cat-val').value || 'Diğer',
         eventDate: Timestamp.fromDate(new Date(dateVal)),
         capacity: parseInt(modal.querySelector('#ev-cap').value)||50,
         fee: parseFloat(modal.querySelector('#ev-fee').value)||0,
@@ -1797,14 +2313,15 @@ function renderAdmin() {
     return;
   }
   const tabs = [
-    ['dashboard','Dashboard'],['users','Kullanıcılar'],['products','Ürün Onayları'],
-    ['requests','Tüm PoC Talepleri'],['events','Tüm Etkinlikler'],['offers','Teklifler'],
+    ['dashboard','Dashboard'],['users','Kullanıcılar'],['categories','Kategoriler'],
+    ['products','Ürün Onayları'],['requests','Tüm PoC Talepleri'],
+    ['events','Tüm Etkinlikler'],['offers','Teklifler'],
   ];
   el('scr-admin').innerHTML = `<div class="dash">
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.4</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.6</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -1820,6 +2337,7 @@ async function loadAdmTab() {
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
 
+  if (CUR_ADM_TAB === 'categories') { await admCategories(m); return; }
   if (CUR_ADM_TAB === 'dashboard') {
     const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap] = await Promise.all([
       getDocs(collection(db,'users')),
@@ -1833,6 +2351,87 @@ async function loadAdmTab() {
     const pocs = pocSnap.docs.map(d=>d.data());
     const events = evSnap.docs.map(d=>d.data());
     const offers = offSnap.docs.map(d=>d.data());
+async function admCategories(m) {
+  const snap = await getDocs(collection(db,'categories'));
+  const cats = snap.docs.map(d => ({...d.data(), id:d.id}));
+  cats.sort((a,b) => (a.order||0)-(b.order||0));
+  m.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="font-size:18px;font-weight:700">Kategori Yönetimi</h2>
+    <button class="btn-p btn-sm" id="add-cat-btn">+ Yeni Kategori</button>
+  </div>
+  <div style="background:#0f1117;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden;margin-bottom:16px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr>
+        <th style="background:#1c1f2a;padding:9px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#5a6278">Kategori Adı</th>
+        <th style="background:#1c1f2a;padding:9px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#5a6278">Sıra</th>
+        <th style="background:#1c1f2a;padding:9px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#5a6278">Açıklama</th>
+        <th style="background:#1c1f2a;padding:9px 14px;text-align:center;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#5a6278">İşlem</th>
+      </tr></thead>
+      <tbody>
+        ${cats.length===0
+          ? '<tr><td colspan="4" style="text-align:center;padding:32px;color:#5a6278">Henüz kategori yok. + Yeni Kategori ile ekleyin.</td></tr>'
+          : cats.map(cat=>\`<tr style="border-top:1px solid rgba(255,255,255,.06)">
+              <td style="padding:11px 14px;font-weight:700">\${cat.name}</td>
+              <td style="padding:11px 14px;color:#7c87a0;font-family:monospace">\${cat.order||0}</td>
+              <td style="padding:11px 14px;color:#7c87a0;font-size:12px">\${cat.description||'—'}</td>
+              <td style="padding:11px 14px;text-align:center;white-space:nowrap">
+                <button class="btn-g btn-sm edit-cat-btn" data-id="\${cat.id}" data-name="\${cat.name}" data-order="\${cat.order||0}" data-desc="\${cat.description||''}" style="margin-right:6px">Düzenle</button>
+                <button class="btn-red btn-sm del-cat-btn" data-id="\${cat.id}" data-name="\${cat.name}">Sil</button>
+              </td>
+            </tr>\`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+  m.querySelector('#add-cat-btn')?.addEventListener('click', () => openCatModal(null));
+  m.querySelectorAll('.edit-cat-btn').forEach(b => b.addEventListener('click', () =>
+    openCatModal({id:b.dataset.id, name:b.dataset.name, order:parseInt(b.dataset.order)||0, description:b.dataset.desc})
+  ));
+  m.querySelectorAll('.del-cat-btn').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm(`"${b.dataset.name}" kategorisini silmek istiyor musunuz?`)) return;
+    await deleteDoc(doc(db,'categories',b.dataset.id));
+    showToast('Kategori silindi.');
+    loadAdmTab();
+  }));
+}
+
+function openCatModal(existing) {
+  const isEdit = !!existing;
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = `<div class="modal" style="max-width:420px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 style="font-size:15px;font-weight:700">${isEdit?'Kategori Düzenle':'Yeni Kategori'}</h3>
+      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-cat-modal">×</button>
+    </div>
+    <label class="lbl">Kategori Adı *</label>
+    <input class="inp" id="cat-name" value="${existing?.name||''}" placeholder="Örn: Firewall">
+    <label class="lbl">Sıra (küçük = önce gösterilir)</label>
+    <input class="inp" id="cat-order" type="number" value="${existing?.order||0}">
+    <label class="lbl">Açıklama</label>
+    <input class="inp" id="cat-desc" value="${existing?.description||''}" placeholder="Kısa açıklama (opsiyonel)">
+    <div id="cat-err" style="margin-top:10px"></div>
+    <button class="btn-p" id="cat-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">${isEdit?'Güncelle':'Ekle'}</button>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector('#close-cat-modal').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+  modal.querySelector('#cat-submit').addEventListener('click', async () => {
+    const name = modal.querySelector('#cat-name').value.trim();
+    if (!name) { modal.querySelector('#cat-err').innerHTML='<div class="alert alert-err">Kategori adı zorunludur.</div>'; return; }
+    const btn = modal.querySelector('#cat-submit');
+    btn.disabled=true; btn.textContent=isEdit?'Güncelleniyor...':'Ekleniyor...';
+    try {
+      const data = { name, order: parseInt(modal.querySelector('#cat-order').value)||0, description: modal.querySelector('#cat-desc').value, updatedAt: serverTimestamp() };
+      if (isEdit) { await updateDoc(doc(db,'categories',existing.id), data); showToast('Kategori güncellendi!'); }
+      else { data.createdAt = serverTimestamp(); await addDoc(collection(db,'categories'), data); showToast('Kategori eklendi!'); }
+      modal.remove(); loadAdmTab();
+    } catch(e) {
+      modal.querySelector('#cat-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      btn.disabled=false; btn.textContent=isEdit?'Güncelle':'Ekle';
+    }
+  });
+}
+
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:18px">Platform Dashboard</h2>
     <div class="g4" style="margin-bottom:20px">
       ${[
