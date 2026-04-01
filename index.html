@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.3.2 | 30.03.2026 | Takvim, Email Doğrulama, Şirket Kaydı, Çakışma Kontrolü -->
+<!-- PoCHub v1.4 | 01.04.2026 | Çoklu Vendor Seçimi, Talep Düzenleme --> 30.03.2026 | Takvim, Email Doğrulama, Şirket Kaydı, Çakışma Kontrolü -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.3.2</title>
+<title>PoCHub.co — v1.4</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -115,7 +115,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.3.2';
+const VERSION = 'v1.4';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 const firebaseConfig = {
@@ -984,7 +984,7 @@ async function loadCatalog() {
         ${p.specs ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${
           Object.entries(p.specs).slice(0,4).map(([k,v])=>`<span style="background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:2px 7px;font-size:11px"><span style="color:#7c87a0">${k}:</span> ${v}</span>`).join('')
         }</div>` : ''}
-        <button class="btn-p btn-sm poc-req-btn" data-id="${p.id}" data-name="${p.name}" data-vendor="${p.vendorId}" data-vendor-name="${p.vendorName||''}" data-vendor-email="${p.vendorEmail||''}">
+        <button class="btn-p btn-sm poc-req-btn" data-id="${p.id}">
           PoC Talebi Oluştur →
         </button>
       </div>`).join('')
@@ -992,97 +992,370 @@ async function loadCatalog() {
     gridEl.querySelectorAll('.poc-req-btn').forEach(b => b.addEventListener('click', () => {
       if (!CUR_USER) { openAuthModal('customer',''); return; }
       if (CUR_PROFILE?.role !== 'customer') { showToast('PoC talebi oluşturmak için müşteri hesabı gerekli.','err'); return; }
-      openPocModal(b.dataset.id, b.dataset.name, b.dataset.vendor, b.dataset.vendorName, b.dataset.vendorEmail);
+      openMultiVendorPocModal(b.dataset.id);
     }));
   } catch(e) {
     gridEl.innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
   }
 }
 
-/* PoC MODAL */
+/* ═══════════════════════════════════════════
+   POC TALEBİ — ÇOKLU VENDOR SEÇİMİ (v1.4)
+═══════════════════════════════════════════ */
+
+// Katalog'dan "PoC Talebi Oluştur" butonu — ürün bazlı (tek vendor)
+// Yeni akış: Kategori → Çoklu Ürün/Vendor Seçimi
 function openPocModal(productId, productName, vendorId, vendorName, vendorEmail) {
-  el('poc-form').innerHTML = `
-    <p style="font-size:12.5px;color:#7c87a0;margin-bottom:16px">Ürün: <b style="color:#e9ecf3">${productName}</b> · ${vendorName}</p>
+  // Eski tek-vendor modal yerine çoklu seçime yönlendir
+  // Seçili ürünü pre-select ederek aç
+  openMultiVendorPocModal(productId);
+}
+
+function openEditPocModal(pocId, title, requirements, preferredDates, location) {
+  const locLabels = {customer:'Müşteri Lokasyonu',vendor:'Vendor Lokasyonu',online:'Online',hybrid:'Hibrit'};
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = `<div class="modal" style="max-width:500px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 style="font-size:15px;font-weight:700">PoC Talebi Düzenle</h3>
+      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-edit-poc">×</button>
+    </div>
+    <div style="background:rgba(240,164,41,.1);border:1px solid rgba(240,164,41,.2);border-radius:7px;padding:9px 12px;font-size:12px;color:#f0a429;margin-bottom:14px">
+      ℹ Sadece bekleyen (Pending) talepler düzenlenebilir. Vendor'a yeni bildirim gönderilir.
+    </div>
     <label class="lbl">PoC Başlığı *</label>
-    <input class="inp" id="poc-title" placeholder="Örn: 1000 kullanıcı için Firewall değerlendirmesi">
+    <input class="inp" id="edit-title" value="${title||''}">
     <label class="lbl">Gereksinimler / Notlar</label>
-    <textarea class="inp" id="poc-req" rows="4" placeholder="Test ortamı, kullanıcı sayısı, özel gereksinimler..." style="resize:none"></textarea>
+    <textarea class="inp" id="edit-req" rows="3" style="resize:none">${requirements||''}</textarea>
     <label class="lbl">Tercih Edilen Tarih Aralığı</label>
-    <input class="inp" id="poc-dates" placeholder="Örn: Mayıs 2026 içinde, hafta içi sabah">
+    <input class="inp" id="edit-dates" value="${preferredDates||''}">
     <label class="lbl">PoC Lokasyonu</label>
-    <select class="inp" id="poc-location">
-      <option value="customer">Müşteri Lokasyonu</option>
-      <option value="vendor">Vendor / Üretici Lokasyonu</option>
-      <option value="online">Online / Uzaktan</option>
-      <option value="hybrid">Hibrit</option>
+    <select class="inp" id="edit-loc">
+      <option value="customer" ${location==='customer'?'selected':''}>Müşteri Lokasyonu</option>
+      <option value="vendor" ${location==='vendor'?'selected':''}>Vendor Lokasyonu</option>
+      <option value="online" ${location==='online'?'selected':''}>Online / Uzaktan</option>
+      <option value="hybrid" ${location==='hybrid'?'selected':''}>Hibrit</option>
     </select>
-    <div id="poc-err" style="margin-top:10px"></div>
-    <button class="btn-p" id="poc-submit" style="width:100%;padding:11px;font-size:14px;margin-top:16px">PoC Talebi Gönder</button>
-  `;
-  el('poc-modal').classList.add('on');
-  el('poc-submit').addEventListener('click', async () => {
-    const title = el('poc-title')?.value?.trim();
-    if (!title) { el('poc-err').innerHTML='<div class="alert alert-err">Başlık zorunludur.</div>'; return; }
-    const isVerifiedForPoc = CUR_USER?.emailVerified || CUR_PROFILE?.emailVerified === true;
-    if (CUR_USER && !isVerifiedForPoc) {
-      el('poc-err').innerHTML='<div class="alert alert-err">PoC talebi oluşturmadan önce e-posta adresinizi doğrulamanız gerekmektedir.</div>';
-      return;
-    }
-    const btn = el('poc-submit');
-    btn.disabled=true; btn.textContent='Çakışma kontrol ediliyor...';
+    <div id="edit-err" style="margin-top:10px"></div>
+    <button class="btn-p" id="edit-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector('#close-edit-poc').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+
+  modal.querySelector('#edit-submit').addEventListener('click', async () => {
+    const newTitle = modal.querySelector('#edit-title').value.trim();
+    if (!newTitle) { modal.querySelector('#edit-err').innerHTML='<div class="alert alert-err">Başlık zorunludur.</div>'; return; }
+    const btn = modal.querySelector('#edit-submit');
+    btn.disabled=true; btn.textContent='Güncelleniyor...';
     try {
-      // Takvim çakışma kontrolü — müşteri adı gösterilmez
-      const activeSnap = await getDocs(query(
-        collection(db,'poc_requests'),
-        where('vendorId','==',vendorId),
-        where('status','in',['pending','active'])
-      ));
-      if (activeSnap.size >= 3) {
-        el('poc-err').innerHTML=`<div class="alert" style="background:rgba(240,164,41,.1);border:1px solid rgba(240,164,41,.25);color:#f0a429;border-radius:8px;padding:12px">
-          ⚠ Bu vendor'ın takviminde şu an ${activeSnap.size} aktif PoC süreci var. Tarih çakışması yaşanabilir.<br>
-          <small style="color:#7c87a0">Not: Diğer PoC'lerin detayları gizlidir.</small><br><br>
-          <button class="btn-p btn-sm" id="force-poc-btn">Yine de Gönder</button>
-          <button class="btn-g btn-sm" id="cancel-poc-btn" style="margin-left:8px">İptal</button>
-        </div>`;
-        btn.disabled=false; btn.textContent='PoC Talebi Gönder';
-        document.getElementById('force-poc-btn')?.addEventListener('click',()=>{el('poc-err').innerHTML='';submitPocRequest(vendorId,vendorName,vendorEmail,productId,productName);});
-        document.getElementById('cancel-poc-btn')?.addEventListener('click',()=>{el('poc-err').innerHTML='';});
-        return;
-      }
-    } catch(e2) {}
-    btn.textContent='Gönderiliyor...';
-    try {
-      await addDoc(collection(db,'poc_requests'), {
-        customerId: CUR_USER.uid,
-        customerEmail: CUR_USER.email,
-        customerName: CUR_PROFILE?.displayName||CUR_USER.email,
-        customerCompany: CUR_PROFILE?.company||'',
-        productId, productName, vendorId, vendorName, vendorEmail,
-        title,
-        requirements: el('poc-req')?.value||'',
-        preferredDates: el('poc-dates')?.value||'',
-        location: el('poc-location')?.value||'customer',
-        status: 'pending',
-        createdAt: serverTimestamp()
+      // Mevcut talebi al (vendor bilgisi için)
+      const pocSnap = await getDoc(doc(db,'poc_requests',pocId));
+      const pocData = pocSnap.data();
+
+      await updateDoc(doc(db,'poc_requests',pocId), {
+        title: newTitle,
+        requirements: modal.querySelector('#edit-req').value,
+        preferredDates: modal.querySelector('#edit-dates').value,
+        location: modal.querySelector('#edit-loc').value,
+        updatedAt: serverTimestamp()
       });
-      el('poc-modal').classList.remove('on');
-      showToast('PoC talebiniz gönderildi!');
-      // Müşteriye mail
-      sendEmail(CUR_USER.email, CUR_PROFILE?.displayName||'', 'PoC Talebiniz Alındı',
-        `"${title}" başlıklı PoC talebiniz ${vendorName} firmasına iletildi.`,
-        `Vendor en kısa sürede size dönüş yapacaktır.`);
-      // Vendor'a mail
-      if (vendorEmail) sendEmail(vendorEmail, vendorName, 'Yeni PoC Talebi',
-        `${CUR_PROFILE?.displayName||CUR_USER.email} (${CUR_PROFILE?.company||''}) sizinle bir PoC yapmak istiyor.`,
-        `Ürün: ${productName}\nTalep: ${title}\nGereksinimler: ${el('poc-req')?.value||'-'}\nLokasyon: ${el('poc-location')?.value}`);
+
+      // Vendor'a güncelleme bildirimi
+      if (pocData?.vendorEmail) {
+        const locLbl = {customer:'Müşteri Lokasyonu',vendor:'Vendor Lokasyonu',online:'Online',hybrid:'Hibrit'};
+        sendEmail(pocData.vendorEmail, pocData.vendorName||'', 'PoC Talebi Güncellendi — PoCHub',
+          `${CUR_PROFILE?.displayName||CUR_USER.email} PoC talebini güncelledi.`,
+          `Ürün: ${pocData.productName}\nYeni Başlık: ${newTitle}\nGereksinimler: ${modal.querySelector('#edit-req').value||'-'}\nLokasyon: ${locLbl[modal.querySelector('#edit-loc').value]}`
+        );
+      }
+
+      modal.remove();
+      showToast('Talep güncellendi!');
+      loadCustTab();
     } catch(e) {
-      el('poc-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
-      btn.disabled=false; btn.textContent='PoC Talebi Gönder';
+      modal.querySelector('#edit-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      btn.disabled=false; btn.textContent='Güncelle';
     }
   });
 }
 
-window.closePocModal = () => el('poc-modal').classList.remove('on');
+async function openMultiVendorPocModal(preSelectProductId) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.id = 'poc-multi-modal';
+  modal.innerHTML = `<div class="modal" style="max-width:680px;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h2 style="font-size:17px;font-weight:700">PoC Talebi Oluştur</h2>
+      <button id="close-multi-poc" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:20px">×</button>
+    </div>
+
+    <!-- ADIM 1: Kategori -->
+    <div id="poc-step1">
+      <div style="font-size:12px;color:#7c87a0;margin-bottom:12px">Adım 1 / 3 — Kategori Seçin</div>
+      <div id="poc-cats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div class="loading"><div class="spinner"></div>Yükleniyor...</div>
+      </div>
+    </div>
+
+    <!-- ADIM 2: Ürün/Vendor Seçimi -->
+    <div id="poc-step2" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <button id="poc-back1" style="background:none;border:none;color:#3b7cff;cursor:pointer;font-size:12.5px">← Geri</button>
+        <div style="font-size:12px;color:#7c87a0">Adım 2 / 3 — Ürün ve Vendor Seçin</div>
+      </div>
+      <div style="font-size:12px;color:#7c87a0;margin-bottom:10px">
+        Birden fazla ürün/vendor seçebilirsiniz. Her vendor teklifinizi ayrı ayrı değerlendirir.
+        <span style="color:#5a6278;font-size:11px;display:block;margin-top:3px">Not: Seçtiğiniz diğer vendorlar birbirinden haberdar edilmez.</span>
+      </div>
+      <div id="poc-products" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto"></div>
+      <div style="margin-top:12px;padding:10px;background:#1c1f2a;border-radius:8px;font-size:12.5px">
+        Seçilen: <span id="poc-sel-count" style="color:#3b7cff;font-weight:700">0</span> vendor
+      </div>
+      <button class="btn-p" id="poc-next2" style="width:100%;padding:11px;font-size:14px;margin-top:12px" disabled>Devam Et →</button>
+    </div>
+
+    <!-- ADIM 3: Talep Detayları -->
+    <div id="poc-step3" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <button id="poc-back2" style="background:none;border:none;color:#3b7cff;cursor:pointer;font-size:12.5px">← Geri</button>
+        <div style="font-size:12px;color:#7c87a0">Adım 3 / 3 — Talep Detayları</div>
+      </div>
+      <div id="poc-sel-summary" style="background:#1c1f2a;border-radius:8px;padding:11px;margin-bottom:14px;font-size:12.5px"></div>
+      <label class="lbl">PoC Başlığı *</label>
+      <input class="inp" id="poc-title" placeholder="Örn: 1000 kullanıcı için Firewall değerlendirmesi">
+      <label class="lbl">Gereksinimler / Notlar</label>
+      <textarea class="inp" id="poc-req" rows="3" placeholder="Test ortamı, kullanıcı sayısı, özel gereksinimler..." style="resize:none"></textarea>
+      <label class="lbl">Tercih Edilen Tarih Aralığı</label>
+      <input class="inp" id="poc-dates" placeholder="Örn: Mayıs 2026 içinde, hafta içi sabah">
+      <label class="lbl">PoC Lokasyonu</label>
+      <select class="inp" id="poc-location">
+        <option value="customer">Müşteri Lokasyonu</option>
+        <option value="vendor">Vendor / Üretici Lokasyonu</option>
+        <option value="online">Online / Uzaktan</option>
+        <option value="hybrid">Hibrit</option>
+      </select>
+      <div id="poc-err" style="margin-top:10px"></div>
+      <button class="btn-p" id="poc-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Talebi Gönder →</button>
+    </div>
+  </div>`;
+
+  document.body.appendChild(modal);
+  modal.querySelector('#close-multi-poc').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+  modal.querySelector('#poc-back1')?.addEventListener('click', () => {
+    modal.querySelector('#poc-step2').style.display='none';
+    modal.querySelector('#poc-step1').style.display='block';
+  });
+  modal.querySelector('#poc-back2')?.addEventListener('click', () => {
+    modal.querySelector('#poc-step3').style.display='none';
+    modal.querySelector('#poc-step2').style.display='block';
+  });
+
+  // Kategorileri yükle
+  let allProducts = [];
+  let selectedVendors = []; // [{productId, productName, vendorId, vendorName, vendorEmail, vendorType}]
+  let selectedCat = '';
+
+  try {
+    const snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
+    allProducts = snap.docs.map(d => ({...d.data(), id:d.id}));
+
+    const cats = [...new Set(allProducts.map(p=>p.category).filter(Boolean))];
+    const catsEl = modal.querySelector('#poc-cats');
+    catsEl.innerHTML = cats.map(cat => {
+      const count = allProducts.filter(p=>p.category===cat).length;
+      return `<button class="cat-sel-btn" data-cat="${cat}" style="background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:14px;cursor:pointer;font:inherit;color:#e9ecf3;text-align:left;transition:.1s">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">${cat}</div>
+        <div style="font-size:11.5px;color:#7c87a0">${count} ürün</div>
+      </button>`;
+    }).join('');
+
+    catsEl.querySelectorAll('.cat-sel-btn').forEach(b => b.addEventListener('click', () => {
+      selectedCat = b.dataset.cat;
+      selectedVendors = [];
+      showProductStep(allProducts.filter(p=>p.category===selectedCat));
+      modal.querySelector('#poc-step1').style.display='none';
+      modal.querySelector('#poc-step2').style.display='block';
+    }));
+
+    // Pre-select varsa
+    if (preSelectProductId) {
+      const preP = allProducts.find(p=>p.id===preSelectProductId);
+      if (preP) {
+        selectedCat = preP.category;
+        showProductStep(allProducts.filter(p=>p.category===selectedCat));
+        modal.querySelector('#poc-step1').style.display='none';
+        modal.querySelector('#poc-step2').style.display='block';
+        // Pre-select ürünü işaretle
+        setTimeout(() => {
+          const cb = modal.querySelector(`[data-pid="${preSelectProductId}"]`);
+          if (cb) { cb.checked=true; updateSelection(); }
+        }, 100);
+      }
+    }
+  } catch(e) {
+    modal.querySelector('#poc-cats').innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
+  }
+
+  function showProductStep(products) {
+    const prodsEl = modal.querySelector('#poc-products');
+    const vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+    const vtypeBg = {ureticid:'rgba(59,124,255,.12)',distributor:'rgba(139,92,246,.12)',integrator:'rgba(240,164,41,.12)'};
+    const vtypeCol = {ureticid:'#7db4ff',distributor:'#c4a8ff',integrator:'#f0a429'};
+
+    prodsEl.innerHTML = products.map(p => `
+      <label style="display:flex;align-items:center;gap:12px;padding:13px 14px;background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:9px;cursor:pointer;transition:.1s" class="prod-label">
+        <input type="checkbox" class="prod-cb" data-pid="${p.id}" data-pname="${(p.name||'').replace(/"/g,'')}" data-vid="${p.vendorId}" data-vname="${(p.vendorName||'').replace(/"/g,'')}" data-vemail="${p.vendorEmail||''}" data-vtype="${p.vendorType||''}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:13px;font-weight:700">${p.name}</span>
+            <span class="bdg" style="background:${vtypeBg[p.vendorType]||'#1c1f2a'};color:${vtypeCol[p.vendorType]||'#7c87a0'}">${vtypeLabels[p.vendorType]||'Vendor'}</span>
+          </div>
+          <div style="font-size:12px;color:#7c87a0">${p.vendorName||'—'}${p.country?' · '+p.country:''}</div>
+          ${p.description?`<div style="font-size:11.5px;color:#5a6278;margin-top:3px;line-height:1.5">${p.description.substring(0,80)}...</div>`:''}
+        </div>
+        ${p.specs?`<div style="flex-shrink:0;text-align:right">${Object.entries(p.specs).slice(0,2).map(([k,v])=>`<div style="font-size:11px;color:#5a6278">${k}: <b style="color:#7c87a0">${v}</b></div>`).join('')}</div>`:''}
+      </label>`).join('');
+
+    prodsEl.querySelectorAll('.prod-cb').forEach(cb => cb.addEventListener('change', updateSelection));
+    prodsEl.querySelectorAll('.prod-label').forEach(lbl => {
+      lbl.addEventListener('mouseenter', () => lbl.style.borderColor='rgba(59,124,255,.3)');
+      lbl.addEventListener('mouseleave', () => lbl.style.borderColor='rgba(255,255,255,.1)');
+    });
+  }
+
+  function updateSelection() {
+    selectedVendors = [];
+    modal.querySelectorAll('.prod-cb:checked').forEach(cb => {
+      selectedVendors.push({
+        productId: cb.dataset.pid,
+        productName: cb.dataset.pname,
+        vendorId: cb.dataset.vid,
+        vendorName: cb.dataset.vname,
+        vendorEmail: cb.dataset.vemail,
+        vendorType: cb.dataset.vtype,
+      });
+    });
+    const countEl = modal.querySelector('#poc-sel-count');
+    if (countEl) countEl.textContent = selectedVendors.length;
+    const nextBtn = modal.querySelector('#poc-next2');
+    if (nextBtn) nextBtn.disabled = selectedVendors.length === 0;
+
+    // Seçili label'ları vurgula
+    modal.querySelectorAll('.prod-label').forEach(lbl => {
+      const cb = lbl.querySelector('.prod-cb');
+      lbl.style.borderColor = cb?.checked ? '#3b7cff' : 'rgba(255,255,255,.1)';
+      lbl.style.background = cb?.checked ? 'rgba(59,124,255,.08)' : '#1c1f2a';
+    });
+  }
+
+  modal.querySelector('#poc-next2')?.addEventListener('click', () => {
+    if (selectedVendors.length === 0) return;
+    // Özet göster
+    const sumEl = modal.querySelector('#poc-sel-summary');
+    const vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+    sumEl.innerHTML = `<div style="font-size:11.5px;color:#7c87a0;margin-bottom:8px">Seçilen ${selectedVendors.length} vendor'a talep gönderilecek:</div>`
+      + selectedVendors.map(v=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+          <div style="width:6px;height:6px;border-radius:50%;background:#3b7cff;flex-shrink:0"></div>
+          <span style="font-weight:600">${v.productName}</span>
+          <span style="color:#7c87a0;font-size:11.5px">— ${v.vendorName}</span>
+          <span class="bdg" style="background:rgba(59,124,255,.1);color:#7db4ff;margin-left:auto">${vtypeLabels[v.vendorType]||''}</span>
+        </div>`).join('');
+    modal.querySelector('#poc-step2').style.display='none';
+    modal.querySelector('#poc-step3').style.display='block';
+  });
+
+  modal.querySelector('#poc-submit')?.addEventListener('click', async () => {
+    const title = modal.querySelector('#poc-title')?.value?.trim();
+    if (!title) {
+      modal.querySelector('#poc-err').innerHTML='<div class="alert alert-err">Başlık zorunludur.</div>';
+      return;
+    }
+    const isVerifiedForPoc = CUR_USER?.emailVerified || CUR_PROFILE?.emailVerified === true;
+    if (!isVerifiedForPoc) {
+      modal.querySelector('#poc-err').innerHTML='<div class="alert alert-err">PoC talebi oluşturmadan önce e-posta doğrulaması gereklidir.</div>';
+      return;
+    }
+
+    const btn = modal.querySelector('#poc-submit');
+    btn.disabled=true; btn.textContent='Gönderiliyor...';
+
+    const requirements = modal.querySelector('#poc-req')?.value||'';
+    const preferredDates = modal.querySelector('#poc-dates')?.value||'';
+    const location = modal.querySelector('#poc-location')?.value||'customer';
+    const locLabels = {customer:'Müşteri Lokasyonu',vendor:'Vendor Lokasyonu',online:'Online',hybrid:'Hibrit'};
+
+    try {
+      // Her vendor için ayrı poc_request oluştur
+      const batchResults = [];
+      for (const v of selectedVendors) {
+        // Çakışma kontrolü
+        const activeSnap = await getDocs(query(
+          collection(db,'poc_requests'),
+          where('vendorId','==',v.vendorId),
+          where('status','in',['pending','active'])
+        ));
+
+        const docRef = await addDoc(collection(db,'poc_requests'), {
+          customerId: CUR_USER.uid,
+          customerEmail: CUR_USER.email,
+          customerName: CUR_PROFILE?.displayName||CUR_USER.email,
+          customerCompany: CUR_PROFILE?.company||'',
+          productId: v.productId,
+          productName: v.productName,
+          vendorId: v.vendorId,
+          vendorName: v.vendorName,
+          vendorEmail: v.vendorEmail,
+          vendorType: v.vendorType,
+          title, requirements, preferredDates, location,
+          status: 'pending',
+          activeVendorCount: activeSnap.size, // bilgi amaçlı
+          createdAt: serverTimestamp()
+        });
+        batchResults.push({...v, docId: docRef.id, hadConflict: activeSnap.size >= 3});
+
+        // Vendor'a mail
+        if (v.vendorEmail) {
+          sendEmail(v.vendorEmail, v.vendorName, 'Yeni PoC Talebi — PoCHub',
+            `${CUR_PROFILE?.displayName||CUR_USER.email} (${CUR_PROFILE?.company||''}) sizinle bir PoC yapmak istiyor.`,
+            `Ürün: ${v.productName}\nTalep: ${title}\nGereksinimler: ${requirements||'-'}\nLokasyon: ${locLabels[location]}\nTercih Edilen Tarih: ${preferredDates||'-'}`
+          );
+        }
+      }
+
+      // Müşteriye özet mail
+      const vendorList = batchResults.map(v=>`• ${v.productName} (${v.vendorName})`).join('\n');
+      sendEmail(CUR_USER.email, CUR_PROFILE?.displayName||'',
+        'PoC Talepleriniz Gönderildi — PoCHub',
+        `${batchResults.length} vendor'a PoC talebiniz iletildi.`,
+        `Talepler:\n${vendorList}\n\nVendorlar en kısa sürede size dönüş yapacaktır.`
+      );
+
+      // Çakışma uyarısı varsa göster
+      const conflicts = batchResults.filter(v=>v.hadConflict);
+
+      modal.remove();
+      showToast(`${batchResults.length} vendor'a PoC talebi gönderildi!`);
+
+      if (conflicts.length > 0) {
+        setTimeout(() => {
+          showToast(`⚠ ${conflicts.map(v=>v.vendorName).join(', ')} için takvim yoğunluğu var. Dönüş süresi uzayabilir.`, 'err');
+        }, 2000);
+      }
+
+      // Müşteri panelini yenile
+      if (CUR_SCREEN === 'customer') { CUR_CUST_TAB='requests'; renderCustomer(); }
+
+    } catch(e) {
+      modal.querySelector('#poc-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      btn.disabled=false; btn.textContent='Talebi Gönder →';
+    }
+  });
+}
+
+window.closePocModal = () => el('poc-modal')?.classList.remove('on');
+
 
 /* ══════════════════════════════════════
    MÜŞTERİ PANELİ
@@ -1130,15 +1403,24 @@ async function loadCustTab() {
         <td style="color:#7c87a0">${locLabels[r.location]||r.location||'—'}</td>
         <td>${statusBadge(r.status)}</td>
         <td style="color:#7c87a0;font-size:12px">${fmt(r.createdAt)}</td>
-        <td>${r.status==='pending'?`<button class="btn-red btn-sm" data-id="${d.id}">İptal</button>`:''}</td>
+        <td><div style="display:flex;gap:6px">
+          ${r.status==='pending'?`<button class="edit-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-req="${(r.requirements||'')}" data-dates="${r.preferredDates||''}" data-loc="${r.location||'customer'}">Düzenle</button>`:''}
+          ${r.status==='pending'?`<button class="cancel-poc-btn btn-red btn-sm" data-id="${d.id}">İptal</button>`:''}
+        </div></td>
       </tr>`;
     }).join('')}
     </tbody></table>`;
-    m.querySelectorAll('.btn-red').forEach(b => b.addEventListener('click', async () => {
+    // İptal
+    m.querySelectorAll('.cancel-poc-btn').forEach(b => b.addEventListener('click', async () => {
       if (!confirm('Bu talebi iptal etmek istiyor musunuz?')) return;
       await updateDoc(doc(db,'poc_requests',b.dataset.id), {status:'cancelled'});
       showToast('Talep iptal edildi.');
       loadCustTab();
+    }));
+
+    // Düzenle
+    m.querySelectorAll('.edit-poc-btn').forEach(b => b.addEventListener('click', () => {
+      openEditPocModal(b.dataset.id, b.dataset.title, b.dataset.req, b.dataset.dates, b.dataset.loc);
     }));
   }
 
@@ -1522,7 +1804,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.3.2</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.4</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -1639,13 +1921,15 @@ async function loadAdmTab() {
   else if (CUR_ADM_TAB === 'requests') {
     const snap = await getDocs(query(collection(db,'poc_requests')));
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Tüm PoC Talepleri (${snap.size})</h2>
-    <table><thead><tr><th>Başlık</th><th>Müşteri</th><th>Vendor</th><th>Ürün</th><th>Lokasyon</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
+    <table><thead><tr><th>Başlık</th><th>Müşteri</th><th>Vendor</th><th>Vendor Tipi</th><th>Ürün</th><th>Lokasyon</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const r={...d.data(),id:d.id};
       const locLabels={customer:'Müşteri',vendor:'Vendor',online:'Online',hybrid:'Hibrit'};
       return `<tr>
         <td style="font-weight:600">${r.title}</td>
         <td style="color:#7c87a0"><div>${r.customerName||'—'}</div><div style="font-size:11px">${r.customerCompany||''}</div></td>
         <td style="color:#7c87a0">${r.vendorName||'—'}</td>
+        <td>${r.vendorType?`<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff;font-size:10px">
+          ${{ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'}[r.vendorType]||r.vendorType}</span>`:'—'}</td>
         <td style="color:#7c87a0">${r.productName||'—'}</td>
         <td style="color:#7c87a0">${locLabels[r.location]||r.location||'—'}</td>
         <td>${statusBadge(r.status)}</td>
