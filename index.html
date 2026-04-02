@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.6 | 01.04.2026 | Mesajlaşma, Teklif Karşılaştırma, Bildirimler, Kategori Yönetimi, Ülke Listesi, Çoklu Vendor/Katalog Seçimi, Email Doğrulama -->
+<!-- PoCHub v1.7 | 02.04.2026 | Vendor Ürün Düzenle/Sil, Etkinlik Form İyileştirmeleri --> 01.04.2026 | Mesajlaşma, Teklif Karşılaştırma, Bildirimler, Kategori Yönetimi, Ülke Listesi, Çoklu Vendor/Katalog Seçimi, Email Doğrulama -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.6.2</title>
+<title>PoCHub.co — v1.7</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,7 +121,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.6.2';
+const VERSION = 'v1.7';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 const ALL_COUNTRIES = [
@@ -2050,12 +2050,46 @@ async function loadVendTab() {
       <button class="btn-p btn-sm" id="v-add-prod2">+ Ürün Ekle</button>
     </div>
     ${snap.empty?'<div class="empty"><div class="empty-icon">📦</div>Henüz ürün eklemediniz.</div>':
-    `<table><thead><tr><th>Ürün Adı</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>Eklenme</th></tr></thead><tbody>
+    `<table><thead><tr><th>Ürün Adı</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>Eklenme</th><th>İşlem</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const p={...d.data(),id:d.id};
-      return `<tr><td style="font-weight:600">${p.name}</td><td style="color:#7c87a0">${p.category||'—'}</td><td>${cc(p.country||'TR')}</td><td>${statusBadge(p.status)}</td><td style="color:#7c87a0;font-size:12px">${fmt(p.createdAt)}</td></tr>`;
+      return `<tr>
+        <td style="font-weight:600">${p.name}</td>
+        <td style="color:#7c87a0">${p.category||'—'}</td>
+        <td>${cc(p.country||'TR')}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td style="color:#7c87a0;font-size:12px">${fmt(p.createdAt)}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-g btn-sm edit-prod-btn" data-id="${d.id}"
+            data-name="${(p.name||'').replace(/"/g,'')}"
+            data-cat="${p.category||''}"
+            data-country="${p.country||'TR'}"
+            data-desc="${(p.description||'').replace(/"/g,'').replace(/\n/g,' ')}"
+            data-support="${p.supportModel||'inhouse'}"
+            style="margin-right:5px">Düzenle</button>
+          ${p.status!=='active'?`<button class="btn-red btn-sm del-prod-btn" data-id="${d.id}" data-name="${(p.name||'').replace(/"/g,'')}">Sil</button>`:''}
+        </td>
+      </tr>`;
     }).join('')}
     </tbody></table>`}`;
     el('v-add-prod2')?.addEventListener('click', openAddProductModal);
+
+    // Düzenle
+    m.querySelectorAll('.edit-prod-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        openEditProductModal(b.dataset.id, b.dataset.name, b.dataset.cat, b.dataset.country, b.dataset.desc, b.dataset.support);
+      });
+    });
+    // Sil
+    m.querySelectorAll('.del-prod-btn').forEach(function(b) {
+      b.addEventListener('click', async function() {
+        if (!confirm('"' + b.dataset.name + '" ürününü silmek istiyor musunuz?\nBu işlem geri alınamaz.')) return;
+        try {
+          await deleteDoc(doc(db,'products',b.dataset.id));
+          showToast('Ürün silindi.');
+          loadVendTab();
+        } catch(e) { showToast('Silinemedi: '+e.message,'err'); }
+      });
+    });
   }
 
   else if (CUR_VEND_TAB === 'events') {
@@ -2144,6 +2178,93 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
   });
 }
 
+function openEditProductModal(prodId, name, category, country, description, supportModel) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = '<div class="modal" style="max-width:500px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Ürün Düzenle</h3>' +
+    '<button id="close-edit-prod" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<div style="background:rgba(240,164,41,.1);border:1px solid rgba(240,164,41,.2);border-radius:7px;padding:9px 12px;font-size:12px;color:#f0a429;margin-bottom:14px">' +
+    'ℹ Onaylı ürünleri düzenlediğinizde admin yeniden onaylaması gerekebilir.' +
+    '</div>' +
+    '<label class="lbl">Ürün Adı *</label>' +
+    '<input class="inp" id="epr-name" value="' + (name||'') + '">' +
+    '<label class="lbl">Kategori</label>' +
+    '<select class="inp" id="epr-cat"></select>' +
+    '<label class="lbl">Menşei Ülke</label>' +
+    '<div style="position:relative;margin-bottom:4px">' +
+    '<input class="inp" id="epr-country-search" placeholder="Ülke ara..." autocomplete="off" value="' + (country||'TR') + '">' +
+    '<div id="epr-country-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:2px"></div>' +
+    '<input type="hidden" id="epr-country-val" value="' + (country||'TR') + '">' +
+    '</div>' +
+    '<label class="lbl">Açıklama</label>' +
+    '<textarea class="inp" id="epr-desc" rows="3" style="resize:none">' + (description||'') + '</textarea>' +
+    '<label class="lbl">Destek Modeli</label>' +
+    '<select class="inp" id="epr-support">' +
+    '<option value="inhouse"' + (supportModel==='inhouse'?' selected':'') + '>Kendi bünyesi</option>' +
+    '<option value="outsource"' + (supportModel==='outsource'?' selected':'') + '>Dış kaynak</option>' +
+    '<option value="hybrid"' + (supportModel==='hybrid'?' selected':'') + '>Hibrit</option>' +
+    '</select>' +
+    '<div id="epr-err" style="margin-top:10px"></div>' +
+    '<button class="btn-p" id="epr-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>' +
+    '</div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#close-edit-prod').addEventListener('click', function() { modal.remove(); });
+  modal.addEventListener('click', function(e) { if(e.target===modal) modal.remove(); });
+
+  // Country search listener
+  var eprSearch = modal.querySelector('#epr-country-search');
+  var eprList = modal.querySelector('#epr-country-list');
+  var eprVal = modal.querySelector('#epr-country-val');
+  if (eprSearch) {
+    eprSearch.addEventListener('input', function() {
+      filterCountryOpts(this.value, 'epr-country-list', 'epr-country-val');
+    });
+    // Başlangıç değerini göster
+    var initCountry = ALL_COUNTRIES.find(function(x){return x.code===country;});
+    if (initCountry) eprSearch.value = initCountry.name + ' (' + initCountry.code + ')';
+  }
+
+  // Kategorileri yükle
+  getDocs(collection(db,'categories')).then(function(snap) {
+    var cats = snap.docs.map(function(d){return d.data();}).sort(function(a,b){return (a.order||0)-(b.order||0);});
+    var sel = modal.querySelector('#epr-cat');
+    if (cats.length) {
+      sel.innerHTML = cats.map(function(cat){ return '<option value="'+cat.name+'"'+(cat.name===category?' selected':'')+'>'+cat.name+'</option>'; }).join('');
+    } else {
+      sel.innerHTML = ['Firewall','Storage','Yedekleme','Network','Server','Güvenlik'].map(function(c){ return '<option'+(c===category?' selected':'')+'>'+c+'</option>'; }).join('');
+    }
+  }).catch(function(){
+    var sel = modal.querySelector('#epr-cat');
+    sel.innerHTML = ['Firewall','Storage','Yedekleme','Network','Server'].map(function(c){ return '<option'+(c===category?' selected':'')+'>'+c+'</option>'; }).join('');
+  });
+
+  modal.querySelector('#epr-submit').addEventListener('click', async function() {
+    var nm = modal.querySelector('#epr-name').value.trim();
+    if (!nm) { modal.querySelector('#epr-err').innerHTML='<div class="alert alert-err">Ürün adı zorunludur.</div>'; return; }
+    var btn = modal.querySelector('#epr-submit');
+    btn.disabled=true; btn.textContent='Güncelleniyor...';
+    try {
+      await updateDoc(doc(db,'products',prodId), {
+        name: nm,
+        category: modal.querySelector('#epr-cat').value,
+        country: modal.querySelector('#epr-country-val').value || country,
+        description: modal.querySelector('#epr-desc').value,
+        supportModel: modal.querySelector('#epr-support').value,
+        updatedAt: serverTimestamp()
+      });
+      modal.remove();
+      showToast('Ürün güncellendi!');
+      loadVendTab();
+    } catch(e) {
+      modal.querySelector('#epr-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      btn.disabled=false; btn.textContent='Güncelle';
+    }
+  });
+}
+
 async function openAddProductModal() {
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -2217,34 +2338,89 @@ async function openAddProductModal() {
 async function openNewEventModal() {
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
-  modal.innerHTML = `<div class="modal" style="max-width:500px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-      <h3 style="font-size:15px;font-weight:700">Yeni Etkinlik Oluştur</h3>
-      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-ev-modal">×</button>
-    </div>
-    <label class="lbl">Etkinlik Başlığı *</label><input class="inp" id="ev-title" placeholder="FortiGate 100F — Canlı Demo">
-    <label class="lbl">Ürün Seç *</label>
-    <div style="position:relative;margin-bottom:4px">
-      <input class="inp" id="ev-prod-search" placeholder="Ürün ara veya listeden seç..." autocomplete="off" oninput="filterVendorProducts(this.value)">
-      <div id="ev-prod-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:220px;overflow-y:auto;z-index:100;margin-top:2px"></div>
-      <input type="hidden" id="ev-prod-id" value="">
-      <input type="hidden" id="ev-prod-name-val" value="">
-      <input type="hidden" id="ev-prod-cat-val" value="">
-    </div>
-    <label class="lbl">Tarih *</label><input class="inp" id="ev-date" type="datetime-local">
-    <div class="g2">
-      <div><label class="lbl">Kapasite</label><input class="inp" id="ev-cap" type="number" value="50"></div>
-      <div><label class="lbl">Katılım Ücreti (0 = Ücretsiz)</label><input class="inp" id="ev-fee" type="number" value="0"></div>
-    </div>
-    <label class="lbl">Format</label>
-    <select class="inp" id="ev-fmt"><option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option></select>
-    <label class="lbl">Lokasyon / Zoom Linki</label><input class="inp" id="ev-loc" placeholder="İstanbul Levent / zoom.us/j/...">
-    <label class="lbl">Açıklama</label><textarea class="inp" id="ev-desc" rows="3" style="resize:none"></textarea>
-    <div id="ev-err" style="margin-top:10px"></div>
-    <button class="btn-p" id="ev-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Etkinliği Yayınla</button>
-  </div>`;
+  modal.innerHTML = '<div class="modal" style="max-width:520px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Yeni Etkinlik Oluştur</h3>' +
+    '<button id="close-ev-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+
+    '<label class="lbl">Etkinlik Başlığı *</label>' +
+    '<input class="inp" id="ev-title" placeholder="FortiGate 100F — Canlı Demo">' +
+
+    '<label class="lbl">Etkinlik Açıklaması *</label>' +
+    '<textarea class="inp" id="ev-desc" rows="3" placeholder="Etkinlik içeriği, hedef kitle, gündem..." style="resize:none"></textarea>' +
+
+    '<label class="lbl">Ürün Seç *</label>' +
+    '<div style="position:relative;margin-bottom:4px">' +
+    '<input class="inp" id="ev-prod-search" placeholder="Ürün ara veya listeden seç..." autocomplete="off">' +
+    '<div id="ev-prod-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:220px;overflow-y:auto;z-index:100;margin-top:2px"></div>' +
+    '<input type="hidden" id="ev-prod-id" value="">' +
+    '<input type="hidden" id="ev-prod-name-val" value="">' +
+    '<input type="hidden" id="ev-prod-cat-val" value="">' +
+    '</div>' +
+
+    '<label class="lbl">Tarih ve Saat *</label>' +
+    '<div class="g2">' +
+    '<input class="inp" id="ev-date" type="date" title="Tarih seçin">' +
+    '<input class="inp" id="ev-time" type="time" value="10:00" title="Saat seçin">' +
+    '</div>' +
+
+    '<div class="g2">' +
+    '<div><label class="lbl">Kapasite *</label><input class="inp" id="ev-cap" type="number" value="50" min="1"></div>' +
+    '<div><label class="lbl">Katılım Ücreti (₺, 0=Ücretsiz)</label><input class="inp" id="ev-fee" type="number" value="0" min="0"></div>' +
+    '</div>' +
+
+    '<label class="lbl">Format *</label>' +
+    '<select class="inp" id="ev-fmt">' +
+    '<option value="online">Online</option>' +
+    '<option value="onsite">Fiziksel (Yüz yüze)</option>' +
+    '<option value="hybrid">Hibrit (Online + Fiziksel)</option>' +
+    '</select>' +
+
+    '<div id="ev-loc-online" style="margin-top:8px">' +
+    '<label class="lbl">Online Katılım Linki * <span style="color:#5a6278;font-size:11px">(Zoom, Teams, Meet vb.)</span></label>' +
+    '<input class="inp" id="ev-url" placeholder="https://zoom.us/j/... veya teams.microsoft.com/...">' +
+    '</div>' +
+
+    '<div id="ev-loc-onsite" style="display:none;margin-top:8px">' +
+    '<label class="lbl">Fiziksel Lokasyon Adresi * <span style="color:#5a6278;font-size:11px">(Google Maps&#39;te görünecek)</span></label>' +
+    '<input class="inp" id="ev-address" placeholder="Büyükdere Cad. No:127, Esentepe, İstanbul">' +
+    '</div>' +
+
+    '<div id="ev-err" style="margin-top:10px"></div>' +
+    '<button class="btn-p" id="ev-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Etkinliği Yayınla</button>' +
+    '</div>';
   document.body.appendChild(modal);
   modal.querySelector('#close-ev-modal').addEventListener('click', () => modal.remove());
+
+  // Format değişince lokasyon alanlarını güncelle
+  function updateLocFields() {
+    var fmt = modal.querySelector('#ev-fmt').value;
+    var onlineDiv = modal.querySelector('#ev-loc-online');
+    var onsiteDiv = modal.querySelector('#ev-loc-onsite');
+    if (fmt === 'online') {
+      onlineDiv.style.display = 'block';
+      onsiteDiv.style.display = 'none';
+    } else if (fmt === 'onsite') {
+      onlineDiv.style.display = 'none';
+      onsiteDiv.style.display = 'block';
+    } else { // hybrid
+      onlineDiv.style.display = 'block';
+      onsiteDiv.style.display = 'block';
+      onlineDiv.querySelector('label').innerHTML = 'Online Katılım Linki * <span style="color:#5a6278;font-size:11px">(Zoom, Teams, Meet vb.)</span>';
+      onsiteDiv.querySelector('label').innerHTML = 'Fiziksel Lokasyon Adresi * <span style="color:#5a6278;font-size:11px">(Hibrit - Her iki alan zorunlu)</span>';
+    }
+  }
+  modal.querySelector('#ev-fmt').addEventListener('change', updateLocFields);
+  updateLocFields();
+
+  // ev-prod-search için oninput listener (oninput attribute'u kaldırdık)
+  modal.querySelector('#ev-prod-search').addEventListener('input', function() {
+    filterVendorProductsInModal(this.value, vendorProds, modal);
+  });
+  modal.querySelector('#ev-prod-search').addEventListener('focus', function() {
+    renderEvProdList(vendorProds, modal);
+  });
 
   // Vendor'un ürünlerini yükle
   let vendorProds = [];
@@ -2261,44 +2437,63 @@ async function openNewEventModal() {
     console.error('Vendor ürünleri yüklenemedi:', e);
   }
 
-  modal.querySelector('#ev-prod-search').addEventListener('input', function() {
-    filterVendorProductsInModal(this.value, vendorProds, modal);
-  });
-  modal.querySelector('#ev-prod-search').addEventListener('focus', function() {
-    renderEvProdList(
-      this.value ? vendorProds.filter(p=>p.name?.toLowerCase().includes(this.value.toLowerCase())) : vendorProds,
-      modal
-    );
-  });
-  modal.querySelector('#ev-submit').addEventListener('click', async () => {
-    const title = modal.querySelector('#ev-title').value.trim();
-    const dateVal = modal.querySelector('#ev-date').value;
-    if (!title || !dateVal) { modal.querySelector('#ev-err').innerHTML='<div class="alert alert-err">Başlık ve tarih zorunludur.</div>'; return; }
-    const btn = modal.querySelector('#ev-submit');
+  // ev-prod listener yukarıda tanımlandı
+  modal.querySelector('#ev-submit').addEventListener('click', async function() {
+    var title = modal.querySelector('#ev-title').value.trim();
+    var desc = modal.querySelector('#ev-desc').value.trim();
+    var dateVal = modal.querySelector('#ev-date').value;
+    var timeVal = modal.querySelector('#ev-time') ? modal.querySelector('#ev-time').value || '10:00' : '10:00';
+    var fmt = modal.querySelector('#ev-fmt').value;
+    var urlVal = modal.querySelector('#ev-url') ? modal.querySelector('#ev-url').value.trim() : '';
+    var addrVal = modal.querySelector('#ev-address') ? modal.querySelector('#ev-address').value.trim() : '';
+    var prodName = modal.querySelector('#ev-prod-name-val').value || modal.querySelector('#ev-prod-search').value.trim();
+    var errDiv = modal.querySelector('#ev-err');
+
+    var errors = [];
+    if (!title) errors.push('Başlık');
+    if (!desc) errors.push('Açıklama');
+    if (!prodName) errors.push('Ürün');
+    if (!dateVal) errors.push('Tarih');
+    if ((fmt==='online'||fmt==='hybrid') && !urlVal) errors.push('Online link');
+    if ((fmt==='onsite'||fmt==='hybrid') && !addrVal) errors.push('Fiziksel adres');
+
+    if (errors.length) {
+      errDiv.innerHTML = '<div class="alert alert-err">Zorunlu alanlar eksik: <b>' + errors.join(', ') + '</b></div>';
+      return;
+    }
+    if ((fmt==='online'||fmt==='hybrid') && urlVal && !urlVal.startsWith('http')) {
+      errDiv.innerHTML = '<div class="alert alert-err">Online link http:// veya https:// ile başlamalıdır.</div>';
+      return;
+    }
+
+    var btn = modal.querySelector('#ev-submit');
     btn.disabled=true; btn.textContent='Yayınlanıyor...';
     try {
+      var dateTime = new Date(dateVal + 'T' + timeVal + ':00');
+      var locStr = fmt==='online' ? urlVal : fmt==='onsite' ? addrVal : addrVal + ' | Online: ' + urlVal;
+
       await addDoc(collection(db,'public_events'), {
         vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
+        vendorName: CUR_PROFILE ? (CUR_PROFILE.displayName||CUR_USER.email) : CUR_USER.email,
         vendorEmail: CUR_USER.email,
-        title, productName: modal.querySelector('#ev-prod-name-val').value || modal.querySelector('#ev-prod-search').value,
+        title: title, description: desc,
+        productName: prodName,
         productId: modal.querySelector('#ev-prod-id').value,
         category: modal.querySelector('#ev-prod-cat-val').value || 'Diğer',
-        eventDate: Timestamp.fromDate(new Date(dateVal)),
+        eventDate: Timestamp.fromDate(dateTime),
         capacity: parseInt(modal.querySelector('#ev-cap').value)||50,
         fee: parseFloat(modal.querySelector('#ev-fee').value)||0,
-        format: modal.querySelector('#ev-fmt').value,
-        location: modal.querySelector('#ev-loc').value,
-        description: modal.querySelector('#ev-desc').value,
-        registeredCount: 0,
-        status: 'published',
+        format: fmt, location: locStr,
+        onlineUrl: (fmt==='online'||fmt==='hybrid') ? urlVal : '',
+        physicalAddress: (fmt==='onsite'||fmt==='hybrid') ? addrVal : '',
+        registeredCount: 0, status: 'published',
         createdAt: serverTimestamp()
       });
       modal.remove();
       showToast('Etkinlik yayınlandı!');
       if (CUR_VEND_TAB==='events') loadVendTab();
     } catch(e) {
-      modal.querySelector('#ev-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      errDiv.innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
       btn.disabled=false; btn.textContent='Etkinliği Yayınla';
     }
   });
@@ -2321,7 +2516,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.6.2</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.7</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
