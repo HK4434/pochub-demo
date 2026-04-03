@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.9 | pochub.co -->
+<!-- PoCHub v1.6 | 01.04.2026 | Mesajlaşma, Teklif Karşılaştırma, Bildirimler, Kategori Yönetimi, Ülke Listesi, Çoklu Vendor/Katalog Seçimi, Email Doğrulama -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.9.1</title>
+<title>PoCHub.co — v1.9.2</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,7 +121,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.9.1';
+const VERSION = 'v1.9.2';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 const ALL_COUNTRIES = [
@@ -1673,10 +1673,8 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       const batchResults = [];
       for (const v of selectedVendors) {
         // Çakışma kontrolü
-        const activeSnap = await getDocs(query(
-          collection(db,'poc_requests'),
-          where('vendorId','==',v.vendorId)
-        ));
+        const _pocSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',v.vendorId)));
+        const activeSnap = {size: _pocSnap.docs.filter(d=>['pending','active'].includes(d.data().status)).length};
 
         const docRef = await addDoc(collection(db,'poc_requests'), {
           customerId: CUR_USER.uid,
@@ -2020,7 +2018,28 @@ async function loadVendTab() {
   }
 
   else if (CUR_VEND_TAB === 'calendar') {
-    await renderVendorCalendar(m);
+    const [pocSnap, evSnap] = await Promise.all([
+      getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
+      getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid))),
+    ]);
+    const pocItems = pocSnap.docs.map(d=>({...d.data(),id:d.id,type:'private'}));
+    const evItems = evSnap.docs.map(d=>({...d.data(),id:d.id,type:'public'}));
+    const all = [...pocItems,...evItems].sort((a,b)=>{
+      const da = a.eventDate||a.createdAt;
+      const db2 = b.eventDate||b.createdAt;
+      return (da?.seconds||0)-(db2?.seconds||0);
+    });
+    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">PoC Takvimi</h2>
+    ${!all.length?'<div class="empty"><div class="empty-icon">📅</div>Takvimde kayıt yok.</div>':
+    `<table><thead><tr><th>Başlık</th><th>Tür</th><th>Müşteri / Ürün</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
+    ${all.map(e=>`<tr>
+      <td style="font-weight:600">${e.title||e.productName||'—'}</td>
+      <td>${e.type==='public'?'<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078">Public</span>':'<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">Private</span>'}</td>
+      <td style="color:#7c87a0">${e.customerName||e.productName||'—'}</td>
+      <td>${statusBadge(e.status)}</td>
+      <td style="color:#7c87a0;font-size:12px">${fmt(e.eventDate||e.createdAt)}</td>
+    </tr>`).join('')}
+    </tbody></table>`}`;
   }
 
   else if (CUR_VEND_TAB === 'products') {
@@ -2030,46 +2049,12 @@ async function loadVendTab() {
       <button class="btn-p btn-sm" id="v-add-prod2">+ Ürün Ekle</button>
     </div>
     ${snap.empty?'<div class="empty"><div class="empty-icon">📦</div>Henüz ürün eklemediniz.</div>':
-    `<table><thead><tr><th>Ürün Adı</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>Eklenme</th><th>İşlem</th></tr></thead><tbody>
+    `<table><thead><tr><th>Ürün Adı</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>Eklenme</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const p={...d.data(),id:d.id};
-      return `<tr>
-        <td style="font-weight:600">${p.name}</td>
-        <td style="color:#7c87a0">${p.category||'—'}</td>
-        <td>${cc(p.country||'TR')}</td>
-        <td>${statusBadge(p.status)}</td>
-        <td style="color:#7c87a0;font-size:12px">${fmt(p.createdAt)}</td>
-        <td style="white-space:nowrap">
-          <button class="btn-g btn-sm edit-prod-btn" data-id="${d.id}"
-            data-name="${(p.name||'').replace(/"/g,'')}"
-            data-cat="${p.category||''}"
-            data-country="${p.country||'TR'}"
-            data-desc="${(p.description||'').replace(/"/g,'').replace(/\n/g,' ')}"
-            data-support="${p.supportModel||'inhouse'}"
-            style="margin-right:5px">Düzenle</button>
-          <button class="btn-red btn-sm del-prod-btn" data-id="${d.id}" data-name="${(p.name||'').replace(/"/g,'')}">Sil</button>
-        </td>
-      </tr>`;
+      return `<tr><td style="font-weight:600">${p.name}</td><td style="color:#7c87a0">${p.category||'—'}</td><td>${cc(p.country||'TR')}</td><td>${statusBadge(p.status)}</td><td style="color:#7c87a0;font-size:12px">${fmt(p.createdAt)}</td></tr>`;
     }).join('')}
     </tbody></table>`}`;
     el('v-add-prod2')?.addEventListener('click', openAddProductModal);
-
-    // Düzenle
-    m.querySelectorAll('.edit-prod-btn').forEach(function(b) {
-      b.addEventListener('click', function() {
-        openEditProductModal(b.dataset.id, b.dataset.name, b.dataset.cat, b.dataset.country, b.dataset.desc, b.dataset.support);
-      });
-    });
-    // Sil
-    m.querySelectorAll('.del-prod-btn').forEach(function(b) {
-      b.addEventListener('click', async function() {
-        if (!confirm('"' + b.dataset.name + '" ürününü silmek istiyor musunuz?\nBu işlem geri alınamaz.')) return;
-        try {
-          await deleteDoc(doc(db,'products',b.dataset.id));
-          showToast('Ürün silindi.');
-          loadVendTab();
-        } catch(e) { showToast('Silinemedi: '+e.message,'err'); }
-      });
-    });
   }
 
   else if (CUR_VEND_TAB === 'events') {
@@ -2079,36 +2064,12 @@ async function loadVendTab() {
       <button class="btn-p btn-sm" id="v-add-ev2">+ Etkinlik Oluştur</button>
     </div>
     ${snap.empty?'<div class="empty"><div class="empty-icon">🎯</div>Henüz etkinlik oluşturmadınız.</div>':
-    `<table><thead><tr><th>Başlık</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>
+    `<table><thead><tr><th>Başlık</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const e={...d.data(),id:d.id};
-      return `<tr>
-        <td style="font-weight:600">${e.title}</td>
-        <td style="color:#7c87a0;font-size:12px">${fmt(e.eventDate)}</td>
-        <td style="color:#7c87a0">${e.format||'—'}</td>
-        <td style="color:#7c87a0">${e.registeredCount||0} / ${e.capacity||0}</td>
-        <td>${statusBadge(e.status)}</td>
-        <td style="white-space:nowrap">
-          ${e.status!=='cancelled'?`<button class="btn-g btn-sm edit-ev-btn" data-id="${d.id}" style="margin-right:5px">Düzenle</button>`:''}
-          ${e.status==='published'?`<button class="btn-red btn-sm cancel-ev-btn" data-id="${d.id}" data-title="${(e.title||'').replace(/"/g,'')}">İptal</button>`:''}
-        </td>
-      </tr>`;
+      return `<tr><td style="font-weight:600">${e.title}</td><td style="color:#7c87a0;font-size:12px">${fmt(e.eventDate)}</td><td style="color:#7c87a0">${e.format||'—'}</td><td style="color:#7c87a0">${e.registeredCount||0} / ${e.capacity||0}</td><td>${statusBadge(e.status)}</td></tr>`;
     }).join('')}
     </tbody></table>`}`;
     el('v-add-ev2')?.addEventListener('click', openNewEventModal);
-    m.querySelectorAll('.edit-ev-btn').forEach(function(b) {
-      b.addEventListener('click', async function() {
-        var evSnap = await getDoc(doc(db,'public_events',b.dataset.id));
-        if (evSnap.exists()) openEditEventModal(b.dataset.id, evSnap.data());
-      });
-    });
-    m.querySelectorAll('.cancel-ev-btn').forEach(function(b) {
-      b.addEventListener('click', async function() {
-        if (!confirm('"'+b.dataset.title+'" etkinliğini iptal etmek istiyor musunuz?')) return;
-        await updateDoc(doc(db,'public_events',b.dataset.id), {status:'cancelled'});
-        showToast('Etkinlik iptal edildi.');
-        loadVendTab();
-      });
-    });
   }
 
   else if (CUR_VEND_TAB === 'offers-sent') {
@@ -2178,93 +2139,6 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
     } catch(e) {
       modal.querySelector('#of-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
       btn.disabled=false; btn.textContent='Teklifi Gönder';
-    }
-  });
-}
-
-function openEditProductModal(prodId, name, category, country, description, supportModel) {
-  const modal = document.createElement('div');
-  modal.className = 'modal-bg on';
-  modal.innerHTML = '<div class="modal" style="max-width:500px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
-    '<h3 style="font-size:15px;font-weight:700">Ürün Düzenle</h3>' +
-    '<button id="close-edit-prod" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
-    '</div>' +
-    '<div style="background:rgba(240,164,41,.1);border:1px solid rgba(240,164,41,.2);border-radius:7px;padding:9px 12px;font-size:12px;color:#f0a429;margin-bottom:14px">' +
-    'ℹ Onaylı ürünleri düzenlediğinizde admin yeniden onaylaması gerekebilir.' +
-    '</div>' +
-    '<label class="lbl">Ürün Adı *</label>' +
-    '<input class="inp" id="epr-name" value="' + (name||'') + '">' +
-    '<label class="lbl">Kategori</label>' +
-    '<select class="inp" id="epr-cat"></select>' +
-    '<label class="lbl">Menşei Ülke</label>' +
-    '<div style="position:relative;margin-bottom:4px">' +
-    '<input class="inp" id="epr-country-search" placeholder="Ülke ara..." autocomplete="off" value="' + (country||'TR') + '">' +
-    '<div id="epr-country-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:2px"></div>' +
-    '<input type="hidden" id="epr-country-val" value="' + (country||'TR') + '">' +
-    '</div>' +
-    '<label class="lbl">Açıklama</label>' +
-    '<textarea class="inp" id="epr-desc" rows="3" style="resize:none">' + (description||'') + '</textarea>' +
-    '<label class="lbl">Destek Modeli</label>' +
-    '<select class="inp" id="epr-support">' +
-    '<option value="inhouse"' + (supportModel==='inhouse'?' selected':'') + '>Kendi bünyesi</option>' +
-    '<option value="outsource"' + (supportModel==='outsource'?' selected':'') + '>Dış kaynak</option>' +
-    '<option value="hybrid"' + (supportModel==='hybrid'?' selected':'') + '>Hibrit</option>' +
-    '</select>' +
-    '<div id="epr-err" style="margin-top:10px"></div>' +
-    '<button class="btn-p" id="epr-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>' +
-    '</div>';
-  document.body.appendChild(modal);
-  modal.querySelector('#close-edit-prod').addEventListener('click', function() { modal.remove(); });
-  modal.addEventListener('click', function(e) { if(e.target===modal) modal.remove(); });
-
-  // Country search listener
-  var eprSearch = modal.querySelector('#epr-country-search');
-  var eprList = modal.querySelector('#epr-country-list');
-  var eprVal = modal.querySelector('#epr-country-val');
-  if (eprSearch) {
-    eprSearch.addEventListener('input', function() {
-      filterCountryOpts(this.value, 'epr-country-list', 'epr-country-val');
-    });
-    // Başlangıç değerini göster
-    var initCountry = ALL_COUNTRIES.find(function(x){return x.code===country;});
-    if (initCountry) eprSearch.value = initCountry.name + ' (' + initCountry.code + ')';
-  }
-
-  // Kategorileri yükle
-  getDocs(collection(db,'categories')).then(function(snap) {
-    var cats = snap.docs.map(function(d){return d.data();}).sort(function(a,b){return (a.order||0)-(b.order||0);});
-    var sel = modal.querySelector('#epr-cat');
-    if (cats.length) {
-      sel.innerHTML = cats.map(function(cat){ return '<option value="'+cat.name+'"'+(cat.name===category?' selected':'')+'>'+cat.name+'</option>'; }).join('');
-    } else {
-      sel.innerHTML = ['Firewall','Storage','Yedekleme','Network','Server','Güvenlik'].map(function(c){ return '<option'+(c===category?' selected':'')+'>'+c+'</option>'; }).join('');
-    }
-  }).catch(function(){
-    var sel = modal.querySelector('#epr-cat');
-    sel.innerHTML = ['Firewall','Storage','Yedekleme','Network','Server'].map(function(c){ return '<option'+(c===category?' selected':'')+'>'+c+'</option>'; }).join('');
-  });
-
-  modal.querySelector('#epr-submit').addEventListener('click', async function() {
-    var nm = modal.querySelector('#epr-name').value.trim();
-    if (!nm) { modal.querySelector('#epr-err').innerHTML='<div class="alert alert-err">Ürün adı zorunludur.</div>'; return; }
-    var btn = modal.querySelector('#epr-submit');
-    btn.disabled=true; btn.textContent='Güncelleniyor...';
-    try {
-      await updateDoc(doc(db,'products',prodId), {
-        name: nm,
-        category: modal.querySelector('#epr-cat').value,
-        country: modal.querySelector('#epr-country-val').value || country,
-        description: modal.querySelector('#epr-desc').value,
-        supportModel: modal.querySelector('#epr-support').value,
-        updatedAt: serverTimestamp()
-      });
-      modal.remove();
-      showToast('Ürün güncellendi!');
-      loadVendTab();
-    } catch(e) {
-      modal.querySelector('#epr-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
-      btn.disabled=false; btn.textContent='Güncelle';
     }
   });
 }
@@ -2339,402 +2213,37 @@ async function openAddProductModal() {
   });
 }
 
-async function renderVendorCalendar(m) {
-  // Tüm vendor verilerini çek
-  var pocSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid)));
-  var evSnap2 = await getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid)));
-
-  var pocItems = pocSnap.docs.map(function(d) { return {...d.data(), id:d.id, itemType:'private'}; });
-  var evItems2 = evSnap2.docs.map(function(d) { return {...d.data(), id:d.id, itemType:'public'}; });
-  var allItems = pocItems.concat(evItems2);
-  allItems.sort(function(a,b) {
-    var da = a.eventDate || a.createdAt;
-    var db2 = b.eventDate || b.createdAt;
-    return (da&&da.seconds?da.seconds:0) - (db2&&db2.seconds?db2.seconds:0);
-  });
-
-  var today = new Date();
-  var calYear = today.getFullYear();
-  var calMonth = today.getMonth();
-  var calView = 'calendar'; // 'calendar' | 'list'
-  var searchQuery = '';
-
-  function getFiltered() {
-    var q = searchQuery.toLowerCase();
-    if (!q) return allItems;
-    return allItems.filter(function(item) {
-      return (item.title||'').toLowerCase().includes(q) ||
-             (item.productName||'').toLowerCase().includes(q) ||
-             (item.customerName||'').toLowerCase().includes(q);
-    });
-  }
-
-  function renderContent() {
-    var filtered = getFiltered();
-    var contentEl = document.getElementById('vcal-content');
-    if (!contentEl) return;
-
-    if (calView === 'list') {
-      renderListView(filtered, contentEl);
-    } else {
-      renderCalView(filtered, contentEl);
-    }
-  }
-
-  function renderListView(items, container) {
-    if (!items.length) {
-      container.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>Kayıt bulunamadı.</div>';
-      return;
-    }
-    var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
-      '<thead><tr>' +
-      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Başlık / Ürün</th>' +
-      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Tür</th>' +
-      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Müşteri</th>' +
-      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Durum</th>' +
-      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Tarih</th>' +
-      '</tr></thead><tbody>';
-
-    items.forEach(function(item) {
-      var isPublic = item.itemType === 'public';
-      var dateStr = item.eventDate ? fmt(item.eventDate) : item.createdAt ? fmt(item.createdAt) : '—';
-      html += '<tr style="border-top:1px solid rgba(255,255,255,.06)">' +
-        '<td style="padding:11px 14px"><div style="font-weight:600">' + (item.title||item.productName||'—') + '</div>' +
-        (item.productName&&item.itemType==='private'?'<div style="font-size:11px;color:#5a6278">'+item.productName+'</div>':'') + '</td>' +
-        '<td style="padding:11px 14px">' + (isPublic ?
-          '<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078">Public</span>' :
-          '<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">Private</span>') + '</td>' +
-        '<td style="padding:11px 14px;color:#7c87a0">' + (item.customerName||'—') + '</td>' +
-        '<td style="padding:11px 14px">' + statusBadge(item.status) + '</td>' +
-        '<td style="padding:11px 14px;color:#7c87a0;font-size:12px">' + dateStr + '</td>' +
-        '</tr>';
-    });
-    html += '</tbody></table>';
-    container.innerHTML = html;
-  }
-
-  function renderCalView(items, container) {
-    var MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-    var DAYS = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
-
-    // O aya ait item'ları gün bazında grupla
-    var dayMap = {};
-    items.forEach(function(item) {
-      var dateField = item.eventDate || item.createdAt;
-      if (!dateField || !dateField.toDate) return;
-      var d = dateField.toDate();
-      if (d.getFullYear()===calYear && d.getMonth()===calMonth) {
-        var day = d.getDate();
-        if (!dayMap[day]) dayMap[day] = [];
-        dayMap[day].push(item);
-      }
-    });
-
-    var firstDay = new Date(calYear, calMonth, 1).getDay();
-    var offset = firstDay===0 ? 6 : firstDay-1;
-    var daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-
-    var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:16px">';
-    DAYS.forEach(function(d) {
-      html += '<div style="text-align:center;font-size:10px;color:#5a6278;font-weight:700;padding:4px 0">' + d + '</div>';
-    });
-    for (var i=0;i<offset;i++) html += '<div></div>';
-    for (var day=1;day<=daysInMonth;day++) {
-      var isToday = today.getFullYear()===calYear && today.getMonth()===calMonth && today.getDate()===day;
-      var dayItems = dayMap[day]||[];
-      var hasPoc = dayItems.some(function(x){return x.itemType==='private';});
-      var hasEv = dayItems.some(function(x){return x.itemType==='public';});
-      var bg = isToday ? '#3b7cff' : (hasPoc||hasEv) ? 'rgba(59,124,255,.15)' : 'transparent';
-      var border = isToday ? 'none' : (hasPoc||hasEv) ? '1px solid rgba(59,124,255,.3)' : '1px solid rgba(255,255,255,.06)';
-      html += '<div class="vcal-day" data-day="' + day + '" style="min-height:52px;border-radius:6px;padding:4px;cursor:' + (dayItems.length?'pointer':'default') + ';background:' + bg + ';border:' + border + '">' +
-        '<div style="font-size:11.5px;font-weight:' + (isToday||dayItems.length?'700':'400') + ';color:' + (isToday?'#fff':dayItems.length?'#e9ecf3':'#5a6278') + '">' + day + '</div>';
-      if (hasPoc) html += '<div style="width:6px;height:6px;border-radius:50%;background:#7db4ff;margin-top:2px" title="Private PoC"></div>';
-      if (hasEv) html += '<div style="width:6px;height:6px;border-radius:50%;background:#22d078;margin-top:2px" title="Public Etkinlik"></div>';
-      html += '</div>';
-    }
-    html += '</div>';
-
-    // Seçili gün detayı
-    html += '<div id="vcal-day-detail"></div>';
-
-    container.innerHTML = html;
-
-    // Gün tıklama
-    container.querySelectorAll('.vcal-day').forEach(function(dayEl) {
-      dayEl.addEventListener('click', function() {
-        var day = parseInt(dayEl.dataset.day);
-        var dayItems = dayMap[day]||[];
-        if (!dayItems.length) return;
-
-        // Önceki seçimi temizle
-        container.querySelectorAll('.vcal-day').forEach(function(d) {
-          if (!d.classList.contains('today')) d.style.outline='none';
-        });
-        dayEl.style.outline='2px solid #3b7cff';
-
-        var detailEl = document.getElementById('vcal-day-detail');
-        if (!detailEl) return;
-        var dHtml = '<div style="margin-top:4px">';
-        dayItems.forEach(function(item) {
-          var isPublic = item.itemType==='public';
-          dHtml += '<div class="card" style="margin-bottom:8px;padding:12px;border-color:' + (isPublic?'rgba(34,208,120,.25)':'rgba(59,124,255,.25)') + '">' +
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' +
-            '<span class="bdg" style="background:' + (isPublic?'rgba(34,208,120,.12)':'rgba(59,124,255,.12)') + ';color:' + (isPublic?'#22d078':'#7db4ff') + '">' + (isPublic?'Public Etkinlik':'Private PoC') + '</span>' +
-            statusBadge(item.status) + '</div>' +
-            '<div style="font-size:13px;font-weight:700">' + (item.title||item.productName||'—') + '</div>' +
-            (item.customerName?'<div style="font-size:12px;color:#7c87a0;margin-top:3px">Müşteri: '+item.customerName+'</div>':'') +
-            (item.productName&&isPublic?'<div style="font-size:12px;color:#7c87a0;margin-top:3px">Ürün: '+item.productName+'</div>':'') +
-            '</div>';
-        });
-        dHtml += '</div>';
-        detailEl.innerHTML = dHtml;
-      });
-    });
-  }
-
-  // Ana layout
-  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-    '<h2 style="font-size:18px;font-weight:700">PoC Takvimim</h2>' +
-    '<div style="display:flex;gap:8px;align-items:center">' +
-    '<input class="inp" id="vcal-search" placeholder="Ürün, müşteri veya başlık ara..." style="width:240px;font-size:12.5px">' +
-    '<button id="vcal-toggle-list" class="btn-g btn-sm">📋 Liste</button>' +
-    '<button id="vcal-toggle-cal" class="btn-p btn-sm">📅 Takvim</button>' +
-    '</div>' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px" id="vcal-nav">' +
-    '<button id="vcal-prev" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">‹</button>' +
-    '<span id="vcal-month-label" style="font-size:13px;font-weight:700;min-width:120px;text-align:center"></span>' +
-    '<button id="vcal-next" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">›</button>' +
-    '</div>' +
-    '<div id="vcal-legend" style="display:flex;gap:14px;margin-bottom:12px;font-size:12px;color:#7c87a0">' +
-    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7db4ff;margin-right:4px"></span>Private PoC</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22d078;margin-right:4px"></span>Public Etkinlik</span>' +
-    '</div>' +
-    '<div id="vcal-content"></div>';
-
-  var MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-
-  function updateMonthLabel() {
-    var lbl = document.getElementById('vcal-month-label');
-    if (lbl) lbl.textContent = MONTHS_TR[calMonth] + ' ' + calYear;
-  }
-
-  function setView(view) {
-    calView = view;
-    var navEl = document.getElementById('vcal-nav');
-    var legEl = document.getElementById('vcal-legend');
-    if (navEl) navEl.style.display = view==='calendar' ? 'flex' : 'none';
-    if (legEl) legEl.style.display = view==='calendar' ? 'flex' : 'none';
-    document.getElementById('vcal-toggle-cal').className = view==='calendar' ? 'btn-p btn-sm' : 'btn-g btn-sm';
-    document.getElementById('vcal-toggle-list').className = view==='list' ? 'btn-p btn-sm' : 'btn-g btn-sm';
-    updateMonthLabel();
-    renderContent();
-  }
-
-  m.querySelector('#vcal-prev').addEventListener('click', function() {
-    calMonth--; if(calMonth<0){calMonth=11;calYear--;}
-    updateMonthLabel(); renderContent();
-  });
-  m.querySelector('#vcal-next').addEventListener('click', function() {
-    calMonth++; if(calMonth>11){calMonth=0;calYear++;}
-    updateMonthLabel(); renderContent();
-  });
-  m.querySelector('#vcal-toggle-list').addEventListener('click', function() { setView('list'); });
-  m.querySelector('#vcal-toggle-cal').addEventListener('click', function() { setView('calendar'); });
-  m.querySelector('#vcal-search').addEventListener('input', function() {
-    searchQuery = this.value;
-    renderContent();
-  });
-
-  setView('calendar');
-}
-
-async function openEditEventModal(evId, evData) {
-  var modal = document.createElement('div');
-  modal.className = 'modal-bg on';
-
-  var fmtDate = '';
-  var fmtTime = '10:00';
-  if (evData.eventDate && evData.eventDate.toDate) {
-    var d = evData.eventDate.toDate();
-    fmtDate = d.toISOString().split('T')[0];
-    fmtTime = d.toTimeString().slice(0,5);
-  }
-
-  modal.innerHTML = '<div class="modal" style="max-width:520px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
-    '<h3 style="font-size:15px;font-weight:700">Etkinlik Düzenle</h3>' +
-    '<button id="close-eedit" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
-    '</div>' +
-    '<label class="lbl">Etkinlik Başlığı *</label>' +
-    '<input class="inp" id="ee-title" value="' + (evData.title||'').replace(/"/g,'&quot;') + '">' +
-    '<label class="lbl">Açıklama *</label>' +
-    '<textarea class="inp" id="ee-desc" rows="3" style="resize:none">' + (evData.description||'') + '</textarea>' +
-    '<label class="lbl">Tarih ve Saat</label>' +
-    '<div class="g2">' +
-    '<input class="inp" id="ee-date" type="date" value="' + fmtDate + '">' +
-    '<input class="inp" id="ee-time" type="time" value="' + fmtTime + '">' +
-    '</div>' +
-    '<div class="g2">' +
-    '<div><label class="lbl">Kapasite</label><input class="inp" id="ee-cap" type="number" value="' + (evData.capacity||50) + '"></div>' +
-    '<div><label class="lbl">Ücret (₺)</label><input class="inp" id="ee-fee" type="number" value="' + (evData.fee||0) + '"></div>' +
-    '</div>' +
-    '<label class="lbl">Format</label>' +
-    '<select class="inp" id="ee-fmt">' +
-    '<option value="online"' + (evData.format==='online'?' selected':'') + '>Online</option>' +
-    '<option value="onsite"' + (evData.format==='onsite'?' selected':'') + '>Fiziksel</option>' +
-    '<option value="hybrid"' + (evData.format==='hybrid'?' selected':'') + '>Hibrit</option>' +
-    '</select>' +
-    '<div id="ee-loc-online" style="margin-top:8px">' +
-    '<label class="lbl">Online Link</label>' +
-    '<input class="inp" id="ee-url" value="' + (evData.onlineUrl||'').replace(/"/g,'&quot;') + '" placeholder="https://zoom.us/j/...">' +
-    '</div>' +
-    '<div id="ee-loc-onsite" style="margin-top:8px">' +
-    '<label class="lbl">Fiziksel Adres</label>' +
-    '<input class="inp" id="ee-address" value="' + (evData.physicalAddress||'').replace(/"/g,'&quot;') + '" placeholder="Büyükdere Cad. No:127, İstanbul">' +
-    '</div>' +
-    '<div id="ee-err" style="margin-top:10px"></div>' +
-    '<button class="btn-p" id="ee-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>' +
-    '</div>';
-
-  document.body.appendChild(modal);
-  modal.querySelector('#close-eedit').addEventListener('click', function() { modal.remove(); });
-  modal.addEventListener('click', function(e) { if(e.target===modal) modal.remove(); });
-
-  function updateEeLocFields() {
-    var fmt = modal.querySelector('#ee-fmt').value;
-    modal.querySelector('#ee-loc-online').style.display = (fmt==='online'||fmt==='hybrid') ? 'block' : 'none';
-    modal.querySelector('#ee-loc-onsite').style.display = (fmt==='onsite'||fmt==='hybrid') ? 'block' : 'none';
-  }
-  modal.querySelector('#ee-fmt').addEventListener('change', updateEeLocFields);
-  updateEeLocFields();
-
-  modal.querySelector('#ee-submit').addEventListener('click', async function() {
-    var title = modal.querySelector('#ee-title').value.trim();
-    var desc = modal.querySelector('#ee-desc').value.trim();
-    if (!title || !desc) {
-      modal.querySelector('#ee-err').innerHTML = '<div class="alert alert-err">Başlık ve açıklama zorunludur.</div>';
-      return;
-    }
-    var btn = modal.querySelector('#ee-submit');
-    btn.disabled=true; btn.textContent='Güncelleniyor...';
-    try {
-      var dateVal = modal.querySelector('#ee-date').value;
-      var timeVal = modal.querySelector('#ee-time').value || '10:00';
-      var fmt = modal.querySelector('#ee-fmt').value;
-      var urlVal = modal.querySelector('#ee-url').value.trim();
-      var addrVal = modal.querySelector('#ee-address').value.trim();
-      var locStr = fmt==='online' ? urlVal : fmt==='onsite' ? addrVal : addrVal + ' | ' + urlVal;
-
-      var updateData = {
-        title: title, description: desc,
-        capacity: parseInt(modal.querySelector('#ee-cap').value)||50,
-        fee: parseFloat(modal.querySelector('#ee-fee').value)||0,
-        format: fmt, location: locStr,
-        onlineUrl: (fmt==='online'||fmt==='hybrid') ? urlVal : '',
-        physicalAddress: (fmt==='onsite'||fmt==='hybrid') ? addrVal : '',
-        updatedAt: serverTimestamp()
-      };
-      if (dateVal) {
-        updateData.eventDate = Timestamp.fromDate(new Date(dateVal + 'T' + timeVal + ':00'));
-      }
-      await updateDoc(doc(db,'public_events',evId), updateData);
-      modal.remove();
-      showToast('Etkinlik güncellendi!');
-      loadVendTab();
-    } catch(e) {
-      modal.querySelector('#ee-err').innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
-      btn.disabled=false; btn.textContent='Güncelle';
-    }
-  });
-}
-
 async function openNewEventModal() {
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
-  modal.innerHTML = '<div class="modal" style="max-width:520px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
-    '<h3 style="font-size:15px;font-weight:700">Yeni Etkinlik Oluştur</h3>' +
-    '<button id="close-ev-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
-    '</div>' +
-
-    '<label class="lbl">Etkinlik Başlığı *</label>' +
-    '<input class="inp" id="ev-title" placeholder="FortiGate 100F — Canlı Demo">' +
-
-    '<label class="lbl">Etkinlik Açıklaması *</label>' +
-    '<textarea class="inp" id="ev-desc" rows="3" placeholder="Etkinlik içeriği, hedef kitle, gündem..." style="resize:none"></textarea>' +
-
-    '<label class="lbl">Ürün Seç *</label>' +
-    '<div style="position:relative;margin-bottom:4px">' +
-    '<input class="inp" id="ev-prod-search" placeholder="Ürün ara veya listeden seç..." autocomplete="off">' +
-    '<div id="ev-prod-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:220px;overflow-y:auto;z-index:100;margin-top:2px"></div>' +
-    '<input type="hidden" id="ev-prod-id" value="">' +
-    '<input type="hidden" id="ev-prod-name-val" value="">' +
-    '<input type="hidden" id="ev-prod-cat-val" value="">' +
-    '</div>' +
-
-    '<label class="lbl">Tarih ve Saat *</label>' +
-    '<div class="g2">' +
-    '<input class="inp" id="ev-date" type="date" title="Tarih seçin">' +
-    '<input class="inp" id="ev-time" type="time" value="10:00" title="Saat seçin">' +
-    '</div>' +
-
-    '<div class="g2">' +
-    '<div><label class="lbl">Kapasite *</label><input class="inp" id="ev-cap" type="number" value="50" min="1"></div>' +
-    '<div><label class="lbl">Katılım Ücreti (₺, 0=Ücretsiz)</label><input class="inp" id="ev-fee" type="number" value="0" min="0"></div>' +
-    '</div>' +
-
-    '<label class="lbl">Format *</label>' +
-    '<select class="inp" id="ev-fmt">' +
-    '<option value="online">Online</option>' +
-    '<option value="onsite">Fiziksel (Yüz yüze)</option>' +
-    '<option value="hybrid">Hibrit (Online + Fiziksel)</option>' +
-    '</select>' +
-
-    '<div id="ev-loc-online" style="margin-top:8px">' +
-    '<label class="lbl">Online Katılım Linki * <span style="color:#5a6278;font-size:11px">(Zoom, Teams, Meet vb.)</span></label>' +
-    '<input class="inp" id="ev-url" placeholder="https://zoom.us/j/... veya teams.microsoft.com/...">' +
-    '</div>' +
-
-    '<div id="ev-loc-onsite" style="display:none;margin-top:8px">' +
-    '<label class="lbl">Fiziksel Lokasyon Adresi * <span style="color:#5a6278;font-size:11px">(Google Maps&#39;te görünecek)</span></label>' +
-    '<input class="inp" id="ev-address" placeholder="Büyükdere Cad. No:127, Esentepe, İstanbul">' +
-    '</div>' +
-
-    '<div id="ev-err" style="margin-top:10px"></div>' +
-    '<button class="btn-p" id="ev-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Etkinliği Yayınla</button>' +
-    '</div>';
+  modal.innerHTML = `<div class="modal" style="max-width:500px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 style="font-size:15px;font-weight:700">Yeni Etkinlik Oluştur</h3>
+      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-ev-modal">×</button>
+    </div>
+    <label class="lbl">Etkinlik Başlığı *</label><input class="inp" id="ev-title" placeholder="FortiGate 100F — Canlı Demo">
+    <label class="lbl">Ürün Seç *</label>
+    <div style="position:relative;margin-bottom:4px">
+      <input class="inp" id="ev-prod-search" placeholder="Ürün ara veya listeden seç..." autocomplete="off" oninput="filterVendorProducts(this.value)">
+      <div id="ev-prod-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:220px;overflow-y:auto;z-index:100;margin-top:2px"></div>
+      <input type="hidden" id="ev-prod-id" value="">
+      <input type="hidden" id="ev-prod-name-val" value="">
+      <input type="hidden" id="ev-prod-cat-val" value="">
+    </div>
+    <label class="lbl">Tarih *</label><input class="inp" id="ev-date" type="datetime-local">
+    <div class="g2">
+      <div><label class="lbl">Kapasite</label><input class="inp" id="ev-cap" type="number" value="50"></div>
+      <div><label class="lbl">Katılım Ücreti (0 = Ücretsiz)</label><input class="inp" id="ev-fee" type="number" value="0"></div>
+    </div>
+    <label class="lbl">Format</label>
+    <select class="inp" id="ev-fmt"><option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option></select>
+    <label class="lbl">Lokasyon / Zoom Linki</label><input class="inp" id="ev-loc" placeholder="İstanbul Levent / zoom.us/j/...">
+    <label class="lbl">Açıklama</label><textarea class="inp" id="ev-desc" rows="3" style="resize:none"></textarea>
+    <div id="ev-err" style="margin-top:10px"></div>
+    <button class="btn-p" id="ev-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Etkinliği Yayınla</button>
+  </div>`;
   document.body.appendChild(modal);
   modal.querySelector('#close-ev-modal').addEventListener('click', () => modal.remove());
-
-  // Format değişince lokasyon alanlarını güncelle
-  function updateLocFields() {
-    var fmt = modal.querySelector('#ev-fmt').value;
-    var onlineDiv = modal.querySelector('#ev-loc-online');
-    var onsiteDiv = modal.querySelector('#ev-loc-onsite');
-    if (fmt === 'online') {
-      onlineDiv.style.display = 'block';
-      onsiteDiv.style.display = 'none';
-    } else if (fmt === 'onsite') {
-      onlineDiv.style.display = 'none';
-      onsiteDiv.style.display = 'block';
-    } else { // hybrid
-      onlineDiv.style.display = 'block';
-      onsiteDiv.style.display = 'block';
-      onlineDiv.querySelector('label').innerHTML = 'Online Katılım Linki * <span style="color:#5a6278;font-size:11px">(Zoom, Teams, Meet vb.)</span>';
-      onsiteDiv.querySelector('label').innerHTML = 'Fiziksel Lokasyon Adresi * <span style="color:#5a6278;font-size:11px">(Hibrit - Her iki alan zorunlu)</span>';
-    }
-  }
-  modal.querySelector('#ev-fmt').addEventListener('change', updateLocFields);
-  updateLocFields();
-
-  // ev-prod-search için oninput listener (oninput attribute'u kaldırdık)
-  modal.querySelector('#ev-prod-search').addEventListener('input', function() {
-    filterVendorProductsInModal(this.value, vendorProds, modal);
-  });
-  modal.querySelector('#ev-prod-search').addEventListener('focus', function() {
-    renderEvProdList(vendorProds, modal);
-  });
 
   // Vendor'un ürünlerini yükle
   let vendorProds = [];
@@ -2751,63 +2260,44 @@ async function openNewEventModal() {
     console.error('Vendor ürünleri yüklenemedi:', e);
   }
 
-  // ev-prod listener yukarıda tanımlandı
-  modal.querySelector('#ev-submit').addEventListener('click', async function() {
-    var title = modal.querySelector('#ev-title').value.trim();
-    var desc = modal.querySelector('#ev-desc').value.trim();
-    var dateVal = modal.querySelector('#ev-date').value;
-    var timeVal = modal.querySelector('#ev-time') ? modal.querySelector('#ev-time').value || '10:00' : '10:00';
-    var fmt = modal.querySelector('#ev-fmt').value;
-    var urlVal = modal.querySelector('#ev-url') ? modal.querySelector('#ev-url').value.trim() : '';
-    var addrVal = modal.querySelector('#ev-address') ? modal.querySelector('#ev-address').value.trim() : '';
-    var prodName = modal.querySelector('#ev-prod-name-val').value || modal.querySelector('#ev-prod-search').value.trim();
-    var errDiv = modal.querySelector('#ev-err');
-
-    var errors = [];
-    if (!title) errors.push('Başlık');
-    if (!desc) errors.push('Açıklama');
-    if (!prodName) errors.push('Ürün');
-    if (!dateVal) errors.push('Tarih');
-    if ((fmt==='online'||fmt==='hybrid') && !urlVal) errors.push('Online link');
-    if ((fmt==='onsite'||fmt==='hybrid') && !addrVal) errors.push('Fiziksel adres');
-
-    if (errors.length) {
-      errDiv.innerHTML = '<div class="alert alert-err">Zorunlu alanlar eksik: <b>' + errors.join(', ') + '</b></div>';
-      return;
-    }
-    if ((fmt==='online'||fmt==='hybrid') && urlVal && !urlVal.startsWith('http')) {
-      errDiv.innerHTML = '<div class="alert alert-err">Online link http:// veya https:// ile başlamalıdır.</div>';
-      return;
-    }
-
-    var btn = modal.querySelector('#ev-submit');
+  modal.querySelector('#ev-prod-search').addEventListener('input', function() {
+    filterVendorProductsInModal(this.value, vendorProds, modal);
+  });
+  modal.querySelector('#ev-prod-search').addEventListener('focus', function() {
+    renderEvProdList(
+      this.value ? vendorProds.filter(p=>p.name?.toLowerCase().includes(this.value.toLowerCase())) : vendorProds,
+      modal
+    );
+  });
+  modal.querySelector('#ev-submit').addEventListener('click', async () => {
+    const title = modal.querySelector('#ev-title').value.trim();
+    const dateVal = modal.querySelector('#ev-date').value;
+    if (!title || !dateVal) { modal.querySelector('#ev-err').innerHTML='<div class="alert alert-err">Başlık ve tarih zorunludur.</div>'; return; }
+    const btn = modal.querySelector('#ev-submit');
     btn.disabled=true; btn.textContent='Yayınlanıyor...';
     try {
-      var dateTime = new Date(dateVal + 'T' + timeVal + ':00');
-      var locStr = fmt==='online' ? urlVal : fmt==='onsite' ? addrVal : addrVal + ' | Online: ' + urlVal;
-
       await addDoc(collection(db,'public_events'), {
         vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE ? (CUR_PROFILE.displayName||CUR_USER.email) : CUR_USER.email,
+        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
         vendorEmail: CUR_USER.email,
-        title: title, description: desc,
-        productName: prodName,
+        title, productName: modal.querySelector('#ev-prod-name-val').value || modal.querySelector('#ev-prod-search').value,
         productId: modal.querySelector('#ev-prod-id').value,
         category: modal.querySelector('#ev-prod-cat-val').value || 'Diğer',
-        eventDate: Timestamp.fromDate(dateTime),
+        eventDate: Timestamp.fromDate(new Date(dateVal)),
         capacity: parseInt(modal.querySelector('#ev-cap').value)||50,
         fee: parseFloat(modal.querySelector('#ev-fee').value)||0,
-        format: fmt, location: locStr,
-        onlineUrl: (fmt==='online'||fmt==='hybrid') ? urlVal : '',
-        physicalAddress: (fmt==='onsite'||fmt==='hybrid') ? addrVal : '',
-        registeredCount: 0, status: 'published',
+        format: modal.querySelector('#ev-fmt').value,
+        location: modal.querySelector('#ev-loc').value,
+        description: modal.querySelector('#ev-desc').value,
+        registeredCount: 0,
+        status: 'published',
         createdAt: serverTimestamp()
       });
       modal.remove();
       showToast('Etkinlik yayınlandı!');
       if (CUR_VEND_TAB==='events') loadVendTab();
     } catch(e) {
-      errDiv.innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
+      modal.querySelector('#ev-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
       btn.disabled=false; btn.textContent='Etkinliği Yayınla';
     }
   });
@@ -2821,7 +2311,6 @@ function renderAdmin() {
     el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Admin yetkisi gerekli.</div></div>`;
     return;
   }
-  // Sidebar zaten oluşturulmuşsa sadece içeriği güncelle
   if (el('adm-main')) { loadAdmTab(); return; }
   const tabs = [
     ['dashboard','Dashboard'],['users','Kullanıcılar'],['categories','Kategoriler'],
@@ -2832,7 +2321,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.9.1</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.9.2</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -2847,16 +2336,15 @@ async function loadAdmTab() {
   const m = el('adm-main');
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
+  try {
+    if (CUR_ADM_TAB === 'categories') { await admCategories(m); return; }
+    if (CUR_ADM_TAB === 'users')      { await admUsers(m);      return; }
+    if (CUR_ADM_TAB === 'products')   { await admProducts(m);   return; }
+    if (CUR_ADM_TAB === 'requests')   { await admRequests(m);   return; }
+    if (CUR_ADM_TAB === 'events')     { await admEvents(m);     return; }
+    if (CUR_ADM_TAB === 'offers')     { await admOffers(m);     return; }
 
-  if (CUR_ADM_TAB === 'categories') { await admCategories(m); return; }
-  if (CUR_ADM_TAB === 'users') { await admUsers(m); return; }
-  if (CUR_ADM_TAB === 'products') { await admProducts(m); return; }
-  if (CUR_ADM_TAB === 'requests') { await admRequests(m); return; }
-  if (CUR_ADM_TAB === 'events') { await admEvents(m); return; }
-  if (CUR_ADM_TAB === 'offers') { await admOffers(m); return; }
-
-  // Dashboard
-  if (CUR_ADM_TAB === 'dashboard') {
+    // DASHBOARD
     const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap] = await Promise.all([
       getDocs(collection(db,'users')),
       getDocs(collection(db,'products')),
@@ -2864,414 +2352,283 @@ async function loadAdmTab() {
       getDocs(collection(db,'public_events')),
       getDocs(collection(db,'offers')),
     ]);
-    const users = usersSnap.docs.map(d=>d.data());
-    const prods = prodsSnap.docs.map(d=>d.data());
-    const allPocs = pocSnap.docs.map(d=>d.data());
-    const pocs = allPocs.filter(p=>p.status==='pending'||p.status==='active');
-    const allEvents = evSnap.docs.map(d=>d.data());
-    const events = allEvents.filter(e=>e.status==='published');
+    const users  = usersSnap.docs.map(d=>d.data());
+    const prods  = prodsSnap.docs.map(d=>d.data());
+    const pocs   = pocSnap.docs.map(d=>d.data());
+    const evs    = evSnap.docs.map(d=>d.data());
     const offers = offSnap.docs.map(d=>d.data());
+
+    var html = '<h2 style="font-size:18px;font-weight:700;margin-bottom:18px">Platform Dashboard</h2>';
+    html += '<div class="g4" style="margin-bottom:20px">';
+    var stats = [
+      {v:users.length, l:'Toplam Kullanıcı', c:'#e9ecf3'},
+      {v:users.filter(function(u){return u.role==='customer';}).length, l:'Müşteri', c:'#22d078'},
+      {v:users.filter(function(u){return u.role==='vendor';}).length, l:'Vendor', c:'#3b7cff'},
+      {v:prods.filter(function(p){return p.status==='pending';}).length, l:'Onay Bekleyen Ürün', c:'#f0a429'},
+      {v:pocs.filter(function(p){return p.status==='pending';}).length, l:'Bekleyen PoC', c:'#f0a429'},
+      {v:pocs.filter(function(p){return p.status==='active';}).length, l:'Aktif PoC', c:'#22d078'},
+      {v:evs.filter(function(e){return e.status==='published';}).length, l:'Aktif Etkinlik', c:'#3b7cff'},
+      {v:offers.filter(function(o){return o.status==='accepted';}).length, l:'Kabul Edilen Teklif', c:'#22d078'},
+    ];
+    stats.forEach(function(s) {
+      html += '<div class="stat-card"><div style="font-size:26px;font-weight:700;color:'+s.c+';font-family:monospace">'+s.v+'</div><div style="font-size:11px;color:#7c87a0;margin-top:3px">'+s.l+'</div></div>';
+    });
+    html += '</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+    html += '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:10px">PoC Durum Dağılımı</div>';
+    ['pending','active','completed','cancelled','rejected'].forEach(function(s) {
+      html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px"><span>'+statusBadge(s)+'</span><span style="font-family:monospace;font-weight:700">'+pocs.filter(function(p){return p.status===s;}).length+'</span></div>';
+    });
+    html += '</div><div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:10px">Vendor Tür Dağılımı</div>';
+    [{k:'ureticid',l:'Üretici'},{k:'distributor',l:'Distribütör'},{k:'integrator',l:'Entegratör'}].forEach(function(t) {
+      html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px"><span style="color:#7c87a0">'+t.l+'</span><span style="font-family:monospace;font-weight:700">'+users.filter(function(u){return u.vendorType===t.k;}).length+'</span></div>';
+    });
+    html += '</div></div>';
+    m.innerHTML = html;
+  } catch(err) {
+    m.innerHTML = '<div class="empty"><div class="empty-icon">⚠</div>Hata: '+err.message+'</div>';
+    console.error('loadAdmTab:', err);
+  }
+}
 
 async function admUsers(m) {
   const snap = await getDocs(collection(db,'users'));
-  var allUsers = snap.docs.map(d=>({...d.data(),id:d.id}));
-  allUsers.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  const vtypes={ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
-  const roleBg={admin:'rgba(240,164,41,.12)',vendor:'rgba(59,124,255,.12)',customer:'rgba(34,208,120,.12)'};
-  const roleCol={admin:'#f0a429',vendor:'#7db4ff',customer:'#22d078'};
-
-  function renderRows(users) {
-    var tbody = m.querySelector('#users-tbody');
-    var count = m.querySelector('#users-count');
-    if (count) count.textContent = '(' + users.length + ')';
-    if (!tbody) return;
-    if (!users.length) { tbody.innerHTML='<tr><td colspan="4" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>'; return; }
-    tbody.innerHTML = users.map(function(u) {
-      var roleLabel = u.role==='vendor'?(vtypes[u.vendorType]||'Vendor'):u.role==='admin'?'Admin':'Müşteri';
-      return '<tr><td><div style="font-weight:600">'+(u.displayName||'—')+'</div><div style="font-size:11.5px;color:#7c87a0">'+u.email+'</div></td>' +
-        '<td><span class="bdg" style="background:'+(roleBg[u.role]||'#1c1f2a')+';color:'+(roleCol[u.role]||'#7c87a0')+'">'+roleLabel+'</span></td>' +
-        '<td style="color:#7c87a0">'+(u.company||'—')+'</td>' +
+  var all = snap.docs.map(d=>({...d.data(),id:d.id}));
+  all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  var vtypes={ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+  var roleBg={admin:'rgba(240,164,41,.12)',vendor:'rgba(59,124,255,.12)',customer:'rgba(34,208,120,.12)'};
+  var roleCol={admin:'#f0a429',vendor:'#7db4ff',customer:'#22d078'};
+  var roleFilter='';
+  function renderRows(items) {
+    var tbody=m.querySelector('#u-tbody');
+    var cnt=m.querySelector('#u-cnt');
+    if(cnt) cnt.textContent='('+items.length+')';
+    if(!tbody) return;
+    tbody.innerHTML=items.length?items.map(function(u){
+      var rl=u.role==='vendor'?(vtypes[u.vendorType]||'Vendor'):u.role==='admin'?'Admin':'Müşteri';
+      return '<tr><td><div style="font-weight:600">'+(u.displayName||'—')+'</div><div style="font-size:11.5px;color:#7c87a0">'+u.email+'</div></td>'+
+        '<td><span class="bdg" style="background:'+(roleBg[u.role]||'#1c1f2a')+';color:'+(roleCol[u.role]||'#7c87a0')+'">'+rl+'</span></td>'+
+        '<td style="color:#7c87a0">'+(u.company||'—')+'</td>'+
         '<td style="color:#7c87a0;font-size:12px">'+fmt(u.createdAt)+'</td></tr>';
-    }).join('');
+    }).join(''):'<tr><td colspan="4" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
   }
-
-  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-    '<h2 style="font-size:18px;font-weight:700">Kullanıcılar <span id="users-count" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
-    '<input class="inp" id="users-search" placeholder="Ad, e-posta veya şirket ara..." style="width:260px;font-size:12.5px"></div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:12px">' +
-    '<button class="btn-g btn-sm user-role-filter on" data-role="">Tümü</button>' +
-    '<button class="btn-g btn-sm user-role-filter" data-role="customer">Müşteri</button>' +
-    '<button class="btn-g btn-sm user-role-filter" data-role="vendor">Vendor</button>' +
-    '<button class="btn-g btn-sm user-role-filter" data-role="admin">Admin</button>' +
-    '</div>' +
-    '<table><thead><tr><th>Ad / E-posta</th><th>Rol</th><th>Şirket</th><th>Kayıt</th></tr></thead><tbody id="users-tbody"></tbody></table>';
-
-  var roleFilter = '';
   function applyFilter() {
-    var q = (m.querySelector('#users-search')?.value||'').toLowerCase();
-    var filtered = allUsers.filter(function(u) {
-      var matchRole = !roleFilter || u.role===roleFilter;
-      var matchQ = !q || (u.displayName||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.company||'').toLowerCase().includes(q);
-      return matchRole && matchQ;
+    var q=(m.querySelector('#u-search')?.value||'').toLowerCase();
+    var filtered=all.filter(function(u){
+      return (!roleFilter||u.role===roleFilter)&&(!q||(u.displayName||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)||(u.company||'').toLowerCase().includes(q));
     });
     renderRows(filtered);
   }
-
-  renderRows(allUsers);
-  m.querySelector('#users-search').addEventListener('input', applyFilter);
-  m.querySelectorAll('.user-role-filter').forEach(function(b) {
-    b.addEventListener('click', function() {
-      m.querySelectorAll('.user-role-filter').forEach(function(x){x.className='btn-g btn-sm user-role-filter';});
-      b.className='btn-p btn-sm user-role-filter on';
-      roleFilter = b.dataset.role;
-      applyFilter();
-    });
-  });
+  m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<h2 style="font-size:18px;font-weight:700">Kullanıcılar <span id="u-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
+    '<input class="inp" id="u-search" placeholder="Ad, e-posta veya şirket..." style="width:250px;font-size:12.5px"></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    '<button class="btn-p btn-sm u-rf" data-r="">Tümü</button>'+
+    '<button class="btn-g btn-sm u-rf" data-r="customer">Müşteri</button>'+
+    '<button class="btn-g btn-sm u-rf" data-r="vendor">Vendor</button>'+
+    '<button class="btn-g btn-sm u-rf" data-r="admin">Admin</button></div>'+
+    '<table><thead><tr><th>Ad / E-posta</th><th>Rol</th><th>Şirket</th><th>Kayıt</th></tr></thead><tbody id="u-tbody"></tbody></table>';
+  renderRows(all);
+  m.querySelector('#u-search').addEventListener('input', applyFilter);
+  m.querySelectorAll('.u-rf').forEach(function(b){b.addEventListener('click',function(){
+    m.querySelectorAll('.u-rf').forEach(function(x){x.className='btn-g btn-sm u-rf';});
+    b.className='btn-p btn-sm u-rf'; roleFilter=b.dataset.r; applyFilter();
+  });});
 }
 
 async function admProducts(m) {
   const snap = await getDocs(collection(db,'products'));
-  var allProds = snap.docs.map(d=>({...d.data(),id:d.id}));
-  allProds.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-
-  function renderRows(prods) {
-    var tbody = m.querySelector('#prods-tbody');
-    var count = m.querySelector('#prods-count');
-    if (count) count.textContent = '(' + prods.length + ')';
-    if (!tbody) return;
-    if (!prods.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>'; return; }
-    tbody.innerHTML = prods.map(function(p) {
-      return '<tr><td><div style="font-weight:600">'+p.name+'</div>'+(p.description?'<div style="font-size:11.5px;color:#7c87a0">'+p.description.substring(0,50)+'...</div>':'')+'</td>' +
-        '<td style="color:#7c87a0">'+(p.vendorName||'—')+'</td>' +
-        '<td style="color:#7c87a0">'+(p.category||'—')+'</td>' +
-        '<td>'+cc(p.country||'TR')+'</td>' +
-        '<td>'+statusBadge(p.status)+'</td>' +
-        '<td style="white-space:nowrap">' +
-        (p.status==='pending'?
-          '<button class="btn-gr btn-sm appr-prod" data-id="'+p.id+'" data-vemail="'+(p.vendorEmail||'')+'" data-vname="'+(p.vendorName||'')+'" data-pname="'+p.name+'" style="margin-right:5px">Onayla</button>' +
-          '<button class="btn-red btn-sm rej-prod" data-id="'+p.id+'" data-vemail="'+(p.vendorEmail||'')+'" data-vname="'+(p.vendorName||'')+'" data-pname="'+p.name+'">Reddet</button>' :
-          p.status==='active'?'<button class="btn-red btn-sm arc-prod" data-id="'+p.id+'">Arşivle</button>':'—') +
-        '</td></tr>';
-    }).join('');
-    // Binding
-    m.querySelectorAll('.appr-prod').forEach(function(b){b.addEventListener('click',async function(){
+  var all = snap.docs.map(d=>({...d.data(),id:d.id}));
+  all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  var stFilter='';
+  function renderRows(items) {
+    var tbody=m.querySelector('#p-tbody');
+    var cnt=m.querySelector('#p-cnt');
+    if(cnt) cnt.textContent='('+items.length+')';
+    if(!tbody) return;
+    tbody.innerHTML=items.length?items.map(function(p){
+      return '<tr><td><div style="font-weight:600">'+p.name+'</div>'+(p.description?'<div style="font-size:11.5px;color:#7c87a0">'+p.description.substring(0,50)+'...</div>':'')+'</td>'+
+        '<td style="color:#7c87a0">'+(p.vendorName||'—')+'</td>'+
+        '<td style="color:#7c87a0">'+(p.category||'—')+'</td>'+
+        '<td>'+cc(p.country||'TR')+'</td>'+
+        '<td>'+statusBadge(p.status)+'</td>'+
+        '<td style="white-space:nowrap">'+(p.status==='pending'?
+          '<button class="btn-gr btn-sm p-appr" data-id="'+p.id+'" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+'" data-pn="'+p.name+'" style="margin-right:4px">Onayla</button>'+
+          '<button class="btn-red btn-sm p-rej" data-id="'+p.id+'" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+'" data-pn="'+p.name+'">Reddet</button>':
+          p.status==='active'?'<button class="btn-red btn-sm p-arc" data-id="'+p.id+'">Arşivle</button>':'—')+'</td></tr>';
+    }).join(''):'<tr><td colspan="6" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
+    m.querySelectorAll('.p-appr').forEach(function(b){b.addEventListener('click',async function(){
       await updateDoc(doc(db,'products',b.dataset.id),{status:'active'});
       showToast('Ürün onaylandı!');
-      if(b.dataset.vemail) sendEmail(b.dataset.vemail,b.dataset.vname,'Ürününüz Onaylandı',''+b.dataset.pname+' ürününüz onaylandı.','');
+      if(b.dataset.ve) sendEmail(b.dataset.ve,b.dataset.vn,'Ürününüz Onaylandı',b.dataset.pn+' ürününüz onaylandı.','');
       admProducts(m);
     });});
-    m.querySelectorAll('.rej-prod').forEach(function(b){b.addEventListener('click',async function(){
+    m.querySelectorAll('.p-rej').forEach(function(b){b.addEventListener('click',async function(){
       await updateDoc(doc(db,'products',b.dataset.id),{status:'rejected'});
       showToast('Ürün reddedildi.');
-      if(b.dataset.vemail) sendEmail(b.dataset.vemail,b.dataset.vname,'Ürün Değerlendirmesi',b.dataset.pname+' ürününüz onaylanmadı.','');
+      if(b.dataset.ve) sendEmail(b.dataset.ve,b.dataset.vn,'Ürün Değerlendirmesi',b.dataset.pn+' onaylanmadı.','');
       admProducts(m);
     });});
-    m.querySelectorAll('.arc-prod').forEach(function(b){b.addEventListener('click',async function(){
+    m.querySelectorAll('.p-arc').forEach(function(b){b.addEventListener('click',async function(){
       await updateDoc(doc(db,'products',b.dataset.id),{status:'archived'});
-      showToast('Ürün arşivlendi.');
-      admProducts(m);
+      showToast('Arşivlendi.'); admProducts(m);
     });});
   }
-
-  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-    '<h2 style="font-size:18px;font-weight:700">Ürün Yönetimi <span id="prods-count" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
-    '<input class="inp" id="prods-search" placeholder="Ürün adı, vendor veya kategori ara..." style="width:260px;font-size:12.5px"></div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:12px">' +
-    '<button class="btn-g btn-sm prod-status-filter on" data-status="">Tümü</button>' +
-    '<button class="btn-g btn-sm prod-status-filter" data-status="pending">Bekleyen</button>' +
-    '<button class="btn-g btn-sm prod-status-filter" data-status="active">Aktif</button>' +
-    '<button class="btn-g btn-sm prod-status-filter" data-status="rejected">Reddedilen</button>' +
-    '</div>' +
-    '<table><thead><tr><th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="prods-tbody"></tbody></table>';
-
-  var statusFilter = '';
   function applyFilter() {
-    var q = (m.querySelector('#prods-search')?.value||'').toLowerCase();
-    var filtered = allProds.filter(function(p) {
-      var matchS = !statusFilter || p.status===statusFilter;
-      var matchQ = !q || (p.name||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q);
-      return matchS && matchQ;
-    });
-    renderRows(filtered);
+    var q=(m.querySelector('#p-search')?.value||'').toLowerCase();
+    renderRows(all.filter(function(p){
+      return (!stFilter||p.status===stFilter)&&(!q||(p.name||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q));
+    }));
   }
-  renderRows(allProds);
-  m.querySelector('#prods-search').addEventListener('input', applyFilter);
-  m.querySelectorAll('.prod-status-filter').forEach(function(b){
-    b.addEventListener('click',function(){
-      m.querySelectorAll('.prod-status-filter').forEach(function(x){x.className='btn-g btn-sm prod-status-filter';});
-      b.className='btn-p btn-sm prod-status-filter on';
-      statusFilter=b.dataset.status;
-      applyFilter();
-    });
-  });
+  m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<h2 style="font-size:18px;font-weight:700">Ürün Yönetimi <span id="p-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
+    '<input class="inp" id="p-search" placeholder="Ürün, vendor veya kategori..." style="width:250px;font-size:12.5px"></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    '<button class="btn-p btn-sm p-sf" data-s="">Tümü</button>'+
+    '<button class="btn-g btn-sm p-sf" data-s="pending">Bekleyen</button>'+
+    '<button class="btn-g btn-sm p-sf" data-s="active">Aktif</button>'+
+    '<button class="btn-g btn-sm p-sf" data-s="rejected">Reddedilen</button></div>'+
+    '<table><thead><tr><th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="p-tbody"></tbody></table>';
+  renderRows(all);
+  m.querySelector('#p-search').addEventListener('input', applyFilter);
+  m.querySelectorAll('.p-sf').forEach(function(b){b.addEventListener('click',function(){
+    m.querySelectorAll('.p-sf').forEach(function(x){x.className='btn-g btn-sm p-sf';});
+    b.className='btn-p btn-sm p-sf'; stFilter=b.dataset.s; applyFilter();
+  });});
 }
 
 async function admRequests(m) {
   const snap = await getDocs(collection(db,'poc_requests'));
-  var allReqs = snap.docs.map(d=>({...d.data(),id:d.id}));
-  allReqs.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  const locLabels={customer:'Müşteri',vendor:'Vendor',online:'Online',hybrid:'Hibrit'};
-
-  function renderRows(reqs) {
-    var tbody = m.querySelector('#reqs-tbody');
-    var count = m.querySelector('#reqs-count');
-    if (count) count.textContent = '(' + reqs.length + ')';
-    if (!tbody) return;
-    if (!reqs.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>'; return; }
-    tbody.innerHTML = reqs.map(function(r) {
-      return '<tr><td style="font-weight:600">'+r.title+'</td>' +
-        '<td style="color:#7c87a0"><div>'+(r.customerName||'—')+'</div><div style="font-size:11px">'+(r.customerCompany||'')+'</div></td>' +
-        '<td style="color:#7c87a0">'+(r.vendorName||'—')+'</td>' +
-        '<td>'+(r.vendorType?'<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff;font-size:10px">'+({ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'}[r.vendorType]||r.vendorType)+'</span>':'—')+'</td>' +
-        '<td style="color:#7c87a0">'+(r.productName||'—')+'</td>' +
-        '<td>'+statusBadge(r.status)+'</td>' +
+  var all = snap.docs.map(d=>({...d.data(),id:d.id}));
+  all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  var stFilter='';
+  var locLabels={customer:'Müşteri',vendor:'Vendor',online:'Online',hybrid:'Hibrit'};
+  function renderRows(items) {
+    var tbody=m.querySelector('#r-tbody');
+    var cnt=m.querySelector('#r-cnt');
+    if(cnt) cnt.textContent='('+items.length+')';
+    if(!tbody) return;
+    tbody.innerHTML=items.length?items.map(function(r){
+      return '<tr><td style="font-weight:600">'+r.title+'</td>'+
+        '<td style="color:#7c87a0"><div>'+(r.customerName||'—')+'</div><div style="font-size:11px">'+(r.customerCompany||'')+'</div></td>'+
+        '<td style="color:#7c87a0">'+(r.vendorName||'—')+'</td>'+
+        '<td style="color:#7c87a0">'+(r.productName||'—')+'</td>'+
+        '<td style="color:#7c87a0">'+(locLabels[r.location]||r.location||'—')+'</td>'+
+        '<td>'+statusBadge(r.status)+'</td>'+
         '<td style="color:#7c87a0;font-size:12px">'+fmt(r.createdAt)+'</td></tr>';
-    }).join('');
+    }).join(''):'<tr><td colspan="7" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
   }
-
-  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-    '<h2 style="font-size:18px;font-weight:700">PoC Talepleri <span id="reqs-count" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
-    '<input class="inp" id="reqs-search" placeholder="Başlık, müşteri, vendor veya ürün ara..." style="width:280px;font-size:12.5px"></div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:12px">' +
-    '<button class="btn-g btn-sm req-status-filter on" data-status="">Tümü</button>' +
-    '<button class="btn-g btn-sm req-status-filter" data-status="pending">Bekleyen</button>' +
-    '<button class="btn-g btn-sm req-status-filter" data-status="active">Aktif</button>' +
-    '<button class="btn-g btn-sm req-status-filter" data-status="completed">Tamamlanan</button>' +
-    '<button class="btn-g btn-sm req-status-filter" data-status="cancelled">İptal</button>' +
-    '</div>' +
-    '<table><thead><tr><th>Başlık</th><th>Müşteri</th><th>Vendor</th><th>Tip</th><th>Ürün</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="reqs-tbody"></tbody></table>';
-
-  var statusFilter = '';
   function applyFilter() {
-    var q = (m.querySelector('#reqs-search')?.value||'').toLowerCase();
-    var filtered = allReqs.filter(function(r) {
-      var matchS = !statusFilter || r.status===statusFilter;
-      var matchQ = !q||(r.title||'').toLowerCase().includes(q)||(r.customerName||'').toLowerCase().includes(q)||(r.vendorName||'').toLowerCase().includes(q)||(r.productName||'').toLowerCase().includes(q);
-      return matchS&&matchQ;
-    });
-    renderRows(filtered);
+    var q=(m.querySelector('#r-search')?.value||'').toLowerCase();
+    renderRows(all.filter(function(r){
+      return (!stFilter||r.status===stFilter)&&(!q||(r.title||'').toLowerCase().includes(q)||(r.customerName||'').toLowerCase().includes(q)||(r.vendorName||'').toLowerCase().includes(q)||(r.productName||'').toLowerCase().includes(q));
+    }));
   }
-  renderRows(allReqs);
-  m.querySelector('#reqs-search').addEventListener('input', applyFilter);
-  m.querySelectorAll('.req-status-filter').forEach(function(b){
-    b.addEventListener('click',function(){
-      m.querySelectorAll('.req-status-filter').forEach(function(x){x.className='btn-g btn-sm req-status-filter';});
-      b.className='btn-p btn-sm req-status-filter on';
-      statusFilter=b.dataset.status;
-      applyFilter();
-    });
-  });
+  m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<h2 style="font-size:18px;font-weight:700">PoC Talepleri <span id="r-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
+    '<input class="inp" id="r-search" placeholder="Başlık, müşteri veya vendor..." style="width:260px;font-size:12.5px"></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    '<button class="btn-p btn-sm r-sf" data-s="">Tümü</button>'+
+    '<button class="btn-g btn-sm r-sf" data-s="pending">Bekleyen</button>'+
+    '<button class="btn-g btn-sm r-sf" data-s="active">Aktif</button>'+
+    '<button class="btn-g btn-sm r-sf" data-s="completed">Tamamlanan</button>'+
+    '<button class="btn-g btn-sm r-sf" data-s="cancelled">İptal</button></div>'+
+    '<table><thead><tr><th>Başlık</th><th>Müşteri</th><th>Vendor</th><th>Ürün</th><th>Lokasyon</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="r-tbody"></tbody></table>';
+  renderRows(all);
+  m.querySelector('#r-search').addEventListener('input', applyFilter);
+  m.querySelectorAll('.r-sf').forEach(function(b){b.addEventListener('click',function(){
+    m.querySelectorAll('.r-sf').forEach(function(x){x.className='btn-g btn-sm r-sf';});
+    b.className='btn-p btn-sm r-sf'; stFilter=b.dataset.s; applyFilter();
+  });});
 }
 
 async function admEvents(m) {
-  const pocSnap = await getDocs(collection(db,'poc_requests'));
   const evSnap2 = await getDocs(collection(db,'public_events'));
-  var pocItems = pocSnap.docs.map(d=>({...d.data(),id:d.id,itemType:'private'}));
-  var evItems2 = evSnap2.docs.map(d=>({...d.data(),id:d.id,itemType:'public'}));
-  var allItems = pocItems.concat(evItems2);
-  allItems.sort((a,b)=>(a.eventDate?.seconds||a.createdAt?.seconds||0)-(b.eventDate?.seconds||b.createdAt?.seconds||0));
-
-  var today2 = new Date();
-  var calYear2 = today2.getFullYear();
-  var calMonth2 = today2.getMonth();
-  var calView2 = 'calendar';
-  var searchQ2 = '';
-  var MONTHS_TR2 = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-
-  function getFiltered2() {
-    var q = searchQ2.toLowerCase();
-    if (!q) return allItems;
-    return allItems.filter(function(item) {
-      return (item.title||'').toLowerCase().includes(q)||(item.productName||'').toLowerCase().includes(q)||(item.vendorName||'').toLowerCase().includes(q)||(item.customerName||'').toLowerCase().includes(q);
-    });
+  var all = evSnap2.docs.map(d=>({...d.data(),id:d.id}));
+  all.sort((a,b)=>(a.eventDate?.seconds||a.createdAt?.seconds||0)-(b.eventDate?.seconds||b.createdAt?.seconds||0));
+  var stFilter='';
+  function renderRows(items) {
+    var tbody=m.querySelector('#ev-tbody');
+    var cnt=m.querySelector('#ev-cnt');
+    if(cnt) cnt.textContent='('+items.length+')';
+    if(!tbody) return;
+    tbody.innerHTML=items.length?items.map(function(e){
+      return '<tr><td style="font-weight:600">'+e.title+'</td>'+
+        '<td style="color:#7c87a0">'+(e.vendorName||'—')+'</td>'+
+        '<td style="color:#7c87a0;font-size:12px">'+fmt(e.eventDate)+'</td>'+
+        '<td style="color:#7c87a0">'+(e.format||'—')+'</td>'+
+        '<td style="color:#7c87a0">'+(e.registeredCount||0)+'/'+(e.capacity||0)+'</td>'+
+        '<td>'+statusBadge(e.status)+'</td>'+
+        '<td>'+(e.status==='published'?'<button class="btn-red btn-sm ev-cancel" data-id="'+e.id+'">İptal</button>':'—')+'</td></tr>';
+    }).join(''):'<tr><td colspan="7" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
+    m.querySelectorAll('.ev-cancel').forEach(function(b){b.addEventListener('click',async function(){
+      if(!confirm('Etkinliği iptal etmek istiyor musunuz?')) return;
+      await updateDoc(doc(db,'public_events',b.dataset.id),{status:'cancelled'});
+      showToast('İptal edildi.'); admEvents(m);
+    });});
   }
-
-  function renderListView2(items, container) {
-    if (!items.length) { container.innerHTML='<div class="empty"><div class="empty-icon">📅</div>Kayıt bulunamadı.</div>'; return; }
-    var html = '<table><thead><tr><th>Başlık</th><th>Vendor</th><th>Tür</th><th>Tarih</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>';
-    items.forEach(function(item) {
-      var isPublic = item.itemType==='public';
-      html += '<tr><td style="font-weight:600">'+(item.title||item.productName||'—')+'<div style="font-size:11px;color:#5a6278">'+(isPublic?item.productName||'':'item.customerName'||'')+'</div></td>' +
-        '<td style="color:#7c87a0">'+(item.vendorName||'—')+'</td>' +
-        '<td>'+(isPublic?'<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078">Public</span>':'<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">Private</span>')+'</td>' +
-        '<td style="color:#7c87a0;font-size:12px">'+fmt(item.eventDate||item.createdAt)+'</td>' +
-        '<td>'+statusBadge(item.status)+'</td>' +
-        '<td>'+(isPublic&&item.status==='published'?'<button class="btn-red btn-sm adm-cancel-ev" data-id="'+item.id+'">İptal</button>':'—')+'</td>' +
-        '</tr>';
-    });
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    container.querySelectorAll('.adm-cancel-ev').forEach(function(b){
-      b.addEventListener('click',async function(){
-        if(!confirm('Etkinliği iptal etmek istiyor musunuz?')) return;
-        await updateDoc(doc(db,'public_events',b.dataset.id),{status:'cancelled'});
-        showToast('Etkinlik iptal edildi.');
-        admEvents(m);
-      });
-    });
+  function applyFilter() {
+    var q=(m.querySelector('#ev-search2')?.value||'').toLowerCase();
+    renderRows(all.filter(function(e){
+      return (!stFilter||e.status===stFilter)&&(!q||(e.title||'').toLowerCase().includes(q)||(e.vendorName||'').toLowerCase().includes(q)||(e.productName||'').toLowerCase().includes(q));
+    }));
   }
-
-  function renderCalView2(items, container) {
-    var dayMap = {};
-    items.forEach(function(item) {
-      var dateField = item.eventDate||item.createdAt;
-      if (!dateField||!dateField.toDate) return;
-      var d = dateField.toDate();
-      if (d.getFullYear()===calYear2&&d.getMonth()===calMonth2) {
-        var day = d.getDate();
-        if (!dayMap[day]) dayMap[day]=[];
-        dayMap[day].push(item);
-      }
-    });
-    var firstDay = new Date(calYear2,calMonth2,1).getDay();
-    var offset = firstDay===0?6:firstDay-1;
-    var daysInMonth = new Date(calYear2,calMonth2+1,0).getDate();
-    var DAYS2=['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
-    var html='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">';
-    DAYS2.forEach(function(d){html+='<div style="text-align:center;font-size:10px;color:#5a6278;font-weight:700;padding:4px 0">'+d+'</div>';});
-    for(var i=0;i<offset;i++) html+='<div></div>';
-    for(var day=1;day<=daysInMonth;day++){
-      var isToday2=today2.getFullYear()===calYear2&&today2.getMonth()===calMonth2&&today2.getDate()===day;
-      var dayItems=dayMap[day]||[];
-      var hasPoc=dayItems.some(function(x){return x.itemType==='private';});
-      var hasEv=dayItems.some(function(x){return x.itemType==='public';});
-      var bg=isToday2?'#3b7cff':(hasPoc||hasEv)?'rgba(59,124,255,.15)':'transparent';
-      var brd=isToday2?'none':(hasPoc||hasEv)?'1px solid rgba(59,124,255,.3)':'1px solid rgba(255,255,255,.06)';
-      html+='<div class="vcal-day2" data-day="'+day+'" style="min-height:52px;border-radius:6px;padding:4px;cursor:'+(dayItems.length?'pointer':'default')+';background:'+bg+';border:'+brd+'">' +
-        '<div style="font-size:11.5px;font-weight:'+(isToday2||dayItems.length?'700':'400')+';color:'+(isToday2?'#fff':dayItems.length?'#e9ecf3':'#5a6278')+'">'+day+'</div>';
-      if(hasPoc) html+='<div style="width:6px;height:6px;border-radius:50%;background:#7db4ff;margin-top:2px"></div>';
-      if(hasEv) html+='<div style="width:6px;height:6px;border-radius:50%;background:#22d078;margin-top:2px"></div>';
-      html+='</div>';
-    }
-    html+='</div><div id="vcal2-detail"></div>';
-    container.innerHTML=html;
-    container.querySelectorAll('.vcal-day2').forEach(function(dayEl){
-      dayEl.addEventListener('click',function(){
-        var day=parseInt(dayEl.dataset.day);
-        var dayItems=dayMap[day]||[];
-        if(!dayItems.length) return;
-        var detailEl=document.getElementById('vcal2-detail');
-        if(!detailEl) return;
-        var dHtml='';
-        dayItems.forEach(function(item){
-          var isPublic=item.itemType==='public';
-          dHtml+='<div class="card" style="margin-bottom:8px;padding:12px;border-color:'+(isPublic?'rgba(34,208,120,.25)':'rgba(59,124,255,.25)')+'">'+
-            '<div style="display:flex;gap:8px;margin-bottom:5px">'+
-            '<span class="bdg" style="background:'+(isPublic?'rgba(34,208,120,.12)':'rgba(59,124,255,.12)')+';color:'+(isPublic?'#22d078':'#7db4ff')+'">'+(isPublic?'Public Etkinlik':'Private PoC')+'</span>'+
-            statusBadge(item.status)+'</div>'+
-            '<div style="font-size:13px;font-weight:700">'+(item.title||item.productName||'—')+'</div>'+
-            '<div style="font-size:12px;color:#7c87a0;margin-top:3px">Vendor: '+(item.vendorName||'—')+'</div>'+
-            (item.customerName?'<div style="font-size:12px;color:#7c87a0">Müşteri: '+item.customerName+'</div>':'')+'</div>';
-        });
-        detailEl.innerHTML=dHtml;
-      });
-    });
-  }
-
-  function renderContent2() {
-    var filtered=getFiltered2();
-    var contentEl=document.getElementById('admcal-content');
-    if(!contentEl) return;
-    if(calView2==='list') renderListView2(filtered,contentEl);
-    else renderCalView2(filtered,contentEl);
-  }
-
-  function updateLabel2() {
-    var lbl=document.getElementById('admcal-label');
-    if(lbl) lbl.textContent=MONTHS_TR2[calMonth2]+' '+calYear2;
-  }
-
   m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-    '<h2 style="font-size:18px;font-weight:700">Tüm Etkinlikler ve PoC Süreci</h2>'+
-    '<div style="display:flex;gap:8px;align-items:center">'+
-    '<input class="inp" id="admcal-search" placeholder="Ara..." style="width:200px;font-size:12.5px">'+
-    '<button id="admcal-list" class="btn-g btn-sm">📋 Liste</button>'+
-    '<button id="admcal-cal" class="btn-p btn-sm">📅 Takvim</button>'+
-    '</div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px" id="admcal-nav">'+
-    '<button id="admcal-prev" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">‹</button>'+
-    '<span id="admcal-label" style="font-size:13px;font-weight:700;min-width:120px;text-align:center"></span>'+
-    '<button id="admcal-next" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">›</button>'+
-    '</div>'+
-    '<div style="display:flex;gap:14px;margin-bottom:12px;font-size:12px;color:#7c87a0" id="admcal-legend">'+
-    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7db4ff;margin-right:4px"></span>Private PoC</span>'+
-    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22d078;margin-right:4px"></span>Public Etkinlik</span>'+
-    '</div>'+
-    '<div id="admcal-content"></div>';
-
-  function setView2(v) {
-    calView2=v;
-    var nav=document.getElementById('admcal-nav');
-    var leg=document.getElementById('admcal-legend');
-    if(nav) nav.style.display=v==='calendar'?'flex':'none';
-    if(leg) leg.style.display=v==='calendar'?'flex':'none';
-    document.getElementById('admcal-cal').className=v==='calendar'?'btn-p btn-sm':'btn-g btn-sm';
-    document.getElementById('admcal-list').className=v==='list'?'btn-p btn-sm':'btn-g btn-sm';
-    updateLabel2();
-    renderContent2();
-  }
-
-  m.querySelector('#admcal-prev').addEventListener('click',function(){calMonth2--;if(calMonth2<0){calMonth2=11;calYear2--;}updateLabel2();renderContent2();});
-  m.querySelector('#admcal-next').addEventListener('click',function(){calMonth2++;if(calMonth2>11){calMonth2=0;calYear2++;}updateLabel2();renderContent2();});
-  m.querySelector('#admcal-list').addEventListener('click',function(){setView2('list');});
-  m.querySelector('#admcal-cal').addEventListener('click',function(){setView2('calendar');});
-  m.querySelector('#admcal-search').addEventListener('input',function(){searchQ2=this.value;renderContent2();});
-  setView2('calendar');
+    '<h2 style="font-size:18px;font-weight:700">Tüm Etkinlikler <span id="ev-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
+    '<input class="inp" id="ev-search2" placeholder="Başlık veya vendor..." style="width:240px;font-size:12.5px"></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    '<button class="btn-p btn-sm ev-sf" data-s="">Tümü</button>'+
+    '<button class="btn-g btn-sm ev-sf" data-s="published">Yayında</button>'+
+    '<button class="btn-g btn-sm ev-sf" data-s="cancelled">İptal</button></div>'+
+    '<table><thead><tr><th>Başlık</th><th>Vendor</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="ev-tbody"></tbody></table>';
+  renderRows(all);
+  m.querySelector('#ev-search2').addEventListener('input', applyFilter);
+  m.querySelectorAll('.ev-sf').forEach(function(b){b.addEventListener('click',function(){
+    m.querySelectorAll('.ev-sf').forEach(function(x){x.className='btn-g btn-sm ev-sf';});
+    b.className='btn-p btn-sm ev-sf'; stFilter=b.dataset.s; applyFilter();
+  });});
 }
 
 async function admOffers(m) {
   const snap = await getDocs(collection(db,'offers'));
-  var allOffers = snap.docs.map(d=>({...d.data(),id:d.id}));
-  allOffers.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-
-  function renderRows(offers) {
-    var tbody=m.querySelector('#offers-tbody');
-    var count=m.querySelector('#offers-count');
-    if(count) count.textContent='('+offers.length+')';
+  var all = snap.docs.map(d=>({...d.data(),id:d.id}));
+  all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  var stFilter='';
+  function renderRows(items) {
+    var tbody=m.querySelector('#of-tbody');
+    var cnt=m.querySelector('#of-cnt');
+    if(cnt) cnt.textContent='('+items.length+')';
     if(!tbody) return;
-    if(!offers.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';return;}
-    tbody.innerHTML=offers.map(function(o){
-      return '<tr><td style="font-weight:600">'+(o.productName||'—')+'</td>' +
-        '<td style="color:#7c87a0">'+(o.vendorName||'—')+'</td>' +
-        '<td style="color:#7c87a0">'+(o.customerName||'—')+'</td>' +
-        '<td style="font-family:monospace;font-weight:700">'+((o.amount||0).toLocaleString('tr-TR'))+' '+(o.currency||'₺')+'</td>' +
-        '<td>'+(o.hasChannelFee?'<span style="color:#f0a429">Var</span>':'<span style="color:#22d078">Yok</span>')+'</td>' +
-        '<td>'+statusBadge(o.status)+'</td>' +
+    tbody.innerHTML=items.length?items.map(function(o){
+      return '<tr><td style="font-weight:600">'+(o.productName||'—')+'</td>'+
+        '<td style="color:#7c87a0">'+(o.vendorName||'—')+'</td>'+
+        '<td style="color:#7c87a0">'+(o.customerName||'—')+'</td>'+
+        '<td style="font-family:monospace;font-weight:700">'+((o.amount||0).toLocaleString('tr-TR'))+' '+(o.currency||'₺')+'</td>'+
+        '<td>'+(o.hasChannelFee?'<span style="color:#f0a429">Var</span>':'<span style="color:#22d078">Yok</span>')+'</td>'+
+        '<td>'+statusBadge(o.status)+'</td>'+
         '<td style="color:#7c87a0;font-size:12px">'+fmt(o.createdAt)+'</td></tr>';
-    }).join('');
+    }).join(''):'<tr><td colspan="7" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
   }
-
+  function applyFilter() {
+    var q=(m.querySelector('#of-search')?.value||'').toLowerCase();
+    renderRows(all.filter(function(o){
+      return (!stFilter||o.status===stFilter)&&(!q||(o.productName||'').toLowerCase().includes(q)||(o.vendorName||'').toLowerCase().includes(q)||(o.customerName||'').toLowerCase().includes(q));
+    }));
+  }
   m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-    '<h2 style="font-size:18px;font-weight:700">Teklifler <span id="offers-count" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
-    '<input class="inp" id="offers-search" placeholder="Ürün, vendor veya müşteri ara..." style="width:260px;font-size:12.5px"></div>'+
+    '<h2 style="font-size:18px;font-weight:700">Teklifler <span id="of-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
+    '<input class="inp" id="of-search" placeholder="Ürün, vendor veya müşteri..." style="width:250px;font-size:12.5px"></div>'+
     '<div style="display:flex;gap:8px;margin-bottom:12px">'+
-    '<button class="btn-g btn-sm off-status-filter on" data-status="">Tümü</button>'+
-    '<button class="btn-g btn-sm off-status-filter" data-status="pending">Bekleyen</button>'+
-    '<button class="btn-g btn-sm off-status-filter" data-status="accepted">Kabul</button>'+
-    '<button class="btn-g btn-sm off-status-filter" data-status="rejected">Red</button>'+
-    '</div>'+
-    '<table><thead><tr><th>Ürün</th><th>Vendor</th><th>Müşteri</th><th>Tutar</th><th>Kanal Payı</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="offers-tbody"></tbody></table>';
-
-  var statusFilter='';
-  function applyFilter(){
-    var q=(m.querySelector('#offers-search')?.value||'').toLowerCase();
-    var filtered=allOffers.filter(function(o){
-      var matchS=!statusFilter||o.status===statusFilter;
-      var matchQ=!q||(o.productName||'').toLowerCase().includes(q)||(o.vendorName||'').toLowerCase().includes(q)||(o.customerName||'').toLowerCase().includes(q);
-      return matchS&&matchQ;
-    });
-    renderRows(filtered);
-  }
-  renderRows(allOffers);
-  m.querySelector('#offers-search').addEventListener('input',applyFilter);
-  m.querySelectorAll('.off-status-filter').forEach(function(b){
-    b.addEventListener('click',function(){
-      m.querySelectorAll('.off-status-filter').forEach(function(x){x.className='btn-g btn-sm off-status-filter';});
-      b.className='btn-p btn-sm off-status-filter on';
-      statusFilter=b.dataset.status;
-      applyFilter();
-    });
-  });
+    '<button class="btn-p btn-sm of-sf" data-s="">Tümü</button>'+
+    '<button class="btn-g btn-sm of-sf" data-s="pending">Bekleyen</button>'+
+    '<button class="btn-g btn-sm of-sf" data-s="accepted">Kabul</button>'+
+    '<button class="btn-g btn-sm of-sf" data-s="rejected">Red</button></div>'+
+    '<table><thead><tr><th>Ürün</th><th>Vendor</th><th>Müşteri</th><th>Tutar</th><th>Kanal Payı</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="of-tbody"></tbody></table>';
+  renderRows(all);
+  m.querySelector('#of-search').addEventListener('input', applyFilter);
+  m.querySelectorAll('.of-sf').forEach(function(b){b.addEventListener('click',function(){
+    m.querySelectorAll('.of-sf').forEach(function(x){x.className='btn-g btn-sm of-sf';});
+    b.className='btn-p btn-sm of-sf'; stFilter=b.dataset.s; applyFilter();
+  });});
 }
 
 
@@ -3394,129 +2751,6 @@ function openCatModal(existing) {
         }).join('')}
       </div>
     </div>`;
-  }
-
-  else if (CUR_ADM_TAB === 'users') {
-    const snap = await getDocs(query(collection(db,'users')));
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Kullanıcılar (${snap.size})</h2>
-    <table><thead><tr><th>Ad / E-posta</th><th>Rol</th><th>Şirket</th><th>Kayıt</th></tr></thead><tbody>
-    ${snap.docs.map(d=>{const u={...d.data(),id:d.id};
-      const vtypes={ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
-      const roleLabel = u.role==='vendor'?(vtypes[u.vendorType]||'Vendor'):u.role==='admin'?'Admin':'Müşteri';
-      const roleBg = {admin:'rgba(240,164,41,.12)',vendor:'rgba(59,124,255,.12)',customer:'rgba(34,208,120,.12)'};
-      const roleCol = {admin:'#f0a429',vendor:'#7db4ff',customer:'#22d078'};
-      return `<tr>
-        <td><div style="font-weight:600">${u.displayName||'—'}</div><div style="font-size:11.5px;color:#7c87a0">${u.email}</div></td>
-        <td><span class="bdg" style="background:${roleBg[u.role]||'#1c1f2a'};color:${roleCol[u.role]||'#7c87a0'}">${roleLabel}</span></td>
-        <td style="color:#7c87a0">${u.company||'—'}</td>
-        <td style="color:#7c87a0;font-size:12px">${fmt(u.createdAt)}</td>
-      </tr>`;
-    }).join('')}
-    </tbody></table>`;
-  }
-
-  else if (CUR_ADM_TAB === 'products') {
-    const snap = await getDocs(query(collection(db,'products')));
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Ürün Yönetimi</h2>
-    <table><thead><tr><th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>
-    ${snap.docs.map(d=>{const p={...d.data(),id:d.id};
-      return `<tr>
-        <td><div style="font-weight:600">${p.name}</div>${p.description?`<div style="font-size:11.5px;color:#7c87a0">${p.description.substring(0,60)}...</div>`:''}</td>
-        <td style="color:#7c87a0">${p.vendorName||'—'}</td>
-        <td style="color:#7c87a0">${p.category||'—'}</td>
-        <td>${cc(p.country||'TR')}</td>
-        <td>${statusBadge(p.status)}</td>
-        <td style="white-space:nowrap">
-          ${p.status==='pending'?`
-            <button class="btn-gr btn-sm appr-prod" data-id="${d.id}" data-vemail="${p.vendorEmail||''}" data-vname="${p.vendorName||''}" data-pname="${p.name}" style="margin-right:5px">Onayla</button>
-            <button class="btn-red btn-sm rej-prod" data-id="${d.id}" data-vemail="${p.vendorEmail||''}" data-vname="${p.vendorName||''}" data-pname="${p.name}">Reddet</button>
-          `:p.status==='active'?`<button class="btn-red btn-sm arc-prod" data-id="${d.id}">Arşivle</button>`:'—'}
-        </td>
-      </tr>`;
-    }).join('')}
-    </tbody></table>`;
-    m.querySelectorAll('.appr-prod').forEach(b => b.addEventListener('click', async () => {
-      await updateDoc(doc(db,'products',b.dataset.id), {status:'active'});
-      showToast('Ürün onaylandı!');
-      if(b.dataset.vemail) sendEmail(b.dataset.vemail, b.dataset.vname, 'Ürününüz Onaylandı',
-        `"${b.dataset.pname}" ürününüz admin tarafından onaylandı ve katalogda yayınlandı.`,'');
-      loadAdmTab();
-    }));
-    m.querySelectorAll('.rej-prod').forEach(b => b.addEventListener('click', async () => {
-      await updateDoc(doc(db,'products',b.dataset.id), {status:'rejected'});
-      showToast('Ürün reddedildi.');
-      if(b.dataset.vemail) sendEmail(b.dataset.vemail, b.dataset.vname, 'Ürün Değerlendirmesi',
-        `"${b.dataset.pname}" ürününüz onaylanmadı. Daha fazla bilgi için yöneticinizle iletişime geçin.`,'');
-      loadAdmTab();
-    }));
-    m.querySelectorAll('.arc-prod').forEach(b => b.addEventListener('click', async () => {
-      await updateDoc(doc(db,'products',b.dataset.id), {status:'archived'});
-      showToast('Ürün arşivlendi.'); loadAdmTab();
-    }));
-  }
-
-  else if (CUR_ADM_TAB === 'requests') {
-    const snap = await getDocs(query(collection(db,'poc_requests')));
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Tüm PoC Talepleri (${snap.size})</h2>
-    <table><thead><tr><th>Başlık</th><th>Müşteri</th><th>Vendor</th><th>Vendor Tipi</th><th>Ürün</th><th>Lokasyon</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
-    ${snap.docs.map(d=>{const r={...d.data(),id:d.id};
-      const locLabels={customer:'Müşteri',vendor:'Vendor',online:'Online',hybrid:'Hibrit'};
-      return `<tr>
-        <td style="font-weight:600">${r.title}</td>
-        <td style="color:#7c87a0"><div>${r.customerName||'—'}</div><div style="font-size:11px">${r.customerCompany||''}</div></td>
-        <td style="color:#7c87a0">${r.vendorName||'—'}</td>
-        <td>${r.vendorType?`<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff;font-size:10px">
-          ${{ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'}[r.vendorType]||r.vendorType}</span>`:'—'}</td>
-        <td style="color:#7c87a0">${r.productName||'—'}</td>
-        <td style="color:#7c87a0">${locLabels[r.location]||r.location||'—'}</td>
-        <td>${statusBadge(r.status)}</td>
-        <td style="color:#7c87a0;font-size:12px">${fmt(r.createdAt)}</td>
-      </tr>`;
-    }).join('')}
-    </tbody></table>`;
-  }
-
-  else if (CUR_ADM_TAB === 'events') {
-    const snap = await getDocs(query(collection(db,'public_events')));
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Tüm Etkinlikler (${snap.size})</h2>
-    <table><thead><tr><th>Başlık</th><th>Vendor</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>
-    ${snap.docs.map(d=>{const e={...d.data(),id:d.id};
-      return `<tr>
-        <td style="font-weight:600">${e.title}</td>
-        <td style="color:#7c87a0">${e.vendorName||'—'}</td>
-        <td style="color:#7c87a0;font-size:12px">${fmt(e.eventDate)}</td>
-        <td style="color:#7c87a0">${e.format||'—'}</td>
-        <td style="color:#7c87a0">${e.registeredCount||0}/${e.capacity||0}</td>
-        <td>${statusBadge(e.status)}</td>
-        <td>${e.status==='published'?`<button class="btn-red btn-sm cancel-ev" data-id="${d.id}">İptal</button>`:'—'}</td>
-      </tr>`;
-    }).join('')}
-    </tbody></table>`;
-    m.querySelectorAll('.cancel-ev').forEach(b => b.addEventListener('click', async () => {
-      if (!confirm('Etkinliği iptal etmek istiyor musunuz?')) return;
-      await updateDoc(doc(db,'public_events',b.dataset.id), {status:'cancelled'});
-      showToast('Etkinlik iptal edildi.'); loadAdmTab();
-    }));
-  }
-
-  else if (CUR_ADM_TAB === 'offers') {
-    const snap = await getDocs(query(collection(db,'offers')));
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Tüm Teklifler (${snap.size})</h2>
-    <table><thead><tr><th>Ürün</th><th>Vendor</th><th>Müşteri</th><th>Tutar</th><th>Kanal Payı</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
-    ${snap.docs.map(d=>{const o={...d.data(),id:d.id};
-      return `<tr>
-        <td style="font-weight:600">${o.productName||'—'}</td>
-        <td style="color:#7c87a0">${o.vendorName||'—'}</td>
-        <td style="color:#7c87a0">${o.customerName||'—'}</td>
-        <td style="font-family:monospace;font-weight:700">${o.amount?.toLocaleString('tr-TR')} ${o.currency||'₺'}</td>
-        <td>${o.hasChannelFee?'<span style="color:#f0a429">Var</span>':'<span style="color:#22d078">Yok</span>'}</td>
-        <td>${statusBadge(o.status)}</td>
-        <td style="color:#7c87a0;font-size:12px">${fmt(o.createdAt)}</td>
-      </tr>`;
-    }).join('')}
-    </tbody></table>`;
-  }
-}
 
 // EmailJS public key — sonradan eklenecek
 window.addEventListener('DOMContentLoaded', () => {
