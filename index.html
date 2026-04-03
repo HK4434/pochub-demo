@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.7 | 02.04.2026 | Vendor Ürün Düzenle/Sil, Etkinlik Form İyileştirmeleri --> 01.04.2026 | Mesajlaşma, Teklif Karşılaştırma, Bildirimler, Kategori Yönetimi, Ülke Listesi, Çoklu Vendor/Katalog Seçimi, Email Doğrulama -->
+<!-- PoCHub v1.8 | 03.04.2026 | Etkinlik Düzenleme, Ürün Silme, Gelişmiş Takvim --> 02.04.2026 | Vendor Ürün Düzenle/Sil, Etkinlik Form İyileştirmeleri --> 01.04.2026 | Mesajlaşma, Teklif Karşılaştırma, Bildirimler, Kategori Yönetimi, Ülke Listesi, Çoklu Vendor/Katalog Seçimi, Email Doğrulama -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.7</title>
+<title>PoCHub.co — v1.8</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,7 +121,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.7';
+const VERSION = 'v1.8';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 const ALL_COUNTRIES = [
@@ -2019,28 +2019,7 @@ async function loadVendTab() {
   }
 
   else if (CUR_VEND_TAB === 'calendar') {
-    const [pocSnap, evSnap] = await Promise.all([
-      getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid))),
-    ]);
-    const pocItems = pocSnap.docs.map(d=>({...d.data(),id:d.id,type:'private'}));
-    const evItems = evSnap.docs.map(d=>({...d.data(),id:d.id,type:'public'}));
-    const all = [...pocItems,...evItems].sort((a,b)=>{
-      const da = a.eventDate||a.createdAt;
-      const db2 = b.eventDate||b.createdAt;
-      return (da?.seconds||0)-(db2?.seconds||0);
-    });
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">PoC Takvimi</h2>
-    ${!all.length?'<div class="empty"><div class="empty-icon">📅</div>Takvimde kayıt yok.</div>':
-    `<table><thead><tr><th>Başlık</th><th>Tür</th><th>Müşteri / Ürün</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
-    ${all.map(e=>`<tr>
-      <td style="font-weight:600">${e.title||e.productName||'—'}</td>
-      <td>${e.type==='public'?'<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078">Public</span>':'<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">Private</span>'}</td>
-      <td style="color:#7c87a0">${e.customerName||e.productName||'—'}</td>
-      <td>${statusBadge(e.status)}</td>
-      <td style="color:#7c87a0;font-size:12px">${fmt(e.eventDate||e.createdAt)}</td>
-    </tr>`).join('')}
-    </tbody></table>`}`;
+    await renderVendorCalendar(m);
   }
 
   else if (CUR_VEND_TAB === 'products') {
@@ -2066,7 +2045,7 @@ async function loadVendTab() {
             data-desc="${(p.description||'').replace(/"/g,'').replace(/\n/g,' ')}"
             data-support="${p.supportModel||'inhouse'}"
             style="margin-right:5px">Düzenle</button>
-          ${p.status!=='active'?`<button class="btn-red btn-sm del-prod-btn" data-id="${d.id}" data-name="${(p.name||'').replace(/"/g,'')}">Sil</button>`:''}
+          <button class="btn-red btn-sm del-prod-btn" data-id="${d.id}" data-name="${(p.name||'').replace(/"/g,'')}">Sil</button>
         </td>
       </tr>`;
     }).join('')}
@@ -2099,12 +2078,36 @@ async function loadVendTab() {
       <button class="btn-p btn-sm" id="v-add-ev2">+ Etkinlik Oluştur</button>
     </div>
     ${snap.empty?'<div class="empty"><div class="empty-icon">🎯</div>Henüz etkinlik oluşturmadınız.</div>':
-    `<table><thead><tr><th>Başlık</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th></tr></thead><tbody>
+    `<table><thead><tr><th>Başlık</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const e={...d.data(),id:d.id};
-      return `<tr><td style="font-weight:600">${e.title}</td><td style="color:#7c87a0;font-size:12px">${fmt(e.eventDate)}</td><td style="color:#7c87a0">${e.format||'—'}</td><td style="color:#7c87a0">${e.registeredCount||0} / ${e.capacity||0}</td><td>${statusBadge(e.status)}</td></tr>`;
+      return `<tr>
+        <td style="font-weight:600">${e.title}</td>
+        <td style="color:#7c87a0;font-size:12px">${fmt(e.eventDate)}</td>
+        <td style="color:#7c87a0">${e.format||'—'}</td>
+        <td style="color:#7c87a0">${e.registeredCount||0} / ${e.capacity||0}</td>
+        <td>${statusBadge(e.status)}</td>
+        <td style="white-space:nowrap">
+          ${e.status!=='cancelled'?`<button class="btn-g btn-sm edit-ev-btn" data-id="${d.id}" style="margin-right:5px">Düzenle</button>`:''}
+          ${e.status==='published'?`<button class="btn-red btn-sm cancel-ev-btn" data-id="${d.id}" data-title="${(e.title||'').replace(/"/g,'')}">İptal</button>`:''}
+        </td>
+      </tr>`;
     }).join('')}
     </tbody></table>`}`;
     el('v-add-ev2')?.addEventListener('click', openNewEventModal);
+    m.querySelectorAll('.edit-ev-btn').forEach(function(b) {
+      b.addEventListener('click', async function() {
+        var evSnap = await getDoc(doc(db,'public_events',b.dataset.id));
+        if (evSnap.exists()) openEditEventModal(b.dataset.id, evSnap.data());
+      });
+    });
+    m.querySelectorAll('.cancel-ev-btn').forEach(function(b) {
+      b.addEventListener('click', async function() {
+        if (!confirm('"'+b.dataset.title+'" etkinliğini iptal etmek istiyor musunuz?')) return;
+        await updateDoc(doc(db,'public_events',b.dataset.id), {status:'cancelled'});
+        showToast('Etkinlik iptal edildi.');
+        loadVendTab();
+      });
+    });
   }
 
   else if (CUR_VEND_TAB === 'offers-sent') {
@@ -2335,6 +2338,316 @@ async function openAddProductModal() {
   });
 }
 
+async function renderVendorCalendar(m) {
+  // Tüm vendor verilerini çek
+  var pocSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid)));
+  var evSnap2 = await getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid)));
+
+  var pocItems = pocSnap.docs.map(function(d) { return {...d.data(), id:d.id, itemType:'private'}; });
+  var evItems2 = evSnap2.docs.map(function(d) { return {...d.data(), id:d.id, itemType:'public'}; });
+  var allItems = pocItems.concat(evItems2);
+  allItems.sort(function(a,b) {
+    var da = a.eventDate || a.createdAt;
+    var db2 = b.eventDate || b.createdAt;
+    return (da&&da.seconds?da.seconds:0) - (db2&&db2.seconds?db2.seconds:0);
+  });
+
+  var today = new Date();
+  var calYear = today.getFullYear();
+  var calMonth = today.getMonth();
+  var calView = 'calendar'; // 'calendar' | 'list'
+  var searchQuery = '';
+
+  function getFiltered() {
+    var q = searchQuery.toLowerCase();
+    if (!q) return allItems;
+    return allItems.filter(function(item) {
+      return (item.title||'').toLowerCase().includes(q) ||
+             (item.productName||'').toLowerCase().includes(q) ||
+             (item.customerName||'').toLowerCase().includes(q);
+    });
+  }
+
+  function renderContent() {
+    var filtered = getFiltered();
+    var contentEl = document.getElementById('vcal-content');
+    if (!contentEl) return;
+
+    if (calView === 'list') {
+      renderListView(filtered, contentEl);
+    } else {
+      renderCalView(filtered, contentEl);
+    }
+  }
+
+  function renderListView(items, container) {
+    if (!items.length) {
+      container.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>Kayıt bulunamadı.</div>';
+      return;
+    }
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
+      '<thead><tr>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Başlık / Ürün</th>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Tür</th>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Müşteri</th>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Durum</th>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Tarih</th>' +
+      '</tr></thead><tbody>';
+
+    items.forEach(function(item) {
+      var isPublic = item.itemType === 'public';
+      var dateStr = item.eventDate ? fmt(item.eventDate) : item.createdAt ? fmt(item.createdAt) : '—';
+      html += '<tr style="border-top:1px solid rgba(255,255,255,.06)">' +
+        '<td style="padding:11px 14px"><div style="font-weight:600">' + (item.title||item.productName||'—') + '</div>' +
+        (item.productName&&item.itemType==='private'?'<div style="font-size:11px;color:#5a6278">'+item.productName+'</div>':'') + '</td>' +
+        '<td style="padding:11px 14px">' + (isPublic ?
+          '<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078">Public</span>' :
+          '<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">Private</span>') + '</td>' +
+        '<td style="padding:11px 14px;color:#7c87a0">' + (item.customerName||'—') + '</td>' +
+        '<td style="padding:11px 14px">' + statusBadge(item.status) + '</td>' +
+        '<td style="padding:11px 14px;color:#7c87a0;font-size:12px">' + dateStr + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  }
+
+  function renderCalView(items, container) {
+    var MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    var DAYS = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
+
+    // O aya ait item'ları gün bazında grupla
+    var dayMap = {};
+    items.forEach(function(item) {
+      var dateField = item.eventDate || item.createdAt;
+      if (!dateField || !dateField.toDate) return;
+      var d = dateField.toDate();
+      if (d.getFullYear()===calYear && d.getMonth()===calMonth) {
+        var day = d.getDate();
+        if (!dayMap[day]) dayMap[day] = [];
+        dayMap[day].push(item);
+      }
+    });
+
+    var firstDay = new Date(calYear, calMonth, 1).getDay();
+    var offset = firstDay===0 ? 6 : firstDay-1;
+    var daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+
+    var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:16px">';
+    DAYS.forEach(function(d) {
+      html += '<div style="text-align:center;font-size:10px;color:#5a6278;font-weight:700;padding:4px 0">' + d + '</div>';
+    });
+    for (var i=0;i<offset;i++) html += '<div></div>';
+    for (var day=1;day<=daysInMonth;day++) {
+      var isToday = today.getFullYear()===calYear && today.getMonth()===calMonth && today.getDate()===day;
+      var dayItems = dayMap[day]||[];
+      var hasPoc = dayItems.some(function(x){return x.itemType==='private';});
+      var hasEv = dayItems.some(function(x){return x.itemType==='public';});
+      var bg = isToday ? '#3b7cff' : (hasPoc||hasEv) ? 'rgba(59,124,255,.15)' : 'transparent';
+      var border = isToday ? 'none' : (hasPoc||hasEv) ? '1px solid rgba(59,124,255,.3)' : '1px solid rgba(255,255,255,.06)';
+      html += '<div class="vcal-day" data-day="' + day + '" style="min-height:52px;border-radius:6px;padding:4px;cursor:' + (dayItems.length?'pointer':'default') + ';background:' + bg + ';border:' + border + '">' +
+        '<div style="font-size:11.5px;font-weight:' + (isToday||dayItems.length?'700':'400') + ';color:' + (isToday?'#fff':dayItems.length?'#e9ecf3':'#5a6278') + '">' + day + '</div>';
+      if (hasPoc) html += '<div style="width:6px;height:6px;border-radius:50%;background:#7db4ff;margin-top:2px" title="Private PoC"></div>';
+      if (hasEv) html += '<div style="width:6px;height:6px;border-radius:50%;background:#22d078;margin-top:2px" title="Public Etkinlik"></div>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Seçili gün detayı
+    html += '<div id="vcal-day-detail"></div>';
+
+    container.innerHTML = html;
+
+    // Gün tıklama
+    container.querySelectorAll('.vcal-day').forEach(function(dayEl) {
+      dayEl.addEventListener('click', function() {
+        var day = parseInt(dayEl.dataset.day);
+        var dayItems = dayMap[day]||[];
+        if (!dayItems.length) return;
+
+        // Önceki seçimi temizle
+        container.querySelectorAll('.vcal-day').forEach(function(d) {
+          if (!d.classList.contains('today')) d.style.outline='none';
+        });
+        dayEl.style.outline='2px solid #3b7cff';
+
+        var detailEl = document.getElementById('vcal-day-detail');
+        if (!detailEl) return;
+        var dHtml = '<div style="margin-top:4px">';
+        dayItems.forEach(function(item) {
+          var isPublic = item.itemType==='public';
+          dHtml += '<div class="card" style="margin-bottom:8px;padding:12px;border-color:' + (isPublic?'rgba(34,208,120,.25)':'rgba(59,124,255,.25)') + '">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' +
+            '<span class="bdg" style="background:' + (isPublic?'rgba(34,208,120,.12)':'rgba(59,124,255,.12)') + ';color:' + (isPublic?'#22d078':'#7db4ff') + '">' + (isPublic?'Public Etkinlik':'Private PoC') + '</span>' +
+            statusBadge(item.status) + '</div>' +
+            '<div style="font-size:13px;font-weight:700">' + (item.title||item.productName||'—') + '</div>' +
+            (item.customerName?'<div style="font-size:12px;color:#7c87a0;margin-top:3px">Müşteri: '+item.customerName+'</div>':'') +
+            (item.productName&&isPublic?'<div style="font-size:12px;color:#7c87a0;margin-top:3px">Ürün: '+item.productName+'</div>':'') +
+            '</div>';
+        });
+        dHtml += '</div>';
+        detailEl.innerHTML = dHtml;
+      });
+    });
+  }
+
+  // Ana layout
+  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+    '<h2 style="font-size:18px;font-weight:700">PoC Takvimim</h2>' +
+    '<div style="display:flex;gap:8px;align-items:center">' +
+    '<input class="inp" id="vcal-search" placeholder="Ürün, müşteri veya başlık ara..." style="width:240px;font-size:12.5px">' +
+    '<button id="vcal-toggle-list" class="btn-g btn-sm">📋 Liste</button>' +
+    '<button id="vcal-toggle-cal" class="btn-p btn-sm">📅 Takvim</button>' +
+    '</div>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px" id="vcal-nav">' +
+    '<button id="vcal-prev" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">‹</button>' +
+    '<span id="vcal-month-label" style="font-size:13px;font-weight:700;min-width:120px;text-align:center"></span>' +
+    '<button id="vcal-next" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">›</button>' +
+    '</div>' +
+    '<div id="vcal-legend" style="display:flex;gap:14px;margin-bottom:12px;font-size:12px;color:#7c87a0">' +
+    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7db4ff;margin-right:4px"></span>Private PoC</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22d078;margin-right:4px"></span>Public Etkinlik</span>' +
+    '</div>' +
+    '<div id="vcal-content"></div>';
+
+  var MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+  function updateMonthLabel() {
+    var lbl = document.getElementById('vcal-month-label');
+    if (lbl) lbl.textContent = MONTHS_TR[calMonth] + ' ' + calYear;
+  }
+
+  function setView(view) {
+    calView = view;
+    var navEl = document.getElementById('vcal-nav');
+    var legEl = document.getElementById('vcal-legend');
+    if (navEl) navEl.style.display = view==='calendar' ? 'flex' : 'none';
+    if (legEl) legEl.style.display = view==='calendar' ? 'flex' : 'none';
+    document.getElementById('vcal-toggle-cal').className = view==='calendar' ? 'btn-p btn-sm' : 'btn-g btn-sm';
+    document.getElementById('vcal-toggle-list').className = view==='list' ? 'btn-p btn-sm' : 'btn-g btn-sm';
+    updateMonthLabel();
+    renderContent();
+  }
+
+  m.querySelector('#vcal-prev').addEventListener('click', function() {
+    calMonth--; if(calMonth<0){calMonth=11;calYear--;}
+    updateMonthLabel(); renderContent();
+  });
+  m.querySelector('#vcal-next').addEventListener('click', function() {
+    calMonth++; if(calMonth>11){calMonth=0;calYear++;}
+    updateMonthLabel(); renderContent();
+  });
+  m.querySelector('#vcal-toggle-list').addEventListener('click', function() { setView('list'); });
+  m.querySelector('#vcal-toggle-cal').addEventListener('click', function() { setView('calendar'); });
+  m.querySelector('#vcal-search').addEventListener('input', function() {
+    searchQuery = this.value;
+    renderContent();
+  });
+
+  setView('calendar');
+}
+
+async function openEditEventModal(evId, evData) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+
+  var fmtDate = '';
+  var fmtTime = '10:00';
+  if (evData.eventDate && evData.eventDate.toDate) {
+    var d = evData.eventDate.toDate();
+    fmtDate = d.toISOString().split('T')[0];
+    fmtTime = d.toTimeString().slice(0,5);
+  }
+
+  modal.innerHTML = '<div class="modal" style="max-width:520px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Etkinlik Düzenle</h3>' +
+    '<button id="close-eedit" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<label class="lbl">Etkinlik Başlığı *</label>' +
+    '<input class="inp" id="ee-title" value="' + (evData.title||'').replace(/"/g,'&quot;') + '">' +
+    '<label class="lbl">Açıklama *</label>' +
+    '<textarea class="inp" id="ee-desc" rows="3" style="resize:none">' + (evData.description||'') + '</textarea>' +
+    '<label class="lbl">Tarih ve Saat</label>' +
+    '<div class="g2">' +
+    '<input class="inp" id="ee-date" type="date" value="' + fmtDate + '">' +
+    '<input class="inp" id="ee-time" type="time" value="' + fmtTime + '">' +
+    '</div>' +
+    '<div class="g2">' +
+    '<div><label class="lbl">Kapasite</label><input class="inp" id="ee-cap" type="number" value="' + (evData.capacity||50) + '"></div>' +
+    '<div><label class="lbl">Ücret (₺)</label><input class="inp" id="ee-fee" type="number" value="' + (evData.fee||0) + '"></div>' +
+    '</div>' +
+    '<label class="lbl">Format</label>' +
+    '<select class="inp" id="ee-fmt">' +
+    '<option value="online"' + (evData.format==='online'?' selected':'') + '>Online</option>' +
+    '<option value="onsite"' + (evData.format==='onsite'?' selected':'') + '>Fiziksel</option>' +
+    '<option value="hybrid"' + (evData.format==='hybrid'?' selected':'') + '>Hibrit</option>' +
+    '</select>' +
+    '<div id="ee-loc-online" style="margin-top:8px">' +
+    '<label class="lbl">Online Link</label>' +
+    '<input class="inp" id="ee-url" value="' + (evData.onlineUrl||'').replace(/"/g,'&quot;') + '" placeholder="https://zoom.us/j/...">' +
+    '</div>' +
+    '<div id="ee-loc-onsite" style="margin-top:8px">' +
+    '<label class="lbl">Fiziksel Adres</label>' +
+    '<input class="inp" id="ee-address" value="' + (evData.physicalAddress||'').replace(/"/g,'&quot;') + '" placeholder="Büyükdere Cad. No:127, İstanbul">' +
+    '</div>' +
+    '<div id="ee-err" style="margin-top:10px"></div>' +
+    '<button class="btn-p" id="ee-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#close-eedit').addEventListener('click', function() { modal.remove(); });
+  modal.addEventListener('click', function(e) { if(e.target===modal) modal.remove(); });
+
+  function updateEeLocFields() {
+    var fmt = modal.querySelector('#ee-fmt').value;
+    modal.querySelector('#ee-loc-online').style.display = (fmt==='online'||fmt==='hybrid') ? 'block' : 'none';
+    modal.querySelector('#ee-loc-onsite').style.display = (fmt==='onsite'||fmt==='hybrid') ? 'block' : 'none';
+  }
+  modal.querySelector('#ee-fmt').addEventListener('change', updateEeLocFields);
+  updateEeLocFields();
+
+  modal.querySelector('#ee-submit').addEventListener('click', async function() {
+    var title = modal.querySelector('#ee-title').value.trim();
+    var desc = modal.querySelector('#ee-desc').value.trim();
+    if (!title || !desc) {
+      modal.querySelector('#ee-err').innerHTML = '<div class="alert alert-err">Başlık ve açıklama zorunludur.</div>';
+      return;
+    }
+    var btn = modal.querySelector('#ee-submit');
+    btn.disabled=true; btn.textContent='Güncelleniyor...';
+    try {
+      var dateVal = modal.querySelector('#ee-date').value;
+      var timeVal = modal.querySelector('#ee-time').value || '10:00';
+      var fmt = modal.querySelector('#ee-fmt').value;
+      var urlVal = modal.querySelector('#ee-url').value.trim();
+      var addrVal = modal.querySelector('#ee-address').value.trim();
+      var locStr = fmt==='online' ? urlVal : fmt==='onsite' ? addrVal : addrVal + ' | ' + urlVal;
+
+      var updateData = {
+        title: title, description: desc,
+        capacity: parseInt(modal.querySelector('#ee-cap').value)||50,
+        fee: parseFloat(modal.querySelector('#ee-fee').value)||0,
+        format: fmt, location: locStr,
+        onlineUrl: (fmt==='online'||fmt==='hybrid') ? urlVal : '',
+        physicalAddress: (fmt==='onsite'||fmt==='hybrid') ? addrVal : '',
+        updatedAt: serverTimestamp()
+      };
+      if (dateVal) {
+        updateData.eventDate = Timestamp.fromDate(new Date(dateVal + 'T' + timeVal + ':00'));
+      }
+      await updateDoc(doc(db,'public_events',evId), updateData);
+      modal.remove();
+      showToast('Etkinlik güncellendi!');
+      loadVendTab();
+    } catch(e) {
+      modal.querySelector('#ee-err').innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
+      btn.disabled=false; btn.textContent='Güncelle';
+    }
+  });
+}
+
 async function openNewEventModal() {
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -2516,7 +2829,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.7</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.8</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
