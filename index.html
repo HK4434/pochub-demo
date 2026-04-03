@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.8 | 03.04.2026 | Etkinlik Düzenleme, Ürün Silme, Gelişmiş Takvim --> 02.04.2026 | Vendor Ürün Düzenle/Sil, Etkinlik Form İyileştirmeleri --> 01.04.2026 | Mesajlaşma, Teklif Karşılaştırma, Bildirimler, Kategori Yönetimi, Ülke Listesi, Çoklu Vendor/Katalog Seçimi, Email Doğrulama -->
+<!-- PoCHub v1.9 | 03.04.2026 | Admin Panel İyileştirmeleri, Arama Kutuları, Takvim --> 03.04.2026 | Etkinlik Düzenleme, Ürün Silme, Gelişmiş Takvim --> 02.04.2026 | Vendor Ürün Düzenle/Sil, Etkinlik Form İyileştirmeleri --> 01.04.2026 | Mesajlaşma, Teklif Karşılaştırma, Bildirimler, Kategori Yönetimi, Ülke Listesi, Çoklu Vendor/Katalog Seçimi, Email Doğrulama -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.8</title>
+<title>PoCHub.co — v1.9</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,7 +121,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.8';
+const VERSION = 'v1.9';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 const ALL_COUNTRIES = [
@@ -1747,6 +1747,7 @@ function renderCustomer() {
     el('scr-customer').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme erişmek için müşteri hesabıyla giriş yapın.<br><br><button class="btn-p" onclick="openAuthModal('customer','')">Giriş Yap / Kayıt Ol</button></div></div>`;
     return;
   }
+  if (el('cust-main')) { loadCustTab(); return; }
   const tabs = [
     ['requests','PoC Taleplerim'],['registrations','Etkinlik Kayıtlarım'],['offers','Teklifler'],
   ];
@@ -1939,6 +1940,7 @@ function renderVendor() {
     el('scr-vendor').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme vendor hesabıyla giriş yapın.</div></div>`;
     return;
   }
+  if (el('vend-main')) { loadVendTab(); return; }
   const vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
   const vtypeLabel = vtypeLabels[CUR_PROFILE.vendorType]||'Vendor';
   const tabs = [
@@ -2820,6 +2822,8 @@ function renderAdmin() {
     el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Admin yetkisi gerekli.</div></div>`;
     return;
   }
+  // Sidebar zaten oluşturulmuşsa sadece içeriği güncelle
+  if (el('adm-main')) { loadAdmTab(); return; }
   const tabs = [
     ['dashboard','Dashboard'],['users','Kullanıcılar'],['categories','Kategoriler'],
     ['products','Ürün Onayları'],['requests','Tüm PoC Talepleri'],
@@ -2829,7 +2833,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.8</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.9</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -2846,12 +2850,19 @@ async function loadAdmTab() {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
 
   if (CUR_ADM_TAB === 'categories') { await admCategories(m); return; }
+  if (CUR_ADM_TAB === 'users') { await admUsers(m); return; }
+  if (CUR_ADM_TAB === 'products') { await admProducts(m); return; }
+  if (CUR_ADM_TAB === 'requests') { await admRequests(m); return; }
+  if (CUR_ADM_TAB === 'events') { await admEvents(m); return; }
+  if (CUR_ADM_TAB === 'offers') { await admOffers(m); return; }
+
+  // Dashboard
   if (CUR_ADM_TAB === 'dashboard') {
     const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap] = await Promise.all([
       getDocs(collection(db,'users')),
       getDocs(collection(db,'products')),
-      getDocs(collection(db,'poc_requests')),
-      getDocs(collection(db,'public_events')),
+      getDocs(query(collection(db,'poc_requests'), where('status','in',['pending','active']))),
+      getDocs(query(collection(db,'public_events'), where('status','==','published'))),
       getDocs(collection(db,'offers')),
     ]);
     const users = usersSnap.docs.map(d=>d.data());
@@ -2859,6 +2870,410 @@ async function loadAdmTab() {
     const pocs = pocSnap.docs.map(d=>d.data());
     const events = evSnap.docs.map(d=>d.data());
     const offers = offSnap.docs.map(d=>d.data());
+
+async function admUsers(m) {
+  const snap = await getDocs(collection(db,'users'));
+  var allUsers = snap.docs.map(d=>({...d.data(),id:d.id}));
+  allUsers.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  const vtypes={ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+  const roleBg={admin:'rgba(240,164,41,.12)',vendor:'rgba(59,124,255,.12)',customer:'rgba(34,208,120,.12)'};
+  const roleCol={admin:'#f0a429',vendor:'#7db4ff',customer:'#22d078'};
+
+  function renderRows(users) {
+    var tbody = m.querySelector('#users-tbody');
+    var count = m.querySelector('#users-count');
+    if (count) count.textContent = '(' + users.length + ')';
+    if (!tbody) return;
+    if (!users.length) { tbody.innerHTML='<tr><td colspan="4" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>'; return; }
+    tbody.innerHTML = users.map(function(u) {
+      var roleLabel = u.role==='vendor'?(vtypes[u.vendorType]||'Vendor'):u.role==='admin'?'Admin':'Müşteri';
+      return '<tr><td><div style="font-weight:600">'+(u.displayName||'—')+'</div><div style="font-size:11.5px;color:#7c87a0">'+u.email+'</div></td>' +
+        '<td><span class="bdg" style="background:'+(roleBg[u.role]||'#1c1f2a')+';color:'+(roleCol[u.role]||'#7c87a0')+'">'+roleLabel+'</span></td>' +
+        '<td style="color:#7c87a0">'+(u.company||'—')+'</td>' +
+        '<td style="color:#7c87a0;font-size:12px">'+fmt(u.createdAt)+'</td></tr>';
+    }).join('');
+  }
+
+  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+    '<h2 style="font-size:18px;font-weight:700">Kullanıcılar <span id="users-count" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
+    '<input class="inp" id="users-search" placeholder="Ad, e-posta veya şirket ara..." style="width:260px;font-size:12.5px"></div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+    '<button class="btn-g btn-sm user-role-filter on" data-role="">Tümü</button>' +
+    '<button class="btn-g btn-sm user-role-filter" data-role="customer">Müşteri</button>' +
+    '<button class="btn-g btn-sm user-role-filter" data-role="vendor">Vendor</button>' +
+    '<button class="btn-g btn-sm user-role-filter" data-role="admin">Admin</button>' +
+    '</div>' +
+    '<table><thead><tr><th>Ad / E-posta</th><th>Rol</th><th>Şirket</th><th>Kayıt</th></tr></thead><tbody id="users-tbody"></tbody></table>';
+
+  var roleFilter = '';
+  function applyFilter() {
+    var q = (m.querySelector('#users-search')?.value||'').toLowerCase();
+    var filtered = allUsers.filter(function(u) {
+      var matchRole = !roleFilter || u.role===roleFilter;
+      var matchQ = !q || (u.displayName||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.company||'').toLowerCase().includes(q);
+      return matchRole && matchQ;
+    });
+    renderRows(filtered);
+  }
+
+  renderRows(allUsers);
+  m.querySelector('#users-search').addEventListener('input', applyFilter);
+  m.querySelectorAll('.user-role-filter').forEach(function(b) {
+    b.addEventListener('click', function() {
+      m.querySelectorAll('.user-role-filter').forEach(function(x){x.className='btn-g btn-sm user-role-filter';});
+      b.className='btn-p btn-sm user-role-filter on';
+      roleFilter = b.dataset.role;
+      applyFilter();
+    });
+  });
+}
+
+async function admProducts(m) {
+  const snap = await getDocs(collection(db,'products'));
+  var allProds = snap.docs.map(d=>({...d.data(),id:d.id}));
+  allProds.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+  function renderRows(prods) {
+    var tbody = m.querySelector('#prods-tbody');
+    var count = m.querySelector('#prods-count');
+    if (count) count.textContent = '(' + prods.length + ')';
+    if (!tbody) return;
+    if (!prods.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>'; return; }
+    tbody.innerHTML = prods.map(function(p) {
+      return '<tr><td><div style="font-weight:600">'+p.name+'</div>'+(p.description?'<div style="font-size:11.5px;color:#7c87a0">'+p.description.substring(0,50)+'...</div>':'')+'</td>' +
+        '<td style="color:#7c87a0">'+(p.vendorName||'—')+'</td>' +
+        '<td style="color:#7c87a0">'+(p.category||'—')+'</td>' +
+        '<td>'+cc(p.country||'TR')+'</td>' +
+        '<td>'+statusBadge(p.status)+'</td>' +
+        '<td style="white-space:nowrap">' +
+        (p.status==='pending'?
+          '<button class="btn-gr btn-sm appr-prod" data-id="'+p.id+'" data-vemail="'+(p.vendorEmail||'')+'" data-vname="'+(p.vendorName||'')+'" data-pname="'+p.name+'" style="margin-right:5px">Onayla</button>' +
+          '<button class="btn-red btn-sm rej-prod" data-id="'+p.id+'" data-vemail="'+(p.vendorEmail||'')+'" data-vname="'+(p.vendorName||'')+'" data-pname="'+p.name+'">Reddet</button>' :
+          p.status==='active'?'<button class="btn-red btn-sm arc-prod" data-id="'+p.id+'">Arşivle</button>':'—') +
+        '</td></tr>';
+    }).join('');
+    // Binding
+    m.querySelectorAll('.appr-prod').forEach(function(b){b.addEventListener('click',async function(){
+      await updateDoc(doc(db,'products',b.dataset.id),{status:'active'});
+      showToast('Ürün onaylandı!');
+      if(b.dataset.vemail) sendEmail(b.dataset.vemail,b.dataset.vname,'Ürününüz Onaylandı',''+b.dataset.pname+' ürününüz onaylandı.','');
+      admProducts(m);
+    });});
+    m.querySelectorAll('.rej-prod').forEach(function(b){b.addEventListener('click',async function(){
+      await updateDoc(doc(db,'products',b.dataset.id),{status:'rejected'});
+      showToast('Ürün reddedildi.');
+      if(b.dataset.vemail) sendEmail(b.dataset.vemail,b.dataset.vname,'Ürün Değerlendirmesi',b.dataset.pname+' ürününüz onaylanmadı.','');
+      admProducts(m);
+    });});
+    m.querySelectorAll('.arc-prod').forEach(function(b){b.addEventListener('click',async function(){
+      await updateDoc(doc(db,'products',b.dataset.id),{status:'archived'});
+      showToast('Ürün arşivlendi.');
+      admProducts(m);
+    });});
+  }
+
+  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+    '<h2 style="font-size:18px;font-weight:700">Ürün Yönetimi <span id="prods-count" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
+    '<input class="inp" id="prods-search" placeholder="Ürün adı, vendor veya kategori ara..." style="width:260px;font-size:12.5px"></div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+    '<button class="btn-g btn-sm prod-status-filter on" data-status="">Tümü</button>' +
+    '<button class="btn-g btn-sm prod-status-filter" data-status="pending">Bekleyen</button>' +
+    '<button class="btn-g btn-sm prod-status-filter" data-status="active">Aktif</button>' +
+    '<button class="btn-g btn-sm prod-status-filter" data-status="rejected">Reddedilen</button>' +
+    '</div>' +
+    '<table><thead><tr><th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="prods-tbody"></tbody></table>';
+
+  var statusFilter = '';
+  function applyFilter() {
+    var q = (m.querySelector('#prods-search')?.value||'').toLowerCase();
+    var filtered = allProds.filter(function(p) {
+      var matchS = !statusFilter || p.status===statusFilter;
+      var matchQ = !q || (p.name||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q);
+      return matchS && matchQ;
+    });
+    renderRows(filtered);
+  }
+  renderRows(allProds);
+  m.querySelector('#prods-search').addEventListener('input', applyFilter);
+  m.querySelectorAll('.prod-status-filter').forEach(function(b){
+    b.addEventListener('click',function(){
+      m.querySelectorAll('.prod-status-filter').forEach(function(x){x.className='btn-g btn-sm prod-status-filter';});
+      b.className='btn-p btn-sm prod-status-filter on';
+      statusFilter=b.dataset.status;
+      applyFilter();
+    });
+  });
+}
+
+async function admRequests(m) {
+  const snap = await getDocs(collection(db,'poc_requests'));
+  var allReqs = snap.docs.map(d=>({...d.data(),id:d.id}));
+  allReqs.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  const locLabels={customer:'Müşteri',vendor:'Vendor',online:'Online',hybrid:'Hibrit'};
+
+  function renderRows(reqs) {
+    var tbody = m.querySelector('#reqs-tbody');
+    var count = m.querySelector('#reqs-count');
+    if (count) count.textContent = '(' + reqs.length + ')';
+    if (!tbody) return;
+    if (!reqs.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>'; return; }
+    tbody.innerHTML = reqs.map(function(r) {
+      return '<tr><td style="font-weight:600">'+r.title+'</td>' +
+        '<td style="color:#7c87a0"><div>'+(r.customerName||'—')+'</div><div style="font-size:11px">'+(r.customerCompany||'')+'</div></td>' +
+        '<td style="color:#7c87a0">'+(r.vendorName||'—')+'</td>' +
+        '<td>'+(r.vendorType?'<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff;font-size:10px">'+({ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'}[r.vendorType]||r.vendorType)+'</span>':'—')+'</td>' +
+        '<td style="color:#7c87a0">'+(r.productName||'—')+'</td>' +
+        '<td>'+statusBadge(r.status)+'</td>' +
+        '<td style="color:#7c87a0;font-size:12px">'+fmt(r.createdAt)+'</td></tr>';
+    }).join('');
+  }
+
+  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+    '<h2 style="font-size:18px;font-weight:700">PoC Talepleri <span id="reqs-count" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
+    '<input class="inp" id="reqs-search" placeholder="Başlık, müşteri, vendor veya ürün ara..." style="width:280px;font-size:12.5px"></div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+    '<button class="btn-g btn-sm req-status-filter on" data-status="">Tümü</button>' +
+    '<button class="btn-g btn-sm req-status-filter" data-status="pending">Bekleyen</button>' +
+    '<button class="btn-g btn-sm req-status-filter" data-status="active">Aktif</button>' +
+    '<button class="btn-g btn-sm req-status-filter" data-status="completed">Tamamlanan</button>' +
+    '<button class="btn-g btn-sm req-status-filter" data-status="cancelled">İptal</button>' +
+    '</div>' +
+    '<table><thead><tr><th>Başlık</th><th>Müşteri</th><th>Vendor</th><th>Tip</th><th>Ürün</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="reqs-tbody"></tbody></table>';
+
+  var statusFilter = '';
+  function applyFilter() {
+    var q = (m.querySelector('#reqs-search')?.value||'').toLowerCase();
+    var filtered = allReqs.filter(function(r) {
+      var matchS = !statusFilter || r.status===statusFilter;
+      var matchQ = !q||(r.title||'').toLowerCase().includes(q)||(r.customerName||'').toLowerCase().includes(q)||(r.vendorName||'').toLowerCase().includes(q)||(r.productName||'').toLowerCase().includes(q);
+      return matchS&&matchQ;
+    });
+    renderRows(filtered);
+  }
+  renderRows(allReqs);
+  m.querySelector('#reqs-search').addEventListener('input', applyFilter);
+  m.querySelectorAll('.req-status-filter').forEach(function(b){
+    b.addEventListener('click',function(){
+      m.querySelectorAll('.req-status-filter').forEach(function(x){x.className='btn-g btn-sm req-status-filter';});
+      b.className='btn-p btn-sm req-status-filter on';
+      statusFilter=b.dataset.status;
+      applyFilter();
+    });
+  });
+}
+
+async function admEvents(m) {
+  const pocSnap = await getDocs(collection(db,'poc_requests'));
+  const evSnap2 = await getDocs(collection(db,'public_events'));
+  var pocItems = pocSnap.docs.map(d=>({...d.data(),id:d.id,itemType:'private'}));
+  var evItems2 = evSnap2.docs.map(d=>({...d.data(),id:d.id,itemType:'public'}));
+  var allItems = pocItems.concat(evItems2);
+  allItems.sort((a,b)=>(a.eventDate?.seconds||a.createdAt?.seconds||0)-(b.eventDate?.seconds||b.createdAt?.seconds||0));
+
+  var today2 = new Date();
+  var calYear2 = today2.getFullYear();
+  var calMonth2 = today2.getMonth();
+  var calView2 = 'calendar';
+  var searchQ2 = '';
+  var MONTHS_TR2 = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+  function getFiltered2() {
+    var q = searchQ2.toLowerCase();
+    if (!q) return allItems;
+    return allItems.filter(function(item) {
+      return (item.title||'').toLowerCase().includes(q)||(item.productName||'').toLowerCase().includes(q)||(item.vendorName||'').toLowerCase().includes(q)||(item.customerName||'').toLowerCase().includes(q);
+    });
+  }
+
+  function renderListView2(items, container) {
+    if (!items.length) { container.innerHTML='<div class="empty"><div class="empty-icon">📅</div>Kayıt bulunamadı.</div>'; return; }
+    var html = '<table><thead><tr><th>Başlık</th><th>Vendor</th><th>Tür</th><th>Tarih</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>';
+    items.forEach(function(item) {
+      var isPublic = item.itemType==='public';
+      html += '<tr><td style="font-weight:600">'+(item.title||item.productName||'—')+'<div style="font-size:11px;color:#5a6278">'+(isPublic?item.productName||'':'item.customerName'||'')+'</div></td>' +
+        '<td style="color:#7c87a0">'+(item.vendorName||'—')+'</td>' +
+        '<td>'+(isPublic?'<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078">Public</span>':'<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">Private</span>')+'</td>' +
+        '<td style="color:#7c87a0;font-size:12px">'+fmt(item.eventDate||item.createdAt)+'</td>' +
+        '<td>'+statusBadge(item.status)+'</td>' +
+        '<td>'+(isPublic&&item.status==='published'?'<button class="btn-red btn-sm adm-cancel-ev" data-id="'+item.id+'">İptal</button>':'—')+'</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    container.querySelectorAll('.adm-cancel-ev').forEach(function(b){
+      b.addEventListener('click',async function(){
+        if(!confirm('Etkinliği iptal etmek istiyor musunuz?')) return;
+        await updateDoc(doc(db,'public_events',b.dataset.id),{status:'cancelled'});
+        showToast('Etkinlik iptal edildi.');
+        admEvents(m);
+      });
+    });
+  }
+
+  function renderCalView2(items, container) {
+    var dayMap = {};
+    items.forEach(function(item) {
+      var dateField = item.eventDate||item.createdAt;
+      if (!dateField||!dateField.toDate) return;
+      var d = dateField.toDate();
+      if (d.getFullYear()===calYear2&&d.getMonth()===calMonth2) {
+        var day = d.getDate();
+        if (!dayMap[day]) dayMap[day]=[];
+        dayMap[day].push(item);
+      }
+    });
+    var firstDay = new Date(calYear2,calMonth2,1).getDay();
+    var offset = firstDay===0?6:firstDay-1;
+    var daysInMonth = new Date(calYear2,calMonth2+1,0).getDate();
+    var DAYS2=['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
+    var html='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">';
+    DAYS2.forEach(function(d){html+='<div style="text-align:center;font-size:10px;color:#5a6278;font-weight:700;padding:4px 0">'+d+'</div>';});
+    for(var i=0;i<offset;i++) html+='<div></div>';
+    for(var day=1;day<=daysInMonth;day++){
+      var isToday2=today2.getFullYear()===calYear2&&today2.getMonth()===calMonth2&&today2.getDate()===day;
+      var dayItems=dayMap[day]||[];
+      var hasPoc=dayItems.some(function(x){return x.itemType==='private';});
+      var hasEv=dayItems.some(function(x){return x.itemType==='public';});
+      var bg=isToday2?'#3b7cff':(hasPoc||hasEv)?'rgba(59,124,255,.15)':'transparent';
+      var brd=isToday2?'none':(hasPoc||hasEv)?'1px solid rgba(59,124,255,.3)':'1px solid rgba(255,255,255,.06)';
+      html+='<div class="vcal-day2" data-day="'+day+'" style="min-height:52px;border-radius:6px;padding:4px;cursor:'+(dayItems.length?'pointer':'default')+';background:'+bg+';border:'+brd+'">' +
+        '<div style="font-size:11.5px;font-weight:'+(isToday2||dayItems.length?'700':'400')+';color:'+(isToday2?'#fff':dayItems.length?'#e9ecf3':'#5a6278')+'">'+day+'</div>';
+      if(hasPoc) html+='<div style="width:6px;height:6px;border-radius:50%;background:#7db4ff;margin-top:2px"></div>';
+      if(hasEv) html+='<div style="width:6px;height:6px;border-radius:50%;background:#22d078;margin-top:2px"></div>';
+      html+='</div>';
+    }
+    html+='</div><div id="vcal2-detail"></div>';
+    container.innerHTML=html;
+    container.querySelectorAll('.vcal-day2').forEach(function(dayEl){
+      dayEl.addEventListener('click',function(){
+        var day=parseInt(dayEl.dataset.day);
+        var dayItems=dayMap[day]||[];
+        if(!dayItems.length) return;
+        var detailEl=document.getElementById('vcal2-detail');
+        if(!detailEl) return;
+        var dHtml='';
+        dayItems.forEach(function(item){
+          var isPublic=item.itemType==='public';
+          dHtml+='<div class="card" style="margin-bottom:8px;padding:12px;border-color:'+(isPublic?'rgba(34,208,120,.25)':'rgba(59,124,255,.25)')+'">'+
+            '<div style="display:flex;gap:8px;margin-bottom:5px">'+
+            '<span class="bdg" style="background:'+(isPublic?'rgba(34,208,120,.12)':'rgba(59,124,255,.12)')+';color:'+(isPublic?'#22d078':'#7db4ff')+'">'+(isPublic?'Public Etkinlik':'Private PoC')+'</span>'+
+            statusBadge(item.status)+'</div>'+
+            '<div style="font-size:13px;font-weight:700">'+(item.title||item.productName||'—')+'</div>'+
+            '<div style="font-size:12px;color:#7c87a0;margin-top:3px">Vendor: '+(item.vendorName||'—')+'</div>'+
+            (item.customerName?'<div style="font-size:12px;color:#7c87a0">Müşteri: '+item.customerName+'</div>':'')+'</div>';
+        });
+        detailEl.innerHTML=dHtml;
+      });
+    });
+  }
+
+  function renderContent2() {
+    var filtered=getFiltered2();
+    var contentEl=document.getElementById('admcal-content');
+    if(!contentEl) return;
+    if(calView2==='list') renderListView2(filtered,contentEl);
+    else renderCalView2(filtered,contentEl);
+  }
+
+  function updateLabel2() {
+    var lbl=document.getElementById('admcal-label');
+    if(lbl) lbl.textContent=MONTHS_TR2[calMonth2]+' '+calYear2;
+  }
+
+  m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<h2 style="font-size:18px;font-weight:700">Tüm Etkinlikler ve PoC Süreci</h2>'+
+    '<div style="display:flex;gap:8px;align-items:center">'+
+    '<input class="inp" id="admcal-search" placeholder="Ara..." style="width:200px;font-size:12.5px">'+
+    '<button id="admcal-list" class="btn-g btn-sm">📋 Liste</button>'+
+    '<button id="admcal-cal" class="btn-p btn-sm">📅 Takvim</button>'+
+    '</div></div>'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px" id="admcal-nav">'+
+    '<button id="admcal-prev" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">‹</button>'+
+    '<span id="admcal-label" style="font-size:13px;font-weight:700;min-width:120px;text-align:center"></span>'+
+    '<button id="admcal-next" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">›</button>'+
+    '</div>'+
+    '<div style="display:flex;gap:14px;margin-bottom:12px;font-size:12px;color:#7c87a0" id="admcal-legend">'+
+    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7db4ff;margin-right:4px"></span>Private PoC</span>'+
+    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22d078;margin-right:4px"></span>Public Etkinlik</span>'+
+    '</div>'+
+    '<div id="admcal-content"></div>';
+
+  function setView2(v) {
+    calView2=v;
+    var nav=document.getElementById('admcal-nav');
+    var leg=document.getElementById('admcal-legend');
+    if(nav) nav.style.display=v==='calendar'?'flex':'none';
+    if(leg) leg.style.display=v==='calendar'?'flex':'none';
+    document.getElementById('admcal-cal').className=v==='calendar'?'btn-p btn-sm':'btn-g btn-sm';
+    document.getElementById('admcal-list').className=v==='list'?'btn-p btn-sm':'btn-g btn-sm';
+    updateLabel2();
+    renderContent2();
+  }
+
+  m.querySelector('#admcal-prev').addEventListener('click',function(){calMonth2--;if(calMonth2<0){calMonth2=11;calYear2--;}updateLabel2();renderContent2();});
+  m.querySelector('#admcal-next').addEventListener('click',function(){calMonth2++;if(calMonth2>11){calMonth2=0;calYear2++;}updateLabel2();renderContent2();});
+  m.querySelector('#admcal-list').addEventListener('click',function(){setView2('list');});
+  m.querySelector('#admcal-cal').addEventListener('click',function(){setView2('calendar');});
+  m.querySelector('#admcal-search').addEventListener('input',function(){searchQ2=this.value;renderContent2();});
+  setView2('calendar');
+}
+
+async function admOffers(m) {
+  const snap = await getDocs(collection(db,'offers'));
+  var allOffers = snap.docs.map(d=>({...d.data(),id:d.id}));
+  allOffers.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+  function renderRows(offers) {
+    var tbody=m.querySelector('#offers-tbody');
+    var count=m.querySelector('#offers-count');
+    if(count) count.textContent='('+offers.length+')';
+    if(!tbody) return;
+    if(!offers.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';return;}
+    tbody.innerHTML=offers.map(function(o){
+      return '<tr><td style="font-weight:600">'+(o.productName||'—')+'</td>' +
+        '<td style="color:#7c87a0">'+(o.vendorName||'—')+'</td>' +
+        '<td style="color:#7c87a0">'+(o.customerName||'—')+'</td>' +
+        '<td style="font-family:monospace;font-weight:700">'+((o.amount||0).toLocaleString('tr-TR'))+' '+(o.currency||'₺')+'</td>' +
+        '<td>'+(o.hasChannelFee?'<span style="color:#f0a429">Var</span>':'<span style="color:#22d078">Yok</span>')+'</td>' +
+        '<td>'+statusBadge(o.status)+'</td>' +
+        '<td style="color:#7c87a0;font-size:12px">'+fmt(o.createdAt)+'</td></tr>';
+    }).join('');
+  }
+
+  m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<h2 style="font-size:18px;font-weight:700">Teklifler <span id="offers-count" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
+    '<input class="inp" id="offers-search" placeholder="Ürün, vendor veya müşteri ara..." style="width:260px;font-size:12.5px"></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    '<button class="btn-g btn-sm off-status-filter on" data-status="">Tümü</button>'+
+    '<button class="btn-g btn-sm off-status-filter" data-status="pending">Bekleyen</button>'+
+    '<button class="btn-g btn-sm off-status-filter" data-status="accepted">Kabul</button>'+
+    '<button class="btn-g btn-sm off-status-filter" data-status="rejected">Red</button>'+
+    '</div>'+
+    '<table><thead><tr><th>Ürün</th><th>Vendor</th><th>Müşteri</th><th>Tutar</th><th>Kanal Payı</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="offers-tbody"></tbody></table>';
+
+  var statusFilter='';
+  function applyFilter(){
+    var q=(m.querySelector('#offers-search')?.value||'').toLowerCase();
+    var filtered=allOffers.filter(function(o){
+      var matchS=!statusFilter||o.status===statusFilter;
+      var matchQ=!q||(o.productName||'').toLowerCase().includes(q)||(o.vendorName||'').toLowerCase().includes(q)||(o.customerName||'').toLowerCase().includes(q);
+      return matchS&&matchQ;
+    });
+    renderRows(filtered);
+  }
+  renderRows(allOffers);
+  m.querySelector('#offers-search').addEventListener('input',applyFilter);
+  m.querySelectorAll('.off-status-filter').forEach(function(b){
+    b.addEventListener('click',function(){
+      m.querySelectorAll('.off-status-filter').forEach(function(x){x.className='btn-g btn-sm off-status-filter';});
+      b.className='btn-p btn-sm off-status-filter on';
+      statusFilter=b.dataset.status;
+      applyFilter();
+    });
+  });
+}
+
+
 async function admCategories(m) {
   try {
     const snap = await getDocs(collection(db,'categories'));
