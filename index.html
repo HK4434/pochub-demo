@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v1.9 | 03.04.2026 | Admin Panel İyileştirmeleri, Arama Kutuları, Takvim --> 03.04.2026 | Etkinlik Düzenleme, Ürün Silme, Gelişmiş Takvim --> 02.04.2026 | Vendor Ürün Düzenle/Sil, Etkinlik Form İyileştirmeleri --> 01.04.2026 | Mesajlaşma, Teklif Karşılaştırma, Bildirimler, Kategori Yönetimi, Ülke Listesi, Çoklu Vendor/Katalog Seçimi, Email Doğrulama -->
+<!-- PoCHub v1.9 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.9</title>
+<title>PoCHub.co — v1.9.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,7 +121,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.9';
+const VERSION = 'v1.9.1';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 const ALL_COUNTRIES = [
@@ -559,7 +559,7 @@ function startNotifListener() {
   const role = CUR_PROFILE.role;
   let q;
   if (role === 'customer') {
-    q = query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid), where('status','in',['active','rejected']));
+    q = query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid));
   } else if (role === 'vendor') {
     q = query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid), where('status','==','pending'));
   } else {
@@ -876,7 +876,7 @@ async function renderHome() {
     const [evSnap, userSnap, pocSnap, prodSnap] = await Promise.all([
       getDocs(query(collection(db,'public_events'), where('status','==','published'))),
       getDocs(collection(db,'users')),
-      getDocs(query(collection(db,'poc_requests'), where('status','in',['pending','active']))),
+      getDocs(collection(db,'poc_requests')),
       getDocs(query(collection(db,'products'), where('status','==','active'))),
     ]);
     const vals = [evSnap.size, userSnap.size, pocSnap.size, prodSnap.size];
@@ -1675,8 +1675,7 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
         // Çakışma kontrolü
         const activeSnap = await getDocs(query(
           collection(db,'poc_requests'),
-          where('vendorId','==',v.vendorId),
-          where('status','in',['pending','active'])
+          where('vendorId','==',v.vendorId)
         ));
 
         const docRef = await addDoc(collection(db,'poc_requests'), {
@@ -2833,7 +2832,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.9</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.9.1</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -2861,14 +2860,16 @@ async function loadAdmTab() {
     const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap] = await Promise.all([
       getDocs(collection(db,'users')),
       getDocs(collection(db,'products')),
-      getDocs(query(collection(db,'poc_requests'), where('status','in',['pending','active']))),
-      getDocs(query(collection(db,'public_events'), where('status','==','published'))),
+      getDocs(collection(db,'poc_requests')),
+      getDocs(collection(db,'public_events')),
       getDocs(collection(db,'offers')),
     ]);
     const users = usersSnap.docs.map(d=>d.data());
     const prods = prodsSnap.docs.map(d=>d.data());
-    const pocs = pocSnap.docs.map(d=>d.data());
-    const events = evSnap.docs.map(d=>d.data());
+    const allPocs = pocSnap.docs.map(d=>d.data());
+    const pocs = allPocs.filter(p=>p.status==='pending'||p.status==='active');
+    const allEvents = evSnap.docs.map(d=>d.data());
+    const events = allEvents.filter(e=>e.status==='published');
     const offers = offSnap.docs.map(d=>d.data());
 
 async function admUsers(m) {
