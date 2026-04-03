@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v2.0</title>
+<title>PoCHub.co — v2.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,7 +121,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v2.0';
+const VERSION = 'v2.1';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -2058,7 +2058,8 @@ function renderVendor() {
   const vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
   const vtypeLabel = vtypeLabels[CUR_PROFILE.vendorType]||'Vendor';
   const tabs = [
-    ['dashboard','Dashboard'],['requests','PoC Talepleri'],['calendar','Takvim'],['products','Ürünlerim'],
+    ['dashboard','Dashboard'],['requests','PoC Talepleri'],['calendar','Takvim'],
+    ['products','Ürünlerim'],['portfolio','Portföyüm'],
     ['events','Etkinliklerim'],['offers-sent','Gönderilen Teklifler'],
   ];
   el('scr-vendor').innerHTML = `<div class="dash">
@@ -2104,6 +2105,7 @@ async function loadVendTab() {
       '</div>';
     return;
   }
+  if (CUR_VEND_TAB === 'portfolio') { await vendPortfolio(m); return; }
   if (CUR_VEND_TAB === 'requests') {
     const snap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid)));
     if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Henüz PoC talebi yok.<br><small style="color:#5a6278">Müşteriler katalogdan ürünlerinize talep oluşturunca burada görünür.</small></div>'; return; }
@@ -2287,6 +2289,181 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
   });
 }
 
+/* ════════════════════════════════════════
+   VENDOR PORTFÖYܙ (v2.1)
+   Distribütör/entegratör başkasının ürününü portföyüne ekler
+════════════════════════════════════════ */
+async function vendPortfolio(m) {
+  // Vendor'ın portföy girişleri — vendor_products koleksiyonu
+  const portSnap = await getDocs(query(collection(db,'vendor_products'), where('vendorId','==',CUR_USER.uid)));
+  var portItems = portSnap.docs.map(d=>({...d.data(),id:d.id}));
+
+  m.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+    '<div>' +
+    '<h2 style="font-size:18px;font-weight:700">Portföyüm</h2>' +
+    '<div style="font-size:12.5px;color:#7c87a0;margin-top:3px">Distribütörü veya entegratörü olduğunuz ürünleri ekleyin. Etkinliklerinizde kullanabilirsiniz.</div>' +
+    '</div>' +
+    '<button class="btn-p btn-sm" id="add-port-btn">+ Ürün Ekle</button>' +
+    '</div>' +
+    '<div style="background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:11px 14px;font-size:12.5px;color:#7db4ff;margin-bottom:14px">' +
+    'ℹ Katalogda kayıtlı bir ürünü seçip portföyünüze ekleyebilirsiniz. Ürün sahibi (üretici) bildirim alır. Admin onayı sonrası etkinliklerinizde kullanabilirsiniz.' +
+    '</div>' +
+    (portItems.length ?
+      '<table><thead><tr><th>Ürün</th><th>Orijinal Vendor</th><th>Rolünüz</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>' +
+      portItems.map(function(p) {
+        return '<tr><td style="font-weight:600">'+(p.productName||'—')+'</td>' +
+          '<td style="color:#7c87a0">'+(p.originalVendorName||'—')+'</td>' +
+          '<td><span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">'+(p.role||'Distribütör')+'</span></td>' +
+          '<td>'+statusBadge(p.status)+'</td>' +
+          '<td><button class="btn-red btn-sm port-del" data-id="'+p.id+'">Kaldır</button></td></tr>';
+      }).join('') +
+      '</tbody></table>' :
+      '<div class="empty"><div class="empty-icon">📦</div>Portföyünüzde ürün yok.<br><small style="color:#5a6278">Katalogdan ürün ekleyerek başlayın.</small></div>'
+    );
+
+  m.querySelector('#add-port-btn')?.addEventListener('click', () => openAddToPortfolio());
+  m.querySelectorAll('.port-del').forEach(function(b) {
+    b.addEventListener('click', async function() {
+      if (!confirm('Bu ürünü portföyünüzden kaldırmak istiyor musunuz?')) return;
+      await deleteDoc(doc(db,'vendor_products',b.dataset.id));
+      showToast('Portföyden kaldırıldı.');
+      vendPortfolio(m);
+    });
+  });
+}
+
+async function openAddToPortfolio() {
+  // Tüm onaylı ürünleri çek — kendi ürünleri hariç
+  const snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
+  var allProds = snap.docs.map(d=>({...d.data(),id:d.id}))
+    .filter(p => p.vendorId !== CUR_USER.uid); // kendi ürünleri zaten ürünlerimde
+
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:580px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Portföye Ürün Ekle</h3>' +
+    '<button id="close-port-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<input class="inp" id="port-search" placeholder="Ürün veya marka ara..." style="margin-bottom:10px">' +
+    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
+    '<button class="btn-p btn-sm port-role-btn" data-role="Distribütör">Distribütör</button>' +
+    '<button class="btn-g btn-sm port-role-btn" data-role="Entegratör">Entegratör</button>' +
+    '<button class="btn-g btn-sm port-role-btn" data-role="Bayi">Bayi</button>' +
+    '</div>' +
+    '<div id="port-prod-list" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>' +
+    '<div id="port-sel-info" style="margin-top:10px;padding:10px;background:#1c1f2a;border-radius:8px;font-size:12.5px;display:none">' +
+    'Seçilen: <span id="port-sel-name" style="color:#3b7cff;font-weight:700"></span>' +
+    '</div>' +
+    '<div id="port-err" style="margin-top:8px"></div>' +
+    '<button class="btn-p" id="port-submit" style="width:100%;padding:11px;font-size:14px;margin-top:12px" disabled>Portföye Ekle</button>' +
+    '</div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#close-port-modal').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+
+  var selectedProd = null;
+  var selectedRole = 'Distribütör';
+
+  function renderProds(prods) {
+    var listEl = modal.querySelector('#port-prod-list');
+    if (!prods.length) { listEl.innerHTML='<div class="empty">Ürün bulunamadı.</div>'; return; }
+    listEl.innerHTML = prods.slice(0,20).map(function(p) {
+      return '<div class="port-prod-item" data-id="'+p.id+'" style="padding:11px 14px;background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:8px;cursor:pointer;transition:.1s">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="flex:1">' +
+        '<div style="font-size:13px;font-weight:600">'+p.name+'</div>' +
+        '<div style="font-size:12px;color:#7c87a0;margin-top:2px">'+( p.vendorName||'—')+' · '+(p.category||'—')+' · '+cc(p.country||'TR')+'</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+    listEl.querySelectorAll('.port-prod-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        listEl.querySelectorAll('.port-prod-item').forEach(function(x){
+          x.style.borderColor='rgba(255,255,255,.1)'; x.style.background='#1c1f2a';
+        });
+        item.style.borderColor='#3b7cff'; item.style.background='rgba(59,124,255,.08)';
+        selectedProd = allProds.find(function(p){return p.id===item.dataset.id;});
+        var selInfo = modal.querySelector('#port-sel-info');
+        var selName = modal.querySelector('#port-sel-name');
+        if (selInfo) selInfo.style.display='block';
+        if (selName) selName.textContent = selectedProd?.name || '';
+        modal.querySelector('#port-submit').disabled = false;
+      });
+    });
+  }
+
+  renderProds(allProds);
+
+  modal.querySelector('#port-search').addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    renderProds(q ? allProds.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q)) : allProds);
+  });
+
+  modal.querySelectorAll('.port-role-btn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      modal.querySelectorAll('.port-role-btn').forEach(function(x){x.className='btn-g btn-sm port-role-btn';});
+      b.className='btn-p btn-sm port-role-btn';
+      selectedRole = b.dataset.role;
+    });
+  });
+
+  modal.querySelector('#port-submit').addEventListener('click', async function() {
+    if (!selectedProd) return;
+    var btn = modal.querySelector('#port-submit');
+    btn.disabled=true; btn.textContent='Ekleniyor...';
+    try {
+      // Zaten portföyde mi?
+      var existing = await getDocs(query(collection(db,'vendor_products'),
+        where('vendorId','==',CUR_USER.uid),
+        where('productId','==',selectedProd.id)
+      ));
+      if (!existing.empty) {
+        modal.querySelector('#port-err').innerHTML='<div class="alert alert-err">Bu ürün zaten portföyünüzde.</div>';
+        btn.disabled=false; btn.textContent='Portföye Ekle'; return;
+      }
+
+      await addDoc(collection(db,'vendor_products'), {
+        vendorId: CUR_USER.uid,
+        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
+        vendorEmail: CUR_USER.email,
+        vendorType: CUR_PROFILE?.vendorType||'',
+        productId: selectedProd.id,
+        productName: selectedProd.name,
+        productCategory: selectedProd.category||'',
+        originalVendorId: selectedProd.vendorId,
+        originalVendorName: selectedProd.vendorName||'',
+        originalVendorEmail: selectedProd.vendorEmail||'',
+        role: selectedRole,
+        status: 'active',
+        createdAt: serverTimestamp()
+      });
+
+      // Orijinal üreticiye/vendor'a bildirim
+      if (selectedProd.vendorEmail && selectedProd.vendorEmail !== CUR_USER.email) {
+        sendEmail(
+          selectedProd.vendorEmail,
+          selectedProd.vendorName||'',
+          'Ürününüz Portföye Eklendi — PoCHub',
+          (CUR_PROFILE?.displayName||CUR_USER.email)+' ('+( CUR_PROFILE?.company||'')+') ürününüzü portföyüne ekledi ve etkinliklerinde kullanmak istiyor.',
+          'Ürün: '+selectedProd.name+'\nRol: '+selectedRole+'\npochub.co üzerinden detayları görebilirsiniz.'
+        );
+      }
+
+      modal.remove();
+      showToast(selectedProd.name+' portföyünüze eklendi!');
+      CUR_VEND_TAB='portfolio';
+      loadVendTab();
+    } catch(e) {
+      modal.querySelector('#port-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      btn.disabled=false; btn.textContent='Portföye Ekle';
+    }
+  });
+}
+
 function openEditProd(prodId, name, category, country, description, supportModel) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -2387,135 +2564,244 @@ async function openAddProductModal() {
 }
 
 async function openNewEventModal() {
-  const modal = document.createElement('div');
+  var modal = document.createElement('div');
   modal.className = 'modal-bg on';
-  modal.innerHTML = `<div class="modal" style="max-width:500px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-      <h3 style="font-size:15px;font-weight:700">Yeni Etkinlik Oluştur</h3>
-      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-ev-modal">×</button>
-    </div>
-    <label class="lbl">Etkinlik Başlığı *</label><input class="inp" id="ev-title" placeholder="FortiGate 100F — Canlı Demo">
-    <label class="lbl">Ürün Seç *</label>
-    <div style="position:relative;margin-bottom:4px">
-      <input class="inp" id="ev-prod-search" placeholder="Ürün ara veya listeden seç..." autocomplete="off" oninput="filterVendorProducts(this.value)">
-      <div id="ev-prod-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c1f2a;border:1px solid rgba(255,255,255,.2);border-radius:8px;max-height:220px;overflow-y:auto;z-index:100;margin-top:2px"></div>
-      <input type="hidden" id="ev-prod-id" value="">
-      <input type="hidden" id="ev-prod-name-val" value="">
-      <input type="hidden" id="ev-prod-cat-val" value="">
-    </div>
-    <label class="lbl">Tarih *</label><input class="inp" id="ev-date" type="datetime-local">
-    <div class="g2">
-      <div><label class="lbl">Kapasite</label><input class="inp" id="ev-cap" type="number" value="50"></div>
-      <div><label class="lbl">Katılım Ücreti (0 = Ücretsiz)</label><input class="inp" id="ev-fee" type="number" value="0"></div>
-    </div>
-    <label class="lbl">Format</label>
-    <select class="inp" id="ev-fmt"><option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option></select>
-    <label class="lbl">PoC Dili * <span style="font-size:11px;color:#5a6278;font-weight:400">(Zorunlu — etkinlik hangi dilde yapılacak?)</span></label>
-    <select class="inp" id="ev-lang">
-      ${POC_LANGUAGES.map(l=>`<option value="${l.code}">${l.flag} ${l.name}</option>`).join('')}
-    </select>
-    <label class="lbl">Lokasyon / Zoom Linki</label><input class="inp" id="ev-loc" placeholder="İstanbul Levent / zoom.us/j/...">
-    <label class="lbl">Açıklama</label><textarea class="inp" id="ev-desc" rows="3" style="resize:none"></textarea>
-    <div id="ev-err" style="margin-top:10px"></div>
-    <button class="btn-p" id="ev-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Etkinliği Yayınla</button>
-  </div>`;
+  modal.innerHTML =
+    '<div class="modal" style="max-width:520px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Yeni Etkinlik Oluştur</h3>' +
+    '<button id="close-ev-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<label class="lbl">Etkinlik Başlığı *</label>' +
+    '<input class="inp" id="ev-title" placeholder="FortiGate 100F — Canlı Demo">' +
+    '<label class="lbl">Etkinlik Açıklaması *</label>' +
+    '<textarea class="inp" id="ev-desc" rows="3" placeholder="Etkinlik içeriği, hedef kitle, gündem..." style="resize:none"></textarea>' +
+    '<label class="lbl">Ürün Seç *</label>' +
+    '<div class="tab-bar" style="margin-bottom:8px">' +
+    '<button class="tab-btn on" id="ev-tab-mine" type="button">📦 Ürünlerim</button>' +
+    '<button class="tab-btn" id="ev-tab-portfolio" type="button">🤝 Portföyüm</button>' +
+    '<button class="tab-btn" id="ev-tab-catalog" type="button">🌐 Tüm Katalog</button>' +
+    '</div>' +
+    '<input class="inp" id="ev-prod-search" placeholder="Ürün ara..." autocomplete="off" style="margin-bottom:6px">' +
+    '<div id="ev-prod-list" style="background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:8px;max-height:190px;overflow-y:auto;margin-bottom:6px"></div>' +
+    '<div id="ev-prod-selected" style="display:none;padding:8px 12px;background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.25);border-radius:7px;font-size:12.5px;margin-bottom:4px">' +
+    'Seçilen: <span id="ev-prod-sel-name" style="color:#3b7cff;font-weight:700"></span>' +
+    '</div>' +
+    '<input type="hidden" id="ev-prod-id" value="">' +
+    '<input type="hidden" id="ev-prod-name-val" value="">' +
+    '<input type="hidden" id="ev-prod-cat-val" value="">' +
+    '<input type="hidden" id="ev-prod-owner-id" value="">' +
+    '<input type="hidden" id="ev-prod-owner-email" value="">' +
+    '<input type="hidden" id="ev-prod-owner-name" value="">' +
+    '<label class="lbl">Tarih ve Saat *</label>' +
+    '<div class="g2"><input class="inp" id="ev-date" type="date"><input class="inp" id="ev-time" type="time" value="10:00"></div>' +
+    '<div class="g2">' +
+    '<div><label class="lbl">Kapasite *</label><input class="inp" id="ev-cap" type="number" value="50" min="1"></div>' +
+    '<div><label class="lbl">Katılım Ücreti (₺)</label><input class="inp" id="ev-fee" type="number" value="0" min="0"></div>' +
+    '</div>' +
+    '<label class="lbl">Format *</label>' +
+    '<select class="inp" id="ev-fmt"><option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option></select>' +
+    '<label class="lbl">PoC Dili * <span style="font-size:11px;color:#5a6278;font-weight:400">(Zorunlu)</span></label>' +
+    '<select class="inp" id="ev-lang">' +
+    POC_LANGUAGES.map(function(l){return '<option value="'+l.code+'">'+l.flag+' '+l.name+'</option>';}).join('') +
+    '</select>' +
+    '<div id="ev-loc-online" style="margin-top:8px">' +
+    '<label class="lbl">Online Katılım Linki *</label>' +
+    '<input class="inp" id="ev-url" placeholder="https://zoom.us/j/...">' +
+    '</div>' +
+    '<div id="ev-loc-onsite" style="display:none;margin-top:8px">' +
+    '<label class="lbl">Fiziksel Lokasyon Adresi *</label>' +
+    '<input class="inp" id="ev-address" placeholder="Büyükdere Cad. No:127, İstanbul">' +
+    '</div>' +
+    '<div id="ev-err" style="margin-top:10px"></div>' +
+    '<button class="btn-p" id="ev-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Etkinliği Yayınla</button>' +
+    '</div>';
+
   document.body.appendChild(modal);
-  modal.querySelector('#close-ev-modal').addEventListener('click', () => modal.remove());
+  modal.querySelector('#close-ev-modal').addEventListener('click', function(){modal.remove();});
+  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
 
-  // Vendor'un ürünlerini yükle
-  let vendorProds = [];
+  // Format değişince lokasyon alanları
+  function updateLocFields() {
+    var fmt = modal.querySelector('#ev-fmt').value;
+    var onlineDiv = modal.querySelector('#ev-loc-online');
+    var onsiteDiv = modal.querySelector('#ev-loc-onsite');
+    if (fmt==='online')  { onlineDiv.style.display='block'; onsiteDiv.style.display='none'; }
+    else if (fmt==='onsite') { onlineDiv.style.display='none'; onsiteDiv.style.display='block'; }
+    else { onlineDiv.style.display='block'; onsiteDiv.style.display='block'; }
+  }
+  modal.querySelector('#ev-fmt').addEventListener('change', updateLocFields);
+  updateLocFields();
+
+  // ── ÜRÜN SEKMELERİ ──
+  var allProds = [];
+  var portProds = [];
+  var catProds = [];
+  var currentTab = 'mine';
+
+  // Verileri paralel çek
   try {
-    const psnap = await getDocs(query(collection(db,'products'),
-      where('vendorId','==',CUR_USER.uid),
-      where('status','==','active')
-    ));
-    vendorProds = psnap.docs.map(d => ({...d.data(), id:d.id}));
-
-    // İlk yükleme — tüm ürünleri göster
-    renderEvProdList(vendorProds, modal);
+    var [ownSnap, portSnap, catSnap] = await Promise.all([
+      getDocs(query(collection(db,'products'), where('vendorId','==',CUR_USER.uid), where('status','==','active'))),
+      getDocs(query(collection(db,'vendor_products'), where('vendorId','==',CUR_USER.uid), where('status','==','active'))),
+      getDocs(query(collection(db,'products'), where('status','==','active'))),
+    ]);
+    allProds = ownSnap.docs.map(function(d){return {...d.data(),id:d.id,_source:'mine'};});
+    portProds = portSnap.docs.map(function(d){return {...d.data(),id:d.id,_source:'portfolio',name:d.data().productName,category:d.data().productCategory};});
+    catProds = catSnap.docs.map(function(d){return {...d.data(),id:d.id,_source:'catalog'};}).filter(function(p){return p.vendorId!==CUR_USER.uid;});
   } catch(e) {
-    console.error('Vendor ürünleri yüklenemedi:', e);
+    console.error('Ürün yükleme:', e);
   }
 
-  modal.querySelector('#ev-prod-search').addEventListener('input', function() {
-    filterVendorProductsInModal(this.value, vendorProds, modal);
+  function renderProdList(prods) {
+    var listEl = modal.querySelector('#ev-prod-list');
+    if (!listEl) return;
+    if (!prods.length) {
+      listEl.innerHTML = '<div style="padding:14px;color:#5a6278;font-size:12.5px;text-align:center">' +
+        (currentTab==='mine' ? 'Onaylı ürününüz yok. <a href="#" id="go-add-prod" style="color:#3b7cff">Ürün ekleyin</a> veya başka sekme deneyin.' :
+         currentTab==='portfolio' ? 'Portföyünüzde ürün yok. <a href="#" id="go-portfolio" style="color:#3b7cff">Portföy sekmesinden ekleyin.</a>' :
+         'Ürün bulunamadı.') + '</div>';
+      listEl.querySelector('#go-add-prod')?.addEventListener('click', function(e){e.preventDefault();modal.remove();openAddProductModal();});
+      listEl.querySelector('#go-portfolio')?.addEventListener('click', function(e){e.preventDefault();modal.remove();CUR_VEND_TAB='portfolio';loadVendTab();});
+      return;
+    }
+    listEl.innerHTML = prods.slice(0,15).map(function(p) {
+      var srcBadge = p._source==='portfolio' ?
+        '<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff;font-size:10px">Portföy</span>' :
+        p._source==='catalog' ? '<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078;font-size:10px">Katalog</span>' : '';
+      return '<div class="ev-prod-opt" data-id="'+p.id+'" data-name="'+(p.name||p.productName||'')+'" data-cat="'+(p.category||p.productCategory||'')+'" data-owner-id="'+(p.originalVendorId||p.vendorId||'')+'" data-owner-email="'+(p.originalVendorEmail||p.vendorEmail||'')+'" data-owner-name="'+(p.originalVendorName||p.vendorName||'')+'" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px">' +
+        '<div style="flex:1">' +
+        '<div style="font-size:13px;font-weight:600">'+(p.name||p.productName||'—')+'</div>' +
+        '<div style="font-size:11.5px;color:#7c87a0">'+(p.vendorName||p.originalVendorName||'—')+' · '+(p.category||p.productCategory||'—')+'</div>' +
+        '</div>' + srcBadge + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.ev-prod-opt').forEach(function(opt) {
+      opt.addEventListener('mouseover',function(){opt.style.background='rgba(59,124,255,.08)';});
+      opt.addEventListener('mouseout',function(){opt.style.background='';});
+      opt.addEventListener('click', function() {
+        modal.querySelector('#ev-prod-id').value = opt.dataset.id;
+        modal.querySelector('#ev-prod-name-val').value = opt.dataset.name;
+        modal.querySelector('#ev-prod-cat-val').value = opt.dataset.cat;
+        modal.querySelector('#ev-prod-owner-id').value = opt.dataset.ownerId;
+        modal.querySelector('#ev-prod-owner-email').value = opt.dataset.ownerEmail;
+        modal.querySelector('#ev-prod-owner-name').value = opt.dataset.ownerName;
+        var selDiv = modal.querySelector('#ev-prod-selected');
+        var selName = modal.querySelector('#ev-prod-sel-name');
+        if (selDiv) selDiv.style.display='block';
+        if (selName) selName.textContent = opt.dataset.name;
+        listEl.style.display='none';
+      });
+    });
+  }
+
+  function getCurrentProds() {
+    var q = (modal.querySelector('#ev-prod-search')?.value||'').toLowerCase();
+    var base = currentTab==='mine' ? allProds : currentTab==='portfolio' ? portProds : catProds;
+    return q ? base.filter(function(p){return (p.name||p.productName||'').toLowerCase().includes(q)||(p.category||p.productCategory||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q);}) : base;
+  }
+
+  // Tab butonları
+  ['ev-tab-mine','ev-tab-portfolio','ev-tab-catalog'].forEach(function(tabId) {
+    modal.querySelector('#'+tabId)?.addEventListener('click', function() {
+      modal.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('on');});
+      this.classList.add('on');
+      currentTab = tabId==='ev-tab-mine'?'mine':tabId==='ev-tab-portfolio'?'portfolio':'catalog';
+      modal.querySelector('#ev-prod-list').style.display='block';
+      modal.querySelector('#ev-prod-search').value='';
+      renderProdList(getCurrentProds());
+    });
   });
-  modal.querySelector('#ev-prod-search').addEventListener('focus', function() {
-    renderEvProdList(
-      this.value ? vendorProds.filter(p=>p.name?.toLowerCase().includes(this.value.toLowerCase())) : vendorProds,
-      modal
-    );
+
+  modal.querySelector('#ev-prod-search').addEventListener('input', function(){
+    modal.querySelector('#ev-prod-list').style.display='block';
+    renderProdList(getCurrentProds());
   });
-  modal.querySelector('#ev-submit').addEventListener('click', async () => {
-    const title = modal.querySelector('#ev-title').value.trim();
-    const dateVal = modal.querySelector('#ev-date').value;
-    if (!title || !dateVal) { modal.querySelector('#ev-err').innerHTML='<div class="alert alert-err">Başlık ve tarih zorunludur.</div>'; return; }
-    const btn = modal.querySelector('#ev-submit');
+  modal.querySelector('#ev-prod-search').addEventListener('focus', function(){
+    modal.querySelector('#ev-prod-list').style.display='block';
+    renderProdList(getCurrentProds());
+  });
+
+  // İlk yükleme
+  renderProdList(allProds);
+
+  // ── SUBMIT ──
+  modal.querySelector('#ev-submit').addEventListener('click', async function() {
+    var title = modal.querySelector('#ev-title').value.trim();
+    var desc = modal.querySelector('#ev-desc').value.trim();
+    var dateVal = modal.querySelector('#ev-date').value;
+    var timeVal = modal.querySelector('#ev-time').value||'10:00';
+    var fmt = modal.querySelector('#ev-fmt').value;
+    var langVal = modal.querySelector('#ev-lang').value;
+    var urlVal = modal.querySelector('#ev-url')?.value.trim()||'';
+    var addrVal = modal.querySelector('#ev-address')?.value.trim()||'';
+    var prodName = modal.querySelector('#ev-prod-name-val').value;
+    var prodId = modal.querySelector('#ev-prod-id').value;
+    var prodCat = modal.querySelector('#ev-prod-cat-val').value;
+    var ownerEmail = modal.querySelector('#ev-prod-owner-email').value;
+    var ownerId = modal.querySelector('#ev-prod-owner-id').value;
+    var ownerName = modal.querySelector('#ev-prod-owner-name').value;
+    var errDiv = modal.querySelector('#ev-err');
+
+    var errors = [];
+    if (!title) errors.push('Başlık');
+    if (!desc) errors.push('Açıklama');
+    if (!prodName) errors.push('Ürün');
+    if (!dateVal) errors.push('Tarih');
+    if (!langVal) errors.push('Dil');
+    if ((fmt==='online'||fmt==='hybrid') && !urlVal) errors.push('Online link');
+    if ((fmt==='onsite'||fmt==='hybrid') && !addrVal) errors.push('Fiziksel adres');
+    if (errors.length) { errDiv.innerHTML='<div class="alert alert-err">Zorunlu alanlar eksik: <b>'+errors.join(', ')+'</b></div>'; return; }
+    if ((fmt==='online'||fmt==='hybrid') && urlVal && !urlVal.startsWith('http')) { errDiv.innerHTML='<div class="alert alert-err">Online link http:// ile başlamalıdır.</div>'; return; }
+
+    var btn = modal.querySelector('#ev-submit');
     btn.disabled=true; btn.textContent='Yayınlanıyor...';
     try {
+      var dateTime = new Date(dateVal+'T'+timeVal+':00');
+      var locStr = fmt==='online'?urlVal:fmt==='onsite'?addrVal:addrVal+' | '+urlVal;
+
       await addDoc(collection(db,'public_events'), {
         vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
+        vendorName: CUR_PROFILE?(CUR_PROFILE.displayName||CUR_USER.email):CUR_USER.email,
         vendorEmail: CUR_USER.email,
-        title, productName: modal.querySelector('#ev-prod-name-val').value || modal.querySelector('#ev-prod-search').value,
-        productId: modal.querySelector('#ev-prod-id').value,
-        category: modal.querySelector('#ev-prod-cat-val').value || 'Diğer',
-        eventDate: Timestamp.fromDate(new Date(dateVal)),
+        vendorType: CUR_PROFILE?.vendorType||'',
+        title, description: desc,
+        productName: prodName, productId: prodId,
+        category: prodCat||'Diğer',
+        language: langVal,
+        originalProductOwnerId: ownerId,
+        originalProductOwnerEmail: ownerEmail,
+        originalProductOwnerName: ownerName,
+        eventDate: Timestamp.fromDate(dateTime),
         capacity: parseInt(modal.querySelector('#ev-cap').value)||50,
         fee: parseFloat(modal.querySelector('#ev-fee').value)||0,
-        format: modal.querySelector('#ev-fmt').value,
-        language: modal.querySelector('#ev-lang')?.value||'tr',
-        location: modal.querySelector('#ev-loc').value,
-        description: modal.querySelector('#ev-desc').value,
-        registeredCount: 0,
-        status: 'published',
+        format: fmt, location: locStr,
+        onlineUrl: (fmt==='online'||fmt==='hybrid')?urlVal:'',
+        physicalAddress: (fmt==='onsite'||fmt==='hybrid')?addrVal:'',
+        registeredCount: 0, status: 'published',
         createdAt: serverTimestamp()
       });
+
+      // Orijinal ürün sahibine bildirim (farklı vendor ise)
+      if (ownerEmail && ownerEmail !== CUR_USER.email) {
+        sendEmail(ownerEmail, ownerName,
+          'Ürününüz Etkinlikte Kullanılıyor — PoCHub',
+          (CUR_PROFILE?.displayName||CUR_USER.email)+' ('+( CUR_PROFILE?.company||'')+') "'+prodName+'" ürününüzü etkinliğinde kullanıyor.',
+          'Etkinlik: '+title+'\nTarih: '+dateVal+' '+timeVal+'\nFormat: '+fmt+'\nDil: '+langVal
+        );
+      }
+
       modal.remove();
       showToast('Etkinlik yayınlandı!');
       if (CUR_VEND_TAB==='events') loadVendTab();
     } catch(e) {
-      modal.querySelector('#ev-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      errDiv.innerHTML='<div class="alert alert-err">'+e.message+'</div>';
       btn.disabled=false; btn.textContent='Etkinliği Yayınla';
     }
   });
 }
 
-/* ══════════════════════════════════════
-   ADMİN PANELİ
-══════════════════════════════════════ */
-function renderAdmin() {
-  if (!CUR_USER || !isAdminLike(CUR_PROFILE?.role)) {
-    el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme erişim yetkiniz yok.</div></div>`;
-    return;
-  }
-  if (el('adm-main')) { loadAdmTab(); return; }
-  const role = CUR_PROFILE?.role;
-  const perms = getRolePerm(role);
-  const tabs = [
-    ['dashboard','Dashboard'],
-    ...(perms.canViewAll ? [['users','Kullanıcılar']] : []),
-    ...(role==='admin' ? [['roles','Rol Yönetimi']] : []),
-    ...(role==='admin' ? [['categories','Kategoriler']] : []),
-    ...(perms.canApproveProducts ? [['products','Ürün Onayları']] : []),
-    ['requests','PoC Talepleri'],
-    ['events','Etkinlikler'],
-    ...(perms.canViewAll ? [['offers','Teklifler']] : []),
-  ];
-  el('scr-admin').innerHTML = `<div class="dash">
-    <div class="sbar">
-      <div class="role-tag" style="background:${getRolePerm(CUR_PROFILE?.role).bg};border:1px solid rgba(255,255,255,.15)">
-        <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.0</span>
-      </div>
-      <div class="slbl">Admin Paneli</div>
-      ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
-    </div>
-    <div class="main-content" id="adm-main"></div>
-  </div>`;
-  tabs.forEach(([t]) => el('atab-'+t)?.addEventListener('click', () => { CUR_ADM_TAB=t; loadAdmTab(); el('scr-admin').querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t===t)); }));
-  loadAdmTab();
-}
+
+
 
 async function loadAdmTab() {
   const m = el('adm-main');
