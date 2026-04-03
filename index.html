@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v1.9.4</title>
+<title>PoCHub.co — v2.0</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,8 +121,45 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v1.9.4';
+const VERSION = 'v2.0';
 console.log('PoCHub', VERSION, '| pochub.co');
+
+/* ── DİL LİSTESİ ── */
+var POC_LANGUAGES = [
+  {code:'tr', name:'Türkçe', flag:'🇹🇷'},
+  {code:'en', name:'İngilizce', flag:'🇬🇧'},
+  {code:'de', name:'Almanca', flag:'🇩🇪'},
+  {code:'fr', name:'Fransızca', flag:'🇫🇷'},
+  {code:'ar', name:'Arapça', flag:'🇸🇦'},
+  {code:'ru', name:'Rusça', flag:'🇷🇺'},
+  {code:'zh', name:'Çince', flag:'🇨🇳'},
+  {code:'es', name:'İspanyolca', flag:'🇪🇸'},
+  {code:'it', name:'İtalyanca', flag:'🇮🇹'},
+  {code:'ja', name:'Japonca', flag:'🇯🇵'},
+];
+
+function langLabel(code) {
+  var l = POC_LANGUAGES.find(function(x){return x.code===code;});
+  return l ? l.flag+' '+l.name : code||'—';
+}
+
+/* ── ROL HİYERARŞİSİ ── */
+// admin > moderator > support > vendor > customer
+var ROLE_PERMS = {
+  admin:     {label:'Admin',      color:'#f0a429', bg:'rgba(240,164,41,.12)',  canManageUsers:true,  canApproveProducts:true, canViewAll:true,  canManageRoles:true},
+  moderator: {label:'Moderatör',  color:'#c4a8ff', bg:'rgba(139,92,246,.12)', canManageUsers:true,  canApproveProducts:true, canViewAll:true,  canManageRoles:false},
+  support:   {label:'Destek',     color:'#7db4ff', bg:'rgba(59,124,255,.12)', canManageUsers:false, canApproveProducts:false,canViewAll:true,  canManageRoles:false},
+  vendor:    {label:'Vendor',     color:'#7db4ff', bg:'rgba(59,124,255,.12)', canManageUsers:false, canApproveProducts:false,canViewAll:false, canManageRoles:false},
+  customer:  {label:'Müşteri',    color:'#22d078', bg:'rgba(34,208,120,.12)', canManageUsers:false, canApproveProducts:false,canViewAll:false, canManageRoles:false},
+};
+
+function getRolePerm(role) {
+  return ROLE_PERMS[role] || ROLE_PERMS.customer;
+}
+
+function isAdminLike(role) {
+  return role === 'admin' || role === 'moderator' || role === 'support';
+}
 
 /* ── KATEGORİ CACHE ── */
 var _catCache = null;
@@ -578,7 +615,7 @@ onAuthStateChanged(auth, async user => {
     // Giriş yapınca role göre panele yönlendir
     // Sadece ana sayfadaysa yönlendir (başka sayfadaysa müdahale etme)
     if (CUR_SCREEN === 'home' && CUR_PROFILE?.role) {
-      const roleScreen = {customer:'customer', vendor:'vendor', admin:'admin'};
+      const roleScreen = {customer:'customer', vendor:'vendor', admin:'admin', moderator:'admin', support:'admin'};
       const target = roleScreen[CUR_PROFILE.role];
       if (target) {
         CUR_SCREEN = target;
@@ -646,7 +683,7 @@ function buildNav() {
   ];
   if (CUR_PROFILE?.role === 'customer') tabItems.push(['customer','Panelim']);
   if (CUR_PROFILE?.role === 'vendor') tabItems.push(['vendor','Vendor Paneli']);
-  if (CUR_PROFILE?.role === 'admin') tabItems.push(['admin','Admin']);
+  if (isAdminLike(CUR_PROFILE?.role)) tabItems.push(['admin','Admin']);
 
   tabs.innerHTML = tabItems.map(([s,l]) =>
     `<button class="nt${CUR_SCREEN===s?' on':''}" data-s="${s}">${l}</button>`
@@ -1041,6 +1078,7 @@ async function renderHome() {
           <div style="display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap">
             <span class="bdg" style="background:#1c1f2a;color:#7c87a0">${e.category||'—'}</span>
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
+            ${e.language?`<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">${langLabel(e.language)}</span>`:''}
             <span class="bdg" style="background:${e.fee>0?'rgba(59,124,255,.12)':'rgba(34,208,120,.12)'};color:${e.fee>0?'#7db4ff':'#22d078'}">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
           </div>
           <div style="font-size:14px;font-weight:700;margin-bottom:4px">${e.title}</div>
@@ -1123,6 +1161,10 @@ async function renderEvents() {
         <option value="">Tüm Formatlar</option>
         <option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option>
       </select>
+      <select class="inp" id="ev-lang-filter" style="width:auto">
+        <option value="">Tüm Diller</option>
+        ${POC_LANGUAGES.map(l=>`<option value="${l.code}">${l.flag} ${l.name}</option>`).join('')}
+      </select>
       <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#7c87a0;cursor:pointer">
         <input type="checkbox" id="ev-free"> Ücretsiz
       </label>
@@ -1133,7 +1175,7 @@ async function renderEvents() {
   if (CUR_PROFILE?.role==='vendor') {
     el('new-event-btn')?.addEventListener('click', () => openNewEventModal());
   }
-  ['ev-search','ev-cat','ev-format','ev-free'].forEach(id => {
+  ['ev-search','ev-cat','ev-format','ev-lang-filter','ev-free'].forEach(id => {
     el(id)?.addEventListener('change', loadEventsList);
     el(id)?.addEventListener('input', loadEventsList);
   });
@@ -1161,6 +1203,7 @@ async function openEventDetail(eventId) {
           <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
             <span class="bdg" style="background:#1c1f2a;color:#7c87a0">${e.category||'—'}</span>
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
+            ${e.language?`<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">${langLabel(e.language)}</span>`:''}
             <span class="bdg" style="background:${e.fee>0?'rgba(59,124,255,.12)':'rgba(34,208,120,.12)'};color:${e.fee>0?'#7db4ff':'#22d078'}">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
           </div>
           <h2 style="font-size:17px;font-weight:700;line-height:1.3">${e.title}</h2>
@@ -1225,6 +1268,8 @@ async function loadEventsList() {
     if (search) docs = docs.filter(e => e.title?.toLowerCase().includes(search) || e.productName?.toLowerCase().includes(search));
     if (cat) docs = docs.filter(e => e.category===cat);
     if (format) docs = docs.filter(e => e.format===format);
+    const langFilter = el('ev-lang-filter')?.value||'';
+    if (langFilter) docs = docs.filter(e => e.language===langFilter);
     if (free) docs = docs.filter(e => !e.fee || e.fee===0);
 
     if (!docs.length) {
@@ -1240,6 +1285,7 @@ async function loadEventsList() {
           <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
             <span class="bdg" style="background:#1c1f2a;color:#7c87a0">${e.category||'—'}</span>
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
+            ${e.language?`<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">${langLabel(e.language)}</span>`:''}
             <span class="bdg" style="background:${e.fee>0?'rgba(59,124,255,.12)':'rgba(34,208,120,.12)'};color:${e.fee>0?'#7db4ff':'#22d078'}">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
           </div>
           <div style="font-size:15px;font-weight:700;margin-bottom:5px">${e.title}</div>
@@ -2364,6 +2410,10 @@ async function openNewEventModal() {
     </div>
     <label class="lbl">Format</label>
     <select class="inp" id="ev-fmt"><option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option></select>
+    <label class="lbl">PoC Dili * <span style="font-size:11px;color:#5a6278;font-weight:400">(Zorunlu — etkinlik hangi dilde yapılacak?)</span></label>
+    <select class="inp" id="ev-lang">
+      ${POC_LANGUAGES.map(l=>`<option value="${l.code}">${l.flag} ${l.name}</option>`).join('')}
+    </select>
     <label class="lbl">Lokasyon / Zoom Linki</label><input class="inp" id="ev-loc" placeholder="İstanbul Levent / zoom.us/j/...">
     <label class="lbl">Açıklama</label><textarea class="inp" id="ev-desc" rows="3" style="resize:none"></textarea>
     <div id="ev-err" style="margin-top:10px"></div>
@@ -2414,6 +2464,7 @@ async function openNewEventModal() {
         capacity: parseInt(modal.querySelector('#ev-cap').value)||50,
         fee: parseFloat(modal.querySelector('#ev-fee').value)||0,
         format: modal.querySelector('#ev-fmt').value,
+        language: modal.querySelector('#ev-lang')?.value||'tr',
         location: modal.querySelector('#ev-loc').value,
         description: modal.querySelector('#ev-desc').value,
         registeredCount: 0,
@@ -2434,21 +2485,28 @@ async function openNewEventModal() {
    ADMİN PANELİ
 ══════════════════════════════════════ */
 function renderAdmin() {
-  if (!CUR_USER || CUR_PROFILE?.role !== 'admin') {
-    el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Admin yetkisi gerekli.</div></div>`;
+  if (!CUR_USER || !isAdminLike(CUR_PROFILE?.role)) {
+    el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme erişim yetkiniz yok.</div></div>`;
     return;
   }
   if (el('adm-main')) { loadAdmTab(); return; }
+  const role = CUR_PROFILE?.role;
+  const perms = getRolePerm(role);
   const tabs = [
-    ['dashboard','Dashboard'],['users','Kullanıcılar'],['categories','Kategoriler'],
-    ['products','Ürün Onayları'],['requests','Tüm PoC Talepleri'],
-    ['events','Tüm Etkinlikler'],['offers','Teklifler'],
+    ['dashboard','Dashboard'],
+    ...(perms.canViewAll ? [['users','Kullanıcılar']] : []),
+    ...(role==='admin' ? [['roles','Rol Yönetimi']] : []),
+    ...(role==='admin' ? [['categories','Kategoriler']] : []),
+    ...(perms.canApproveProducts ? [['products','Ürün Onayları']] : []),
+    ['requests','PoC Talepleri'],
+    ['events','Etkinlikler'],
+    ...(perms.canViewAll ? [['offers','Teklifler']] : []),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
     <div class="sbar">
-      <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
-        <span style="color:#f0a429">Admin</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v1.9.4</span>
+      <div class="role-tag" style="background:${getRolePerm(CUR_PROFILE?.role).bg};border:1px solid rgba(255,255,255,.15)">
+        <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.0</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -2466,6 +2524,7 @@ async function loadAdmTab() {
   try {
     if (CUR_ADM_TAB === 'categories') { await admCategories(m); return; }
     if (CUR_ADM_TAB === 'users')      { await admUsers(m);      return; }
+    if (CUR_ADM_TAB === 'roles')      { await admRoles(m);      return; }
     if (CUR_ADM_TAB === 'products')   { await admProducts(m);   return; }
     if (CUR_ADM_TAB === 'requests')   { await admRequests(m);   return; }
     if (CUR_ADM_TAB === 'events')     { await admEvents(m);     return; }
@@ -2756,6 +2815,104 @@ async function admOffers(m) {
     m.querySelectorAll('.of-sf').forEach(function(x){x.className='btn-g btn-sm of-sf';});
     b.className='btn-p btn-sm of-sf'; stFilter=b.dataset.s; applyFilter();
   });});
+}
+
+
+async function admRoles(m) {
+  const snap = await getDocs(collection(db,'users'));
+  var allUsers = snap.docs.map(d=>({...d.data(),id:d.id}));
+  allUsers.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+  var ASSIGNABLE_ROLES = [
+    {value:'customer',  label:'Müşteri'},
+    {value:'vendor',    label:'Vendor'},
+    {value:'support',   label:'Destek'},
+    {value:'moderator', label:'Moderatör'},
+    {value:'admin',     label:'Admin'},
+  ];
+
+  function renderRows(users) {
+    var tbody = m.querySelector('#roles-tbody');
+    var cnt = m.querySelector('#roles-cnt');
+    if (cnt) cnt.textContent = '(' + users.length + ')';
+    if (!tbody) return;
+    tbody.innerHTML = users.map(function(u) {
+      var perm = getRolePerm(u.role);
+      var vtypes = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+      var roleLabel = u.role==='vendor' ? (vtypes[u.vendorType]||'Vendor') : perm.label;
+      return '<tr style="border-top:1px solid rgba(255,255,255,.06)">' +
+        '<td style="padding:11px 14px"><div style="font-weight:600">'+(u.displayName||'—')+'</div><div style="font-size:11.5px;color:#7c87a0">'+u.email+'</div></td>' +
+        '<td style="padding:11px 14px"><span class="bdg" style="background:'+perm.bg+';color:'+perm.color+'">'+roleLabel+'</span></td>' +
+        '<td style="padding:11px 14px;color:#7c87a0">'+(u.company||'—')+'</td>' +
+        '<td style="padding:11px 14px">' +
+        '<select class="inp role-sel" data-uid="'+u.id+'" style="padding:5px 8px;font-size:12px;width:auto">' +
+        ASSIGNABLE_ROLES.map(function(r){
+          return '<option value="'+r.value+'"'+(u.role===r.value?' selected':'')+'>'+r.label+'</option>';
+        }).join('') +
+        '</select></td>' +
+        '<td style="padding:11px 14px"><button class="btn-p btn-sm save-role" data-uid="'+u.id+'" data-name="'+(u.displayName||u.email)+'">Kaydet</button></td>' +
+        '</tr>';
+    }).join('');
+
+    m.querySelectorAll('.save-role').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var uid = btn.dataset.uid;
+        var sel = m.querySelector('.role-sel[data-uid="'+uid+'"]');
+        var newRole = sel?.value;
+        if (!newRole) return;
+        if (uid === CUR_USER?.uid) { showToast('Kendi rolünüzü değiştiremezsiniz.','err'); return; }
+        btn.disabled = true; btn.textContent = '...';
+        try {
+          await updateDoc(doc(db,'users',uid), {role: newRole, vendorType: newRole==='vendor'?'ureticid':''});
+          showToast(btn.dataset.name + ' rolü güncellendi.');
+          admRoles(m);
+        } catch(e) {
+          showToast('Hata: '+e.message,'err');
+          btn.disabled=false; btn.textContent='Kaydet';
+        }
+      });
+    });
+  }
+
+  m.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+    '<h2 style="font-size:18px;font-weight:700">Rol Yönetimi <span id="roles-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
+    '<input class="inp" id="roles-search" placeholder="Ad, e-posta veya şirket ara..." style="width:250px;font-size:12.5px"></div>' +
+    '<div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:11px 14px;font-size:12.5px;color:#f0a429;margin-bottom:14px">' +
+    '⚠ Rol değişikliği anında geçerli olur. Admin rolü vermek tüm yetkileri devreder. Kendi rolünüzü değiştiremezsiniz.</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:12px" id="roles-filter-btns">' +
+    '<button class="btn-p btn-sm roles-rf" data-r="">Tümü</button>' +
+    '<button class="btn-g btn-sm roles-rf" data-r="customer">Müşteri</button>' +
+    '<button class="btn-g btn-sm roles-rf" data-r="vendor">Vendor</button>' +
+    '<button class="btn-g btn-sm roles-rf" data-r="support">Destek</button>' +
+    '<button class="btn-g btn-sm roles-rf" data-r="moderator">Moderatör</button>' +
+    '<button class="btn-g btn-sm roles-rf" data-r="admin">Admin</button>' +
+    '</div>' +
+    '<table><thead><tr>' +
+    '<th>Ad / E-posta</th><th>Mevcut Rol</th><th>Şirket</th><th>Yeni Rol</th><th>İşlem</th>' +
+    '</tr></thead><tbody id="roles-tbody"></tbody></table>';
+
+  var roleFilter = '';
+  function applyFilter() {
+    var q = (m.querySelector('#roles-search')?.value||'').toLowerCase();
+    renderRows(allUsers.filter(function(u) {
+      return (!roleFilter || u.role===roleFilter) &&
+             (!q || (u.displayName||'').toLowerCase().includes(q) ||
+                    (u.email||'').toLowerCase().includes(q) ||
+                    (u.company||'').toLowerCase().includes(q));
+    }));
+  }
+
+  renderRows(allUsers);
+  m.querySelector('#roles-search').addEventListener('input', applyFilter);
+  m.querySelectorAll('.roles-rf').forEach(function(b) {
+    b.addEventListener('click', function() {
+      m.querySelectorAll('.roles-rf').forEach(function(x){x.className='btn-g btn-sm roles-rf';});
+      b.className='btn-p btn-sm roles-rf';
+      roleFilter = b.dataset.r;
+      applyFilter();
+    });
+  });
 }
 
 
