@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v2.2</title>
+<title>PoCHub.co — v2.3</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,45 +121,37 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v2.2';
+const VERSION = 'v2.3';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
 var POC_LANGUAGES = [
-  {code:'tr', name:'Türkçe', flag:'🇹🇷'},
-  {code:'en', name:'İngilizce', flag:'🇬🇧'},
-  {code:'de', name:'Almanca', flag:'🇩🇪'},
-  {code:'fr', name:'Fransızca', flag:'🇫🇷'},
-  {code:'ar', name:'Arapça', flag:'🇸🇦'},
-  {code:'ru', name:'Rusça', flag:'🇷🇺'},
-  {code:'zh', name:'Çince', flag:'🇨🇳'},
-  {code:'es', name:'İspanyolca', flag:'🇪🇸'},
-  {code:'it', name:'İtalyanca', flag:'🇮🇹'},
-  {code:'ja', name:'Japonca', flag:'🇯🇵'},
+  {code:'tr',name:'Türkçe',flag:'🇹🇷'},
+  {code:'en',name:'İngilizce',flag:'🇬🇧'},
+  {code:'de',name:'Almanca',flag:'🇩🇪'},
+  {code:'fr',name:'Fransızca',flag:'🇫🇷'},
+  {code:'ar',name:'Arapça',flag:'🇸🇦'},
+  {code:'ru',name:'Rusça',flag:'🇷🇺'},
+  {code:'zh',name:'Çince',flag:'🇨🇳'},
+  {code:'es',name:'İspanyolca',flag:'🇪🇸'},
+  {code:'it',name:'İtalyanca',flag:'🇮🇹'},
+  {code:'ja',name:'Japonca',flag:'🇯🇵'},
 ];
-
 function langLabel(code) {
   var l = POC_LANGUAGES.find(function(x){return x.code===code;});
-  return l ? l.flag+' '+l.name : code||'—';
+  return l ? l.flag+' '+l.name : (code||'—');
 }
 
-/* ── ROL HİYERARŞİSİ ── */
-// admin > moderator > support > vendor > customer
+/* ── ROL SİSTEMİ ── */
 var ROLE_PERMS = {
-  admin:     {label:'Admin',      color:'#f0a429', bg:'rgba(240,164,41,.12)',  canManageUsers:true,  canApproveProducts:true, canViewAll:true,  canManageRoles:true},
-  moderator: {label:'Moderatör',  color:'#c4a8ff', bg:'rgba(139,92,246,.12)', canManageUsers:true,  canApproveProducts:true, canViewAll:true,  canManageRoles:false},
-  support:   {label:'Destek',     color:'#7db4ff', bg:'rgba(59,124,255,.12)', canManageUsers:false, canApproveProducts:false,canViewAll:true,  canManageRoles:false},
-  vendor:    {label:'Vendor',     color:'#7db4ff', bg:'rgba(59,124,255,.12)', canManageUsers:false, canApproveProducts:false,canViewAll:false, canManageRoles:false},
-  customer:  {label:'Müşteri',    color:'#22d078', bg:'rgba(34,208,120,.12)', canManageUsers:false, canApproveProducts:false,canViewAll:false, canManageRoles:false},
+  admin:     {label:'Admin',     color:'#f0a429',bg:'rgba(240,164,41,.12)', canManageRoles:true, canViewAll:true, canApproveProducts:true},
+  moderator: {label:'Moderatör', color:'#c4a8ff',bg:'rgba(139,92,246,.12)',canManageRoles:false,canViewAll:true, canApproveProducts:true},
+  support:   {label:'Destek',    color:'#7db4ff',bg:'rgba(59,124,255,.12)', canManageRoles:false,canViewAll:true, canApproveProducts:false},
+  vendor:    {label:'Vendor',    color:'#7db4ff',bg:'rgba(59,124,255,.12)', canManageRoles:false,canViewAll:false,canApproveProducts:false},
+  customer:  {label:'Müşteri',   color:'#22d078',bg:'rgba(34,208,120,.12)',canManageRoles:false,canViewAll:false,canApproveProducts:false},
 };
-
-function getRolePerm(role) {
-  return ROLE_PERMS[role] || ROLE_PERMS.customer;
-}
-
-function isAdminLike(role) {
-  return role === 'admin' || role === 'moderator' || role === 'support';
-}
+function getRolePerm(role) { return ROLE_PERMS[role]||ROLE_PERMS.customer; }
+function isAdminLike(role) { return role==='admin'||role==='moderator'||role==='support'; }
 
 /* ── KATEGORİ CACHE ── */
 var _catCache = null;
@@ -1078,8 +1070,8 @@ async function renderHome() {
           <div style="display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap">
             <span class="bdg" style="background:#1c1f2a;color:#7c87a0">${e.category||'—'}</span>
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
-            ${e.language?`<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">${langLabel(e.language)}</span>`:''}
-            <span class="bdg" style="background:${e.fee>0?'rgba(59,124,255,.12)':'rgba(34,208,120,.12)'};color:${e.fee>0?'#7db4ff':'#22d078'}">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
+            ${e.language?('<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">'+langLabel(e.language)+'</span>'):''}
+            <span class="bdg" style="background:${feeBg};color:${feeCol}">${feeLabel}</span>
           </div>
           <div style="font-size:14px;font-weight:700;margin-bottom:4px">${e.title}</div>
           <div style="font-size:12px;color:#7c87a0;margin-bottom:3px">${e.vendorName||'—'} · ${e.productName||'—'}</div>
@@ -1163,7 +1155,6 @@ async function renderEvents() {
       </select>
       <select class="inp" id="ev-lang-filter" style="width:auto">
         <option value="">Tüm Diller</option>
-        ${POC_LANGUAGES.map(l=>`<option value="${l.code}">${l.flag} ${l.name}</option>`).join('')}
       </select>
       <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#7c87a0;cursor:pointer">
         <input type="checkbox" id="ev-free"> Ücretsiz
@@ -1182,6 +1173,8 @@ async function renderEvents() {
   getCategories().then(function(cats){
     var sel=el('ev-cat');
     if(sel) sel.innerHTML='<option value="">Tüm Kategoriler</option>'+cats.map(function(cat){return '<option value="'+cat.name+'">'+cat.name+'</option>';}).join('');
+    var sel2=el('ev-lang-filter');
+    if(sel2) sel2.innerHTML='<option value="">Tüm Diller</option>'+POC_LANGUAGES.map(function(l){return '<option value="'+l.code+'">'+l.flag+' '+l.name+'</option>';}).join('');
   });
   loadEventsList();
 }
@@ -1192,6 +1185,9 @@ async function openEventDetail(eventId) {
     const snap = await getDoc(doc(db,'public_events',eventId));
     if (!snap.exists()) { showToast('Etkinlik bulunamadı.','err'); return; }
     const e = {...snap.data(), id: snap.id};
+    const feeBg = e.fee>0?'rgba(59,124,255,.12)':'rgba(34,208,120,.12)';
+    const feeCol = e.fee>0?'#7db4ff':'#22d078';
+    const feeLabel = e.fee>0?('₺'+e.fee):'Ücretsiz';
     const date = e.eventDate?.toDate ? e.eventDate.toDate().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
     const spots = (e.capacity||0) - (e.registeredCount||0);
 
@@ -1203,8 +1199,8 @@ async function openEventDetail(eventId) {
           <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
             <span class="bdg" style="background:#1c1f2a;color:#7c87a0">${e.category||'—'}</span>
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
-            ${e.language?`<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">${langLabel(e.language)}</span>`:''}
-            <span class="bdg" style="background:${e.fee>0?'rgba(59,124,255,.12)':'rgba(34,208,120,.12)'};color:${e.fee>0?'#7db4ff':'#22d078'}">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
+            <span class="bdg" style="background:${feeBg};color:${feeCol}">${feeLabel}</span>
+            ${e.language?('<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">'+langLabel(e.language)+'</span>'):''}2d078'}">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
           </div>
           <h2 style="font-size:17px;font-weight:700;line-height:1.3">${e.title}</h2>
         </div>
@@ -1268,8 +1264,8 @@ async function loadEventsList() {
     if (search) docs = docs.filter(e => e.title?.toLowerCase().includes(search) || e.productName?.toLowerCase().includes(search));
     if (cat) docs = docs.filter(e => e.category===cat);
     if (format) docs = docs.filter(e => e.format===format);
-    const langFilter = el('ev-lang-filter')?.value||'';
-    if (langFilter) docs = docs.filter(e => e.language===langFilter);
+    const langF = el('ev-lang-filter')?.value||'';
+    if (langF) docs = docs.filter(e => e.language===langF);
     if (free) docs = docs.filter(e => !e.fee || e.fee===0);
 
     if (!docs.length) {
@@ -1285,10 +1281,10 @@ async function loadEventsList() {
           <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
             <span class="bdg" style="background:#1c1f2a;color:#7c87a0">${e.category||'—'}</span>
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
-            ${e.language?`<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">${langLabel(e.language)}</span>`:''}
-            <span class="bdg" style="background:${e.fee>0?'rgba(59,124,255,.12)':'rgba(34,208,120,.12)'};color:${e.fee>0?'#7db4ff':'#22d078'}">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
+            <span class="bdg" style="background:${feeBg};color:${feeCol}">${feeLabel}</span>
           </div>
-          <div style="font-size:15px;font-weight:700;margin-bottom:5px">${e.title}</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:5px
+            ${e.language?('<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">'+langLabel(e.language)+'</span>'):''}">${e.title}</div>
           <div style="font-size:12.5px;color:#7c87a0;margin-bottom:5px">${e.vendorName||'—'} · ${e.productName||'—'}</div>
           <div style="font-size:12px;color:#5a6278">📅 ${date}${e.location?' · 📍 '+e.location:''}</div>
           ${e.description ? `<p style="font-size:12.5px;color:#9ca3af;margin-top:8px;line-height:1.6">${e.description}</p>` : ''}
@@ -2087,6 +2083,7 @@ async function loadVendTab() {
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
 
+  if (CUR_VEND_TAB === 'portfolio') { await vendPortfolio(m); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     const [pocSnap,evSnap,offSnap,prodSnap] = await Promise.all([
       getDocs(query(collection(db,'poc_requests'),where('vendorId','==',CUR_USER.uid))),
@@ -2105,7 +2102,6 @@ async function loadVendTab() {
       '</div>';
     return;
   }
-  if (CUR_VEND_TAB === 'portfolio') { await vendPortfolio(m); return; }
   if (CUR_VEND_TAB === 'requests') {
     const snap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid)));
     if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Henüz PoC talebi yok.<br><small style="color:#5a6278">Müşteriler katalogdan ürünlerinize talep oluşturunca burada görünür.</small></div>'; return; }
@@ -2289,39 +2285,77 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
   });
 }
 
-/* ════════════════════════════════════════
-   VENDOR PORTFÖYܙ (v2.1)
-   Distribütör/entegratör başkasının ürününü portföyüne ekler
-════════════════════════════════════════ */
+function openEditProd(prodId, name, category, country, description, supportModel) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = '<div class="modal" style="max-width:500px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Ürün Düzenle</h3>' +
+    '<button id="ep-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<label class="lbl">Ürün Adı *</label><input class="inp" id="ep-name" value="'+name+'">' +
+    '<label class="lbl">Kategori</label><select class="inp" id="ep-cat"></select>' +
+    '<label class="lbl">Menşei Ülke</label><div id="ep-country-cont" style="margin-bottom:4px"></div>' +
+    '<label class="lbl">Açıklama</label><textarea class="inp" id="ep-desc" rows="3" style="resize:none">'+description+'</textarea>' +
+    '<label class="lbl">Destek Modeli</label>' +
+    '<select class="inp" id="ep-sup">' +
+    '<option value="inhouse"'+(supportModel==='inhouse'?' selected':'')+'>Kendi bünyesi</option>' +
+    '<option value="outsource"'+(supportModel==='outsource'?' selected':'')+'>Dış kaynak</option>' +
+    '<option value="hybrid"'+(supportModel==='hybrid'?' selected':'')+'>Hibrit</option>' +
+    '</select>' +
+    '<div id="ep-err" style="margin-top:10px"></div>' +
+    '<button class="btn-p" id="ep-save" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>' +
+    '</div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#ep-close').addEventListener('click', function(){modal.remove();});
+  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
+  fillCatSelect(modal.querySelector('#ep-cat'), category);
+  buildCountryInput('ep-country-cont', 'ep-country-inp', 'ep-country-val', country||'TR');
+  modal.querySelector('#ep-save').addEventListener('click', async function() {
+    var nm = modal.querySelector('#ep-name').value.trim();
+    if(!nm){modal.querySelector('#ep-err').innerHTML='<div class="alert alert-err">Ad zorunlu.</div>';return;}
+    var btn=modal.querySelector('#ep-save'); btn.disabled=true; btn.textContent='Güncelleniyor...';
+    try {
+      await updateDoc(doc(db,'products',prodId),{
+        name:nm, category:modal.querySelector('#ep-cat').value,
+        country:document.getElementById('ep-country-val')?.value||country,
+        description:modal.querySelector('#ep-desc').value,
+        supportModel:modal.querySelector('#ep-sup').value,
+        updatedAt:serverTimestamp()
+      });
+      modal.remove(); showToast('Güncellendi!'); loadVendTab();
+    } catch(e) {
+      modal.querySelector('#ep-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      btn.disabled=false; btn.textContent='Güncelle';
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════
+   PORTFÖY SİSTEMİ (v2.2)
+═══════════════════════════════════════════════════════ */
 async function vendPortfolio(m) {
-  // Vendor'ın portföy girişleri — vendor_products koleksiyonu
   const portSnap = await getDocs(query(collection(db,'vendor_products'), where('vendorId','==',CUR_USER.uid)));
   var portItems = portSnap.docs.map(d=>({...d.data(),id:d.id}));
-
   m.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-    '<div>' +
-    '<h2 style="font-size:18px;font-weight:700">Portföyüm</h2>' +
-    '<div style="font-size:12.5px;color:#7c87a0;margin-top:3px">Distribütörü veya entegratörü olduğunuz ürünleri ekleyin. Etkinliklerinizde kullanabilirsiniz.</div>' +
-    '</div>' +
+    '<div><h2 style="font-size:18px;font-weight:700">Portföyüm</h2>' +
+    '<div style="font-size:12.5px;color:#7c87a0;margin-top:2px">Distribütörü veya entegratörü olduğunuz ürünleri etkinliklerinizde kullanabilirsiniz.</div></div>' +
     '<button class="btn-p btn-sm" id="add-port-btn">+ Ürün Ekle</button>' +
     '</div>' +
     '<div style="background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:11px 14px;font-size:12.5px;color:#7db4ff;margin-bottom:14px">' +
-    'ℹ Katalogda kayıtlı bir ürünü seçip portföyünüze ekleyebilirsiniz. Ürün sahibi (üretici) bildirim alır. Admin onayı sonrası etkinliklerinizde kullanabilirsiniz.' +
+    'ℹ Katalogdan ürün seçip portföyünüze ekleyebilirsiniz. Ürün sahibi bildirim alır. Etkinlik oluştururken "Portföyüm" sekmesinden bu ürünleri kullanabilirsiniz.' +
     '</div>' +
     (portItems.length ?
-      '<table><thead><tr><th>Ürün</th><th>Orijinal Vendor</th><th>Rolünüz</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>' +
+      '<table><thead><tr><th>Ürün</th><th>Orijinal Vendor</th><th>Rolünüz</th><th>İşlem</th></tr></thead><tbody>' +
       portItems.map(function(p) {
         return '<tr><td style="font-weight:600">'+(p.productName||'—')+'</td>' +
           '<td style="color:#7c87a0">'+(p.originalVendorName||'—')+'</td>' +
           '<td><span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">'+(p.role||'Distribütör')+'</span></td>' +
-          '<td>'+statusBadge(p.status)+'</td>' +
           '<td><button class="btn-red btn-sm port-del" data-id="'+p.id+'">Kaldır</button></td></tr>';
-      }).join('') +
-      '</tbody></table>' :
+      }).join('') + '</tbody></table>' :
       '<div class="empty"><div class="empty-icon">📦</div>Portföyünüzde ürün yok.<br><small style="color:#5a6278">Katalogdan ürün ekleyerek başlayın.</small></div>'
     );
-
   m.querySelector('#add-port-btn')?.addEventListener('click', () => openAddToPortfolio());
   m.querySelectorAll('.port-del').forEach(function(b) {
     b.addEventListener('click', async function() {
@@ -2335,12 +2369,9 @@ async function vendPortfolio(m) {
 
 async function openAddToPortfolio() {
   const snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
-  var allProds = snap.docs.map(d=>({...d.data(),id:d.id}))
-    .filter(p => p.vendorId !== CUR_USER.uid);
-
-  // Zaten portföyde olanları bul
+  var allProds = snap.docs.map(d=>({...d.data(),id:d.id})).filter(p=>p.vendorId!==CUR_USER.uid);
   const portSnap = await getDocs(query(collection(db,'vendor_products'), where('vendorId','==',CUR_USER.uid)));
-  var alreadyInPort = new Set(portSnap.docs.map(d=>d.data().productId));
+  var alreadyIn = new Set(portSnap.docs.map(d=>d.data().productId));
 
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -2348,153 +2379,529 @@ async function openAddToPortfolio() {
     '<div class="modal" style="max-width:600px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
     '<h3 style="font-size:15px;font-weight:700">Portföye Ürün Ekle</h3>' +
-    '<button id="close-port-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '<button id="close-port" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
     '</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
-    '<input class="inp" id="port-search" placeholder="Ürün, marka veya kategori ara..." style="flex:1;min-width:180px">' +
-    '<select class="inp" id="port-role-sel" style="width:auto">' +
+    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
+    '<input class="inp" id="port-search" placeholder="Ürün, marka veya kategori ara..." style="flex:1">' +
+    '<select class="inp" id="port-role" style="width:auto">' +
     '<option value="Distribütör">Distribütör</option>' +
     '<option value="Entegratör">Entegratör</option>' +
     '<option value="Bayi">Bayi</option>' +
-    '</select>' +
-    '</div>' +
-    '<div style="font-size:12px;color:#7c87a0;margin-bottom:8px">' +
-    'Checkbox ile birden fazla ürün seçebilirsiniz. Seçilen rol tüm ürünler için geçerli olur.' +
-    '</div>' +
-    '<div id="port-prod-list" style="max-height:340px;overflow-y:auto;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden"></div>' +
-    '<div id="port-sel-bar" style="display:none;margin-top:10px;padding:10px 14px;background:#1c1f2a;border-radius:8px;display:flex;align-items:center;justify-content:space-between">' +
-    '<span style="font-size:12.5px;color:#7c87a0"><span id="port-sel-count" style="color:#3b7cff;font-weight:700;font-size:15px">0</span> ürün seçildi</span>' +
-    '<button class="btn-g btn-sm" id="port-clear-sel">Seçimi Temizle</button>' +
+    '</select></div>' +
+    '<div style="font-size:12px;color:#7c87a0;margin-bottom:8px">Checkbox ile birden fazla ürün seçebilirsiniz.</div>' +
+    '<div id="port-list" style="max-height:320px;overflow-y:auto;border:1px solid rgba(255,255,255,.1);border-radius:8px"></div>' +
+    '<div id="port-sel-bar" style="margin-top:10px;padding:10px 14px;background:#1c1f2a;border-radius:8px;display:none;align-items:center;justify-content:space-between">' +
+    '<span style="font-size:12.5px;color:#7c87a0"><span id="port-cnt" style="color:#3b7cff;font-weight:700;font-size:15px">0</span> ürün seçildi</span>' +
+    '<button class="btn-g btn-sm" id="port-clear">Temizle</button>' +
     '</div>' +
     '<div id="port-err" style="margin-top:8px"></div>' +
     '<button class="btn-p" id="port-submit" style="width:100%;padding:11px;font-size:14px;margin-top:12px" disabled>Seçilenleri Portföye Ekle</button>' +
     '</div>';
-
   document.body.appendChild(modal);
-  modal.querySelector('#close-port-modal').addEventListener('click', function(){modal.remove();});
-  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
+  modal.querySelector('#close-port').addEventListener('click',()=>modal.remove());
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
 
-  var selectedIds = new Set();
-
-  function updateSelBar() {
-    var bar = modal.querySelector('#port-sel-bar');
-    var cnt = modal.querySelector('#port-sel-count');
-    var btn = modal.querySelector('#port-submit');
-    if (bar) bar.style.display = selectedIds.size > 0 ? 'flex' : 'none';
-    if (cnt) cnt.textContent = selectedIds.size;
-    if (btn) btn.disabled = selectedIds.size === 0;
-    if (btn && selectedIds.size > 0) btn.textContent = selectedIds.size + ' Ürünü Portföye Ekle';
-    else if (btn) btn.textContent = 'Seçilenleri Portföye Ekle';
-    // Checkbox görselini güncelle
-    modal.querySelectorAll('.port-cb').forEach(function(cb) {
-      var row = cb.closest('.port-row');
-      if (row) {
-        row.style.background = cb.checked ? 'rgba(59,124,255,.08)' : '';
-        row.style.borderLeft = cb.checked ? '3px solid #3b7cff' : '3px solid transparent';
-      }
+  var sel = new Set();
+  function updateBar() {
+    var bar=modal.querySelector('#port-sel-bar'), cnt=modal.querySelector('#port-cnt'), btn=modal.querySelector('#port-submit');
+    if(bar) bar.style.display=sel.size>0?'flex':'none';
+    if(cnt) cnt.textContent=sel.size;
+    if(btn){btn.disabled=sel.size===0; btn.textContent=sel.size>0?sel.size+' Ürünü Portföye Ekle':'Seçilenleri Portföye Ekle';}
+    modal.querySelectorAll('.port-cb').forEach(function(cb){
+      var row=cb.closest('.port-row');
+      if(row){row.style.background=cb.checked?'rgba(59,124,255,.08)':'';row.style.borderLeft=cb.checked?'3px solid #3b7cff':'3px solid transparent';}
     });
   }
-
-  function renderProds(prods) {
-    var listEl = modal.querySelector('#port-prod-list');
-    if (!prods.length) {
-      listEl.innerHTML = '<div style="padding:20px;color:#5a6278;font-size:12.5px;text-align:center">Ürün bulunamadı.</div>';
-      return;
-    }
-    listEl.innerHTML = prods.slice(0,30).map(function(p) {
-      var inPort = alreadyInPort.has(p.id);
-      var isSelected = selectedIds.has(p.id);
-      return '<label class="port-row" style="display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:'+(inPort?'default':'pointer')+';border-bottom:1px solid rgba(255,255,255,.06);border-left:3px solid '+(isSelected?'#3b7cff':'transparent')+';background:'+(isSelected?'rgba(59,124,255,.08)':'')+(inPort?';opacity:.5':'')+';transition:.1s">' +
-        '<input type="checkbox" class="port-cb" data-id="'+p.id+'" '+(inPort?'disabled title="Zaten portföyünüzde"':'')+(isSelected?' checked':'')+' style="width:16px;height:16px;cursor:'+(inPort?'not-allowed':'pointer')+';flex-shrink:0">' +
-        '<div style="flex:1">' +
-        '<div style="font-size:13px;font-weight:600">' + p.name + (inPort?' <span style="font-size:10px;color:#22d078;font-weight:400">(Portföyünüzde)</span>':'') + '</div>' +
-        '<div style="font-size:12px;color:#7c87a0;margin-top:2px">'+(p.vendorName||'—')+' · '+(p.category||'—')+' · '+cc(p.country||'TR')+'</div>' +
-        '</div>' +
-        (inPort ? '<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078;flex-shrink:0">✓ Portföyde</span>' : '') +
+  function renderList(prods) {
+    var listEl=modal.querySelector('#port-list');
+    if(!prods.length){listEl.innerHTML='<div style="padding:20px;color:#5a6278;text-align:center">Ürün bulunamadı.</div>';return;}
+    listEl.innerHTML=prods.slice(0,30).map(function(p){
+      var inP=alreadyIn.has(p.id), checked=sel.has(p.id);
+      return '<label class="port-row" style="display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:'+(inP?'default':'pointer')+';border-bottom:1px solid rgba(255,255,255,.06);border-left:3px solid '+(checked?'#3b7cff':'transparent')+';background:'+(checked?'rgba(59,124,255,.08)':'')+(inP?';opacity:.55':'')+';transition:.1s">' +
+        '<input type="checkbox" class="port-cb" data-id="'+p.id+'" '+(inP?'disabled':'')+(checked?' checked':'')+' style="width:16px;height:16px;flex-shrink:0;cursor:'+(inP?'not-allowed':'pointer')+'">' +
+        '<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.name+(inP?' <span style="font-size:10px;color:#22d078">(Portföyünüzde)</span>':'')+'</div>' +
+        '<div style="font-size:12px;color:#7c87a0">'+(p.vendorName||'—')+' · '+(p.category||'—')+' · '+cc(p.country||'TR')+'</div></div>' +
+        (inP?'<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078">✓</span>':'') +
         '</label>';
     }).join('');
-
-    modal.querySelectorAll('.port-cb:not([disabled])').forEach(function(cb) {
-      cb.addEventListener('change', function() {
-        if (cb.checked) selectedIds.add(cb.dataset.id);
-        else selectedIds.delete(cb.dataset.id);
-        updateSelBar();
-      });
+    modal.querySelectorAll('.port-cb:not([disabled])').forEach(function(cb){
+      cb.addEventListener('change',function(){if(cb.checked)sel.add(cb.dataset.id);else sel.delete(cb.dataset.id);updateBar();});
     });
   }
-
-  renderProds(allProds);
-
-  modal.querySelector('#port-search').addEventListener('input', function() {
-    var q = this.value.toLowerCase();
-    renderProds(q ? allProds.filter(function(p){
-      return (p.name||'').toLowerCase().includes(q) ||
-             (p.vendorName||'').toLowerCase().includes(q) ||
-             (p.category||'').toLowerCase().includes(q);
-    }) : allProds);
+  renderList(allProds);
+  modal.querySelector('#port-search').addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    renderList(q?allProds.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q)):allProds);
   });
-
-  modal.querySelector('#port-clear-sel')?.addEventListener('click', function() {
-    selectedIds.clear();
-    modal.querySelectorAll('.port-cb').forEach(function(cb){cb.checked=false;});
-    updateSelBar();
+  modal.querySelector('#port-clear').addEventListener('click',function(){
+    sel.clear();modal.querySelectorAll('.port-cb').forEach(cb=>{cb.checked=false;});updateBar();
   });
-
-  modal.querySelector('#port-submit').addEventListener('click', async function() {
-    if (selectedIds.size === 0) return;
-    var role = modal.querySelector('#port-role-sel').value;
-    var btn = modal.querySelector('#port-submit');
-    btn.disabled=true; btn.textContent='Ekleniyor...';
-    var errDiv = modal.querySelector('#port-err');
-
+  modal.querySelector('#port-submit').addEventListener('click',async function(){
+    if(!sel.size) return;
+    var role=modal.querySelector('#port-role').value;
+    var btn=modal.querySelector('#port-submit'); btn.disabled=true; btn.textContent='Ekleniyor...';
     try {
-      var added = 0;
-      var notified = new Set();
-
-      for (var prodId of selectedIds) {
-        var prod = allProds.find(function(p){return p.id===prodId;});
-        if (!prod) continue;
-
-        await addDoc(collection(db,'vendor_products'), {
-          vendorId: CUR_USER.uid,
-          vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
-          vendorEmail: CUR_USER.email,
-          vendorType: CUR_PROFILE?.vendorType||'',
-          productId: prod.id,
-          productName: prod.name,
-          productCategory: prod.category||'',
-          originalVendorId: prod.vendorId,
-          originalVendorName: prod.vendorName||'',
-          originalVendorEmail: prod.vendorEmail||'',
-          role: role,
-          status: 'active',
-          createdAt: serverTimestamp()
+      var added=0, notified=new Set();
+      for(var pid of sel){
+        var prod=allProds.find(p=>p.id===pid); if(!prod) continue;
+        await addDoc(collection(db,'vendor_products'),{
+          vendorId:CUR_USER.uid, vendorName:CUR_PROFILE?.displayName||CUR_USER.email,
+          vendorEmail:CUR_USER.email, vendorType:CUR_PROFILE?.vendorType||'',
+          productId:prod.id, productName:prod.name, productCategory:prod.category||'',
+          originalVendorId:prod.vendorId, originalVendorName:prod.vendorName||'',
+          originalVendorEmail:prod.vendorEmail||'', role:role, status:'active',
+          createdAt:serverTimestamp()
         });
-
-        // Orijinal üreticiye bildirim — aynı vendor'a bir kez
-        if (prod.vendorEmail && prod.vendorEmail !== CUR_USER.email && !notified.has(prod.vendorEmail)) {
+        if(prod.vendorEmail&&prod.vendorEmail!==CUR_USER.email&&!notified.has(prod.vendorEmail)){
           notified.add(prod.vendorEmail);
-          sendEmail(prod.vendorEmail, prod.vendorName||'',
-            'Ürününüz Portföye Eklendi — PoCHub',
-            (CUR_PROFILE?.displayName||CUR_USER.email)+' ('+( CUR_PROFILE?.company||'')+') ürününüzü portföyüne ekledi.',
-            'Ürün: '+prod.name+'\nRol: '+role
-          );
+          sendEmail(prod.vendorEmail,prod.vendorName||'','Ürününüz Portföye Eklendi — PoCHub',
+            (CUR_PROFILE?.displayName||CUR_USER.email)+' ürününüzü portföyüne ekledi.','Ürün: '+prod.name+'\nRol: '+role);
         }
         added++;
       }
-
-      modal.remove();
-      showToast(added+' ürün portföyünüze eklendi!');
-      alreadyInPort = new Set([...alreadyInPort, ...selectedIds]);
-      CUR_VEND_TAB='portfolio';
-      loadVendTab();
-    } catch(e) {
-      errDiv.innerHTML='<div class="alert alert-err">'+e.message+'</div>';
-      btn.disabled=false; btn.textContent=selectedIds.size+' Ürünü Portföye Ekle';
+      modal.remove(); showToast(added+' ürün portföyünüze eklendi!');
+      CUR_VEND_TAB='portfolio'; loadVendTab();
+    } catch(e){
+      modal.querySelector('#port-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      btn.disabled=false; btn.textContent=sel.size+' Ürünü Portföye Ekle';
     }
   });
 }
 
+/* ═══════════════════════════════════════════════════════
+   ROL YÖNETİMİ (v2.2)
+═══════════════════════════════════════════════════════ */
+async function admRoles(m) {
+  const snap = await getDocs(collection(db,'users'));
+  var all = snap.docs.map(d=>({...d.data(),id:d.id}));
+  all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  var ROLES = [{v:'customer',l:'Müşteri'},{v:'vendor',l:'Vendor'},{v:'support',l:'Destek'},{v:'moderator',l:'Moderatör'},{v:'admin',l:'Admin'}];
+  var roleFilter='';
+  function renderRows(users){
+    var tbody=m.querySelector('#roles-tbody'),cnt=m.querySelector('#roles-cnt');
+    if(cnt) cnt.textContent='('+users.length+')';
+    if(!tbody) return;
+    tbody.innerHTML=users.map(function(u){
+      var rp=getRolePerm(u.role);
+      var vt={ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+      var rl=u.role==='vendor'?(vt[u.vendorType]||'Vendor'):rp.label;
+      return '<tr style="border-top:1px solid rgba(255,255,255,.06)">'+
+        '<td style="padding:11px 14px"><div style="font-weight:600">'+(u.displayName||'—')+'</div><div style="font-size:11.5px;color:#7c87a0">'+u.email+'</div></td>'+
+        '<td style="padding:11px 14px"><span class="bdg" style="background:'+rp.bg+';color:'+rp.color+'">'+rl+'</span></td>'+
+        '<td style="padding:11px 14px;color:#7c87a0">'+(u.company||'—')+'</td>'+
+        '<td style="padding:11px 14px">'+
+        '<select class="inp rs-sel" data-uid="'+u.id+'" style="padding:5px 8px;font-size:12px;width:auto">'+
+        ROLES.map(r=>'<option value="'+r.v+'"'+(u.role===r.v?' selected':'')+'>'+r.l+'</option>').join('')+
+        '</select></td>'+
+        '<td style="padding:11px 14px"><button class="btn-p btn-sm rs-save" data-uid="'+u.id+'" data-name="'+(u.displayName||u.email)+'">Kaydet</button></td>'+
+        '</tr>';
+    }).join('');
+    m.querySelectorAll('.rs-save').forEach(function(btn){
+      btn.addEventListener('click',async function(){
+        if(btn.dataset.uid===CUR_USER?.uid){showToast('Kendi rolünüzü değiştiremezsiniz.','err');return;}
+        var newRole=m.querySelector('.rs-sel[data-uid="'+btn.dataset.uid+'"]')?.value;
+        if(!newRole) return;
+        btn.disabled=true; btn.textContent='...';
+        try{
+          await updateDoc(doc(db,'users',btn.dataset.uid),{role:newRole});
+          showToast(btn.dataset.name+' rolü güncellendi.');
+          admRoles(m);
+        }catch(e){showToast('Hata: '+e.message,'err');btn.disabled=false;btn.textContent='Kaydet';}
+      });
+    });
+  }
+  function applyFilter(){
+    var q=(m.querySelector('#roles-s')?.value||'').toLowerCase();
+    renderRows(all.filter(u=>(!roleFilter||u.role===roleFilter)&&(!q||(u.displayName||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)||(u.company||'').toLowerCase().includes(q))));
+  }
+  m.innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<h2 style="font-size:18px;font-weight:700">Rol Yönetimi <span id="roles-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
+    '<input class="inp" id="roles-s" placeholder="Ad veya e-posta..." style="width:240px;font-size:12.5px"></div>'+
+    '<div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#f0a429;margin-bottom:12px">'+
+    '⚠ Rol değişikliği anında geçerli olur. Kendi rolünüzü değiştiremezsiniz.</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    '<button class="btn-p btn-sm roles-rf" data-r="">Tümü</button>'+
+    '<button class="btn-g btn-sm roles-rf" data-r="customer">Müşteri</button>'+
+    '<button class="btn-g btn-sm roles-rf" data-r="vendor">Vendor</button>'+
+    '<button class="btn-g btn-sm roles-rf" data-r="support">Destek</button>'+
+    '<button class="btn-g btn-sm roles-rf" data-r="moderator">Moderatör</button>'+
+    '<button class="btn-g btn-sm roles-rf" data-r="admin">Admin</button>'+
+    '</div>'+
+    '<table><thead><tr><th>Ad/E-posta</th><th>Mevcut</th><th>Şirket</th><th>Yeni Rol</th><th>İşlem</th></tr></thead><tbody id="roles-tbody"></tbody></table>';
+  renderRows(all);
+  m.querySelector('#roles-s').addEventListener('input',applyFilter);
+  m.querySelectorAll('.roles-rf').forEach(function(b){
+    b.addEventListener('click',function(){
+      m.querySelectorAll('.roles-rf').forEach(x=>{x.className='btn-g btn-sm roles-rf';});
+      b.className='btn-p btn-sm roles-rf'; roleFilter=b.dataset.r; applyFilter();
+    });
+  });
+}
+
+
+async function renderVendorCalendar(m) {
+  // Tüm vendor verilerini çek
+  var pocSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid)));
+  var evSnap2 = await getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid)));
+
+  var pocItems = pocSnap.docs.map(function(d) { return {...d.data(), id:d.id, itemType:'private'}; });
+  var evItems2 = evSnap2.docs.map(function(d) { return {...d.data(), id:d.id, itemType:'public'}; });
+  var allItems = pocItems.concat(evItems2);
+  allItems.sort(function(a,b) {
+    var da = a.eventDate || a.createdAt;
+    var db2 = b.eventDate || b.createdAt;
+    return (da&&da.seconds?da.seconds:0) - (db2&&db2.seconds?db2.seconds:0);
+  });
+
+  var today = new Date();
+  var calYear = today.getFullYear();
+  var calMonth = today.getMonth();
+  var calView = 'calendar'; // 'calendar' | 'list'
+  var searchQuery = '';
+
+  function getFiltered() {
+    var q = searchQuery.toLowerCase();
+    if (!q) return allItems;
+    return allItems.filter(function(item) {
+      return (item.title||'').toLowerCase().includes(q) ||
+             (item.productName||'').toLowerCase().includes(q) ||
+             (item.customerName||'').toLowerCase().includes(q);
+    });
+  }
+
+  function renderContent() {
+    var filtered = getFiltered();
+    var contentEl = document.getElementById('vcal-content');
+    if (!contentEl) return;
+
+    if (calView === 'list') {
+      renderListView(filtered, contentEl);
+    } else {
+      renderCalView(filtered, contentEl);
+    }
+  }
+
+  function renderListView(items, container) {
+    if (!items.length) {
+      container.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>Kayıt bulunamadı.</div>';
+      return;
+    }
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
+      '<thead><tr>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Başlık / Ürün</th>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Tür</th>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Müşteri</th>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Durum</th>' +
+      '<th style="background:#1c1f2a;padding:9px 14px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase">Tarih</th>' +
+      '</tr></thead><tbody>';
+
+    items.forEach(function(item) {
+      var isPublic = item.itemType === 'public';
+      var dateStr = item.eventDate ? fmt(item.eventDate) : item.createdAt ? fmt(item.createdAt) : '—';
+      html += '<tr style="border-top:1px solid rgba(255,255,255,.06)">' +
+        '<td style="padding:11px 14px"><div style="font-weight:600">' + (item.title||item.productName||'—') + '</div>' +
+        (item.productName&&item.itemType==='private'?'<div style="font-size:11px;color:#5a6278">'+item.productName+'</div>':'') + '</td>' +
+        '<td style="padding:11px 14px">' + (isPublic ?
+          '<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078">Public</span>' :
+          '<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">Private</span>') + '</td>' +
+        '<td style="padding:11px 14px;color:#7c87a0">' + (item.customerName||'—') + '</td>' +
+        '<td style="padding:11px 14px">' + statusBadge(item.status) + '</td>' +
+        '<td style="padding:11px 14px;color:#7c87a0;font-size:12px">' + dateStr + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  }
+
+  function renderCalView(items, container) {
+    var MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    var DAYS = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
+
+    // O aya ait item'ları gün bazında grupla
+    var dayMap = {};
+    items.forEach(function(item) {
+      var dateField = item.eventDate || item.createdAt;
+      if (!dateField || !dateField.toDate) return;
+      var d = dateField.toDate();
+      if (d.getFullYear()===calYear && d.getMonth()===calMonth) {
+        var day = d.getDate();
+        if (!dayMap[day]) dayMap[day] = [];
+        dayMap[day].push(item);
+      }
+    });
+
+    var firstDay = new Date(calYear, calMonth, 1).getDay();
+    var offset = firstDay===0 ? 6 : firstDay-1;
+    var daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+
+    var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:16px">';
+    DAYS.forEach(function(d) {
+      html += '<div style="text-align:center;font-size:10px;color:#5a6278;font-weight:700;padding:4px 0">' + d + '</div>';
+    });
+    for (var i=0;i<offset;i++) html += '<div></div>';
+    for (var day=1;day<=daysInMonth;day++) {
+      var isToday = today.getFullYear()===calYear && today.getMonth()===calMonth && today.getDate()===day;
+      var dayItems = dayMap[day]||[];
+      var hasPoc = dayItems.some(function(x){return x.itemType==='private';});
+      var hasEv = dayItems.some(function(x){return x.itemType==='public';});
+      var bg = isToday ? '#3b7cff' : (hasPoc||hasEv) ? 'rgba(59,124,255,.15)' : 'transparent';
+      var border = isToday ? 'none' : (hasPoc||hasEv) ? '1px solid rgba(59,124,255,.3)' : '1px solid rgba(255,255,255,.06)';
+      html += '<div class="vcal-day" data-day="' + day + '" style="min-height:52px;border-radius:6px;padding:4px;cursor:' + (dayItems.length?'pointer':'default') + ';background:' + bg + ';border:' + border + '">' +
+        '<div style="font-size:11.5px;font-weight:' + (isToday||dayItems.length?'700':'400') + ';color:' + (isToday?'#fff':dayItems.length?'#e9ecf3':'#5a6278') + '">' + day + '</div>';
+      if (hasPoc) html += '<div style="width:6px;height:6px;border-radius:50%;background:#7db4ff;margin-top:2px" title="Private PoC"></div>';
+      if (hasEv) html += '<div style="width:6px;height:6px;border-radius:50%;background:#22d078;margin-top:2px" title="Public Etkinlik"></div>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Seçili gün detayı
+    html += '<div id="vcal-day-detail"></div>';
+
+    container.innerHTML = html;
+
+    // Gün tıklama
+    container.querySelectorAll('.vcal-day').forEach(function(dayEl) {
+      dayEl.addEventListener('click', function() {
+        var day = parseInt(dayEl.dataset.day);
+        var dayItems = dayMap[day]||[];
+        if (!dayItems.length) return;
+
+        // Önceki seçimi temizle
+        container.querySelectorAll('.vcal-day').forEach(function(d) {
+          if (!d.classList.contains('today')) d.style.outline='none';
+        });
+        dayEl.style.outline='2px solid #3b7cff';
+
+        var detailEl = document.getElementById('vcal-day-detail');
+        if (!detailEl) return;
+        var dHtml = '<div style="margin-top:4px">';
+        dayItems.forEach(function(item) {
+          var isPublic = item.itemType==='public';
+          dHtml += '<div class="card" style="margin-bottom:8px;padding:12px;border-color:' + (isPublic?'rgba(34,208,120,.25)':'rgba(59,124,255,.25)') + '">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' +
+            '<span class="bdg" style="background:' + (isPublic?'rgba(34,208,120,.12)':'rgba(59,124,255,.12)') + ';color:' + (isPublic?'#22d078':'#7db4ff') + '">' + (isPublic?'Public Etkinlik':'Private PoC') + '</span>' +
+            statusBadge(item.status) + '</div>' +
+            '<div style="font-size:13px;font-weight:700">' + (item.title||item.productName||'—') + '</div>' +
+            (item.customerName?'<div style="font-size:12px;color:#7c87a0;margin-top:3px">Müşteri: '+item.customerName+'</div>':'') +
+            (item.productName&&isPublic?'<div style="font-size:12px;color:#7c87a0;margin-top:3px">Ürün: '+item.productName+'</div>':'') +
+            '</div>';
+        });
+        dHtml += '</div>';
+        detailEl.innerHTML = dHtml;
+      });
+    });
+  }
+
+  // Ana layout
+  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+    '<h2 style="font-size:18px;font-weight:700">PoC Takvimim</h2>' +
+    '<div style="display:flex;gap:8px;align-items:center">' +
+    '<input class="inp" id="vcal-search" placeholder="Ürün, müşteri veya başlık ara..." style="width:240px;font-size:12.5px">' +
+    '<button id="vcal-toggle-list" class="btn-g btn-sm">📋 Liste</button>' +
+    '<button id="vcal-toggle-cal" class="btn-p btn-sm">📅 Takvim</button>' +
+    '</div>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px" id="vcal-nav">' +
+    '<button id="vcal-prev" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">‹</button>' +
+    '<span id="vcal-month-label" style="font-size:13px;font-weight:700;min-width:120px;text-align:center"></span>' +
+    '<button id="vcal-next" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px;padding:2px 8px">›</button>' +
+    '</div>' +
+    '<div id="vcal-legend" style="display:flex;gap:14px;margin-bottom:12px;font-size:12px;color:#7c87a0">' +
+    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7db4ff;margin-right:4px"></span>Private PoC</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22d078;margin-right:4px"></span>Public Etkinlik</span>' +
+    '</div>' +
+    '<div id="vcal-content"></div>';
+
+  var MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+  function updateMonthLabel() {
+    var lbl = document.getElementById('vcal-month-label');
+    if (lbl) lbl.textContent = MONTHS_TR[calMonth] + ' ' + calYear;
+  }
+
+  function setView(view) {
+    calView = view;
+    var navEl = document.getElementById('vcal-nav');
+    var legEl = document.getElementById('vcal-legend');
+    if (navEl) navEl.style.display = view==='calendar' ? 'flex' : 'none';
+    if (legEl) legEl.style.display = view==='calendar' ? 'flex' : 'none';
+    document.getElementById('vcal-toggle-cal').className = view==='calendar' ? 'btn-p btn-sm' : 'btn-g btn-sm';
+    document.getElementById('vcal-toggle-list').className = view==='list' ? 'btn-p btn-sm' : 'btn-g btn-sm';
+    updateMonthLabel();
+    renderContent();
+  }
+
+  m.querySelector('#vcal-prev').addEventListener('click', function() {
+    calMonth--; if(calMonth<0){calMonth=11;calYear--;}
+    updateMonthLabel(); renderContent();
+  });
+  m.querySelector('#vcal-next').addEventListener('click', function() {
+    calMonth++; if(calMonth>11){calMonth=0;calYear++;}
+    updateMonthLabel(); renderContent();
+  });
+  m.querySelector('#vcal-toggle-list').addEventListener('click', function() { setView('list'); });
+  m.querySelector('#vcal-toggle-cal').addEventListener('click', function() { setView('calendar'); });
+  m.querySelector('#vcal-search').addEventListener('input', function() {
+    searchQuery = this.value;
+    renderContent();
+  });
+
+  setView('calendar');
+}
+
+async function openEditEventModal(evId, evData) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+
+  var fmtDate = '';
+  var fmtTime = '10:00';
+  if (evData.eventDate && evData.eventDate.toDate) {
+    var d = evData.eventDate.toDate();
+    fmtDate = d.toISOString().split('T')[0];
+    fmtTime = d.toTimeString().slice(0,5);
+  }
+
+  modal.innerHTML = '<div class="modal" style="max-width:520px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Etkinlik Düzenle</h3>' +
+    '<button id="close-eedit" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<label class="lbl">Etkinlik Başlığı *</label>' +
+    '<input class="inp" id="ee-title" value="' + (evData.title||'').replace(/"/g,'&quot;') + '">' +
+    '<label class="lbl">Açıklama *</label>' +
+    '<textarea class="inp" id="ee-desc" rows="3" style="resize:none">' + (evData.description||'') + '</textarea>' +
+    '<label class="lbl">Tarih ve Saat</label>' +
+    '<div class="g2">' +
+    '<input class="inp" id="ee-date" type="date" value="' + fmtDate + '">' +
+    '<input class="inp" id="ee-time" type="time" value="' + fmtTime + '">' +
+    '</div>' +
+    '<div class="g2">' +
+    '<div><label class="lbl">Kapasite</label><input class="inp" id="ee-cap" type="number" value="' + (evData.capacity||50) + '"></div>' +
+    '<div><label class="lbl">Ücret (₺)</label><input class="inp" id="ee-fee" type="number" value="' + (evData.fee||0) + '"></div>' +
+    '</div>' +
+    '<label class="lbl">Format</label>' +
+    '<select class="inp" id="ee-fmt">' +
+    '<option value="online"' + (evData.format==='online'?' selected':'') + '>Online</option>' +
+    '<option value="onsite"' + (evData.format==='onsite'?' selected':'') + '>Fiziksel</option>' +
+    '<option value="hybrid"' + (evData.format==='hybrid'?' selected':'') + '>Hibrit</option>' +
+    '</select>' +
+    '<div id="ee-loc-online" style="margin-top:8px">' +
+    '<label class="lbl">Online Link</label>' +
+    '<input class="inp" id="ee-url" value="' + (evData.onlineUrl||'').replace(/"/g,'&quot;') + '" placeholder="https://zoom.us/j/...">' +
+    '</div>' +
+    '<div id="ee-loc-onsite" style="margin-top:8px">' +
+    '<label class="lbl">Fiziksel Adres</label>' +
+    '<input class="inp" id="ee-address" value="' + (evData.physicalAddress||'').replace(/"/g,'&quot;') + '" placeholder="Büyükdere Cad. No:127, İstanbul">' +
+    '</div>' +
+    '<div id="ee-err" style="margin-top:10px"></div>' +
+    '<button class="btn-p" id="ee-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#close-eedit').addEventListener('click', function() { modal.remove(); });
+  modal.addEventListener('click', function(e) { if(e.target===modal) modal.remove(); });
+
+  function updateEeLocFields() {
+    var fmt = modal.querySelector('#ee-fmt').value;
+    modal.querySelector('#ee-loc-online').style.display = (fmt==='online'||fmt==='hybrid') ? 'block' : 'none';
+    modal.querySelector('#ee-loc-onsite').style.display = (fmt==='onsite'||fmt==='hybrid') ? 'block' : 'none';
+  }
+  modal.querySelector('#ee-fmt').addEventListener('change', updateEeLocFields);
+  updateEeLocFields();
+
+  modal.querySelector('#ee-submit').addEventListener('click', async function() {
+    var title = modal.querySelector('#ee-title').value.trim();
+    var desc = modal.querySelector('#ee-desc').value.trim();
+    if (!title || !desc) {
+      modal.querySelector('#ee-err').innerHTML = '<div class="alert alert-err">Başlık ve açıklama zorunludur.</div>';
+      return;
+    }
+    var btn = modal.querySelector('#ee-submit');
+    btn.disabled=true; btn.textContent='Güncelleniyor...';
+    try {
+      var dateVal = modal.querySelector('#ee-date').value;
+      var timeVal = modal.querySelector('#ee-time').value || '10:00';
+      var fmt = modal.querySelector('#ee-fmt').value;
+      var urlVal = modal.querySelector('#ee-url').value.trim();
+      var addrVal = modal.querySelector('#ee-address').value.trim();
+      var locStr = fmt==='online' ? urlVal : fmt==='onsite' ? addrVal : addrVal + ' | ' + urlVal;
+
+      var updateData = {
+        title: title, description: desc,
+        capacity: parseInt(modal.querySelector('#ee-cap').value)||50,
+        fee: parseFloat(modal.querySelector('#ee-fee').value)||0,
+        format: fmt, location: locStr,
+        onlineUrl: (fmt==='online'||fmt==='hybrid') ? urlVal : '',
+        physicalAddress: (fmt==='onsite'||fmt==='hybrid') ? addrVal : '',
+        updatedAt: serverTimestamp()
+      };
+      if (dateVal) {
+        updateData.eventDate = Timestamp.fromDate(new Date(dateVal + 'T' + timeVal + ':00'));
+      }
+      await updateDoc(doc(db,'public_events',evId), updateData);
+      modal.remove();
+      showToast('Etkinlik güncellendi!');
+      loadVendTab();
+    } catch(e) {
+      modal.querySelector('#ee-err').innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
+      btn.disabled=false; btn.textContent='Güncelle';
+    }
+  });
+}
+
+async function openAddProductModal() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = `<div class="modal" style="max-width:500px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 style="font-size:15px;font-weight:700">Yeni Ürün Ekle</h3>
+      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-prod-modal">×</button>
+    </div>
+    <label class="lbl">Ürün Adı *</label><input class="inp" id="pr-name" placeholder="Ürün adı">
+    <label class="lbl">Kategori *</label>
+    <select class="inp" id="pr-cat"><option value="">Yükleniyor...</option></select>
+    <label class="lbl">Menşei Ülke</label>
+    <div id="pr-country-cont" style="margin-bottom:4px"></div>
+      <input type="hidden" id="pr-country-val" value="TR">
+    </div>
+    <label class="lbl">Açıklama</label>
+    <textarea class="inp" id="pr-desc" rows="3" placeholder="Ürün açıklaması..." style="resize:none"></textarea>
+    <label class="lbl">Destek Modeli</label>
+    <select class="inp" id="pr-support"><option value="inhouse">Kendi bünyesi</option><option value="outsource">Dış kaynak</option><option value="hybrid">Hibrit</option></select>
+    <div id="pr-err" style="margin-top:10px"></div>
+    <button class="btn-p" id="pr-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Admin Onayına Gönder</button>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector('#close-prod-modal').addEventListener('click', () => modal.remove());
+
+  fillCatSelect(modal.querySelector('#pr-cat'), '');
+  buildCountryInput('pr-country-cont','pr-country-inp','pr-country-val','TR');
+  modal.querySelector('#pr-submit').addEventListener('click', async () => {
+    const name = modal.querySelector('#pr-name').value.trim();
+    if (!name) { modal.querySelector('#pr-err').innerHTML='<div class="alert alert-err">Ürün adı zorunludur.</div>'; return; }
+    const btn = modal.querySelector('#pr-submit');
+    btn.disabled=true; btn.textContent='Gönderiliyor...';
+    try {
+      await addDoc(collection(db,'products'), {
+        vendorId: CUR_USER.uid,
+        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
+        vendorEmail: CUR_USER.email,
+        name, category: modal.querySelector('#pr-cat').value,
+        country: modal.querySelector('#pr-country-val').value || 'TR',
+        description: modal.querySelector('#pr-desc').value,
+        supportModel: modal.querySelector('#pr-support').value,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+      modal.remove();
+      showToast('Ürün admin onayına gönderildi!');
+    } catch(e) {
+      modal.querySelector('#pr-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      btn.disabled=false; btn.textContent='Admin Onayına Gönder';
+    }
+  });
+}
 
 async function openNewEventModal() {
   var modal = document.createElement('div');
@@ -2503,238 +2910,225 @@ async function openNewEventModal() {
     '<div class="modal" style="max-width:520px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
     '<h3 style="font-size:15px;font-weight:700">Yeni Etkinlik Oluştur</h3>' +
-    '<button id="close-ev-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
-    '</div>' +
+    '<button id="cem-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button></div>' +
     '<label class="lbl">Etkinlik Başlığı *</label>' +
-    '<input class="inp" id="ev-title" placeholder="FortiGate 100F — Canlı Demo">' +
-    '<label class="lbl">Etkinlik Açıklaması *</label>' +
-    '<textarea class="inp" id="ev-desc" rows="3" placeholder="Etkinlik içeriği, hedef kitle, gündem..." style="resize:none"></textarea>' +
+    '<input class="inp" id="cem-title" placeholder="FortiGate 100F — Canlı Demo">' +
+    '<label class="lbl">Açıklama *</label>' +
+    '<textarea class="inp" id="cem-desc" rows="3" style="resize:none" placeholder="Etkinlik içeriği, gündem..."></textarea>' +
     '<label class="lbl">Ürün Seç *</label>' +
-    '<div class="tab-bar" style="margin-bottom:8px">' +
-    '<button class="tab-btn on" id="ev-tab-mine" type="button">📦 Ürünlerim</button>' +
-    '<button class="tab-btn" id="ev-tab-portfolio" type="button">🤝 Portföyüm</button>' +
-    '<button class="tab-btn" id="ev-tab-catalog" type="button">🌐 Tüm Katalog</button>' +
+    '<div style="display:flex;gap:0;margin-bottom:8px;border:1px solid rgba(255,255,255,.12);border-radius:8px;overflow:hidden">' +
+    '<button class="cem-tab on" id="cem-tab-mine" style="flex:1;padding:8px;background:rgba(59,124,255,.15);border:none;color:#7db4ff;font-size:12px;cursor:pointer;border-right:1px solid rgba(255,255,255,.12)">📦 Ürünlerim</button>' +
+    '<button class="cem-tab" id="cem-tab-port" style="flex:1;padding:8px;background:none;border:none;color:#7c87a0;font-size:12px;cursor:pointer;border-right:1px solid rgba(255,255,255,.12)">🤝 Portföyüm</button>' +
+    '<button class="cem-tab" id="cem-tab-cat" style="flex:1;padding:8px;background:none;border:none;color:#7c87a0;font-size:12px;cursor:pointer">🌐 Tüm Katalog</button>' +
     '</div>' +
-    '<input class="inp" id="ev-prod-search" placeholder="Ürün ara..." autocomplete="off" style="margin-bottom:6px">' +
-    '<div id="ev-prod-list" style="background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:8px;max-height:190px;overflow-y:auto;margin-bottom:6px"></div>' +
-    '<div id="ev-prod-selected" style="display:none;padding:8px 12px;background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.25);border-radius:7px;font-size:12.5px;margin-bottom:4px">' +
-    'Seçilen: <span id="ev-prod-sel-name" style="color:#3b7cff;font-weight:700"></span>' +
-    '</div>' +
-    '<input type="hidden" id="ev-prod-id" value="">' +
-    '<input type="hidden" id="ev-prod-name-val" value="">' +
-    '<input type="hidden" id="ev-prod-cat-val" value="">' +
-    '<input type="hidden" id="ev-prod-owner-id" value="">' +
-    '<input type="hidden" id="ev-prod-owner-email" value="">' +
-    '<input type="hidden" id="ev-prod-owner-name" value="">' +
-    '<label class="lbl">Tarih ve Saat *</label>' +
-    '<div class="g2"><input class="inp" id="ev-date" type="date"><input class="inp" id="ev-time" type="time" value="10:00"></div>' +
+    '<input class="inp" id="cem-prod-s" placeholder="Ürün ara..." style="margin-bottom:6px">' +
+    '<div id="cem-prod-list" style="background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:8px;max-height:180px;overflow-y:auto;margin-bottom:8px"></div>' +
+    '<div id="cem-sel-bar" style="display:none;padding:8px 12px;background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.25);border-radius:7px;font-size:12.5px;margin-bottom:4px">' +
+    'Seçilen: <span id="cem-sel-name" style="color:#3b7cff;font-weight:700"></span></div>' +
+    '<input type="hidden" id="cem-prod-id"><input type="hidden" id="cem-prod-name">' +
+    '<input type="hidden" id="cem-prod-cat"><input type="hidden" id="cem-owner-id">' +
+    '<input type="hidden" id="cem-owner-email"><input type="hidden" id="cem-owner-name">' +
     '<div class="g2">' +
-    '<div><label class="lbl">Kapasite *</label><input class="inp" id="ev-cap" type="number" value="50" min="1"></div>' +
-    '<div><label class="lbl">Katılım Ücreti (₺)</label><input class="inp" id="ev-fee" type="number" value="0" min="0"></div>' +
+    '<div><label class="lbl">Tarih *</label><input class="inp" id="cem-date" type="date"></div>' +
+    '<div><label class="lbl">Saat</label><input class="inp" id="cem-time" type="time" value="10:00"></div>' +
+    '</div>' +
+    '<div class="g2">' +
+    '<div><label class="lbl">Kapasite *</label><input class="inp" id="cem-cap" type="number" value="50" min="1"></div>' +
+    '<div><label class="lbl">Ücret (₺)</label><input class="inp" id="cem-fee" type="number" value="0" min="0"></div>' +
     '</div>' +
     '<label class="lbl">Format *</label>' +
-    '<select class="inp" id="ev-fmt"><option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option></select>' +
-    '<label class="lbl">PoC Dili * <span style="font-size:11px;color:#5a6278;font-weight:400">(Zorunlu)</span></label>' +
-    '<select class="inp" id="ev-lang">' +
+    '<select class="inp" id="cem-fmt">' +
+    '<option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option>' +
+    '</select>' +
+    '<label class="lbl">PoC Dili * <span style="font-size:11px;color:#5a6278">(Zorunlu)</span></label>' +
+    '<select class="inp" id="cem-lang">' +
     POC_LANGUAGES.map(function(l){return '<option value="'+l.code+'">'+l.flag+' '+l.name+'</option>';}).join('') +
     '</select>' +
-    '<div id="ev-loc-online" style="margin-top:8px">' +
-    '<label class="lbl">Online Katılım Linki *</label>' +
-    '<input class="inp" id="ev-url" placeholder="https://zoom.us/j/...">' +
-    '</div>' +
-    '<div id="ev-loc-onsite" style="display:none;margin-top:8px">' +
-    '<label class="lbl">Fiziksel Lokasyon Adresi *</label>' +
-    '<input class="inp" id="ev-address" placeholder="Büyükdere Cad. No:127, İstanbul">' +
-    '</div>' +
-    '<div id="ev-err" style="margin-top:10px"></div>' +
-    '<button class="btn-p" id="ev-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Etkinliği Yayınla</button>' +
+    '<div id="cem-loc-online" style="margin-top:8px"><label class="lbl">Online Link *</label><input class="inp" id="cem-url" placeholder="https://zoom.us/j/..."></div>' +
+    '<div id="cem-loc-onsite" style="display:none;margin-top:8px"><label class="lbl">Fiziksel Adres *</label><input class="inp" id="cem-addr" placeholder="Büyükdere Cad. No:127, İstanbul"></div>' +
+    '<div id="cem-err" style="margin-top:10px"></div>' +
+    '<button class="btn-p" id="cem-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Etkinliği Yayınla</button>' +
     '</div>';
-
   document.body.appendChild(modal);
-  modal.querySelector('#close-ev-modal').addEventListener('click', function(){modal.remove();});
-  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
+  modal.querySelector('#cem-close').addEventListener('click',()=>modal.remove());
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
 
-  // Format değişince lokasyon alanları
-  function updateLocFields() {
-    var fmt = modal.querySelector('#ev-fmt').value;
-    var onlineDiv = modal.querySelector('#ev-loc-online');
-    var onsiteDiv = modal.querySelector('#ev-loc-onsite');
-    if (fmt==='online')  { onlineDiv.style.display='block'; onsiteDiv.style.display='none'; }
-    else if (fmt==='onsite') { onlineDiv.style.display='none'; onsiteDiv.style.display='block'; }
-    else { onlineDiv.style.display='block'; onsiteDiv.style.display='block'; }
+  // Format → lokasyon alanları
+  function updLoc(){
+    var f=modal.querySelector('#cem-fmt').value;
+    var o=modal.querySelector('#cem-loc-online'), s=modal.querySelector('#cem-loc-onsite');
+    if(f==='online'){o.style.display='block';s.style.display='none';}
+    else if(f==='onsite'){o.style.display='none';s.style.display='block';}
+    else{o.style.display='block';s.style.display='block';}
   }
-  modal.querySelector('#ev-fmt').addEventListener('change', updateLocFields);
-  updateLocFields();
+  modal.querySelector('#cem-fmt').addEventListener('change',updLoc);
+  updLoc();
 
-  // ── ÜRÜN SEKMELERİ ──
-  var allProds = [];
-  var portProds = [];
-  var catProds = [];
-  var currentTab = 'mine';
-
-  // Verileri paralel çek
+  // Ürün verileri
+  var myProds=[], portProds=[], catProds=[], curTab='mine';
   try {
-    var [ownSnap, portSnap, catSnap] = await Promise.all([
-      getDocs(query(collection(db,'products'), where('vendorId','==',CUR_USER.uid), where('status','==','active'))),
-      getDocs(query(collection(db,'vendor_products'), where('vendorId','==',CUR_USER.uid), where('status','==','active'))),
-      getDocs(query(collection(db,'products'), where('status','==','active'))),
+    var [ownSnap,portSnap,catSnap] = await Promise.all([
+      getDocs(query(collection(db,'products'),where('vendorId','==',CUR_USER.uid),where('status','==','active'))),
+      getDocs(query(collection(db,'vendor_products'),where('vendorId','==',CUR_USER.uid),where('status','==','active'))),
+      getDocs(query(collection(db,'products'),where('status','==','active'))),
     ]);
-    allProds = ownSnap.docs.map(function(d){return {...d.data(),id:d.id,_source:'mine'};});
-    portProds = portSnap.docs.map(function(d){return {...d.data(),id:d.id,_source:'portfolio',name:d.data().productName,category:d.data().productCategory};});
-    catProds = catSnap.docs.map(function(d){return {...d.data(),id:d.id,_source:'catalog'};}).filter(function(p){return p.vendorId!==CUR_USER.uid;});
-  } catch(e) {
-    console.error('Ürün yükleme:', e);
+    myProds=ownSnap.docs.map(d=>({...d.data(),id:d.id,_src:'mine'}));
+    portProds=portSnap.docs.map(d=>({...d.data(),id:d.id,_src:'port',name:d.data().productName,category:d.data().productCategory,vendorName:d.data().originalVendorName}));
+    catProds=catSnap.docs.map(d=>({...d.data(),id:d.id,_src:'cat'})).filter(p=>p.vendorId!==CUR_USER.uid);
+  } catch(e){console.error('Ürün yükle:',e);}
+
+  function selProd(p){
+    modal.querySelector('#cem-prod-id').value=p.id||p.productId||'';
+    modal.querySelector('#cem-prod-name').value=p.name||p.productName||'';
+    modal.querySelector('#cem-prod-cat').value=p.category||p.productCategory||'';
+    modal.querySelector('#cem-owner-id').value=p.originalVendorId||p.vendorId||'';
+    modal.querySelector('#cem-owner-email').value=p.originalVendorEmail||p.vendorEmail||'';
+    modal.querySelector('#cem-owner-name').value=p.originalVendorName||p.vendorName||'';
+    var bar=modal.querySelector('#cem-sel-bar'),nm=modal.querySelector('#cem-sel-name');
+    if(bar)bar.style.display='block';
+    if(nm)nm.textContent=p.name||p.productName||'';
+    modal.querySelector('#cem-prod-list').style.display='none';
   }
 
-  function renderProdList(prods) {
-    var listEl = modal.querySelector('#ev-prod-list');
-    if (!listEl) return;
-    if (!prods.length) {
-      listEl.innerHTML = '<div style="padding:14px;color:#5a6278;font-size:12.5px;text-align:center">' +
-        (currentTab==='mine' ? 'Onaylı ürününüz yok. <a href="#" id="go-add-prod" style="color:#3b7cff">Ürün ekleyin</a> veya başka sekme deneyin.' :
-         currentTab==='portfolio' ? 'Portföyünüzde ürün yok. <a href="#" id="go-portfolio" style="color:#3b7cff">Portföy sekmesinden ekleyin.</a>' :
-         'Ürün bulunamadı.') + '</div>';
-      listEl.querySelector('#go-add-prod')?.addEventListener('click', function(e){e.preventDefault();modal.remove();openAddProductModal();});
-      listEl.querySelector('#go-portfolio')?.addEventListener('click', function(e){e.preventDefault();modal.remove();CUR_VEND_TAB='portfolio';loadVendTab();});
+  function renderProds(prods){
+    var el2=modal.querySelector('#cem-prod-list');
+    if(!prods.length){
+      var msg=curTab==='mine'?'Onaylı ürününüz yok. <a href="#" id="go-addprod" style="color:#3b7cff">Ürün ekleyin</a>.':
+               curTab==='port'?'Portföyünüzde ürün yok. <a href="#" id="go-port" style="color:#3b7cff">Portföy sekmesine gidin.</a>':'Ürün bulunamadı.';
+      el2.innerHTML='<div style="padding:14px;color:#5a6278;font-size:12.5px;text-align:center">'+msg+'</div>';
+      el2.style.display='block';
+      el2.querySelector('#go-addprod')?.addEventListener('click',e=>{e.preventDefault();modal.remove();openAddProductModal();});
+      el2.querySelector('#go-port')?.addEventListener('click',e=>{e.preventDefault();modal.remove();CUR_VEND_TAB='portfolio';loadVendTab();});
       return;
     }
-    listEl.innerHTML = prods.slice(0,15).map(function(p) {
-      var srcBadge = p._source==='portfolio' ?
-        '<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff;font-size:10px">Portföy</span>' :
-        p._source==='catalog' ? '<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078;font-size:10px">Katalog</span>' : '';
-      return '<div class="ev-prod-opt" data-id="'+p.id+'" data-name="'+(p.name||p.productName||'')+'" data-cat="'+(p.category||p.productCategory||'')+'" data-owner-id="'+(p.originalVendorId||p.vendorId||'')+'" data-owner-email="'+(p.originalVendorEmail||p.vendorEmail||'')+'" data-owner-name="'+(p.originalVendorName||p.vendorName||'')+'" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px">' +
-        '<div style="flex:1">' +
-        '<div style="font-size:13px;font-weight:600">'+(p.name||p.productName||'—')+'</div>' +
-        '<div style="font-size:11.5px;color:#7c87a0">'+(p.vendorName||p.originalVendorName||'—')+' · '+(p.category||p.productCategory||'—')+'</div>' +
-        '</div>' + srcBadge + '</div>';
+    el2.style.display='block';
+    el2.innerHTML=prods.slice(0,15).map(function(p){
+      var badge=p._src==='port'?'<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff;font-size:10px">Portföy</span>':
+                p._src==='cat'?'<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078;font-size:10px">Katalog</span>':'';
+      return '<div class="cem-prod-opt" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px">'+
+        '<div style="flex:1"><div style="font-size:13px;font-weight:600">'+(p.name||p.productName||'—')+'</div>'+
+        '<div style="font-size:11.5px;color:#7c87a0">'+(p.vendorName||p.originalVendorName||'—')+' · '+(p.category||p.productCategory||'—')+'</div></div>'+badge+'</div>';
     }).join('');
-    listEl.querySelectorAll('.ev-prod-opt').forEach(function(opt) {
-      opt.addEventListener('mouseover',function(){opt.style.background='rgba(59,124,255,.08)';});
-      opt.addEventListener('mouseout',function(){opt.style.background='';});
-      opt.addEventListener('click', function() {
-        modal.querySelector('#ev-prod-id').value = opt.dataset.id;
-        modal.querySelector('#ev-prod-name-val').value = opt.dataset.name;
-        modal.querySelector('#ev-prod-cat-val').value = opt.dataset.cat;
-        modal.querySelector('#ev-prod-owner-id').value = opt.dataset.ownerId;
-        modal.querySelector('#ev-prod-owner-email').value = opt.dataset.ownerEmail;
-        modal.querySelector('#ev-prod-owner-name').value = opt.dataset.ownerName;
-        var selDiv = modal.querySelector('#ev-prod-selected');
-        var selName = modal.querySelector('#ev-prod-sel-name');
-        if (selDiv) selDiv.style.display='block';
-        if (selName) selName.textContent = opt.dataset.name;
-        listEl.style.display='none';
-      });
+    el2.querySelectorAll('.cem-prod-opt').forEach(function(opt,i){
+      opt.addEventListener('mouseover',()=>opt.style.background='rgba(59,124,255,.08)');
+      opt.addEventListener('mouseout',()=>opt.style.background='');
+      opt.addEventListener('click',()=>selProd(prods[i]));
     });
   }
 
-  function getCurrentProds() {
-    var q = (modal.querySelector('#ev-prod-search')?.value||'').toLowerCase();
-    var base = currentTab==='mine' ? allProds : currentTab==='portfolio' ? portProds : catProds;
-    return q ? base.filter(function(p){return (p.name||p.productName||'').toLowerCase().includes(q)||(p.category||p.productCategory||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q);}) : base;
+  function getProds(){
+    var q=(modal.querySelector('#cem-prod-s')?.value||'').toLowerCase();
+    var base=curTab==='mine'?myProds:curTab==='port'?portProds:catProds;
+    return q?base.filter(p=>(p.name||p.productName||'').toLowerCase().includes(q)||(p.category||p.productCategory||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)):base;
   }
 
-  // Tab butonları
-  ['ev-tab-mine','ev-tab-portfolio','ev-tab-catalog'].forEach(function(tabId) {
-    modal.querySelector('#'+tabId)?.addEventListener('click', function() {
-      modal.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('on');});
-      this.classList.add('on');
-      currentTab = tabId==='ev-tab-mine'?'mine':tabId==='ev-tab-portfolio'?'portfolio':'catalog';
-      modal.querySelector('#ev-prod-list').style.display='block';
-      modal.querySelector('#ev-prod-search').value='';
-      renderProdList(getCurrentProds());
+  // Sekme butonları
+  modal.querySelectorAll('.cem-tab').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      modal.querySelectorAll('.cem-tab').forEach(b=>{b.style.background='none';b.style.color='#7c87a0';});
+      btn.style.background='rgba(59,124,255,.15)'; btn.style.color='#7db4ff';
+      curTab=btn.id==='cem-tab-mine'?'mine':btn.id==='cem-tab-port'?'port':'cat';
+      modal.querySelector('#cem-prod-s').value='';
+      renderProds(getProds());
     });
   });
+  modal.querySelector('#cem-prod-s').addEventListener('input',()=>renderProds(getProds()));
+  modal.querySelector('#cem-prod-s').addEventListener('focus',()=>renderProds(getProds()));
+  renderProds(myProds);
 
-  modal.querySelector('#ev-prod-search').addEventListener('input', function(){
-    modal.querySelector('#ev-prod-list').style.display='block';
-    renderProdList(getCurrentProds());
-  });
-  modal.querySelector('#ev-prod-search').addEventListener('focus', function(){
-    modal.querySelector('#ev-prod-list').style.display='block';
-    renderProdList(getCurrentProds());
-  });
-
-  // İlk yükleme
-  renderProdList(allProds);
-
-  // ── SUBMIT ──
-  modal.querySelector('#ev-submit').addEventListener('click', async function() {
-    var title = modal.querySelector('#ev-title').value.trim();
-    var desc = modal.querySelector('#ev-desc').value.trim();
-    var dateVal = modal.querySelector('#ev-date').value;
-    var timeVal = modal.querySelector('#ev-time').value||'10:00';
-    var fmt = modal.querySelector('#ev-fmt').value;
-    var langVal = modal.querySelector('#ev-lang').value;
-    var urlVal = modal.querySelector('#ev-url')?.value.trim()||'';
-    var addrVal = modal.querySelector('#ev-address')?.value.trim()||'';
-    var prodName = modal.querySelector('#ev-prod-name-val').value;
-    var prodId = modal.querySelector('#ev-prod-id').value;
-    var prodCat = modal.querySelector('#ev-prod-cat-val').value;
-    var ownerEmail = modal.querySelector('#ev-prod-owner-email').value;
-    var ownerId = modal.querySelector('#ev-prod-owner-id').value;
-    var ownerName = modal.querySelector('#ev-prod-owner-name').value;
-    var errDiv = modal.querySelector('#ev-err');
-
-    var errors = [];
-    if (!title) errors.push('Başlık');
-    if (!desc) errors.push('Açıklama');
-    if (!prodName) errors.push('Ürün');
-    if (!dateVal) errors.push('Tarih');
-    if (!langVal) errors.push('Dil');
-    if ((fmt==='online'||fmt==='hybrid') && !urlVal) errors.push('Online link');
-    if ((fmt==='onsite'||fmt==='hybrid') && !addrVal) errors.push('Fiziksel adres');
-    if (errors.length) { errDiv.innerHTML='<div class="alert alert-err">Zorunlu alanlar eksik: <b>'+errors.join(', ')+'</b></div>'; return; }
-    if ((fmt==='online'||fmt==='hybrid') && urlVal && !urlVal.startsWith('http')) { errDiv.innerHTML='<div class="alert alert-err">Online link http:// ile başlamalıdır.</div>'; return; }
-
-    var btn = modal.querySelector('#ev-submit');
-    btn.disabled=true; btn.textContent='Yayınlanıyor...';
-    try {
-      var dateTime = new Date(dateVal+'T'+timeVal+':00');
-      var locStr = fmt==='online'?urlVal:fmt==='onsite'?addrVal:addrVal+' | '+urlVal;
-
-      await addDoc(collection(db,'public_events'), {
-        vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE?(CUR_PROFILE.displayName||CUR_USER.email):CUR_USER.email,
-        vendorEmail: CUR_USER.email,
-        vendorType: CUR_PROFILE?.vendorType||'',
-        title, description: desc,
-        productName: prodName, productId: prodId,
-        category: prodCat||'Diğer',
-        language: langVal,
-        originalProductOwnerId: ownerId,
-        originalProductOwnerEmail: ownerEmail,
-        originalProductOwnerName: ownerName,
-        eventDate: Timestamp.fromDate(dateTime),
-        capacity: parseInt(modal.querySelector('#ev-cap').value)||50,
-        fee: parseFloat(modal.querySelector('#ev-fee').value)||0,
-        format: fmt, location: locStr,
-        onlineUrl: (fmt==='online'||fmt==='hybrid')?urlVal:'',
-        physicalAddress: (fmt==='onsite'||fmt==='hybrid')?addrVal:'',
-        registeredCount: 0, status: 'published',
-        createdAt: serverTimestamp()
+  // Submit
+  modal.querySelector('#cem-submit').addEventListener('click',async function(){
+    var title=modal.querySelector('#cem-title').value.trim();
+    var desc=modal.querySelector('#cem-desc').value.trim();
+    var prodName=modal.querySelector('#cem-prod-name').value;
+    var prodId=modal.querySelector('#cem-prod-id').value;
+    var prodCat=modal.querySelector('#cem-prod-cat').value;
+    var ownerEmail=modal.querySelector('#cem-owner-email').value;
+    var ownerName=modal.querySelector('#cem-owner-name').value;
+    var ownerId=modal.querySelector('#cem-owner-id').value;
+    var dateVal=modal.querySelector('#cem-date').value;
+    var timeVal=modal.querySelector('#cem-time').value||'10:00';
+    var fmt=modal.querySelector('#cem-fmt').value;
+    var lang=modal.querySelector('#cem-lang').value;
+    var urlVal=(modal.querySelector('#cem-url')?.value||'').trim();
+    var addrVal=(modal.querySelector('#cem-addr')?.value||'').trim();
+    var errDiv=modal.querySelector('#cem-err');
+    var errors=[];
+    if(!title)errors.push('Başlık');
+    if(!desc)errors.push('Açıklama');
+    if(!prodName)errors.push('Ürün');
+    if(!dateVal)errors.push('Tarih');
+    if(!lang)errors.push('Dil');
+    if((fmt==='online'||fmt==='hybrid')&&!urlVal)errors.push('Online link');
+    if((fmt==='onsite'||fmt==='hybrid')&&!addrVal)errors.push('Fiziksel adres');
+    if(errors.length){errDiv.innerHTML='<div class="alert alert-err">Zorunlu: <b>'+errors.join(', ')+'</b></div>';return;}
+    if((fmt==='online'||fmt==='hybrid')&&urlVal&&!urlVal.startsWith('http')){errDiv.innerHTML='<div class="alert alert-err">Link http:// ile başlamalı.</div>';return;}
+    var btn=modal.querySelector('#cem-submit');
+    btn.disabled=true;btn.textContent='Yayınlanıyor...';
+    try{
+      var dt=new Date(dateVal+'T'+timeVal+':00');
+      var locStr=fmt==='online'?urlVal:fmt==='onsite'?addrVal:addrVal+' | '+urlVal;
+      await addDoc(collection(db,'public_events'),{
+        vendorId:CUR_USER.uid,
+        vendorName:CUR_PROFILE?(CUR_PROFILE.displayName||CUR_USER.email):CUR_USER.email,
+        vendorEmail:CUR_USER.email, vendorType:CUR_PROFILE?.vendorType||'',
+        title, description:desc,
+        productName:prodName, productId:prodId, category:prodCat||'Diğer',
+        language:lang,
+        originalProductOwnerId:ownerId, originalProductOwnerEmail:ownerEmail, originalProductOwnerName:ownerName,
+        eventDate:Timestamp.fromDate(dt),
+        capacity:parseInt(modal.querySelector('#cem-cap').value)||50,
+        fee:parseFloat(modal.querySelector('#cem-fee').value)||0,
+        format:fmt, location:locStr,
+        onlineUrl:(fmt==='online'||fmt==='hybrid')?urlVal:'',
+        physicalAddress:(fmt==='onsite'||fmt==='hybrid')?addrVal:'',
+        registeredCount:0, status:'published', createdAt:serverTimestamp()
       });
-
-      // Orijinal ürün sahibine bildirim (farklı vendor ise)
-      if (ownerEmail && ownerEmail !== CUR_USER.email) {
-        sendEmail(ownerEmail, ownerName,
-          'Ürününüz Etkinlikte Kullanılıyor — PoCHub',
-          (CUR_PROFILE?.displayName||CUR_USER.email)+' ('+( CUR_PROFILE?.company||'')+') "'+prodName+'" ürününüzü etkinliğinde kullanıyor.',
-          'Etkinlik: '+title+'\nTarih: '+dateVal+' '+timeVal+'\nFormat: '+fmt+'\nDil: '+langVal
-        );
+      if(ownerEmail&&ownerEmail!==CUR_USER.email){
+        sendEmail(ownerEmail,ownerName,'Ürününüz Etkinlikte Kullanılıyor — PoCHub',
+          (CUR_PROFILE?.displayName||CUR_USER.email)+' "'+prodName+'" ürününüzü etkinliğinde kullanıyor.',
+          'Etkinlik: '+title+'\nTarih: '+dateVal+' '+timeVal+'\nDil: '+lang);
       }
-
-      modal.remove();
-      showToast('Etkinlik yayınlandı!');
-      if (CUR_VEND_TAB==='events') loadVendTab();
-    } catch(e) {
+      modal.remove(); showToast('Etkinlik yayınlandı!');
+      if(CUR_VEND_TAB==='events')loadVendTab();
+    }catch(e){
       errDiv.innerHTML='<div class="alert alert-err">'+e.message+'</div>';
-      btn.disabled=false; btn.textContent='Etkinliği Yayınla';
+      btn.disabled=false;btn.textContent='Etkinliği Yayınla';
     }
   });
 }
 
 
-
+function renderAdmin() {
+  if (!CUR_USER || !isAdminLike(CUR_PROFILE?.role)) {
+    el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme erişim yetkiniz yok.</div></div>`;
+    return;
+  }
+  if (el('adm-main')) { loadAdmTab(); return; }
+  const _rp = getRolePerm(CUR_PROFILE?.role);
+  const tabs = [
+    ['dashboard','Dashboard'],
+    ...(_rp.canViewAll?[['users','Kullanıcılar']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['roles','Rol Yönetimi'],['categories','Kategoriler']]:[]),
+    ...(_rp.canApproveProducts?[['products','Ürün Onayları']]:[]),
+    ['requests','PoC Talepleri'],
+    ['events','Etkinlikler'],
+    ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
+  ];
+  el('scr-admin').innerHTML = `<div class="dash">
+    <div class="sbar">
+      <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
+        <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.3</span>
+      </div>
+      <div class="slbl">Admin Paneli</div>
+      ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
+    </div>
+    <div class="main-content" id="adm-main"></div>
+  </div>`;
+  tabs.forEach(([t]) => el('atab-'+t)?.addEventListener('click', () => { CUR_ADM_TAB=t; loadAdmTab(); el('scr-admin').querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t===t)); }));
+  loadAdmTab();
+}
 
 async function loadAdmTab() {
   const m = el('adm-main');
@@ -3034,104 +3428,6 @@ async function admOffers(m) {
     m.querySelectorAll('.of-sf').forEach(function(x){x.className='btn-g btn-sm of-sf';});
     b.className='btn-p btn-sm of-sf'; stFilter=b.dataset.s; applyFilter();
   });});
-}
-
-
-async function admRoles(m) {
-  const snap = await getDocs(collection(db,'users'));
-  var allUsers = snap.docs.map(d=>({...d.data(),id:d.id}));
-  allUsers.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-
-  var ASSIGNABLE_ROLES = [
-    {value:'customer',  label:'Müşteri'},
-    {value:'vendor',    label:'Vendor'},
-    {value:'support',   label:'Destek'},
-    {value:'moderator', label:'Moderatör'},
-    {value:'admin',     label:'Admin'},
-  ];
-
-  function renderRows(users) {
-    var tbody = m.querySelector('#roles-tbody');
-    var cnt = m.querySelector('#roles-cnt');
-    if (cnt) cnt.textContent = '(' + users.length + ')';
-    if (!tbody) return;
-    tbody.innerHTML = users.map(function(u) {
-      var perm = getRolePerm(u.role);
-      var vtypes = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
-      var roleLabel = u.role==='vendor' ? (vtypes[u.vendorType]||'Vendor') : perm.label;
-      return '<tr style="border-top:1px solid rgba(255,255,255,.06)">' +
-        '<td style="padding:11px 14px"><div style="font-weight:600">'+(u.displayName||'—')+'</div><div style="font-size:11.5px;color:#7c87a0">'+u.email+'</div></td>' +
-        '<td style="padding:11px 14px"><span class="bdg" style="background:'+perm.bg+';color:'+perm.color+'">'+roleLabel+'</span></td>' +
-        '<td style="padding:11px 14px;color:#7c87a0">'+(u.company||'—')+'</td>' +
-        '<td style="padding:11px 14px">' +
-        '<select class="inp role-sel" data-uid="'+u.id+'" style="padding:5px 8px;font-size:12px;width:auto">' +
-        ASSIGNABLE_ROLES.map(function(r){
-          return '<option value="'+r.value+'"'+(u.role===r.value?' selected':'')+'>'+r.label+'</option>';
-        }).join('') +
-        '</select></td>' +
-        '<td style="padding:11px 14px"><button class="btn-p btn-sm save-role" data-uid="'+u.id+'" data-name="'+(u.displayName||u.email)+'">Kaydet</button></td>' +
-        '</tr>';
-    }).join('');
-
-    m.querySelectorAll('.save-role').forEach(function(btn) {
-      btn.addEventListener('click', async function() {
-        var uid = btn.dataset.uid;
-        var sel = m.querySelector('.role-sel[data-uid="'+uid+'"]');
-        var newRole = sel?.value;
-        if (!newRole) return;
-        if (uid === CUR_USER?.uid) { showToast('Kendi rolünüzü değiştiremezsiniz.','err'); return; }
-        btn.disabled = true; btn.textContent = '...';
-        try {
-          await updateDoc(doc(db,'users',uid), {role: newRole, vendorType: newRole==='vendor'?'ureticid':''});
-          showToast(btn.dataset.name + ' rolü güncellendi.');
-          admRoles(m);
-        } catch(e) {
-          showToast('Hata: '+e.message,'err');
-          btn.disabled=false; btn.textContent='Kaydet';
-        }
-      });
-    });
-  }
-
-  m.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-    '<h2 style="font-size:18px;font-weight:700">Rol Yönetimi <span id="roles-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
-    '<input class="inp" id="roles-search" placeholder="Ad, e-posta veya şirket ara..." style="width:250px;font-size:12.5px"></div>' +
-    '<div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:11px 14px;font-size:12.5px;color:#f0a429;margin-bottom:14px">' +
-    '⚠ Rol değişikliği anında geçerli olur. Admin rolü vermek tüm yetkileri devreder. Kendi rolünüzü değiştiremezsiniz.</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:12px" id="roles-filter-btns">' +
-    '<button class="btn-p btn-sm roles-rf" data-r="">Tümü</button>' +
-    '<button class="btn-g btn-sm roles-rf" data-r="customer">Müşteri</button>' +
-    '<button class="btn-g btn-sm roles-rf" data-r="vendor">Vendor</button>' +
-    '<button class="btn-g btn-sm roles-rf" data-r="support">Destek</button>' +
-    '<button class="btn-g btn-sm roles-rf" data-r="moderator">Moderatör</button>' +
-    '<button class="btn-g btn-sm roles-rf" data-r="admin">Admin</button>' +
-    '</div>' +
-    '<table><thead><tr>' +
-    '<th>Ad / E-posta</th><th>Mevcut Rol</th><th>Şirket</th><th>Yeni Rol</th><th>İşlem</th>' +
-    '</tr></thead><tbody id="roles-tbody"></tbody></table>';
-
-  var roleFilter = '';
-  function applyFilter() {
-    var q = (m.querySelector('#roles-search')?.value||'').toLowerCase();
-    renderRows(allUsers.filter(function(u) {
-      return (!roleFilter || u.role===roleFilter) &&
-             (!q || (u.displayName||'').toLowerCase().includes(q) ||
-                    (u.email||'').toLowerCase().includes(q) ||
-                    (u.company||'').toLowerCase().includes(q));
-    }));
-  }
-
-  renderRows(allUsers);
-  m.querySelector('#roles-search').addEventListener('input', applyFilter);
-  m.querySelectorAll('.roles-rf').forEach(function(b) {
-    b.addEventListener('click', function() {
-      m.querySelectorAll('.roles-rf').forEach(function(x){x.className='btn-g btn-sm roles-rf';});
-      b.className='btn-p btn-sm roles-rf';
-      roleFilter = b.dataset.r;
-      applyFilter();
-    });
-  });
 }
 
 
