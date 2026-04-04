@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v2.1</title>
+<title>PoCHub.co — v2.2</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -121,7 +121,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v2.1';
+const VERSION = 'v2.2';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -2334,64 +2334,91 @@ async function vendPortfolio(m) {
 }
 
 async function openAddToPortfolio() {
-  // Tüm onaylı ürünleri çek — kendi ürünleri hariç
   const snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
   var allProds = snap.docs.map(d=>({...d.data(),id:d.id}))
-    .filter(p => p.vendorId !== CUR_USER.uid); // kendi ürünleri zaten ürünlerimde
+    .filter(p => p.vendorId !== CUR_USER.uid);
+
+  // Zaten portföyde olanları bul
+  const portSnap = await getDocs(query(collection(db,'vendor_products'), where('vendorId','==',CUR_USER.uid)));
+  var alreadyInPort = new Set(portSnap.docs.map(d=>d.data().productId));
 
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.innerHTML =
-    '<div class="modal" style="max-width:580px">' +
+    '<div class="modal" style="max-width:600px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
     '<h3 style="font-size:15px;font-weight:700">Portföye Ürün Ekle</h3>' +
     '<button id="close-port-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
     '</div>' +
-    '<input class="inp" id="port-search" placeholder="Ürün veya marka ara..." style="margin-bottom:10px">' +
-    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
-    '<button class="btn-p btn-sm port-role-btn" data-role="Distribütör">Distribütör</button>' +
-    '<button class="btn-g btn-sm port-role-btn" data-role="Entegratör">Entegratör</button>' +
-    '<button class="btn-g btn-sm port-role-btn" data-role="Bayi">Bayi</button>' +
+    '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+    '<input class="inp" id="port-search" placeholder="Ürün, marka veya kategori ara..." style="flex:1;min-width:180px">' +
+    '<select class="inp" id="port-role-sel" style="width:auto">' +
+    '<option value="Distribütör">Distribütör</option>' +
+    '<option value="Entegratör">Entegratör</option>' +
+    '<option value="Bayi">Bayi</option>' +
+    '</select>' +
     '</div>' +
-    '<div id="port-prod-list" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>' +
-    '<div id="port-sel-info" style="margin-top:10px;padding:10px;background:#1c1f2a;border-radius:8px;font-size:12.5px;display:none">' +
-    'Seçilen: <span id="port-sel-name" style="color:#3b7cff;font-weight:700"></span>' +
+    '<div style="font-size:12px;color:#7c87a0;margin-bottom:8px">' +
+    'Checkbox ile birden fazla ürün seçebilirsiniz. Seçilen rol tüm ürünler için geçerli olur.' +
+    '</div>' +
+    '<div id="port-prod-list" style="max-height:340px;overflow-y:auto;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden"></div>' +
+    '<div id="port-sel-bar" style="display:none;margin-top:10px;padding:10px 14px;background:#1c1f2a;border-radius:8px;display:flex;align-items:center;justify-content:space-between">' +
+    '<span style="font-size:12.5px;color:#7c87a0"><span id="port-sel-count" style="color:#3b7cff;font-weight:700;font-size:15px">0</span> ürün seçildi</span>' +
+    '<button class="btn-g btn-sm" id="port-clear-sel">Seçimi Temizle</button>' +
     '</div>' +
     '<div id="port-err" style="margin-top:8px"></div>' +
-    '<button class="btn-p" id="port-submit" style="width:100%;padding:11px;font-size:14px;margin-top:12px" disabled>Portföye Ekle</button>' +
+    '<button class="btn-p" id="port-submit" style="width:100%;padding:11px;font-size:14px;margin-top:12px" disabled>Seçilenleri Portföye Ekle</button>' +
     '</div>';
-  document.body.appendChild(modal);
-  modal.querySelector('#close-port-modal').addEventListener('click', () => modal.remove());
-  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
 
-  var selectedProd = null;
-  var selectedRole = 'Distribütör';
+  document.body.appendChild(modal);
+  modal.querySelector('#close-port-modal').addEventListener('click', function(){modal.remove();});
+  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
+
+  var selectedIds = new Set();
+
+  function updateSelBar() {
+    var bar = modal.querySelector('#port-sel-bar');
+    var cnt = modal.querySelector('#port-sel-count');
+    var btn = modal.querySelector('#port-submit');
+    if (bar) bar.style.display = selectedIds.size > 0 ? 'flex' : 'none';
+    if (cnt) cnt.textContent = selectedIds.size;
+    if (btn) btn.disabled = selectedIds.size === 0;
+    if (btn && selectedIds.size > 0) btn.textContent = selectedIds.size + ' Ürünü Portföye Ekle';
+    else if (btn) btn.textContent = 'Seçilenleri Portföye Ekle';
+    // Checkbox görselini güncelle
+    modal.querySelectorAll('.port-cb').forEach(function(cb) {
+      var row = cb.closest('.port-row');
+      if (row) {
+        row.style.background = cb.checked ? 'rgba(59,124,255,.08)' : '';
+        row.style.borderLeft = cb.checked ? '3px solid #3b7cff' : '3px solid transparent';
+      }
+    });
+  }
 
   function renderProds(prods) {
     var listEl = modal.querySelector('#port-prod-list');
-    if (!prods.length) { listEl.innerHTML='<div class="empty">Ürün bulunamadı.</div>'; return; }
-    listEl.innerHTML = prods.slice(0,20).map(function(p) {
-      return '<div class="port-prod-item" data-id="'+p.id+'" style="padding:11px 14px;background:#1c1f2a;border:1px solid rgba(255,255,255,.1);border-radius:8px;cursor:pointer;transition:.1s">' +
-        '<div style="display:flex;align-items:center;gap:10px">' +
+    if (!prods.length) {
+      listEl.innerHTML = '<div style="padding:20px;color:#5a6278;font-size:12.5px;text-align:center">Ürün bulunamadı.</div>';
+      return;
+    }
+    listEl.innerHTML = prods.slice(0,30).map(function(p) {
+      var inPort = alreadyInPort.has(p.id);
+      var isSelected = selectedIds.has(p.id);
+      return '<label class="port-row" style="display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:'+(inPort?'default':'pointer')+';border-bottom:1px solid rgba(255,255,255,.06);border-left:3px solid '+(isSelected?'#3b7cff':'transparent')+';background:'+(isSelected?'rgba(59,124,255,.08)':'')+(inPort?';opacity:.5':'')+';transition:.1s">' +
+        '<input type="checkbox" class="port-cb" data-id="'+p.id+'" '+(inPort?'disabled title="Zaten portföyünüzde"':'')+(isSelected?' checked':'')+' style="width:16px;height:16px;cursor:'+(inPort?'not-allowed':'pointer')+';flex-shrink:0">' +
         '<div style="flex:1">' +
-        '<div style="font-size:13px;font-weight:600">'+p.name+'</div>' +
-        '<div style="font-size:12px;color:#7c87a0;margin-top:2px">'+( p.vendorName||'—')+' · '+(p.category||'—')+' · '+cc(p.country||'TR')+'</div>' +
+        '<div style="font-size:13px;font-weight:600">' + p.name + (inPort?' <span style="font-size:10px;color:#22d078;font-weight:400">(Portföyünüzde)</span>':'') + '</div>' +
+        '<div style="font-size:12px;color:#7c87a0;margin-top:2px">'+(p.vendorName||'—')+' · '+(p.category||'—')+' · '+cc(p.country||'TR')+'</div>' +
         '</div>' +
-        '</div>' +
-        '</div>';
+        (inPort ? '<span class="bdg" style="background:rgba(34,208,120,.12);color:#22d078;flex-shrink:0">✓ Portföyde</span>' : '') +
+        '</label>';
     }).join('');
-    listEl.querySelectorAll('.port-prod-item').forEach(function(item) {
-      item.addEventListener('click', function() {
-        listEl.querySelectorAll('.port-prod-item').forEach(function(x){
-          x.style.borderColor='rgba(255,255,255,.1)'; x.style.background='#1c1f2a';
-        });
-        item.style.borderColor='#3b7cff'; item.style.background='rgba(59,124,255,.08)';
-        selectedProd = allProds.find(function(p){return p.id===item.dataset.id;});
-        var selInfo = modal.querySelector('#port-sel-info');
-        var selName = modal.querySelector('#port-sel-name');
-        if (selInfo) selInfo.style.display='block';
-        if (selName) selName.textContent = selectedProd?.name || '';
-        modal.querySelector('#port-submit').disabled = false;
+
+    modal.querySelectorAll('.port-cb:not([disabled])').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        if (cb.checked) selectedIds.add(cb.dataset.id);
+        else selectedIds.delete(cb.dataset.id);
+        updateSelBar();
       });
     });
   }
@@ -2400,168 +2427,74 @@ async function openAddToPortfolio() {
 
   modal.querySelector('#port-search').addEventListener('input', function() {
     var q = this.value.toLowerCase();
-    renderProds(q ? allProds.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q)) : allProds);
+    renderProds(q ? allProds.filter(function(p){
+      return (p.name||'').toLowerCase().includes(q) ||
+             (p.vendorName||'').toLowerCase().includes(q) ||
+             (p.category||'').toLowerCase().includes(q);
+    }) : allProds);
   });
 
-  modal.querySelectorAll('.port-role-btn').forEach(function(b) {
-    b.addEventListener('click', function() {
-      modal.querySelectorAll('.port-role-btn').forEach(function(x){x.className='btn-g btn-sm port-role-btn';});
-      b.className='btn-p btn-sm port-role-btn';
-      selectedRole = b.dataset.role;
-    });
+  modal.querySelector('#port-clear-sel')?.addEventListener('click', function() {
+    selectedIds.clear();
+    modal.querySelectorAll('.port-cb').forEach(function(cb){cb.checked=false;});
+    updateSelBar();
   });
 
   modal.querySelector('#port-submit').addEventListener('click', async function() {
-    if (!selectedProd) return;
+    if (selectedIds.size === 0) return;
+    var role = modal.querySelector('#port-role-sel').value;
     var btn = modal.querySelector('#port-submit');
     btn.disabled=true; btn.textContent='Ekleniyor...';
+    var errDiv = modal.querySelector('#port-err');
+
     try {
-      // Zaten portföyde mi?
-      var existing = await getDocs(query(collection(db,'vendor_products'),
-        where('vendorId','==',CUR_USER.uid),
-        where('productId','==',selectedProd.id)
-      ));
-      if (!existing.empty) {
-        modal.querySelector('#port-err').innerHTML='<div class="alert alert-err">Bu ürün zaten portföyünüzde.</div>';
-        btn.disabled=false; btn.textContent='Portföye Ekle'; return;
-      }
+      var added = 0;
+      var notified = new Set();
 
-      await addDoc(collection(db,'vendor_products'), {
-        vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
-        vendorEmail: CUR_USER.email,
-        vendorType: CUR_PROFILE?.vendorType||'',
-        productId: selectedProd.id,
-        productName: selectedProd.name,
-        productCategory: selectedProd.category||'',
-        originalVendorId: selectedProd.vendorId,
-        originalVendorName: selectedProd.vendorName||'',
-        originalVendorEmail: selectedProd.vendorEmail||'',
-        role: selectedRole,
-        status: 'active',
-        createdAt: serverTimestamp()
-      });
+      for (var prodId of selectedIds) {
+        var prod = allProds.find(function(p){return p.id===prodId;});
+        if (!prod) continue;
 
-      // Orijinal üreticiye/vendor'a bildirim
-      if (selectedProd.vendorEmail && selectedProd.vendorEmail !== CUR_USER.email) {
-        sendEmail(
-          selectedProd.vendorEmail,
-          selectedProd.vendorName||'',
-          'Ürününüz Portföye Eklendi — PoCHub',
-          (CUR_PROFILE?.displayName||CUR_USER.email)+' ('+( CUR_PROFILE?.company||'')+') ürününüzü portföyüne ekledi ve etkinliklerinde kullanmak istiyor.',
-          'Ürün: '+selectedProd.name+'\nRol: '+selectedRole+'\npochub.co üzerinden detayları görebilirsiniz.'
-        );
+        await addDoc(collection(db,'vendor_products'), {
+          vendorId: CUR_USER.uid,
+          vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
+          vendorEmail: CUR_USER.email,
+          vendorType: CUR_PROFILE?.vendorType||'',
+          productId: prod.id,
+          productName: prod.name,
+          productCategory: prod.category||'',
+          originalVendorId: prod.vendorId,
+          originalVendorName: prod.vendorName||'',
+          originalVendorEmail: prod.vendorEmail||'',
+          role: role,
+          status: 'active',
+          createdAt: serverTimestamp()
+        });
+
+        // Orijinal üreticiye bildirim — aynı vendor'a bir kez
+        if (prod.vendorEmail && prod.vendorEmail !== CUR_USER.email && !notified.has(prod.vendorEmail)) {
+          notified.add(prod.vendorEmail);
+          sendEmail(prod.vendorEmail, prod.vendorName||'',
+            'Ürününüz Portföye Eklendi — PoCHub',
+            (CUR_PROFILE?.displayName||CUR_USER.email)+' ('+( CUR_PROFILE?.company||'')+') ürününüzü portföyüne ekledi.',
+            'Ürün: '+prod.name+'\nRol: '+role
+          );
+        }
+        added++;
       }
 
       modal.remove();
-      showToast(selectedProd.name+' portföyünüze eklendi!');
+      showToast(added+' ürün portföyünüze eklendi!');
+      alreadyInPort = new Set([...alreadyInPort, ...selectedIds]);
       CUR_VEND_TAB='portfolio';
       loadVendTab();
     } catch(e) {
-      modal.querySelector('#port-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
-      btn.disabled=false; btn.textContent='Portföye Ekle';
+      errDiv.innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      btn.disabled=false; btn.textContent=selectedIds.size+' Ürünü Portföye Ekle';
     }
   });
 }
 
-function openEditProd(prodId, name, category, country, description, supportModel) {
-  var modal = document.createElement('div');
-  modal.className = 'modal-bg on';
-  modal.innerHTML = '<div class="modal" style="max-width:500px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
-    '<h3 style="font-size:15px;font-weight:700">Ürün Düzenle</h3>' +
-    '<button id="ep-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
-    '</div>' +
-    '<label class="lbl">Ürün Adı *</label><input class="inp" id="ep-name" value="'+name+'">' +
-    '<label class="lbl">Kategori</label><select class="inp" id="ep-cat"></select>' +
-    '<label class="lbl">Menşei Ülke</label><div id="ep-country-cont" style="margin-bottom:4px"></div>' +
-    '<label class="lbl">Açıklama</label><textarea class="inp" id="ep-desc" rows="3" style="resize:none">'+description+'</textarea>' +
-    '<label class="lbl">Destek Modeli</label>' +
-    '<select class="inp" id="ep-sup">' +
-    '<option value="inhouse"'+(supportModel==='inhouse'?' selected':'')+'>Kendi bünyesi</option>' +
-    '<option value="outsource"'+(supportModel==='outsource'?' selected':'')+'>Dış kaynak</option>' +
-    '<option value="hybrid"'+(supportModel==='hybrid'?' selected':'')+'>Hibrit</option>' +
-    '</select>' +
-    '<div id="ep-err" style="margin-top:10px"></div>' +
-    '<button class="btn-p" id="ep-save" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>' +
-    '</div>';
-  document.body.appendChild(modal);
-  modal.querySelector('#ep-close').addEventListener('click', function(){modal.remove();});
-  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
-  fillCatSelect(modal.querySelector('#ep-cat'), category);
-  buildCountryInput('ep-country-cont', 'ep-country-inp', 'ep-country-val', country||'TR');
-  modal.querySelector('#ep-save').addEventListener('click', async function() {
-    var nm = modal.querySelector('#ep-name').value.trim();
-    if(!nm){modal.querySelector('#ep-err').innerHTML='<div class="alert alert-err">Ad zorunlu.</div>';return;}
-    var btn=modal.querySelector('#ep-save'); btn.disabled=true; btn.textContent='Güncelleniyor...';
-    try {
-      await updateDoc(doc(db,'products',prodId),{
-        name:nm, category:modal.querySelector('#ep-cat').value,
-        country:document.getElementById('ep-country-val')?.value||country,
-        description:modal.querySelector('#ep-desc').value,
-        supportModel:modal.querySelector('#ep-sup').value,
-        updatedAt:serverTimestamp()
-      });
-      modal.remove(); showToast('Güncellendi!'); loadVendTab();
-    } catch(e) {
-      modal.querySelector('#ep-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
-      btn.disabled=false; btn.textContent='Güncelle';
-    }
-  });
-}
-
-async function openAddProductModal() {
-  const modal = document.createElement('div');
-  modal.className = 'modal-bg on';
-  modal.innerHTML = `<div class="modal" style="max-width:500px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-      <h3 style="font-size:15px;font-weight:700">Yeni Ürün Ekle</h3>
-      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-prod-modal">×</button>
-    </div>
-    <label class="lbl">Ürün Adı *</label><input class="inp" id="pr-name" placeholder="Ürün adı">
-    <label class="lbl">Kategori *</label>
-    <select class="inp" id="pr-cat"><option value="">Yükleniyor...</option></select>
-    <label class="lbl">Menşei Ülke</label>
-    <div id="pr-country-cont" style="margin-bottom:4px"></div>
-      <input type="hidden" id="pr-country-val" value="TR">
-    </div>
-    <label class="lbl">Açıklama</label>
-    <textarea class="inp" id="pr-desc" rows="3" placeholder="Ürün açıklaması..." style="resize:none"></textarea>
-    <label class="lbl">Destek Modeli</label>
-    <select class="inp" id="pr-support"><option value="inhouse">Kendi bünyesi</option><option value="outsource">Dış kaynak</option><option value="hybrid">Hibrit</option></select>
-    <div id="pr-err" style="margin-top:10px"></div>
-    <button class="btn-p" id="pr-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Admin Onayına Gönder</button>
-  </div>`;
-  document.body.appendChild(modal);
-  modal.querySelector('#close-prod-modal').addEventListener('click', () => modal.remove());
-
-  fillCatSelect(modal.querySelector('#pr-cat'), '');
-  buildCountryInput('pr-country-cont','pr-country-inp','pr-country-val','TR');
-  modal.querySelector('#pr-submit').addEventListener('click', async () => {
-    const name = modal.querySelector('#pr-name').value.trim();
-    if (!name) { modal.querySelector('#pr-err').innerHTML='<div class="alert alert-err">Ürün adı zorunludur.</div>'; return; }
-    const btn = modal.querySelector('#pr-submit');
-    btn.disabled=true; btn.textContent='Gönderiliyor...';
-    try {
-      await addDoc(collection(db,'products'), {
-        vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
-        vendorEmail: CUR_USER.email,
-        name, category: modal.querySelector('#pr-cat').value,
-        country: modal.querySelector('#pr-country-val').value || 'TR',
-        description: modal.querySelector('#pr-desc').value,
-        supportModel: modal.querySelector('#pr-support').value,
-        status: 'pending',
-        createdAt: serverTimestamp()
-      });
-      modal.remove();
-      showToast('Ürün admin onayına gönderildi!');
-    } catch(e) {
-      modal.querySelector('#pr-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
-      btn.disabled=false; btn.textContent='Admin Onayına Gönder';
-    }
-  });
-}
 
 async function openNewEventModal() {
   var modal = document.createElement('div');
