@@ -17,12 +17,13 @@
 
 <button id="btn-assign">1. Ürünleri Test Kullanıcılarına Ata</button>
 <button id="btn-poc">2. Örnek PoC Talepleri Oluştur</button>
+<button id="btn-delete-poc" style="background:#ff4444">🗑 İptal Talepleri Temizle</button>
 <button id="btn-clear">Logları Temizle</button>
 <div id="log">Hazır. Başlamak için yukarıdaki butonları kullanın.</div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, query, where, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCZ76Ga8DCGAUy33kb0Jk-wEDTHsOzRWDk",
@@ -223,6 +224,32 @@ document.getElementById('btn-poc').addEventListener('click', async function() {
   } catch(e) {
     log('❌ Hata: ' + e.message, 'err');
   }
+  this.disabled = false;
+});
+
+document.getElementById('btn-delete-poc').addEventListener('click', async function() {
+  if (!confirm('İptal edilmiş tüm PoC talepleri silinecek. Emin misiniz?')) return;
+  this.disabled = true;
+  log('\n── İptal Talepler Siliniyor ──', 'info');
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    let custId = null;
+    usersSnap.docs.forEach(d => {
+      if (d.data().email === 'test.musteri@testpochub.com') custId = d.id;
+    });
+    if (!custId) { log('❌ Müşteri bulunamadı', 'err'); this.disabled=false; return; }
+
+    const snap = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',custId)));
+    let deleted = 0;
+    for (const d of snap.docs) {
+      if (['cancelled','rejected'].includes(d.data().status)) {
+        await deleteDoc(doc(db,'poc_requests',d.id));
+        log('  ✓ Silindi: ' + (d.data().title||d.data().productName||d.id), 'ok');
+        deleted++;
+      }
+    }
+    log(`\n✅ ${deleted} iptal talep silindi. Şimdi "2. Örnek PoC Talepleri Oluştur" butonuna basın.`, 'ok');
+  } catch(e) { log('❌ ' + e.message, 'err'); }
   this.disabled = false;
 });
 
