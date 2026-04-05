@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v2.8</title>
+<title>PoCHub.co — v2.9</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v2.8';
+const VERSION = 'v2.9';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -349,14 +349,18 @@ function cc(c) {
 
 function statusBadge(s) {
   const m = {
-    pending: ['rgba(240,164,41,.12)','#f0a429','Bekliyor'],
-    active: ['rgba(34,208,120,.12)','#22d078','Aktif'],
-    completed: ['rgba(59,124,255,.12)','#7db4ff','Tamamlandı'],
-    cancelled: ['rgba(255,77,77,.12)','#ff7070','İptal'],
-    rejected: ['rgba(255,77,77,.12)','#ff7070','Reddedildi'],
-    accepted: ['rgba(34,208,120,.12)','#22d078','Kabul Edildi'],
-    draft: ['#1c1f2a','#7c87a0','Taslak'],
-    published: ['rgba(34,208,120,.12)','#22d078','Yayında'],
+    pending:    ['rgba(240,164,41,.12)', '#f0a429','Bekliyor'],
+    active:     ['rgba(34,208,120,.12)', '#22d078','Aktif'],
+    offer_sent: ['rgba(139,92,246,.12)','#c4a8ff','Teklif Gönderildi'],
+    completed:  ['rgba(59,124,255,.12)', '#7db4ff','Tamamlandı'],
+    cancelled:  ['rgba(255,77,77,.12)',  '#ff7070','İptal'],
+    rejected:   ['rgba(255,77,77,.12)',  '#ff7070','Reddedildi'],
+    accepted:   ['rgba(34,208,120,.12)', '#22d078','Kabul Edildi'],
+    declined:   ['rgba(255,77,77,.12)',  '#ff7070','Reddedildi'],
+    expired:    ['#1c1f2a',              '#5a6278','Süresi Doldu'],
+    archived:   ['#1c1f2a',             '#5a6278','Arşiv'],
+    draft:      ['#1c1f2a',             '#7c87a0','Taslak'],
+    published:  ['rgba(34,208,120,.12)', '#22d078','Yayında'],
   };
   const [bg,col,lbl] = m[s]||['#1c1f2a','#7c87a0',s];
   return `<span class="status-badge" style="background:${bg};color:${col}">${lbl}</span>`;
@@ -3025,10 +3029,17 @@ async function openSendInviteModal() {
         var usersSnap = await getDocs(query(collection(db,'users'), where('email','==',email)));
         if (!usersSnap.empty) {
           var u = usersSnap.docs[0].data();
-          checkEl.innerHTML = '<span style="color:#22d078">✓ Kayıtlı kullanıcı — '+( u.displayName||u.company||'')+'</span>';
-          if (u.displayName||u.company) modal.querySelector('#inv-name').value = u.displayName||u.company;
+          if (u.role === 'vendor' || u.role === 'admin' || u.role === 'moderator' || u.role === 'support') {
+            checkEl.innerHTML = '<span style="color:#ff7070">✗ Bu kullanıcı müşteri değil ('+getRolePerm(u.role).label+'). Davet sadece müşterilere gönderilebilir.</span>';
+            modal.querySelector('#inv-submit').disabled = true;
+          } else {
+            checkEl.innerHTML = '<span style="color:#22d078">✓ Kayıtlı müşteri — '+(u.displayName||u.company||u.email)+'</span>';
+            if (u.displayName||u.company) modal.querySelector('#inv-name').value = u.displayName||u.company;
+            modal.querySelector('#inv-submit').disabled = false;
+          }
         } else {
           checkEl.innerHTML = '<span style="color:#f0a429">⚠ Kayıtlı değil — davet maili gönderilecek</span>';
+          modal.querySelector('#inv-submit').disabled = false;
         }
       } catch(e) { checkEl.innerHTML=''; }
     }, 600);
@@ -3912,7 +3923,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.8</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.9</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
