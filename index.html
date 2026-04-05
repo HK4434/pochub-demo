@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v2.9</title>
+<title>PoCHub.co — v3.0</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v2.9';
+const VERSION = 'v3.0';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -500,6 +500,27 @@ function openChatModal(pocId, pocTitle, otherName) {
         text,
         createdAt: serverTimestamp()
       });
+      // Karşı tarafa Firestore bildirimi
+      try {
+        var pocSnap2 = await getDoc(doc(db,'poc_requests',pocId));
+        if (pocSnap2.exists()) {
+          var pd2 = pocSnap2.data();
+          var recipientId = CUR_USER.uid === pd2.customerId ? pd2.vendorId : pd2.customerId;
+          if (recipientId && recipientId !== CUR_USER.uid) {
+            await addDoc(collection(db,'notifications'), {
+              userId: recipientId,
+              type: 'new_message',
+              title: 'Yeni Mesaj',
+              body: (CUR_PROFILE?.displayName||CUR_USER.email)+': '+text.substring(0,60)+(text.length>60?'...':''),
+              pocId: pocId,
+              senderId: CUR_USER.uid,
+              senderName: CUR_PROFILE?.displayName||CUR_USER.email,
+              read: false,
+              createdAt: serverTimestamp()
+            });
+          }
+        }
+      } catch(ne) { console.warn('Bildirim:', ne.message); }
     } catch(e) {
       showToast('Mesaj gönderilemedi: '+e.message, 'err');
     }
@@ -680,8 +701,133 @@ function stopNotifListener() {
   NOTIF_COUNT = 0;
 }
 
-function updateNotifBadge() {
+async function openNotifPanel() {
+  // Mevcut panel varsa kapat
+  var existing = document.getElementById('notif-panel-overlay');
+  if (existing) { existing.remove(); return; }
+
+  var overlay = document.createElement('div');
+  overlay.id = 'notif-panel-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;';
+  document.body.appendChild(overlay);
+
+  var panel = document.createElement('div');
+  panel.style.cssText = 'position:fixed;top:56px;right:16px;width:360px;max-height:500px;overflow-y:auto;background:#1c1f2a;border:1px solid rgba(255,255,255,.15);border-radius:12px;z-index:9001;box-shadow:0 8px 32px rgba(0,0,0,.5);';
+  document.body.appendChild(panel);
+
+  overlay.addEventListener('click', function() { overlay.remove(); panel.remove(); });
+
+  panel.innerHTML = '<div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center">' +
+    '<div style="font-size:14px;font-weight:700">Bildirimler</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button id="notif-mark-all" style="background:none;border:none;color:#7c87a0;font-size:12px;cursor:pointer">Tümü okundu</button>' +
+    '<button id="notif-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div></div>' +
+    '<div id="notif-list"><div style="padding:24px;text-align:center;color:#5a6278;font-size:13px"><div style="font-size:24px;margin-bottom:8px">⏳</div>Yükleniyor...</div></div>';
+
+  panel.querySelector('#notif-close').addEventListener('click', function() { overlay.remove(); panel.remove(); });
+
+  // Bildirimleri çek
+  try {
+    var nSnap = await getDocs(query(
+      collection(db,'notifications'),
+      where('userId','==',CUR_USER.uid)
+    ));
+    var notifs = nSnap.docs.map(d=>({...d.data(),id:d.id}));
+    notifs.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+    var typeIcons = {
+      new_message: '💬', poc_invite: '📨', poc_accepted: '✅',
+      poc_rejected: '❌', offer_received: '💼', cancellation: '🚫',
+    };
+
+    var listEl = panel.querySelector('#notif-list');
+    if (!notifs.length) {
+      listEl.innerHTML = '<div style="padding:32px;text-align:center;color:#5a6278;font-size:13px"><div style="font-size:28px;margin-bottom:8px">🔔</div>Bildirim yok</div>';
+    } else {
+      listEl.innerHTML = notifs.slice(0,20).map(function(n) {
+        var icon = typeIcons[n.type] || '🔔';
+        var isRead = n.read;
+        return '<div class="notif-item" data-id="'+n.id+'" data-type="'+n.type+'" data-poc-id="'+(n.pocId||'')+'" style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;background:'+(isRead?'transparent':'rgba(59,124,255,.05)')+';display:flex;gap:12px;align-items:start">' +
+          '<div style="font-size:20px;flex-shrink:0;margin-top:2px">'+icon+'</div>' +
+          '<div style="flex:1">' +
+          '<div style="font-size:13px;font-weight:'+(isRead?'400':'700')+'">'+( n.title||'Bildirim')+'</div>' +
+          '<div style="font-size:12px;color:#7c87a0;margin-top:2px;line-height:1.5">'+(n.body||'')+'</div>' +
+          '<div style="font-size:11px;color:#5a6278;margin-top:4px">'+fmt(n.createdAt)+'</div>' +
+          '</div>' +
+          (!isRead?'<div style="width:8px;height:8px;border-radius:50%;background:#3b7cff;flex-shrink:0;margin-top:6px"></div>':'') +
+          '</div>';
+      }).join('');
+
+      // Tıklama
+      listEl.querySelectorAll('.notif-item').forEach(function(item) {
+        item.addEventListener('click', async function() {
+          var nId = item.dataset.id;
+          var nType = item.dataset.type;
+          var pocId = item.dataset.pocId;
+
+          // Okundu işaretle
+          await updateDoc(doc(db,'notifications',nId), {read:true});
+          item.style.background = 'transparent';
+          item.querySelector('[style*="border-radius:50%"]')?.remove();
+          updateNotifBadge();
+
+          overlay.remove(); panel.remove();
+
+          // Tipe göre yönlendir
+          if (nType === 'new_message' && pocId) {
+            var pd = (await getDoc(doc(db,'poc_requests',pocId))).data();
+            if (pd) openChatModal(pocId, pd.vendorId, pd.vendorName||'Vendor', pd.productName||'PoC');
+          } else if (nType === 'poc_invite') {
+            if (CUR_PROFILE?.role==='customer') { go('customer'); CUR_CUST_TAB='invites'; renderCustomer(); }
+          } else if (nType === 'schedule_proposed' && pocId) {
+            var pd2 = (await getDoc(doc(db,'poc_requests',pocId))).data();
+            if (pd2) openPocTimeline({...pd2, id:pocId});
+          } else {
+            if (CUR_PROFILE?.role==='customer') { go('customer'); CUR_CUST_TAB='requests'; renderCustomer(); }
+            else if (CUR_PROFILE?.role==='vendor') { go('vendor'); CUR_VEND_TAB='requests'; renderVendor(); }
+          }
+        });
+      });
+    }
+
+    // Tümünü okundu
+    panel.querySelector('#notif-mark-all').addEventListener('click', async function() {
+      var unread = notifs.filter(n=>!n.read);
+      for (var n of unread) {
+        await updateDoc(doc(db,'notifications',n.id), {read:true});
+      }
+      listEl.querySelectorAll('.notif-item').forEach(function(item) {
+        item.style.background='transparent';
+        item.querySelector('[style*="border-radius:50%"]')?.remove();
+      });
+      updateNotifBadge();
+      showToast(unread.length + ' bildirim okundu olarak işaretlendi.');
+    });
+
+  } catch(e) {
+    panel.querySelector('#notif-list').innerHTML = '<div style="padding:24px;color:#ff7070;font-size:13px">Yükleme hatası: '+e.message+'</div>';
+  }
+}
+
+
+async function updateNotifBadge() {
   const badge = document.getElementById('notif-badge');
+  if (!badge || !CUR_USER) return;
+  try {
+    var snap = await getDocs(query(collection(db,'notifications'),
+      where('userId','==',CUR_USER.uid), where('read','==',false)));
+    var count = snap.size;
+    if (count > 0) {
+      badge.style.display = 'inline';
+      badge.textContent = count > 9 ? '9+' : count;
+    } else {
+      badge.style.display = 'none';
+    }
+    return;
+  } catch(e) {}
+  // Fallback — eski mantık
+  const badge2 = document.getElementById('notif-badge');
   if (badge) {
     badge.textContent = NOTIF_COUNT > 0 ? NOTIF_COUNT : '';
     badge.style.display = NOTIF_COUNT > 0 ? 'inline' : 'none';
@@ -724,12 +870,7 @@ function buildNav() {
       await signOut(auth);
       go('home');
     });
-    el('notif-btn')?.addEventListener('click', () => {
-      const role = CUR_PROFILE.role;
-      if (role==='customer') { go('customer'); CUR_CUST_TAB='requests'; renderCustomer(); }
-      else if (role==='vendor') { go('vendor'); CUR_VEND_TAB='requests'; renderVendor(); }
-      else if (role==='admin') { go('admin'); CUR_ADM_TAB='products'; renderAdmin(); }
-    });
+    el('notif-btn')?.addEventListener('click', () => openNotifPanel());
     updateNotifBadge();
   } else {
     navr.innerHTML = `
@@ -1721,6 +1862,91 @@ async function custInvites(m) {
 
 
 /* ── PoC İPTAL MODALI (v2.8) ── */
+/* ── PoC KABUL MODALI — Tarih Önerisi (v3.0) ── */
+async function openPocAcceptModal(pocId) {
+  var pocDoc = await getDoc(doc(db,'poc_requests',pocId));
+  if (!pocDoc.exists()) { showToast('Talep bulunamadı','err'); return; }
+  var pd = pocDoc.data();
+  var custDate1 = pd.preferredDateTime1?.toDate ? pd.preferredDateTime1.toDate() : null;
+  var custDate2 = pd.preferredDateTime2?.toDate ? pd.preferredDateTime2.toDate() : null;
+  function fmtDt(d) {
+    if(!d) return '—';
+    return d.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' '+d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+  }
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:480px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">PoC Talebini Kabul Et</h3>' +
+    '<button id="pam-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button></div>' +
+    '<div style="background:#1c1f2a;border-radius:8px;padding:12px 14px;margin-bottom:16px">' +
+    '<div style="font-size:11px;color:#5a6278;font-weight:700;margin-bottom:8px">MÜŞTERİ TERCİHLERİ</div>' +
+    '<div style="font-size:13px;font-weight:600;margin-bottom:4px">'+(pd.productName||'—')+'</div>' +
+    '<div style="font-size:12.5px;color:#7c87a0">Müşteri: '+(pd.customerName||'—')+'</div>' +
+    (custDate1?'<div style="font-size:12.5px;color:#f0a429;margin-top:8px">📅 1. Tercih: '+fmtDt(custDate1)+'</div>':'<div style="font-size:12px;color:#5a6278;margin-top:6px">Müşteri tercih tarihi belirtmemiş</div>') +
+    (custDate2?'<div style="font-size:12.5px;color:#7c87a0;margin-top:4px">📅 2. Tercih: '+fmtDt(custDate2)+'</div>':'') +
+    (pd.conflictNote?'<div style="font-size:12px;color:#f0a429;margin-top:8px;padding:6px 10px;background:rgba(240,164,41,.08);border-radius:6px">'+pd.conflictNote+'</div>':'') +
+    '</div>' +
+    '<label class="lbl">PoC Tarihi * <span style="font-size:11px;color:#5a6278;font-weight:400">(Müşteri tercihini onaylayın veya yeni tarih önerin)</span></label>' +
+    '<div class="g2" style="margin-bottom:8px">' +
+    '<input class="inp" id="pam-date" type="date" value="'+(custDate1?custDate1.toISOString().split("T")[0]:'')+'">' +
+    '<input class="inp" id="pam-time" type="time" value="'+(custDate1?custDate1.toTimeString().substring(0,5):'10:00')+'">' +
+    '</div>' +
+    '<label class="lbl">PoC Süresi</label>' +
+    '<select class="inp" id="pam-dur"><option value="60">1 Saat</option><option value="90">1.5 Saat</option><option value="120" selected>2 Saat</option><option value="180">3 Saat</option><option value="240">Tam Gün</option></select>' +
+    '<label class="lbl" style="margin-top:12px">Vendor Notu (müşteriye iletilir)</label>' +
+    '<textarea class="inp" id="pam-note" rows="3" style="resize:none" placeholder="Bağlantı bilgisi, katılımcı gereksinimi, hazırlık..."></textarea>' +
+    '<div id="pam-err" style="margin-top:10px"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:16px">' +
+    '<button class="btn-g" id="pam-back" style="flex:1;padding:10px">Vazgeç</button>' +
+    '<button class="btn-gr" id="pam-submit" style="flex:2;padding:10px">✅ Kabul Et & Tarihi Onayla</button>' +
+    '</div></div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#pam-close').addEventListener('click',()=>modal.remove());
+  modal.querySelector('#pam-back').addEventListener('click',()=>modal.remove());
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+  modal.querySelector('#pam-submit').addEventListener('click', async function() {
+    var dv = modal.querySelector('#pam-date').value;
+    var tv = modal.querySelector('#pam-time').value||'10:00';
+    var dur = parseInt(modal.querySelector('#pam-dur').value)||120;
+    var note = modal.querySelector('#pam-note').value.trim();
+    if (!dv) { modal.querySelector('#pam-err').innerHTML='<div class="alert alert-err">PoC tarihi zorunludur.</div>'; return; }
+    var btn = modal.querySelector('#pam-submit');
+    btn.disabled=true; btn.textContent='Kaydediliyor...';
+    try {
+      var sched = new Date(dv+'T'+tv+':00');
+      await updateDoc(doc(db,'poc_requests',pocId),{
+        status:'active', acceptedAt:serverTimestamp(),
+        scheduledDate:Timestamp.fromDate(sched),
+        scheduledDuration:dur, vendorNote:note,
+      });
+      if (pd.customerEmail) {
+        sendEmail(pd.customerEmail, pd.customerName||'',
+          'PoC Tarihi Belirlendi — PoCHub',
+          (CUR_PROFILE?.displayName||CUR_USER.email)+' talebinizi kabul etti. Tarih: '+sched.toLocaleDateString('tr-TR')+' '+sched.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}),
+          note?'Vendor Notu: '+note:''
+        );
+      }
+      if (pd.customerId) {
+        await addDoc(collection(db,'notifications'),{
+          userId:pd.customerId, type:'schedule_proposed',
+          title:'PoC Tarihi Belirlendi',
+          body:(CUR_PROFILE?.displayName||CUR_USER.email)+' "'+( pd.productName||'PoC')+'" için '+sched.toLocaleDateString('tr-TR')+' tarihini belirledi.',
+          pocId, read:false, createdAt:serverTimestamp()
+        });
+      }
+      modal.remove();
+      showToast('PoC kabul edildi! Tarih: '+sched.toLocaleDateString('tr-TR'));
+      loadVendTab();
+    } catch(e) {
+      modal.querySelector('#pam-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      btn.disabled=false; btn.textContent='✅ Kabul Et & Tarihi Onayla';
+    }
+  });
+}
+
+
 function openPocCancelModal(pocId, pocTitle, vendorEmail, vendorName, onSuccess) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -1857,9 +2083,14 @@ function openPocTimeline(poc) {
       ts: poc.acceptedAt||null, done: ['active','offer_sent','completed'].includes(poc.status)
     },
     {
-      key:'poc_started', icon:'🔬', label:'PoC Süreci Başladı',
-      sub: poc.scheduledDate ? ('Planlanan tarih: '+fmt(poc.scheduledDate)) : 'Takvim bekleniyor',
-      ts: poc.scheduledDate||null, done: ['active','offer_sent','completed'].includes(poc.status) && poc.scheduledDate
+      key:'poc_started', icon:'🔬', label:'Tarih Belirlendi & PoC Başladı',
+      sub: poc.scheduledDate?.toDate ?
+        '📅 '+poc.scheduledDate.toDate().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+
+        ' '+poc.scheduledDate.toDate().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})+
+        (poc.scheduledDuration?' ('+Math.floor(poc.scheduledDuration/60)+'s '+( poc.scheduledDuration%60?poc.scheduledDuration%60+'dk':'')+')'  : '') :
+        (poc.vendorNote ? poc.vendorNote : 'Vendor tarih belirlemedi'),
+      ts: poc.scheduledDate||poc.acceptedAt||null,
+      done: ['active','offer_sent','completed'].includes(poc.status) && (poc.scheduledDate || poc.acceptedAt)
     },
     {
       key:'offer', icon:'💼', label:'Teklif Gönderildi',
@@ -1980,8 +2211,16 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       <input class="inp" id="poc-title" placeholder="Örn: 1000 kullanıcı için Firewall değerlendirmesi">
       <label class="lbl">Gereksinimler / Notlar</label>
       <textarea class="inp" id="poc-req" rows="3" placeholder="Test ortamı, kullanıcı sayısı, özel gereksinimler..." style="resize:none"></textarea>
-      <label class="lbl">Tercih Edilen Tarih Aralığı</label>
-      <input class="inp" id="poc-dates" placeholder="Örn: Mayıs 2026 içinde, hafta içi sabah">
+      <label class="lbl">Tercih Edilen Tarih ve Saat * <span style="font-size:11px;color:#5a6278;font-weight:400">(Zorunlu)</span></label>
+      <div class="g2" style="margin-bottom:4px">
+        <input class="inp" id="poc-date1" type="date" placeholder="Birinci tercih tarihi">
+        <input class="inp" id="poc-time1" type="time" value="10:00" placeholder="Saat">
+      </div>
+      <div class="g2" style="margin-bottom:4px">
+        <input class="inp" id="poc-date2" type="date" placeholder="Alternatif tarih (opsiyonel)">
+        <input class="inp" id="poc-time2" type="time" value="14:00" placeholder="Saat">
+      </div>
+      <div id="poc-conflict-warn" style="display:none;background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#f0a429;margin-bottom:8px"></div>
       <label class="lbl">PoC Lokasyonu</label>
       <select class="inp" id="poc-location">
         <option value="customer">Müşteri Lokasyonu</option>
@@ -2127,6 +2366,32 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
     modal.querySelector('#poc-step3').style.display='block';
   });
 
+  // Tarih değişince çakışma kontrolü
+  modal.querySelector('#poc-date1')?.addEventListener('change', async function() {
+    var dateVal = this.value;
+    var warnEl = modal.querySelector('#poc-conflict-warn');
+    if (!warnEl) return;
+    if (!dateVal || !selectedVendors.length) { warnEl.style.display='none'; return; }
+    var conflicts = [];
+    for (var sv of selectedVendors) {
+      try {
+        var cSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',sv.vendorId)));
+        cSnap.docs.forEach(function(d) {
+          var pd = d.data();
+          if (!['pending','active','offer_sent'].includes(pd.status)) return;
+          if (pd.preferredDates && pd.preferredDates.includes(dateVal))
+            conflicts.push(sv.vendorName+': bu tarihte talep var');
+          if (pd.scheduledDate?.toDate && pd.scheduledDate.toDate().toISOString().split('T')[0]===dateVal)
+            conflicts.push(sv.vendorName+': '+dateVal+' tarihinde planlanmış PoC');
+        });
+      } catch(e) {}
+    }
+    if (conflicts.length) {
+      warnEl.style.display='block';
+      warnEl.innerHTML='⚠ <b>Çakışma Uyarısı</b><br>'+conflicts.join('<br>')+'<br><span style="font-size:11px">Devam edebilirsiniz — vendor bu uyarıyı görecek.</span>';
+    } else { warnEl.style.display='none'; }
+  });
+
   modal.querySelector('#poc-submit')?.addEventListener('click', async () => {
     const title = modal.querySelector('#poc-title')?.value?.trim();
     if (!title) {
@@ -2143,21 +2408,47 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
     btn.disabled=true; btn.textContent='Gönderiliyor...';
 
     const requirements = modal.querySelector('#poc-req')?.value||'';
-    const preferredDates = modal.querySelector('#poc-dates')?.value||'';
+    const date1 = modal.querySelector('#poc-date1')?.value||'';
+    const time1 = modal.querySelector('#poc-time1')?.value||'10:00';
+    const date2 = modal.querySelector('#poc-date2')?.value||'';
+    const time2 = modal.querySelector('#poc-time2')?.value||'14:00';
+    const preferredDates = date1 ? (date1+'T'+time1+(date2?(' / '+date2+'T'+time2):'')) : '';
     const location = modal.querySelector('#poc-location')?.value||'customer';
     const locLabels = {customer:'Müşteri Lokasyonu',vendor:'Vendor Lokasyonu',online:'Online',hybrid:'Hibrit'};
+
+    // Tarih zorunlu validasyon
+    if (!date1) {
+      errDiv.innerHTML = '<div class="alert alert-err">Tercih edilen tarih ve saat zorunludur.</div>';
+      btn.disabled=false; btn.textContent='Talebi Gönder →'; return;
+    }
+    const preferredDateTime1 = new Date(date1+'T'+time1+':00');
+    const preferredDateTime2 = date2 ? new Date(date2+'T'+time2+':00') : null;
 
     try {
       // Her vendor için ayrı poc_request oluştur
       const batchResults = [];
       for (const v of selectedVendors) {
-        // Çakışma kontrolü
+        // Çakışma kontrolü — aynı gün ±2 saat
         const _pocSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',v.vendorId)));
         const activeSnap = {size: _pocSnap.docs.filter(d=>['pending','active'].includes(d.data().status)).length};
+        // Tarih çakışması kontrolü
+        var conflictWarning = '';
+        _pocSnap.docs.forEach(function(d) {
+          var pd = d.data();
+          if (!['pending','active','offer_sent'].includes(pd.status)) return;
+          if (!pd.preferredDates) return;
+          // Aynı tarihte PoC var mı?
+          if (pd.preferredDates.includes(date1)) {
+            conflictWarning = '⚠ Bu vendor '+date1+' tarihinde baska bir PoC talep alacak. Vendor uyari gorecek.';
+          }
+        });
 
         const docRef = await addDoc(collection(db,'poc_requests'), {
           customerId: CUR_USER.uid,
           customerEmail: CUR_USER.email,
+          conflictNote: conflictWarning||'',
+          preferredDateTime1: preferredDateTime1 ? Timestamp.fromDate(preferredDateTime1) : null,
+          preferredDateTime2: preferredDateTime2 ? Timestamp.fromDate(preferredDateTime2) : null,
           customerName: CUR_PROFILE?.displayName||CUR_USER.email,
           customerCompany: CUR_PROFILE?.company||'',
           productId: v.productId,
@@ -2517,6 +2808,12 @@ async function loadVendTab() {
           </div>
           <div style="text-align:right">${statusBadge(r.status)}<div style="font-size:11px;color:#5a6278;margin-top:4px">${fmt(r.createdAt)}</div></div>
         </div>
+        ${r.preferredDateTime1?`<div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:7px;padding:10px;font-size:12px;margin-bottom:10px">
+          <div style="color:#f0a429;font-weight:700;font-size:10.5px;margin-bottom:4px">MÜŞTERİ TERCİH TARİHİ</div>
+          <div>📅 ${r.preferredDateTime1.toDate().toLocaleDateString('tr-TR',{weekday:'short',day:'numeric',month:'long'})} ${r.preferredDateTime1.toDate().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</div>
+          ${r.preferredDateTime2?`<div style="color:#7c87a0;margin-top:2px">2. Tercih: ${r.preferredDateTime2.toDate().toLocaleDateString('tr-TR',{weekday:'short',day:'numeric',month:'long'})} ${r.preferredDateTime2.toDate().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</div>`:''}
+          ${r.conflictNote?`<div style="color:#f0a429;margin-top:4px;font-size:11px">${r.conflictNote}</div>`:''}
+        </div>`:''}
         ${r.requirements?`<div style="background:#1c1f2a;border-radius:7px;padding:10px;font-size:12.5px;color:#9ca3af;margin-bottom:10px">${r.requirements}</div>`:''}
         ${r.status==='cancelled'&&r.cancelReason?`<div style="background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:11px 14px;margin-bottom:10px">
           <div style="font-size:11px;color:#ff7070;font-weight:700;margin-bottom:4px">⚠ İPTAL NEDENİ${r.cancelCategoryLabel?' — '+r.cancelCategoryLabel:''}</div>
@@ -2534,12 +2831,7 @@ async function loadVendTab() {
     }).join('')}`;
 
     m.querySelectorAll('.accept-poc').forEach(b => b.addEventListener('click', async () => {
-      await updateDoc(doc(db,'poc_requests',b.dataset.id), {status:'active', acceptedAt:serverTimestamp()});
-      showToast('PoC talebi aktif edildi!');
-      if(b.dataset.cemail) sendEmail(b.dataset.cemail, b.dataset.cname, 'PoC Talebiniz Kabul Edildi — PoCHub',
-        (CUR_PROFILE?.displayName||CUR_USER.email)+' PoC talebinizi kabul etti. Süreç başlıyor!',
-        'Ürün: '+(b.dataset.pname||'—')+'\nVendor: '+(CUR_PROFILE?.displayName||'—')+'\nDetay için pochub.co adresini ziyaret edin.');
-      loadVendTab();
+      openPocAcceptModal(b.dataset.id);
     }));
     m.querySelectorAll('.reject-poc').forEach(b => b.addEventListener('click', async () => {
       await updateDoc(doc(db,'poc_requests',b.dataset.id), {status:'rejected', rejectedAt:serverTimestamp()});
@@ -3923,7 +4215,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.9</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.0</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
