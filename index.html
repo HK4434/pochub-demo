@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v2.7</title>
+<title>PoCHub.co — v2.8</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v2.7';
+const VERSION = 'v2.8';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -1716,6 +1716,126 @@ async function custInvites(m) {
 }
 
 
+/* ── PoC İPTAL MODALI (v2.8) ── */
+function openPocCancelModal(pocId, pocTitle, vendorEmail, vendorName, onSuccess) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:460px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">PoC Talebini İptal Et</h3>' +
+    '<button id="pcm-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<div style="background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:#ff7070">' +
+    '⚠ Bu işlem geri alınamaz. İptal nedenini belirtmeniz zorunludur. Vendor tarafına bildirilecek ve açıklamanızı görebilecekler.' +
+    '</div>' +
+    '<div style="background:#1c1f2a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#7c87a0">' +
+    'Talep: <span style="color:#e9ecf3;font-weight:600">' + (pocTitle||'PoC Talebi') + '</span>' +
+    '</div>' +
+    '<label class="lbl">İptal Nedeni * <span style="color:#5a6278;font-weight:400">(en az 20 karakter)</span></label>' +
+    '<textarea class="inp" id="pcm-reason" rows="4" style="resize:none" placeholder="Örn: Proje bütçesi iptal edildi. Önümüzdeki çeyrekte tekrar değerlendirmeyi planlıyoruz..."></textarea>' +
+    '<div id="pcm-char" style="font-size:11.5px;color:#5a6278;text-align:right;margin-top:3px">0 / 20 karakter (min)</div>' +
+    '<label class="lbl" style="margin-top:12px">İptal Kategorisi</label>' +
+    '<select class="inp" id="pcm-cat">' +
+    '<option value="budget">Bütçe / Finansal</option>' +
+    '<option value="timing">Zamanlama / Proje Ertelendi</option>' +
+    '<option value="technical">Teknik Gereksinimler Değişti</option>' +
+    '<option value="vendor">Vendor ile İletişim Sorunu</option>' +
+    '<option value="internal">Şirket İçi Karar</option>' +
+    '<option value="other">Diğer</option>' +
+    '</select>' +
+    '<label class="lbl" style="margin-top:12px">Yeniden Görüşme Talebi</label>' +
+    '<select class="inp" id="pcm-reopen">' +
+    '<option value="no">Hayır, kalıcı iptal</option>' +
+    '<option value="1month">1 ay sonra iletişime geçin</option>' +
+    '<option value="3month">3 ay sonra iletişime geçin</option>' +
+    '<option value="6month">6 ay sonra iletişime geçin</option>' +
+    '<option value="yes">Evet, mümkün olan en kısa sürede</option>' +
+    '</select>' +
+    '<div id="pcm-err" style="margin-top:10px"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:16px">' +
+    '<button class="btn-g" id="pcm-back" style="flex:1;padding:10px">Vazgeç</button>' +
+    '<button class="btn-red" id="pcm-submit" style="flex:1;padding:10px" disabled>İptal Et</button>' +
+    '</div></div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#pcm-close').addEventListener('click',()=>modal.remove());
+  modal.querySelector('#pcm-back').addEventListener('click',()=>modal.remove());
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+
+  var reasonEl = modal.querySelector('#pcm-reason');
+  var submitBtn = modal.querySelector('#pcm-submit');
+  var charEl = modal.querySelector('#pcm-char');
+
+  reasonEl.addEventListener('input', function() {
+    var len = this.value.trim().length;
+    charEl.textContent = len + ' / 20 karakter (min)';
+    charEl.style.color = len >= 20 ? '#22d078' : '#5a6278';
+    submitBtn.disabled = len < 20;
+  });
+
+  submitBtn.addEventListener('click', async function() {
+    var reason = reasonEl.value.trim();
+    var cat = modal.querySelector('#pcm-cat').value;
+    var reopen = modal.querySelector('#pcm-reopen').value;
+    if (reason.length < 20) {
+      modal.querySelector('#pcm-err').innerHTML = '<div class="alert alert-err">İptal nedeni en az 20 karakter olmalıdır.</div>';
+      return;
+    }
+    submitBtn.disabled = true; submitBtn.textContent = 'İptal ediliyor...';
+
+    var catLabels = {
+      budget:'Bütçe/Finansal', timing:'Zamanlama/Erteleme',
+      technical:'Teknik Değişiklik', vendor:'Vendor İletişim Sorunu',
+      internal:'Şirket İçi Karar', other:'Diğer'
+    };
+    var reopenLabels = {
+      no:'Kalıcı iptal', '1month':'1 ay sonra', '3month':'3 ay sonra',
+      '6month':'6 ay sonra', yes:'En kısa sürede'
+    };
+
+    try {
+      await updateDoc(doc(db,'poc_requests',pocId), {
+        status:          'cancelled',
+        cancelledAt:     serverTimestamp(),
+        cancelReason:    reason,
+        cancelCategory:  cat,
+        cancelCategoryLabel: catLabels[cat]||cat,
+        reopenRequest:   reopen,
+        reopenLabel:     reopenLabels[reopen]||reopen,
+      });
+
+      // Vendor'a bildirim maili
+      if (vendorEmail) {
+        sendEmail(vendorEmail, vendorName||'',
+          'PoC Talebi İptal Edildi — PoCHub',
+          'Müşteri "'+( pocTitle||'PoC')+'" talebini iptal etti. Neden: '+reason+' Kategori: '+( catLabels[cat]||cat)+'. Yeniden görüşme: '+(reopenLabels[reopen]||reopen),
+          'pochub.co uzerinden detaylara ulasabilirsiniz.'
+        );
+      }
+
+      // Vendor panelinde iptal mesajı görünsün diye poc_cancellations kaydı
+      await addDoc(collection(db,'poc_messages'), {
+        pocId:    pocId,
+        senderId: CUR_USER.uid,
+        senderName: CUR_PROFILE?.displayName||CUR_USER.email,
+        senderRole: 'customer',
+        text:     '[İPTAL BİLDİRİMİ] Neden: '+reason+' | Kategori: '+(catLabels[cat]||cat)+' | Yeniden görüşme: '+(reopenLabels[reopen]||reopen),
+        type:     'cancellation',
+        createdAt: serverTimestamp(),
+      });
+
+      modal.remove();
+      showToast('PoC talebi iptal edildi.');
+      if (typeof onSuccess === 'function') onSuccess();
+    } catch(e) {
+      modal.querySelector('#pcm-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      submitBtn.disabled=false; submitBtn.textContent='İptal Et';
+    }
+  });
+}
+
+
 function openPocTimeline(poc) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -1744,7 +1864,9 @@ function openPocTimeline(poc) {
     },
     {
       key:'decision', icon:'🏁', label:'Karar Verildi',
-      sub: poc.status==='completed'?'PoC tamamlandı':poc.status==='cancelled'?'Talep iptal edildi':'Kararınız bekleniyor',
+      sub: poc.status==='completed'?'PoC tamamlandı':
+           poc.status==='cancelled'?(poc.cancelReason?('İptal: '+poc.cancelReason.substring(0,60)+(poc.cancelReason.length>60?'...':'')):('Talep iptal edildi'+(poc.cancelCategoryLabel?' — '+poc.cancelCategoryLabel:''))):
+           'Kararınız bekleniyor',
       ts: poc.completedAt||poc.cancelledAt||null,
       done: ['completed','cancelled'].includes(poc.status)
     },
@@ -2161,18 +2283,19 @@ async function loadCustTab() {
           <button class="poc-tl-btn btn-g btn-sm" data-id="${d.id}" title="Süreç Detayı">📋 Detay</button>
           ${r.status==='pending'?`<button class="edit-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-req="${(r.requirements||'')}" data-dates="${r.preferredDates||''}" data-loc="${r.location||'customer'}">Düzenle</button>`:''}
           ${(r.status==='active'||r.status==='pending')?`<button class="chat-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-vendor="${(r.vendorName||'')}">💬 Mesaj</button>`:''}
-          ${r.status==='pending'?`<button class="cancel-poc-btn btn-red btn-sm" data-id="${d.id}">İptal</button>`:''}
+          ${r.status==='pending'?`<button class="cancel-poc-btn btn-red btn-sm" data-id="${d.id}" data-title="${(r.title||r.productName||'')}" data-vemail="${(r.vendorEmail||'')}" data-vname="${(r.vendorName||'')}">İptal</button>`:''}
         </div></td>
       </tr>`;
     }).join('')}
     </tbody></table>`;
     // İptal
-    m.querySelectorAll('.cancel-poc-btn').forEach(b => b.addEventListener('click', async () => {
-      if (!confirm('Bu talebi iptal etmek istiyor musunuz?')) return;
-      await updateDoc(doc(db,'poc_requests',b.dataset.id), {status:'cancelled'});
-      showToast('Talep iptal edildi.');
-      loadCustTab();
-    }));
+    m.querySelectorAll('.cancel-poc-btn').forEach(function(b) {
+      b.addEventListener('click', function() {
+        openPocCancelModal(b.dataset.id, b.dataset.title, b.dataset.vemail, b.dataset.vname, function() {
+          loadCustTab();
+        });
+      });
+    });
 
     // Düzenle
     m.querySelectorAll('.poc-tl-btn').forEach(function(btn) {
@@ -2391,6 +2514,11 @@ async function loadVendTab() {
           <div style="text-align:right">${statusBadge(r.status)}<div style="font-size:11px;color:#5a6278;margin-top:4px">${fmt(r.createdAt)}</div></div>
         </div>
         ${r.requirements?`<div style="background:#1c1f2a;border-radius:7px;padding:10px;font-size:12.5px;color:#9ca3af;margin-bottom:10px">${r.requirements}</div>`:''}
+        ${r.status==='cancelled'&&r.cancelReason?`<div style="background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:11px 14px;margin-bottom:10px">
+          <div style="font-size:11px;color:#ff7070;font-weight:700;margin-bottom:4px">⚠ İPTAL NEDENİ${r.cancelCategoryLabel?' — '+r.cancelCategoryLabel:''}</div>
+          <div style="font-size:12.5px;color:#e9ecf3">${r.cancelReason}</div>
+          ${r.reopenLabel&&r.reopenRequest!=='no'?`<div style="font-size:11.5px;color:#f0a429;margin-top:6px">🔄 Yeniden görüşme: ${r.reopenLabel}</div>`:''}
+        </div>`:''}
         ${r.preferredDates?`<div style="font-size:12px;color:#7c87a0;margin-bottom:10px">📅 Tercih: ${r.preferredDates}</div>`:''}
         ${r.status==='pending'?`<div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-p btn-sm accept-poc" data-id="${d.id}" data-cemail="${r.customerEmail||''}" data-cname="${r.customerName||''}">Kabul Et & Aktif Yap</button>
@@ -3784,7 +3912,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.7</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.8</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}

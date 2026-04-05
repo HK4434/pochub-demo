@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>PoCHub Seed v2 — Test Kullanıcı Ürün Ataması</title>
+<style>
+  body { font-family: monospace; background: #0a0d14; color: #e9ecf3; padding: 24px; }
+  button { background: #3b7cff; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; margin: 4px; }
+  button:disabled { opacity: .5; }
+  #log { background: #1c1f2a; border-radius: 8px; padding: 16px; margin-top: 16px; min-height: 200px; white-space: pre-wrap; font-size: 12.5px; line-height: 1.7; }
+  .ok { color: #22d078; } .err { color: #ff7070; } .info { color: #7db4ff; }
+</style>
+</head>
+<body>
+<h2>PoCHub Seed v2 — Test Kullanıcı & Ürün Ataması</h2>
+<p style="color:#7c87a0;font-size:13px">Bu araç katalogdaki ürünleri test kullanıcılarına atar ve örnek PoC talepleri oluşturur.</p>
+
+<button id="btn-assign">1. Ürünleri Test Kullanıcılarına Ata</button>
+<button id="btn-poc">2. Örnek PoC Talepleri Oluştur</button>
+<button id="btn-clear">Logları Temizle</button>
+<div id="log">Hazır. Başlamak için yukarıdaki butonları kullanın.</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, query, where, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCZ76Ga8DCGAUy33kb0Jk-wEDTHsOzRWDk",
+  authDomain: "pochub-co.firebaseapp.com",
+  projectId: "pochub-co",
+  storageBucket: "pochub-co.firebasestorage.app",
+  messagingSenderId: "970891427053",
+  appId: "1:970891427053:web:30a98a281e9fe2260c20e4"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const logEl = document.getElementById('log');
+function log(msg, cls='') {
+  logEl.innerHTML += `<span class="${cls}">${msg}</span>\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// Test kullanıcıları
+const TEST_USERS = {
+  customer:    { email: 'test.musteri@testpochub.com',    role: 'customer' },
+  ureticid:    { email: 'test.ureticid@testpochub.com',   role: 'vendor', vendorType: 'ureticid' },
+  distributor: { email: 'test.distributor@testpochub.com',role: 'vendor', vendorType: 'distributor' },
+  integrator:  { email: 'test.integrator@testpochub.com', role: 'vendor', vendorType: 'integrator' },
+};
+
+// Adım 1: Ürünleri test kullanıcılarına ata
+document.getElementById('btn-assign').addEventListener('click', async function() {
+  this.disabled = true;
+  log('\n── Ürün Ataması Başlıyor ──', 'info');
+
+  try {
+    // Tüm ürünleri çek
+    const prodsSnap = await getDocs(collection(db, 'products'));
+    const prods = prodsSnap.docs.map(d => ({...d.data(), id: d.id}));
+    log(`Katalogda ${prods.length} ürün bulundu.`);
+
+    // Test kullanıcılarını bul
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const users = {};
+    usersSnap.docs.forEach(d => {
+      const u = d.data();
+      Object.entries(TEST_USERS).forEach(([key, tu]) => {
+        if (u.email === tu.email) users[key] = {...u, id: d.id};
+      });
+    });
+
+    log(`Bulunan test kullanıcıları: ${Object.keys(users).join(', ')}`);
+
+    // Her üretici/distribütör/entegratör ürünü
+    // Ürünleri vendor tipine göre dağıt
+    const byVendor = {};
+    prods.forEach(p => {
+      if (!byVendor[p.vendorId]) byVendor[p.vendorId] = [];
+      byVendor[p.vendorId].push(p);
+    });
+
+    log(`\n${Object.keys(byVendor).length} farklı vendor'ın ürünleri var.`);
+
+    // Distribütör ve entegratör test kullanıcılarına tüm ürünleri portföy olarak ata
+    const portTargets = [
+      { key: 'distributor', role: 'Distribütör' },
+      { key: 'integrator',  role: 'Entegratör'  },
+    ];
+
+    for (const target of portTargets) {
+      const user = users[target.key];
+      if (!user) { log(`⚠ ${target.key} kullanıcısı bulunamadı`, 'err'); continue; }
+
+      // Zaten portföyde olanları bul
+      const existSnap = await getDocs(query(collection(db,'vendor_products'), where('vendorId','==',user.id)));
+      const existIds = new Set(existSnap.docs.map(d=>d.data().productId));
+
+      let added = 0;
+      for (const prod of prods) {
+        // Kendi ürettiği ürünü portföye ekleme
+        if (prod.vendorId === user.id) continue;
+        if (existIds.has(prod.id)) {
+          log(`  ↷ [${target.key}] "${prod.name}" zaten portföyde`);
+          continue;
+        }
+        await addDoc(collection(db, 'vendor_products'), {
+          vendorId: user.id,
+          vendorName: user.displayName || user.email,
+          vendorEmail: user.email,
+          vendorType: user.vendorType || '',
+          productId: prod.id,
+          productName: prod.name,
+          productCategory: prod.category || '',
+          originalVendorId: prod.vendorId,
+          originalVendorName: prod.vendorName || '',
+          originalVendorEmail: prod.vendorEmail || '',
+          role: target.role,
+          status: 'active',
+          createdAt: serverTimestamp()
+        });
+        log(`  ✓ [${target.key}] "${prod.name}" portföye eklendi`, 'ok');
+        added++;
+      }
+      log(`  → ${target.key}: ${added} ürün eklendi.`, 'ok');
+    }
+
+    // Üretici test kullanıcısı — kendi ürünleri yoksa katalogdan rastgele ürün sahipliği ata
+    const uretici = users['ureticid'];
+    if (uretici) {
+      const myProds = prods.filter(p => p.vendorId === uretici.id);
+      if (myProds.length === 0) {
+        // İlk 3 ürünü üreticiye ata
+        const toAssign = prods.slice(0, 3);
+        for (const prod of toAssign) {
+          await updateDoc(doc(db, 'products', prod.id), {
+            vendorId: uretici.id,
+            vendorName: uretici.displayName || uretici.email,
+            vendorEmail: uretici.email,
+          });
+          log(`  ✓ [ureticid] "${prod.name}" ürünü atandı`, 'ok');
+        }
+      } else {
+        log(`  ↷ [ureticid] zaten ${myProds.length} ürünü var`);
+      }
+    }
+
+    log('\n✅ Ürün ataması tamamlandı!', 'ok');
+  } catch(e) {
+    log('❌ Hata: ' + e.message, 'err');
+  }
+  this.disabled = false;
+});
+
+// Adım 2: Örnek PoC talepleri oluştur
+document.getElementById('btn-poc').addEventListener('click', async function() {
+  this.disabled = true;
+  log('\n── Örnek PoC Talepleri Oluşturuluyor ──', 'info');
+
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const users = {};
+    usersSnap.docs.forEach(d => {
+      const u = d.data();
+      Object.entries(TEST_USERS).forEach(([key, tu]) => {
+        if (u.email === tu.email) users[key] = {...u, id: d.id};
+      });
+    });
+
+    const prodsSnap = await getDocs(query(collection(db,'products'), where('status','==','active')));
+    const prods = prodsSnap.docs.map(d => ({...d.data(), id: d.id}));
+
+    if (!users.customer) { log('❌ Müşteri test kullanıcısı bulunamadı', 'err'); this.disabled=false; return; }
+    if (!prods.length) { log('❌ Aktif ürün bulunamadı', 'err'); this.disabled=false; return; }
+
+    // Zaten PoC talebi var mı?
+    const existPoc = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',users.customer.id)));
+    if (!existPoc.empty) {
+      log(`⚠ Müşteri test kullanıcısının zaten ${existPoc.size} PoC talebi var. Tekrar oluşturulmadı.`);
+      this.disabled=false; return;
+    }
+
+    const SAMPLE_POCS = [
+      { prodIdx: 0, vendorKey: 'ureticid',    status: 'pending',    title: 'Firewall PoC Değerlendirmesi' },
+      { prodIdx: 1, vendorKey: 'distributor', status: 'active',     title: 'Network Altyapı PoC' },
+      { prodIdx: 2, vendorKey: 'integrator',  status: 'offer_sent', title: 'Yedekleme Çözümü PoC' },
+    ];
+
+    for (const sample of SAMPLE_POCS) {
+      const prod = prods[sample.prodIdx % prods.length];
+      const vendor = users[sample.vendorKey];
+      if (!vendor) { log(`⚠ ${sample.vendorKey} bulunamadı`,'err'); continue; }
+
+      const pocRef = await addDoc(collection(db, 'poc_requests'), {
+        customerId:      users.customer.id,
+        customerName:    users.customer.displayName || users.customer.email,
+        customerEmail:   users.customer.email,
+        customerCompany: users.customer.company || 'Test Firma',
+        vendorId:        vendor.id,
+        vendorName:      vendor.displayName || vendor.email,
+        vendorEmail:     vendor.email,
+        vendorType:      vendor.vendorType || '',
+        productId:       prod.id,
+        productName:     prod.name,
+        category:        prod.category || 'Diğer',
+        title:           sample.title,
+        requirements:    'Test amaçlı oluşturulmuş PoC talebi.',
+        location:        'online',
+        status:          sample.status,
+        createdAt:       serverTimestamp(),
+        ...(sample.status !== 'pending' ? { acceptedAt: serverTimestamp() } : {}),
+        ...(sample.status === 'offer_sent' ? { offerSentAt: serverTimestamp() } : {}),
+      });
+      log(`  ✓ PoC oluşturuldu: "${sample.title}" [${sample.status}] → ${vendor.email}`, 'ok');
+    }
+
+    log('\n✅ Örnek PoC talepleri oluşturuldu!', 'ok');
+    log('   test.musteri@testpochub.com ile giriş yaparak görebilirsiniz.', 'info');
+  } catch(e) {
+    log('❌ Hata: ' + e.message, 'err');
+  }
+  this.disabled = false;
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  logEl.innerHTML = 'Log temizlendi.\n';
+});
+</script>
+</body>
+</html>
