@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v2.6</title>
+<title>PoCHub.co — v2.7</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v2.6';
+const VERSION = 'v2.7';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -2239,8 +2239,11 @@ async function loadOffersWithComparison(m) {
             <thead><tr>
               <th style="background:#1c1f2a;padding:9px 12px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Vendor</th>
               <th style="background:#1c1f2a;padding:9px 12px;text-align:left;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Ürün</th>
-              <th style="background:#1c1f2a;padding:9px 12px;text-align:right;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Tutar</th>
+<th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Teklif Tipi</th>
+                            <th style="background:#1c1f2a;padding:9px 12px;text-align:right;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Tutar</th>
               <th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Kanal Payı</th>
+              <th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Faturalama</th>
+              <th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Geçerlilik</th>
               <th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Durum</th>
               <th style="background:#1c1f2a;padding:9px 12px;text-align:center;color:#5a6278;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">İşlem</th>
             </tr></thead>
@@ -2500,61 +2503,214 @@ async function loadVendTab() {
   }
 }
 
-function openSendOfferModal(pocId, customerId, customerEmail, customerName, productName) {
-  const modal = document.createElement('div');
+function openSendOfferModal(pocId, customerId, customerEmail, customerName, productName, vendorType) {
+  var vtype = vendorType || CUR_PROFILE?.vendorType || '';
+  var vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+  var vtypeLabel = vtypeLabels[vtype] || 'Vendor';
+
+  var modal = document.createElement('div');
   modal.className = 'modal-bg on';
-  modal.innerHTML = `<div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-      <h3 style="font-size:15px;font-weight:700">Teklif Gönder</h3>
-      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-offer-modal">×</button>
-    </div>
-    <p style="font-size:12.5px;color:#7c87a0;margin-bottom:14px">Ürün: <b style="color:#e9ecf3">${productName}</b></p>
-    <label class="lbl">Teklif Tutarı *</label>
-    <input class="inp" id="of-amount" type="number" placeholder="285000">
-    <label class="lbl">Para Birimi</label>
-    <select class="inp" id="of-currency"><option value="TRY">TRY ₺</option><option value="EUR">EUR €</option><option value="USD">USD $</option></select>
-    <label class="lbl">Kanal Payı</label>
-    <select class="inp" id="of-channel"><option value="no">Kanal payı yok</option><option value="yes">Kanal payı var</option></select>
-    <label class="lbl">Teklif Detayları</label>
-    <textarea class="inp" id="of-details" rows="3" placeholder="Kurulum, garanti, destek detayları..." style="resize:none"></textarea>
-    <label class="lbl">Geçerlilik Tarihi</label>
-    <input class="inp" id="of-valid" type="date">
-    <div id="of-err" style="margin-top:10px"></div>
-    <button class="btn-p" id="of-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Teklifi Gönder</button>
-  </div>`;
+  modal.innerHTML =
+    '<div class="modal" style="max-width:520px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Teklif Gönder</h3>' +
+    '<button id="of-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+
+    // Müşteri + ürün bilgisi
+    '<div style="background:#1c1f2a;border-radius:8px;padding:12px 14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+    '<div><div style="font-size:11px;color:#5a6278">Müşteri</div><div style="font-size:13px;font-weight:600">'+(customerName||customerEmail)+'</div></div>' +
+    '<div><div style="font-size:11px;color:#5a6278">Ürün</div><div style="font-size:13px;font-weight:600">'+(productName||'—')+'</div></div>' +
+    '</div>' +
+
+    // Teklif tipi — kanal yapısı
+    '<label class="lbl">Teklif Tipi *</label>' +
+    '<select class="inp" id="of-type">' +
+    '<option value="distributor">Distribütör Teklifi</option>' +
+    '<option value="integrator">Entegratör Teklifi</option>' +
+    '<option value="direct">Doğrudan Üretici Teklifi</option>' +
+    '<option value="enterprise">Enterprise Anlaşma Kapsamı</option>' +
+    '</select>' +
+
+    // Faturalama
+    '<label class="lbl">Faturalama *</label>' +
+    '<select class="inp" id="of-billing">' +
+    '<option value="local_distributor">Türkiye Distribütörü Üzerinden</option>' +
+    '<option value="local_integrator">Entegratör Üzerinden</option>' +
+    '<option value="direct_vendor">Doğrudan Üretici</option>' +
+    '<option value="local_reseller">Yetkili Bayi Üzerinden</option>' +
+    '</select>' +
+
+    // Tutar + Para birimi
+    '<div class="g2">' +
+    '<div><label class="lbl">Teklif Tutarı *</label><input class="inp" id="of-amount" type="number" min="0" placeholder="0"></div>' +
+    '<div><label class="lbl">Para Birimi</label>' +
+    '<select class="inp" id="of-currency">' +
+    '<option value="TRY">₺ TRY</option>' +
+    '<option value="USD">$ USD</option>' +
+    '<option value="EUR">€ EUR</option>' +
+    '</select></div>' +
+    '</div>' +
+
+    // Geçerlilik + Kanal payı
+    '<div class="g2">' +
+    '<div><label class="lbl">Geçerlilik Süresi</label>' +
+    '<select class="inp" id="of-validity">' +
+    '<option value="30">30 Gün</option>' +
+    '<option value="60">60 Gün</option>' +
+    '<option value="90">90 Gün</option>' +
+    '<option value="0">Süresiz</option>' +
+    '</select></div>' +
+    '<div><label class="lbl">Kanal Payı</label>' +
+    '<select class="inp" id="of-channel">' +
+    '<option value="no">Yok</option>' +
+    '<option value="yes">Var</option>' +
+    '</select></div>' +
+    '</div>' +
+
+    // Teslimat & Kurulum
+    '<label class="lbl">Teslimat & Kurulum</label>' +
+    '<select class="inp" id="of-delivery">' +
+    '<option value="included">Kurulum Dahil</option>' +
+    '<option value="excluded">Kurulum Hariç</option>' +
+    '<option value="optional">Opsiyonel (Ücretli)</option>' +
+    '</select>' +
+
+    // BTK / Sertifikasyon
+    '<label class="lbl">BTK / Sertifikasyon Notu</label>' +
+    '<input class="inp" id="of-cert" placeholder="Örn: BTK onaylı, CC EAL4+, FIPS 140-2...">' +
+
+    // Garanti
+    '<label class="lbl">Garanti</label>' +
+    '<input class="inp" id="of-warranty" placeholder="Örn: 3 yıl yerinde garanti">' +
+
+    // Teknik destek
+    '<label class="lbl">Teknik Destek</label>' +
+    '<select class="inp" id="of-support">' +
+    '<option value="8x5">8x5 (İş Günleri)</option>' +
+    '<option value="7x24">7x24</option>' +
+    '<option value="nbd">Next Business Day</option>' +
+    '<option value="none">Yok</option>' +
+    '</select>' +
+
+    // Notlar
+    '<label class="lbl">Ek Notlar / Açıklama</label>' +
+    '<textarea class="inp" id="of-notes" rows="3" style="resize:none" placeholder="Lisans modeli, ödeme planı, özel koşullar..."></textarea>' +
+
+    '<div id="of-err" style="margin-top:10px"></div>' +
+    '<button class="btn-p" id="of-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Teklifi Gönder</button>' +
+    '</div>';
+
   document.body.appendChild(modal);
-  modal.querySelector('#close-offer-modal').addEventListener('click', () => modal.remove());
-  modal.querySelector('#of-submit').addEventListener('click', async () => {
-    const amount = parseFloat(modal.querySelector('#of-amount').value);
-    if (!amount) { modal.querySelector('#of-err').innerHTML='<div class="alert alert-err">Tutar zorunludur.</div>'; return; }
-    const btn = modal.querySelector('#of-submit');
+  modal.querySelector('#of-close').addEventListener('click', function(){modal.remove();});
+  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
+
+  // Teklif tipi değişince faturalama önerisini güncelle
+  modal.querySelector('#of-type').addEventListener('change', function() {
+    var billing = modal.querySelector('#of-billing');
+    var type = this.value;
+    if (type==='direct') billing.value='direct_vendor';
+    else if (type==='integrator') billing.value='local_integrator';
+    else if (type==='enterprise') billing.value='direct_vendor';
+    else billing.value='local_distributor';
+  });
+
+  // Vendor tipine göre varsayılan seç
+  if (vtype==='ureticid') {
+    modal.querySelector('#of-type').value='direct';
+    modal.querySelector('#of-billing').value='direct_vendor';
+  } else if (vtype==='integrator') {
+    modal.querySelector('#of-type').value='integrator';
+    modal.querySelector('#of-billing').value='local_integrator';
+  }
+
+  modal.querySelector('#of-submit').addEventListener('click', async function() {
+    var amount = parseFloat(modal.querySelector('#of-amount').value)||0;
+    var errDiv = modal.querySelector('#of-err');
+    if (amount <= 0) { errDiv.innerHTML='<div class="alert alert-err">Geçerli bir tutar girin.</div>'; return; }
+
+    var btn = modal.querySelector('#of-submit');
     btn.disabled=true; btn.textContent='Gönderiliyor...';
+
+    var offerType = modal.querySelector('#of-type').value;
+    var billingModel = modal.querySelector('#of-billing').value;
+    var currency = modal.querySelector('#of-currency').value;
+    var validity = parseInt(modal.querySelector('#of-validity').value)||30;
+    var hasChannelFee = modal.querySelector('#of-channel').value==='yes';
+    var delivery = modal.querySelector('#of-delivery').value;
+    var cert = modal.querySelector('#of-cert').value.trim();
+    var warranty = modal.querySelector('#of-warranty').value.trim();
+    var supportLevel = modal.querySelector('#of-support').value;
+    var notes = modal.querySelector('#of-notes').value.trim();
+
+    var currencySymbols = {TRY:'₺',USD:'$',EUR:'€'};
+    var validityDate = validity > 0 ? new Date(Date.now() + validity*24*60*60*1000) : null;
+
+    var offerTypeLabels = {
+      distributor:'Distribütör Teklifi', integrator:'Entegratör Teklifi',
+      direct:'Doğrudan Üretici Teklifi', enterprise:'Enterprise Anlaşma'
+    };
+    var billingLabels = {
+      local_distributor:'Türkiye Distribütörü', local_integrator:'Entegratör',
+      direct_vendor:'Doğrudan Üretici', local_reseller:'Yetkili Bayi'
+    };
+
     try {
       await addDoc(collection(db,'offers'), {
-        pocRequestId: pocId,
-        vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
-        vendorEmail: CUR_USER.email,
-        customerId, customerEmail, customerName,
-        productName,
-        amount, currency: modal.querySelector('#of-currency').value,
-        hasChannelFee: modal.querySelector('#of-channel').value==='yes',
-        details: modal.querySelector('#of-details').value,
-        validUntil: modal.querySelector('#of-valid').value,
-        status: 'pending',
-        createdAt: serverTimestamp()
+        pocId:         pocId,
+        customerId:    customerId,
+        customerEmail: customerEmail,
+        customerName:  customerName,
+        vendorId:      CUR_USER.uid,
+        vendorName:    CUR_PROFILE?.displayName||CUR_USER.email,
+        vendorEmail:   CUR_USER.email,
+        vendorType:    vtype,
+        productName:   productName,
+        // Yeni gelişmiş alanlar
+        offerType:     offerType,
+        offerTypeLabel:offerTypeLabels[offerType]||offerType,
+        billingModel:  billingModel,
+        billingLabel:  billingLabels[billingModel]||billingModel,
+        amount:        amount,
+        currency:      currency,
+        currencySymbol:currencySymbols[currency]||'₺',
+        hasChannelFee: hasChannelFee,
+        validityDays:  validity,
+        validUntil:    validityDate ? Timestamp.fromDate(validityDate) : null,
+        delivery:      delivery,
+        certification: cert,
+        warranty:      warranty,
+        supportLevel:  supportLevel,
+        notes:         notes,
+        status:        'pending',
+        createdAt:     serverTimestamp(),
       });
+
+      // Müşteriye bildirim
+      if (customerEmail) {
+        sendEmail(customerEmail, customerName,
+          'Yeni PoC Teklifi Aldınız — PoCHub',
+          (CUR_PROFILE?.displayName||CUR_USER.email)+' size '+productName+' icin teklif gonderdi. Tutar: '+currencySymbols[currency]+amount.toLocaleString('tr-TR'),
+          'pochub.co uzerinden teklifinizi inceleyebilirsiniz.'
+        );
+      }
+
+      // PoC durumunu offer_sent yap
+      await updateDoc(doc(db,'poc_requests',pocId), {
+        status: 'offer_sent',
+        offerSentAt: serverTimestamp(),
+      });
+
       modal.remove();
       showToast('Teklif gönderildi!');
-      if(customerEmail) sendEmail(customerEmail, customerName, 'Yeni Fiyat Teklifiniz Var',
-        `${CUR_PROFILE?.displayName||CUR_USER.email} size fiyat teklifi gönderdi.`,
-        `Ürün: ${productName}\nTutar: ${amount.toLocaleString('tr-TR')} ${modal.querySelector('#of-currency')?.value||'₺'}\n${modal.querySelector('#of-details')?.value||''}`);
+      loadVendTab();
     } catch(e) {
-      modal.querySelector('#of-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      errDiv.innerHTML='<div class="alert alert-err">'+e.message+'</div>';
       btn.disabled=false; btn.textContent='Teklifi Gönder';
     }
   });
 }
+
 
 function openEditProd(prodId, name, category, country, description, supportModel) {
   var modal = document.createElement('div');
@@ -3628,7 +3784,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.6</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.7</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
