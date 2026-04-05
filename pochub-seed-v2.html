@@ -174,12 +174,15 @@ document.getElementById('btn-poc').addEventListener('click', async function() {
     if (!users.customer) { log('❌ Müşteri test kullanıcısı bulunamadı', 'err'); this.disabled=false; return; }
     if (!prods.length) { log('❌ Aktif ürün bulunamadı', 'err'); this.disabled=false; return; }
 
-    // Zaten PoC talebi var mı?
+    // Zaten aktif/pending PoC talebi var mı? (iptal edilmişleri sayma)
     const existPoc = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',users.customer.id)));
-    if (!existPoc.empty) {
-      log(`⚠ Müşteri test kullanıcısının zaten ${existPoc.size} PoC talebi var. Tekrar oluşturulmadı.`);
+    const activePocs = existPoc.docs.filter(d => !['cancelled','rejected'].includes(d.data().status));
+    if (activePocs.length > 0) {
+      log(`⚠ Müşteri test kullanıcısının zaten ${activePocs.length} aktif PoC talebi var. Tekrar oluşturulmadı.`);
+      log(`  (İptal edilmiş ${existPoc.size - activePocs.length} talep sayılmadı)`);
       this.disabled=false; return;
     }
+    log(`ℹ ${existPoc.size} iptal edilmiş talep bulundu, yenileri oluşturuluyor...`);
 
     const SAMPLE_POCS = [
       { prodIdx: 0, vendorKey: 'ureticid',    status: 'pending',    title: 'Firewall PoC Değerlendirmesi' },
