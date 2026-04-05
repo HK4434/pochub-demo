@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v2.4</title>
+<title>PoCHub.co — v2.5</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -73,6 +73,27 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .msg-time{font-size:10px;color:#5a6278;margin-top:3px}
 .notif-dot{width:8px;height:8px;background:#ff4d4d;border-radius:50%;position:absolute;top:2px;right:2px}
 .notif-badge{background:#ff4d4d;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px}
+
+/* ── TIMELINE ── */
+.poc-timeline { padding: 8px 0; }
+.poc-tl-step { display:flex; gap:14px; padding:10px 0; position:relative; }
+.poc-tl-step:not(:last-child)::after {
+  content:''; position:absolute; left:15px; top:36px;
+  width:2px; height:calc(100% - 10px);
+  background:rgba(255,255,255,.08);
+}
+.poc-tl-dot {
+  width:30px; height:30px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; z-index:1;
+}
+.poc-tl-dot.done  { background:rgba(34,208,120,.2);  border:2px solid #22d078; }
+.poc-tl-dot.active{ background:rgba(59,124,255,.2);  border:2px solid #3b7cff; }
+.poc-tl-dot.wait  { background:rgba(255,255,255,.05);border:2px solid rgba(255,255,255,.15); }
+.poc-tl-content { flex:1; }
+.poc-tl-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+.poc-tl-sub   { font-size:11.5px; color:#7c87a0; }
+.poc-tl-time  { font-size:11px; color:#5a6278; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -121,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v2.4';
+const VERSION = 'v2.5';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -1559,6 +1580,98 @@ function openEditPocModal(pocId, title, requirements, preferredDates, location) 
   });
 }
 
+function openPocTimeline(poc) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+
+  // Adımları tanımla
+  var steps = [
+    {
+      key:'created', icon:'📋', label:'Talep Oluşturuldu',
+      sub: poc.productName ? ('"'+poc.productName+'" için talep gönderildi') : 'Talep gönderildi',
+      ts: poc.createdAt, done: true
+    },
+    {
+      key:'accepted', icon:'✅', label:'Vendor Kabul Etti',
+      sub: poc.vendorName ? (poc.vendorName+' talebinizi inceliyor/kabul etti') : 'Vendor inceliyor',
+      ts: poc.acceptedAt||null, done: ['active','offer_sent','completed'].includes(poc.status)
+    },
+    {
+      key:'poc_started', icon:'🔬', label:'PoC Süreci Başladı',
+      sub: poc.scheduledDate ? ('Planlanan tarih: '+fmt(poc.scheduledDate)) : 'Takvim bekleniyor',
+      ts: poc.scheduledDate||null, done: ['active','offer_sent','completed'].includes(poc.status) && poc.scheduledDate
+    },
+    {
+      key:'offer', icon:'💼', label:'Teklif Gönderildi',
+      sub: poc.offerAmount ? ('₺'+poc.offerAmount.toLocaleString('tr-TR')+' teklif alındı') : 'Teklif bekleniyor',
+      ts: poc.offerSentAt||null, done: ['offer_sent','completed'].includes(poc.status)
+    },
+    {
+      key:'decision', icon:'🏁', label:'Karar Verildi',
+      sub: poc.status==='completed'?'PoC tamamlandı':poc.status==='cancelled'?'Talep iptal edildi':'Kararınız bekleniyor',
+      ts: poc.completedAt||poc.cancelledAt||null,
+      done: ['completed','cancelled'].includes(poc.status)
+    },
+  ];
+
+  // Aktif adımı bul
+  var activeIdx = steps.findIndex(function(s){return !s.done;});
+  if (activeIdx === -1) activeIdx = steps.length - 1;
+
+  var statusColors = {
+    pending:'#f0a429', active:'#3b7cff', completed:'#22d078',
+    cancelled:'#ff7070', rejected:'#ff7070', offer_sent:'#c4a8ff'
+  };
+  var statusCol = statusColors[poc.status]||'#7c87a0';
+
+  modal.innerHTML =
+    '<div class="modal" style="max-width:480px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">' +
+    '<div>' +
+    '<h3 style="font-size:15px;font-weight:700;margin-bottom:4px">'+(poc.title||poc.productName||'PoC Talebi')+'</h3>' +
+    '<span class="bdg" style="background:'+statusCol+'22;color:'+statusCol+'">'+statusBadge(poc.status).replace(/<[^>]+>/g,'')+'</span>' +
+    '</div>' +
+    '<button id="ptl-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:20px">×</button>' +
+    '</div>' +
+
+    // Vendor bilgisi
+    (poc.vendorName ? '<div style="background:#1c1f2a;border-radius:8px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;gap:12px">' +
+    '<div style="width:36px;height:36px;border-radius:50%;background:rgba(59,124,255,.15);display:flex;align-items:center;justify-content:center;font-size:16px">🏢</div>' +
+    '<div><div style="font-size:12px;color:#5a6278">Vendor</div><div style="font-size:13px;font-weight:700">'+(poc.vendorName)+'</div></div>' +
+    (poc.vendorType ? '<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff;margin-left:auto">'+({ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'}[poc.vendorType]||poc.vendorType)+'</span>' : '') +
+    '</div>' : '') +
+
+    // Timeline
+    '<div class="poc-timeline">' +
+    steps.map(function(step, i) {
+      var isDone = step.done;
+      var isActive = i === activeIdx && !isDone;
+      var dotClass = isDone ? 'done' : isActive ? 'active' : 'wait';
+      var titleColor = isDone ? '#22d078' : isActive ? '#3b7cff' : '#5a6278';
+      return '<div class="poc-tl-step">' +
+        '<div class="poc-tl-dot '+dotClass+'">'+(isDone?'✓':isActive?'→':step.icon)+'</div>' +
+        '<div class="poc-tl-content">' +
+        '<div class="poc-tl-title" style="color:'+titleColor+'">'+step.label+'</div>' +
+        '<div class="poc-tl-sub">'+step.sub+'</div>' +
+        (step.ts ? '<div class="poc-tl-time">'+fmt(step.ts)+'</div>' : '') +
+        '</div></div>';
+    }).join('') +
+    '</div>' +
+
+    // Chat butonu
+    (poc.id && poc.vendorId ? '<button class="btn-p" id="ptl-chat" style="width:100%;padding:10px;margin-top:18px">💬 Vendor ile Mesajlaş</button>' : '') +
+    '</div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#ptl-close').addEventListener('click', function(){modal.remove();});
+  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
+  modal.querySelector('#ptl-chat')?.addEventListener('click', function(){
+    modal.remove();
+    openChatModal(poc.id, poc.vendorId, poc.vendorName||'Vendor', poc.productName||'PoC');
+  });
+}
+
+
 async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -1903,6 +2016,7 @@ async function loadCustTab() {
         <td>${statusBadge(r.status)}</td>
         <td style="color:#7c87a0;font-size:12px">${fmt(r.createdAt)}</td>
         <td><div style="display:flex;gap:6px">
+          <button class="poc-tl-btn btn-g btn-sm" data-id="${d.id}" title="Süreç Detayı">📋 Detay</button>
           ${r.status==='pending'?`<button class="edit-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-req="${(r.requirements||'')}" data-dates="${r.preferredDates||''}" data-loc="${r.location||'customer'}">Düzenle</button>`:''}
           ${(r.status==='active'||r.status==='pending')?`<button class="chat-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-vendor="${(r.vendorName||'')}">💬 Mesaj</button>`:''}
           ${r.status==='pending'?`<button class="cancel-poc-btn btn-red btn-sm" data-id="${d.id}">İptal</button>`:''}
@@ -1919,6 +2033,13 @@ async function loadCustTab() {
     }));
 
     // Düzenle
+    m.querySelectorAll('.poc-tl-btn').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var pocId = btn.dataset.id;
+        var docSnap = await getDoc(doc(db,'poc_requests',pocId));
+        if (docSnap.exists()) openPocTimeline({...docSnap.data(), id:pocId});
+      });
+    });
     m.querySelectorAll('.edit-poc-btn').forEach(b => b.addEventListener('click', () => {
       openEditPocModal(b.dataset.id, b.dataset.title, b.dataset.req, b.dataset.dates, b.dataset.loc);
     }));
@@ -2135,16 +2256,17 @@ async function loadVendTab() {
     }).join('')}`;
 
     m.querySelectorAll('.accept-poc').forEach(b => b.addEventListener('click', async () => {
-      await updateDoc(doc(db,'poc_requests',b.dataset.id), {status:'active'});
+      await updateDoc(doc(db,'poc_requests',b.dataset.id), {status:'active', acceptedAt:serverTimestamp()});
       showToast('PoC talebi aktif edildi!');
-      if(b.dataset.cemail) sendEmail(b.dataset.cemail, b.dataset.cname, 'PoC Talebiniz Kabul Edildi',
-        `${CUR_PROFILE?.displayName||CUR_USER.email} PoC talebinizi kabul etti.`, 'Yakında sizinle iletişime geçecekler.');
+      if(b.dataset.cemail) sendEmail(b.dataset.cemail, b.dataset.cname, 'PoC Talebiniz Kabul Edildi — PoCHub',
+        (CUR_PROFILE?.displayName||CUR_USER.email)+' PoC talebinizi kabul etti. Süreç başlıyor!',
+        'Ürün: '+(b.dataset.pname||'—')+'\nVendor: '+(CUR_PROFILE?.displayName||'—')+'\nDetay için pochub.co adresini ziyaret edin.');
       loadVendTab();
     }));
     m.querySelectorAll('.reject-poc').forEach(b => b.addEventListener('click', async () => {
-      await updateDoc(doc(db,'poc_requests',b.dataset.id), {status:'rejected'});
+      await updateDoc(doc(db,'poc_requests',b.dataset.id), {status:'rejected', rejectedAt:serverTimestamp()});
       showToast('Talep reddedildi.');
-      if(b.dataset.cemail) sendEmail(b.dataset.cemail, b.dataset.cname, 'PoC Talebi Hakkında',
+      if(b.dataset.cemail) sendEmail(b.dataset.cemail, b.dataset.cname, 'PoC Talebi Hakkında — PoCHub',
         `${CUR_PROFILE?.displayName||CUR_USER.email} maalesef PoC talebinizi kabul edemedi.`, '');
       loadVendTab();
     }));
@@ -3125,7 +3247,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.4</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v2.5</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
