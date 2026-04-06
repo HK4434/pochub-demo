@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v3.4 | pochub.co -->
+<!-- PoCHub v3.5 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v3.4</title>
+<title>PoCHub.co — v3.5</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v3.4';
+const VERSION = 'v3.5';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -627,6 +627,7 @@ let CUR_PROFILE = null;
 let CUR_SCREEN = 'home';
 let CUR_CUST_TAB = 'dashboard';
 let CUR_VEND_TAB = 'dashboard';
+let CUR_EV_PERIOD = 'upcoming'; // Etkinlikler dönem filtresi
 let CUR_ADM_TAB = 'dashboard';
 
 /* ══════════════════════════════════════
@@ -1334,11 +1335,11 @@ async function renderEvents() {
       ${CUR_PROFILE?.role==='vendor' ? '<button class="btn-p btn-sm" id="new-event-btn">+ Etkinlik Oluştur</button>' : ''}
     </div>
     <div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap" id="ev-period-bar">
-      <button class="btn-p btn-sm ev-period-btn" data-period="upcoming" style="font-size:12px">📅 Yaklaşan</button>
-      <button class="btn-g btn-sm ev-period-btn" data-period="this_month" style="font-size:12px">Bu Ay Geçenler</button>
-      <button class="btn-g btn-sm ev-period-btn" data-period="last_month" style="font-size:12px">Geçen Ay</button>
-      <button class="btn-g btn-sm ev-period-btn" data-period="this_year" style="font-size:12px">Bu Yıl Geçenler</button>
-      <button class="btn-g btn-sm ev-period-btn" data-period="all" style="font-size:12px">Tümü</button>
+      <button class="${CUR_EV_PERIOD==='upcoming'?'btn-p':'btn-g'} btn-sm ev-period-btn" data-period="upcoming" style="font-size:12px">📅 Yaklaşan</button>
+      <button class="${CUR_EV_PERIOD==='this_month'?'btn-p':'btn-g'} btn-sm ev-period-btn" data-period="this_month" style="font-size:12px">Bu Ay Geçenler</button>
+      <button class="${CUR_EV_PERIOD==='last_month'?'btn-p':'btn-g'} btn-sm ev-period-btn" data-period="last_month" style="font-size:12px">Geçen Ay</button>
+      <button class="${CUR_EV_PERIOD==='this_year'?'btn-p':'btn-g'} btn-sm ev-period-btn" data-period="this_year" style="font-size:12px">Bu Yıl Geçenler</button>
+      <button class="${CUR_EV_PERIOD==='all'?'btn-p':'btn-g'} btn-sm ev-period-btn" data-period="all" style="font-size:12px">Tümü</button>
     </div>
     <div style="display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap">
       <input class="inp" id="ev-search" placeholder="Etkinlik veya ürün ara..." style="flex:1;min-width:180px">
@@ -1372,14 +1373,15 @@ async function renderEvents() {
     var sel2=el('ev-lang-filter');
     if(sel2) sel2.innerHTML='<option value="">Tüm Diller</option>'+POC_LANGUAGES.map(function(l){return '<option value="'+l.code+'">'+l.flag+' '+l.name+'</option>';}).join('');
   });
-  // Dönem filtresi butonları
+  // Dönem filtresi butonları — CUR_EV_PERIOD global ile yönetilir
   el('events-main')?.addEventListener('click', function(e) {
     var pb = e.target.closest('.ev-period-btn');
     if (pb) {
+      CUR_EV_PERIOD = pb.dataset.period;
       el('events-main').querySelectorAll('.ev-period-btn').forEach(function(x){
-        x.className='btn-g btn-sm ev-period-btn';
+        x.className = 'btn-g btn-sm ev-period-btn';
       });
-      pb.className='btn-p btn-sm ev-period-btn';
+      pb.className = 'btn-p btn-sm ev-period-btn';
       loadEventsList();
     }
   });
@@ -1462,7 +1464,7 @@ async function loadEventsList() {
     const snap = await getDocs(q);
     let allDocs = snap.docs.map(d => ({...d.data(), id:d.id}));
     // Dönem filtresi
-    var evPeriod = el('ev-period-bar')?.querySelector('.btn-p')?.dataset?.period || 'upcoming';
+    var evPeriod = CUR_EV_PERIOD || 'upcoming';
     var now2 = new Date();
     var thisMonthStart = new Date(now2.getFullYear(), now2.getMonth(), 1);
     var lastMonthStart = new Date(now2.getFullYear(), now2.getMonth()-1, 1);
@@ -4282,7 +4284,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.4</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.5</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
