@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v3.2 | pochub.co -->
+<!-- PoCHub v3.3 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v3.2</title>
+<title>PoCHub.co — v3.3</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v3.2';
+const VERSION = 'v3.3';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -1014,6 +1014,14 @@ async function handleAuth() {
         errDiv.innerHTML = `<div class="alert alert-err">Şirket adı zorunludur.</div>`;
         btn.disabled=false; btn.textContent='Kayıt Ol'; return;
       }
+      if (!address) {
+        errDiv.innerHTML = `<div class="alert alert-err">Şirket adresi zorunludur.</div>`;
+        btn.disabled=false; btn.textContent='Kayıt Ol'; return;
+      }
+      if (!name) {
+        errDiv.innerHTML = `<div class="alert alert-err">Ad Soyad zorunludur.</div>`;
+        btn.disabled=false; btn.textContent='Kayıt Ol'; return;
+      }
 
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       await setDoc(doc(db, 'users', cred.user.uid), {
@@ -1135,7 +1143,8 @@ async function renderHome() {
   // Tüm etkinlikleri çek — hem takvim hem liste için
   let allEvents = [];
   try {
-    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published')));
+    var nowHome = Timestamp.fromDate(new Date());
+    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published'), where('eventDate','>=',nowHome)));
     allEvents = snap.docs.map(d => ({...d.data(), id:d.id}));
     allEvents.sort((a,b) => (a.eventDate?.seconds||0) - (b.eventDate?.seconds||0));
   } catch(e) { console.error('Etkinlik yükleme hatası:', e); }
@@ -1425,7 +1434,8 @@ async function loadEventsList() {
   if (!listEl) return;
   listEl.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
   try {
-    let q = query(collection(db,'public_events'), where('status','==','published'));
+    var nowTs2 = Timestamp.fromDate(new Date());
+    let q = query(collection(db,'public_events'), where('status','==','published'), where('eventDate','>=',nowTs2));
     const snap = await getDocs(q);
     let docs = snap.docs.map(d => ({...d.data(), id:d.id}));
     // Client-side sırala (eventDate'e göre)
@@ -4233,7 +4243,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.2</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.3</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -4303,6 +4313,71 @@ async function loadAdmTab() {
   }
 }
 
+async function openAdmUserEditModal(userId, name, email, company, role, phone) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:440px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Kullanıcı Düzenle</h3>' +
+    '<button id="aue-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<div style="background:#1c1f2a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12.5px;color:#7c87a0">' +
+    '📧 ' + email +
+    '</div>' +
+    '<label class="lbl">Ad Soyad</label>' +
+    '<input class="inp" id="aue-name" value="'+name+'">' +
+    '<label class="lbl">Şirket</label>' +
+    '<input class="inp" id="aue-company" value="'+company+'">' +
+    '<label class="lbl">Telefon</label>' +
+    '<input class="inp" id="aue-phone" value="'+( phone||'')+'">' +
+    '<label class="lbl">Rol</label>' +
+    '<select class="inp" id="aue-role">' +
+    '<option value="customer"'+(role==='customer'?' selected':'')+'>Müşteri</option>' +
+    '<option value="vendor"'+(role==='vendor'?' selected':'')+'>Vendor</option>' +
+    '<option value="admin"'+(role==='admin'?' selected':'')+'>Admin</option>' +
+    '<option value="moderator"'+(role==='moderator'?' selected':'')+'>Moderatör</option>' +
+    '<option value="support"'+(role==='support'?' selected':'')+'>Destek</option>' +
+    '</select>' +
+    '<div id="aue-err" style="margin-top:10px"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:16px">' +
+    '<button class="btn-g" id="aue-cancel" style="flex:1;padding:10px">Vazgeç</button>' +
+    '<button class="btn-p" id="aue-save" style="flex:2;padding:10px">Kaydet</button>' +
+    '</div></div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#aue-close').addEventListener('click',()=>modal.remove());
+  modal.querySelector('#aue-cancel').addEventListener('click',()=>modal.remove());
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+
+  modal.querySelector('#aue-save').addEventListener('click', async function() {
+    var newName    = modal.querySelector('#aue-name').value.trim();
+    var newCompany = modal.querySelector('#aue-company').value.trim();
+    var newPhone   = modal.querySelector('#aue-phone').value.trim();
+    var newRole    = modal.querySelector('#aue-role').value;
+    var btn = modal.querySelector('#aue-save');
+    if (!newName) { modal.querySelector('#aue-err').innerHTML='<div class="alert alert-err">Ad Soyad boş olamaz.</div>'; return; }
+    btn.disabled=true; btn.textContent='Kaydediliyor...';
+    try {
+      await updateDoc(doc(db,'users',userId), {
+        displayName: newName,
+        company: newCompany,
+        phone: newPhone,
+        role: newRole,
+      });
+      modal.remove();
+      showToast('Kullanıcı güncellendi.');
+      // Sayfayı yenile
+      var m = el('adm-main');
+      if (m) admUsers(m);
+    } catch(e) {
+      modal.querySelector('#aue-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      btn.disabled=false; btn.textContent='Kaydet';
+    }
+  });
+}
+
+
 async function admUsers(m) {
   const snap = await getDocs(collection(db,'users'));
   var all = snap.docs.map(d=>({...d.data(),id:d.id}));
@@ -4321,8 +4396,13 @@ async function admUsers(m) {
       return '<tr><td><div style="font-weight:600">'+(u.displayName||'—')+'</div><div style="font-size:11.5px;color:#7c87a0">'+u.email+'</div></td>'+
         '<td><span class="bdg" style="background:'+(roleBg[u.role]||'#1c1f2a')+';color:'+(roleCol[u.role]||'#7c87a0')+'">'+rl+'</span></td>'+
         '<td style="color:#7c87a0">'+(u.company||'—')+'</td>'+
-        '<td style="color:#7c87a0;font-size:12px">'+fmt(u.createdAt)+'</td></tr>';
-    }).join(''):'<tr><td colspan="4" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
+        '<td style="color:#7c87a0;font-size:12px">'+fmt(u.createdAt)+'</td>'+
+        '<td style="white-space:nowrap">'+
+          '<button class="btn-g btn-sm adm-user-edit" data-id="'+d.id+'" data-name="'+(u.displayName||'')+'" data-email="'+u.email+'" data-company="'+(u.company||'')+'" data-role="'+(u.role||'')+'" data-phone="'+(u.phone||'')+'" style="margin-right:4px">Düzenle</button>'+
+          (u.role!=='admin'?'<button class="btn-red btn-sm adm-user-del" data-id="'+d.id+'" data-name="'+(u.displayName||u.email)+'">Sil</button>':'')+
+        '</td>'+
+        '</tr>';
+    }).join(''):'<tr><td colspan="5" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
   }
   function applyFilter() {
     var q=(m.querySelector('#u-search')?.value||'').toLowerCase();
@@ -4346,7 +4426,83 @@ async function admUsers(m) {
     m.querySelectorAll('.u-rf').forEach(function(x){x.className='btn-g btn-sm u-rf';});
     b.className='btn-p btn-sm u-rf'; roleFilter=b.dataset.r; applyFilter();
   });});
+
+  // Event delegation — renderRows her çalışınca listener'lar yeniden bağlanır
+  m.querySelector('#u-tbody').addEventListener('click', async function(e) {
+    var editBtn = e.target.closest('.adm-user-edit');
+    var delBtn  = e.target.closest('.adm-user-del');
+    if (editBtn) {
+      openAdmUserEditModal(
+        editBtn.dataset.id, editBtn.dataset.name, editBtn.dataset.email,
+        editBtn.dataset.company, editBtn.dataset.role, editBtn.dataset.phone
+      );
+    }
+    if (delBtn) {
+      if (!confirm('"'+delBtn.dataset.name+'" kullanıcısını silmek istiyor musunuz? Bu işlem geri alınamaz.')) return;
+      try {
+        await deleteDoc(doc(db,'users',delBtn.dataset.id));
+        showToast('Kullanıcı silindi.');
+        all = all.filter(function(u){ return u.id !== delBtn.dataset.id; });
+        applyFilter();
+      } catch(e2) { showToast('Hata: '+e2.message,'err'); }
+    }
+  });
 }
+
+async function openAdmProdEditModal(prodId, name, cat, desc, country) {
+  var cats = await getCategories();
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:440px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">Ürün Düzenle</h3>' +
+    '<button id="ape-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+    '<label class="lbl">Ürün Adı *</label>' +
+    '<input class="inp" id="ape-name" value="'+name+'">' +
+    '<label class="lbl">Kategori</label>' +
+    '<select class="inp" id="ape-cat">' +
+    cats.map(function(ct){ return '<option value="'+ct.name+'"'+(ct.name===cat?' selected':'')+'>'+ct.name+'</option>'; }).join('') +
+    '</select>' +
+    '<label class="lbl">Menşei Ülke</label>' +
+    '<input class="inp" id="ape-country" value="'+(country||'')+'" placeholder="TR, US, IL...">' +
+    '<label class="lbl">Açıklama</label>' +
+    '<textarea class="inp" id="ape-desc" rows="3" style="resize:none">'+( desc||'')+'</textarea>' +
+    '<div id="ape-err" style="margin-top:10px"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:16px">' +
+    '<button class="btn-g" id="ape-cancel" style="flex:1;padding:10px">Vazgeç</button>' +
+    '<button class="btn-p" id="ape-save" style="flex:2;padding:10px">Kaydet</button>' +
+    '</div></div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#ape-close').addEventListener('click',()=>modal.remove());
+  modal.querySelector('#ape-cancel').addEventListener('click',()=>modal.remove());
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+
+  modal.querySelector('#ape-save').addEventListener('click', async function() {
+    var newName    = modal.querySelector('#ape-name').value.trim();
+    var newCat     = modal.querySelector('#ape-cat').value;
+    var newCountry = modal.querySelector('#ape-country').value.trim();
+    var newDesc    = modal.querySelector('#ape-desc').value.trim();
+    var btn = modal.querySelector('#ape-save');
+    if (!newName) { modal.querySelector('#ape-err').innerHTML='<div class="alert alert-err">Ürün adı boş olamaz.</div>'; return; }
+    btn.disabled=true; btn.textContent='Kaydediliyor...';
+    try {
+      await updateDoc(doc(db,'products',prodId),{
+        name:newName, category:newCat, country:newCountry, description:newDesc
+      });
+      modal.remove();
+      showToast('Ürün güncellendi.');
+      var m = el('adm-main');
+      if (m) admProducts(m);
+    } catch(e) {
+      modal.querySelector('#ape-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      btn.disabled=false; btn.textContent='Kaydet';
+    }
+  });
+}
+
 
 async function admProducts(m) {
   const snap = await getDocs(collection(db,'products'));
@@ -4367,7 +4523,9 @@ async function admProducts(m) {
         '<td style="white-space:nowrap">'+(p.status==='pending'?
           '<button class="btn-gr btn-sm p-appr" data-id="'+p.id+'" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+'" data-pn="'+p.name+'" style="margin-right:4px">Onayla</button>'+
           '<button class="btn-red btn-sm p-rej" data-id="'+p.id+'" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+'" data-pn="'+p.name+'">Reddet</button>':
-          p.status==='active'?'<button class="btn-red btn-sm p-arc" data-id="'+p.id+'">Arşivle</button>':'—')+'</td></tr>';
+          p.status==='active'?'<button class="btn-red btn-sm p-arc" data-id="'+p.id+'">Arşivle</button>':'—')+
+          '<button class="btn-g btn-sm p-edit" data-id="'+p.id+'" data-name="'+p.name+'" data-cat="'+(p.category||'')+'" data-desc="'+(p.description||'')+'" data-country="'+(p.country||'')+'" style="margin-left:4px">Düzenle</button>'+
+          (p.status!=='active'?'<button class="btn-red btn-sm p-del" data-id="'+p.id+'" data-name="'+p.name+'" style="margin-left:4px">Sil</button>':'')+'</td></tr>';
     }).join(''):'<tr><td colspan="6" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
     m.querySelectorAll('.p-appr').forEach(function(b){b.addEventListener('click',async function(){
       await updateDoc(doc(db,'products',b.dataset.id),{status:'active'});
@@ -4407,6 +4565,39 @@ async function admProducts(m) {
     m.querySelectorAll('.p-sf').forEach(function(x){x.className='btn-g btn-sm p-sf';});
     b.className='btn-p btn-sm p-sf'; stFilter=b.dataset.s; applyFilter();
   });});
+
+  // Event delegation
+  m.querySelector('#p-tbody').addEventListener('click', async function(e) {
+    var appBtn  = e.target.closest('.p-app');
+    var rejBtn  = e.target.closest('.p-rej');
+    var arcBtn  = e.target.closest('.p-arc');
+    var editBtn = e.target.closest('.p-edit');
+    var delBtn  = e.target.closest('.p-del');
+    if (appBtn) {
+      await updateDoc(doc(db,'products',appBtn.dataset.id),{status:'active',approvedAt:serverTimestamp()});
+      if(appBtn.dataset.ve) sendEmail(appBtn.dataset.ve,appBtn.dataset.vn,'Ürününüz Onaylandı — PoCHub',appBtn.dataset.pn+' ürününüz onaylandı ve katalogda yayınlandı.','');
+      showToast('Ürün onaylandı!'); all=all.map(p=>p.id===appBtn.dataset.id?{...p,status:'active'}:p); applyFilter();
+    }
+    if (rejBtn) {
+      await updateDoc(doc(db,'products',rejBtn.dataset.id),{status:'rejected',rejectedAt:serverTimestamp()});
+      if(rejBtn.dataset.ve) sendEmail(rejBtn.dataset.ve,rejBtn.dataset.vn,'Ürün Başvurusu Hakkında — PoCHub',rejBtn.dataset.pn+' ürününüz incelendi ancak onaylanamadı.','');
+      showToast('Reddedildi.'); all=all.map(p=>p.id===rejBtn.dataset.id?{...p,status:'rejected'}:p); applyFilter();
+    }
+    if (arcBtn) {
+      await updateDoc(doc(db,'products',arcBtn.dataset.id),{status:'archived'});
+      showToast('Arşivlendi.'); all=all.map(p=>p.id===arcBtn.dataset.id?{...p,status:'archived'}:p); applyFilter();
+    }
+    if (editBtn) {
+      openAdmProdEditModal(editBtn.dataset.id,editBtn.dataset.name,editBtn.dataset.cat,editBtn.dataset.desc,editBtn.dataset.country);
+    }
+    if (delBtn) {
+      if (!confirm('"'+delBtn.dataset.name+'" ürününü kalıcı olarak silmek istiyor musunuz?')) return;
+      try {
+        await deleteDoc(doc(db,'products',delBtn.dataset.id));
+        showToast('Ürün silindi.'); all=all.filter(p=>p.id!==delBtn.dataset.id); applyFilter();
+      } catch(e2) { showToast('Hata: '+e2.message,'err'); }
+    }
+  });
 }
 
 async function admRequests(m) {
