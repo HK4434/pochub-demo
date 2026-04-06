@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v3.3 | pochub.co -->
+<!-- PoCHub v3.4 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v3.3</title>
+<title>PoCHub.co — v3.4</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v3.3';
+const VERSION = 'v3.4';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -948,11 +948,11 @@ function renderAuthForm() {
 
   let html = '';
   if (AUTH_MODE === 'register') {
-    html += `<label class="lbl">Ad Soyad *</label><input class="inp" id="a-name" placeholder="Ad Soyad"><br>`;
-    html += `<label class="lbl">Şirket Adı *</label><input class="inp" id="a-company" placeholder="Şirket adı (zorunlu)"><br>`;
-    html += `<label class="lbl">Şirket Telefonu *</label><input class="inp" id="a-phone" placeholder="+90 212 xxx xx xx"><br>`;
-    html += `<label class="lbl">Şirket Adresi</label><textarea class="inp" id="a-address" rows="2" placeholder="Şirket adresi" style="resize:none"></textarea><br>`;
-    html += `<label class="lbl">Vergi No / TC No</label><input class="inp" id="a-taxno" placeholder="Vergi kimlik numarası"><br>`;
+    html += `<label class="lbl">Ad Soyad <span style="color:#ff7070">*</span></label><input class="inp" id="a-name" placeholder="Ad Soyad (zorunlu)"><br>`;
+    html += `<label class="lbl">Şirket Adı <span style="color:#ff7070">*</span></label><input class="inp" id="a-company" placeholder="Şirket adı (zorunlu)"><br>`;
+    html += `<label class="lbl">Şirket Telefonu <span style="color:#ff7070">*</span></label><input class="inp" id="a-phone" placeholder="+90 212 xxx xx xx (zorunlu)"><br>`;
+    html += `<label class="lbl">Şirket Adresi <span style="color:#ff7070">*</span></label><textarea class="inp" id="a-address" rows="2" placeholder="Mahalle, Sokak No, İlçe, İl (zorunlu)" style="resize:none"></textarea><br>`;
+    html += `<label class="lbl">Vergi No / TC No <span style="color:#5a6278;font-size:11px">(opsiyonel)</span></label><input class="inp" id="a-taxno" placeholder="Vergi kimlik numarası"><br>`;
     html += `<div style="background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.2);border-radius:7px;padding:10px;font-size:12px;color:#7db4ff;margin-bottom:4px">ℹ Kayıt için kurumsal e-posta adresi zorunludur. (Gmail, Hotmail vb. kabul edilmez)</div>`;
   }
   html += `<label class="lbl">E-posta *</label><input class="inp" id="a-email" type="email" placeholder="ornek@sirket.com"><br>`;
@@ -1143,9 +1143,14 @@ async function renderHome() {
   // Tüm etkinlikleri çek — hem takvim hem liste için
   let allEvents = [];
   try {
-    var nowHome = Timestamp.fromDate(new Date());
-    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published'), where('eventDate','>=',nowHome)));
-    allEvents = snap.docs.map(d => ({...d.data(), id:d.id}));
+    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published')));
+    var _now = new Date();
+    allEvents = snap.docs.map(d => ({...d.data(), id:d.id}))
+      .filter(e => {
+        if (!e.eventDate) return true;
+        var ed = e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate);
+        return ed >= _now;
+      });
     allEvents.sort((a,b) => (a.eventDate?.seconds||0) - (b.eventDate?.seconds||0));
   } catch(e) { console.error('Etkinlik yükleme hatası:', e); }
 
@@ -1328,6 +1333,13 @@ async function renderEvents() {
       <h2 style="font-size:20px;font-weight:700">Public PoC Etkinlikleri</h2>
       ${CUR_PROFILE?.role==='vendor' ? '<button class="btn-p btn-sm" id="new-event-btn">+ Etkinlik Oluştur</button>' : ''}
     </div>
+    <div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap" id="ev-period-bar">
+      <button class="btn-p btn-sm ev-period-btn" data-period="upcoming" style="font-size:12px">📅 Yaklaşan</button>
+      <button class="btn-g btn-sm ev-period-btn" data-period="this_month" style="font-size:12px">Bu Ay Geçenler</button>
+      <button class="btn-g btn-sm ev-period-btn" data-period="last_month" style="font-size:12px">Geçen Ay</button>
+      <button class="btn-g btn-sm ev-period-btn" data-period="this_year" style="font-size:12px">Bu Yıl Geçenler</button>
+      <button class="btn-g btn-sm ev-period-btn" data-period="all" style="font-size:12px">Tümü</button>
+    </div>
     <div style="display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap">
       <input class="inp" id="ev-search" placeholder="Etkinlik veya ürün ara..." style="flex:1;min-width:180px">
       <select class="inp" id="ev-cat" style="width:auto">
@@ -1360,6 +1372,18 @@ async function renderEvents() {
     var sel2=el('ev-lang-filter');
     if(sel2) sel2.innerHTML='<option value="">Tüm Diller</option>'+POC_LANGUAGES.map(function(l){return '<option value="'+l.code+'">'+l.flag+' '+l.name+'</option>';}).join('');
   });
+  // Dönem filtresi butonları
+  el('events-main')?.addEventListener('click', function(e) {
+    var pb = e.target.closest('.ev-period-btn');
+    if (pb) {
+      el('events-main').querySelectorAll('.ev-period-btn').forEach(function(x){
+        x.className='btn-g btn-sm ev-period-btn';
+      });
+      pb.className='btn-p btn-sm ev-period-btn';
+      loadEventsList();
+    }
+  });
+
   loadEventsList();
 }
 
@@ -1434,11 +1458,26 @@ async function loadEventsList() {
   if (!listEl) return;
   listEl.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
   try {
-    var nowTs2 = Timestamp.fromDate(new Date());
-    let q = query(collection(db,'public_events'), where('status','==','published'), where('eventDate','>=',nowTs2));
+    let q = query(collection(db,'public_events'), where('status','==','published'));
     const snap = await getDocs(q);
-    let docs = snap.docs.map(d => ({...d.data(), id:d.id}));
-    // Client-side sırala (eventDate'e göre)
+    let allDocs = snap.docs.map(d => ({...d.data(), id:d.id}));
+    // Dönem filtresi
+    var evPeriod = el('ev-period-bar')?.querySelector('.btn-p')?.dataset?.period || 'upcoming';
+    var now2 = new Date();
+    var thisMonthStart = new Date(now2.getFullYear(), now2.getMonth(), 1);
+    var lastMonthStart = new Date(now2.getFullYear(), now2.getMonth()-1, 1);
+    var lastMonthEnd   = new Date(now2.getFullYear(), now2.getMonth(), 1);
+    var thisYearStart  = new Date(now2.getFullYear(), 0, 1);
+    var docs = allDocs.filter(function(e) {
+      var ed = e.eventDate?.toDate ? e.eventDate.toDate() : null;
+      if (!ed) return true;
+      if (evPeriod === 'upcoming')    return ed >= now2;
+      if (evPeriod === 'this_month')  return ed >= thisMonthStart && ed < now2;
+      if (evPeriod === 'last_month')  return ed >= lastMonthStart && ed < lastMonthEnd;
+      if (evPeriod === 'this_year')   return ed >= thisYearStart && ed < now2;
+      return true; // 'all'
+    });
+    // Sırala
     docs.sort((a,b) => (a.eventDate?.seconds||0) - (b.eventDate?.seconds||0));
 
     // Filtrele
@@ -4243,7 +4282,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.3</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.4</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -4398,8 +4437,8 @@ async function admUsers(m) {
         '<td style="color:#7c87a0">'+(u.company||'—')+'</td>'+
         '<td style="color:#7c87a0;font-size:12px">'+fmt(u.createdAt)+'</td>'+
         '<td style="white-space:nowrap">'+
-          '<button class="btn-g btn-sm adm-user-edit" data-id="'+d.id+'" data-name="'+(u.displayName||'')+'" data-email="'+u.email+'" data-company="'+(u.company||'')+'" data-role="'+(u.role||'')+'" data-phone="'+(u.phone||'')+'" style="margin-right:4px">Düzenle</button>'+
-          (u.role!=='admin'?'<button class="btn-red btn-sm adm-user-del" data-id="'+d.id+'" data-name="'+(u.displayName||u.email)+'">Sil</button>':'')+
+          '<button class="btn-g btn-sm adm-user-edit" data-id="'+u.id+'" data-name="'+(u.displayName||'')+'" data-email="'+u.email+'" data-company="'+(u.company||'')+'" data-role="'+(u.role||'')+'" data-phone="'+(u.phone||'')+'" style="margin-right:4px">Düzenle</button>'+
+          (u.role!=='admin'?'<button class="btn-red btn-sm adm-user-del" data-id="'+u.id+'" data-name="'+(u.displayName||u.email)+'">Sil</button>':'')+
         '</td>'+
         '</tr>';
     }).join(''):'<tr><td colspan="5" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
