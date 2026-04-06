@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v3.5 | pochub.co -->
+<!-- PoCHub v3.6 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v3.5</title>
+<title>PoCHub.co — v3.6</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v3.5';
+const VERSION = 'v3.6';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -1246,7 +1246,16 @@ async function renderHome() {
     const listEl = el('home-events-list');
     if (!listEl) return;
     if (!events.length) {
-      listEl.innerHTML = '<div class="empty">Bu tarihte etkinlik yok.</div>';
+      var periodLabels = {
+        upcoming:'yaklaşan etkinlik',
+        this_month:'bu ay gerçekleşmiş etkinlik',
+        last_month:'geçen ay gerçekleşmiş etkinlik',
+        this_year:'bu yıl gerçekleşmiş etkinlik',
+        all:'etkinlik'
+      };
+      listEl.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>' +
+        'Bu filtrede ' + (periodLabels[evPeriod]||'etkinlik') + ' bulunamadı.<br>' +
+        '<small style="color:#5a6278">Farklı bir dönem veya filtre seçin.</small></div>';
       return;
     }
     listEl.innerHTML = events.map(e => {
@@ -1499,7 +1508,17 @@ async function loadEventsList() {
       return;
     }
 
-    listEl.innerHTML = docs.map(e => {
+    var periodTitles = {
+      upcoming: '📅 Yaklaşan Etkinlikler',
+      this_month: '📅 Bu Ay Gerçekleşen Etkinlikler',
+      last_month: '📅 Geçen Ay Gerçekleşen Etkinlikler',
+      this_year: '📅 Bu Yıl Gerçekleşen Etkinlikler',
+      all: '📅 Tüm Etkinlikler'
+    };
+    listEl.innerHTML = '<div style="font-size:12.5px;color:#7c87a0;margin-bottom:12px;padding:8px 12px;background:#1c1f2a;border-radius:8px">' +
+      (periodTitles[evPeriod]||'Etkinlikler') + ' — ' + docs.length + ' sonuç' +
+      '</div>' +
+      docs.map(e => {
       const date = e.eventDate?.toDate ? e.eventDate.toDate().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '—';
       const spots = e.capacity - (e.registeredCount||0);
       const feeBg = e.fee>0?'rgba(59,124,255,.12)':'rgba(34,208,120,.12)';
@@ -4284,7 +4303,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.5</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.6</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
