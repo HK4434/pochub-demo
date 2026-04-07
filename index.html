@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v3.6 | pochub.co -->
+<!-- PoCHub v3.7 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v3.6</title>
+<title>PoCHub.co — v3.7</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v3.6';
+const VERSION = 'v3.7';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ── DİL LİSTESİ ── */
@@ -183,10 +183,11 @@ async function getCategories() {
     var cats = snap.docs.map(d=>({...d.data(),id:d.id}));
     cats.sort((a,b)=>(a.order||0)-(b.order||0));
     if (!cats.length) cats = ['Firewall','Network','Storage','Yedekleme','Server','Güvenlik','Yazılım','Diğer'].map(function(n,i){return {name:n,order:i,id:n};});
+    cats.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','tr'); });
     _catCache = cats;
     return cats;
   } catch(e) {
-    return ['Firewall','Network','Storage','Yedekleme','Server','Güvenlik','Yazılım','Diğer'].map(function(n,i){return {name:n,order:i,id:n};});
+    return ['Firewall','Güvenlik','Network','Server','Storage','Yazılım','Yedekleme','Diğer'].map(function(n,i){return {name:n,order:i,id:n};});
   }
 }
 function invalidateCatCache() { _catCache = null; }
@@ -1382,12 +1383,12 @@ async function renderEvents() {
     var sel2=el('ev-lang-filter');
     if(sel2) sel2.innerHTML='<option value="">Tüm Diller</option>'+POC_LANGUAGES.map(function(l){return '<option value="'+l.code+'">'+l.flag+' '+l.name+'</option>';}).join('');
   });
-  // Dönem filtresi butonları — CUR_EV_PERIOD global ile yönetilir
-  el('events-main')?.addEventListener('click', function(e) {
+  // Dönem filtresi butonları — scr-events üzerinden event delegation
+  el('scr-events')?.addEventListener('click', function(e) {
     var pb = e.target.closest('.ev-period-btn');
     if (pb) {
       CUR_EV_PERIOD = pb.dataset.period;
-      el('events-main').querySelectorAll('.ev-period-btn').forEach(function(x){
+      el('scr-events').querySelectorAll('.ev-period-btn').forEach(function(x){
         x.className = 'btn-g btn-sm ev-period-btn';
       });
       pb.className = 'btn-p btn-sm ev-period-btn';
@@ -4303,7 +4304,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.6</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.7</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -4569,6 +4570,26 @@ async function admProducts(m) {
   var all = snap.docs.map(d=>({...d.data(),id:d.id}));
   all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   var stFilter='';
+  var pFilter='upcoming'; // Default: yaklaşan
+
+  function applyPeriod(items) {
+    var now3 = new Date();
+    var thisMonthStart = new Date(now3.getFullYear(), now3.getMonth(), 1);
+    var lastMonthStart = new Date(now3.getFullYear(), now3.getMonth()-1, 1);
+    var lastMonthEnd   = new Date(now3.getFullYear(), now3.getMonth(), 1);
+    var thisYearStart  = new Date(now3.getFullYear(), 0, 1);
+    return items.filter(function(e) {
+      var ed = e.eventDate?.toDate ? e.eventDate.toDate() : null;
+      if (!ed || !pFilter) return true;
+      if (pFilter === 'upcoming')    return ed >= now3;
+      if (pFilter === 'past')        return ed < now3;
+      if (pFilter === 'this_month')  return ed >= thisMonthStart && ed < new Date(now3.getFullYear(), now3.getMonth()+1, 1);
+      if (pFilter === 'last_month')  return ed >= lastMonthStart && ed < lastMonthEnd;
+      if (pFilter === 'this_year')   return ed >= thisYearStart;
+      return true;
+    });
+  }
+
   function renderRows(items) {
     var tbody=m.querySelector('#p-tbody');
     var cnt=m.querySelector('#p-cnt');
@@ -4696,6 +4717,26 @@ async function admEvents(m) {
   var all = evSnap2.docs.map(d=>({...d.data(),id:d.id}));
   all.sort((a,b)=>(a.eventDate?.seconds||a.createdAt?.seconds||0)-(b.eventDate?.seconds||b.createdAt?.seconds||0));
   var stFilter='';
+  var pFilter='upcoming'; // Default: yaklaşan
+
+  function applyPeriod(items) {
+    var now3 = new Date();
+    var thisMonthStart = new Date(now3.getFullYear(), now3.getMonth(), 1);
+    var lastMonthStart = new Date(now3.getFullYear(), now3.getMonth()-1, 1);
+    var lastMonthEnd   = new Date(now3.getFullYear(), now3.getMonth(), 1);
+    var thisYearStart  = new Date(now3.getFullYear(), 0, 1);
+    return items.filter(function(e) {
+      var ed = e.eventDate?.toDate ? e.eventDate.toDate() : null;
+      if (!ed || !pFilter) return true;
+      if (pFilter === 'upcoming')    return ed >= now3;
+      if (pFilter === 'past')        return ed < now3;
+      if (pFilter === 'this_month')  return ed >= thisMonthStart && ed < new Date(now3.getFullYear(), now3.getMonth()+1, 1);
+      if (pFilter === 'last_month')  return ed >= lastMonthStart && ed < lastMonthEnd;
+      if (pFilter === 'this_year')   return ed >= thisYearStart;
+      return true;
+    });
+  }
+
   function renderRows(items) {
     var tbody=m.querySelector('#ev-tbody');
     var cnt=m.querySelector('#ev-cnt');
@@ -4718,23 +4759,38 @@ async function admEvents(m) {
   }
   function applyFilter() {
     var q=(m.querySelector('#ev-search2')?.value||'').toLowerCase();
-    renderRows(all.filter(function(e){
+    var filtered = all.filter(function(e){
       return (!stFilter||e.status===stFilter)&&(!q||(e.title||'').toLowerCase().includes(q)||(e.vendorName||'').toLowerCase().includes(q)||(e.productName||'').toLowerCase().includes(q));
-    }));
+    });
+    filtered = applyPeriod(filtered);
+    renderRows(filtered);
   }
   m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
     '<h2 style="font-size:18px;font-weight:700">Tüm Etkinlikler <span id="ev-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>'+
     '<input class="inp" id="ev-search2" placeholder="Başlık veya vendor..." style="width:240px;font-size:12.5px"></div>'+
-    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">'+
+    '<span style="font-size:11px;color:#5a6278;padding:6px 4px;align-self:center">Durum:</span>'+
     '<button class="btn-p btn-sm ev-sf" data-s="">Tümü</button>'+
     '<button class="btn-g btn-sm ev-sf" data-s="published">Yayında</button>'+
     '<button class="btn-g btn-sm ev-sf" data-s="cancelled">İptal</button></div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">'+
+    '<span style="font-size:11px;color:#5a6278;padding:6px 4px;align-self:center">Dönem:</span>'+
+    '<button class="btn-g btn-sm ev-pf" data-p="">Tümü</button>'+
+    '<button class="btn-p btn-sm ev-pf" data-p="upcoming">Yaklaşan</button>'+
+    '<button class="btn-g btn-sm ev-pf" data-p="past">Geçmiş</button>'+
+    '<button class="btn-g btn-sm ev-pf" data-p="this_month">Bu Ay</button>'+
+    '<button class="btn-g btn-sm ev-pf" data-p="last_month">Geçen Ay</button>'+
+    '<button class="btn-g btn-sm ev-pf" data-p="this_year">Bu Yıl</button></div>'+
     '<table><thead><tr><th>Başlık</th><th>Vendor</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="ev-tbody"></tbody></table>';
   renderRows(all);
   m.querySelector('#ev-search2').addEventListener('input', applyFilter);
   m.querySelectorAll('.ev-sf').forEach(function(b){b.addEventListener('click',function(){
     m.querySelectorAll('.ev-sf').forEach(function(x){x.className='btn-g btn-sm ev-sf';});
     b.className='btn-p btn-sm ev-sf'; stFilter=b.dataset.s; applyFilter();
+  });});
+  m.querySelectorAll('.ev-pf').forEach(function(b){b.addEventListener('click',function(){
+    m.querySelectorAll('.ev-pf').forEach(function(x){x.className='btn-g btn-sm ev-pf';});
+    b.className='btn-p btn-sm ev-pf'; pFilter=b.dataset.p; applyFilter();
   });});
 }
 
@@ -4743,6 +4799,26 @@ async function admOffers(m) {
   var all = snap.docs.map(d=>({...d.data(),id:d.id}));
   all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   var stFilter='';
+  var pFilter='upcoming'; // Default: yaklaşan
+
+  function applyPeriod(items) {
+    var now3 = new Date();
+    var thisMonthStart = new Date(now3.getFullYear(), now3.getMonth(), 1);
+    var lastMonthStart = new Date(now3.getFullYear(), now3.getMonth()-1, 1);
+    var lastMonthEnd   = new Date(now3.getFullYear(), now3.getMonth(), 1);
+    var thisYearStart  = new Date(now3.getFullYear(), 0, 1);
+    return items.filter(function(e) {
+      var ed = e.eventDate?.toDate ? e.eventDate.toDate() : null;
+      if (!ed || !pFilter) return true;
+      if (pFilter === 'upcoming')    return ed >= now3;
+      if (pFilter === 'past')        return ed < now3;
+      if (pFilter === 'this_month')  return ed >= thisMonthStart && ed < new Date(now3.getFullYear(), now3.getMonth()+1, 1);
+      if (pFilter === 'last_month')  return ed >= lastMonthStart && ed < lastMonthEnd;
+      if (pFilter === 'this_year')   return ed >= thisYearStart;
+      return true;
+    });
+  }
+
   function renderRows(items) {
     var tbody=m.querySelector('#of-tbody');
     var cnt=m.querySelector('#of-cnt');
