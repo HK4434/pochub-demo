@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v3.9.2 | pochub.co -->
+<!-- PoCHub v4.0 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v3.9.2</title>
+<title>PoCHub.co — v4.0</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,163 +142,341 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v3.9.2';
+const VERSION = 'v4.0';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
    KATEGORİ BAZLI ALAN ŞEMASI (v3.8)
 ═══════════════════════════════════════════════════════ */
 var CATEGORY_FIELDS = {
+
+  /* ══════════════════════════════════════════════════════
+     FIREWALL / NGFW
+     Referans: FortiGate 100F, Palo Alto PA-Series, Check Point datasheets
+  ══════════════════════════════════════════════════════ */
   'Firewall': [
-    {id:'throughput',     label:'Firewall Throughput',      type:'text',   ph:'Örn: 10 Gbps',                req:true},
-    {id:'vpn_throughput', label:'VPN Throughput',           type:'text',   ph:'Örn: 2 Gbps'},
-    {id:'max_users',      label:'Maks. Kullanıcı Sayısı',   type:'number', ph:'Örn: 5000'},
-    {id:'ips_ids',        label:'IPS/IDS Desteği',          type:'select', opts:['Evet','Hayır','Opsiyonel']},
-    {id:'ssl_inspect',    label:'SSL İnceleme',             type:'select', opts:['Evet','Hayır']},
-    {id:'ha_support',     label:'HA Desteği',               type:'select', opts:['Aktif-Aktif','Aktif-Pasif','Hayır']},
-    {id:'form_factor',    label:'Form Faktörü',             type:'select', opts:['Rack','Desktop','Virtual','Cloud']},
-    {id:'certifications', label:'Sertifikasyonlar',         type:'text',   ph:'BTK, Common Criteria, FIPS...'},
-    {id:'mgmt_interface', label:'Yönetim Arayüzü',          type:'text',   ph:'Web GUI, CLI, REST API...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['Perpetual','Subscription','Abonelik+Donanim']},
+    // Performans
+    {id:'fw_throughput',      label:'Firewall Throughput (Gbps)',     type:'text',   ph:'Örn: 20 Gbps (1518 byte)', req:true,  group:'Performans'},
+    {id:'fw_latency',         label:'Firewall Gecikme (µs)',           type:'text',   ph:'Örn: 3 µs',                            group:'Performans'},
+    {id:'concurrent_sessions',label:'Eş Zamanlı Oturum',              type:'text',   ph:'Örn: 3 Milyon',                         group:'Performans'},
+    {id:'new_sessions_sec',   label:'Yeni Oturum/Saniye',             type:'text',   ph:'Örn: 280,000',                          group:'Performans'},
+    {id:'firewall_policies',  label:'Maks. Firewall Politikası',      type:'text',   ph:'Örn: 10,000',                           group:'Performans'},
+    // IPS / Tehdit
+    {id:'ips_throughput',     label:'IPS Throughput (Gbps)',           type:'text',   ph:'Örn: 2.6 Gbps (Enterprise Mix)',       group:'IPS / Tehdit'},
+    {id:'ngfw_throughput',    label:'NGFW Throughput (Gbps)',          type:'text',   ph:'Örn: 1.6 Gbps',                        group:'IPS / Tehdit'},
+    {id:'threat_protection',  label:'Threat Protection (Gbps)',       type:'text',   ph:'Örn: 1 Gbps',                           group:'IPS / Tehdit'},
+    {id:'ssl_inspection',     label:'SSL İnceleme Throughput',        type:'text',   ph:'Örn: 1 Gbps (avg HTTPS)',               group:'IPS / Tehdit'},
+    {id:'ssl_inspect_support',label:'SSL/TLS İnceleme Desteği',       type:'select', opts:['TLS 1.3 Dahil','TLS 1.2 ve altı','Hayır'], group:'IPS / Tehdit'},
+    {id:'av_support',         label:'Antivirüs / Malware',            type:'select', opts:['Dahili','Sandbox Entegrasyon','Her İkisi','Hayır'], group:'IPS / Tehdit'},
+    // VPN
+    {id:'ipsec_throughput',   label:'IPsec VPN Throughput',           type:'text',   ph:'Örn: 11 Gbps (AES256-SHA256)',         group:'VPN'},
+    {id:'ipsec_tunnels_gw',   label:'Maks. G/W-G/W IPsec Tünel',     type:'text',   ph:'Örn: 2,000',                           group:'VPN'},
+    {id:'ipsec_tunnels_client',label:'Maks. Client IPsec Tünel',      type:'text',   ph:'Örn: 50,000',                          group:'VPN'},
+    {id:'ssl_vpn_throughput', label:'SSL VPN Throughput',             type:'text',   ph:'Örn: 2 Gbps',                          group:'VPN'},
+    {id:'ssl_vpn_users',      label:'Maks. Eş Zamanlı SSL VPN',      type:'text',   ph:'Örn: 500',                              group:'VPN'},
+    {id:'ztna_support',       label:'ZTNA Desteği',                   type:'select', opts:['Evet (Universal ZTNA)','Evet (Basic)','Hayır'], group:'VPN'},
+    // Donanım / Fiziksel
+    {id:'form_factor',        label:'Form Faktörü',                   type:'select', opts:['1U Rack','2U Rack','Desktop','Virtual','Cloud-Native'], group:'Donanım'},
+    {id:'network_interfaces', label:'Ağ Arayüzleri',                  type:'text',   ph:'Örn: 22x GE RJ45, 4x SFP+',           group:'Donanım'},
+    {id:'ha_mode',            label:'HA Modu',                        type:'select', opts:['Aktif-Aktif','Aktif-Pasif','Her İkisi','Hayır'], group:'Donanım'},
+    {id:'hw_accelerator',     label:'Donanım Hızlandırıcı',           type:'text',   ph:'Örn: NP7, CP9, SPU SoC4',             group:'Donanım'},
+    // Yönetim / Lisans
+    {id:'os_platform',        label:'İşletim Sistemi/Platform',       type:'text',   ph:'Örn: FortiOS 7.4, PAN-OS 11.x',       group:'Yönetim'},
+    {id:'sd_wan',             label:'SD-WAN Desteği',                 type:'select', opts:['Dahili','Ek Lisans','Hayır'],        group:'Yönetim'},
+    {id:'mgmt_interfaces',    label:'Yönetim Arayüzleri',             type:'text',   ph:'GUI, CLI, REST API, FortiManager...',   group:'Yönetim'},
+    {id:'certifications',     label:'Sertifikasyonlar',               type:'text',   ph:'BTK, Common Criteria EAL4+, FIPS 140-2, ICSA', group:'Yönetim'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Perpetual+Subscription','Full Bundle','UTM Bundle','Enterprise Bundle'], group:'Yönetim'},
   ],
-  'Guvenlik': [
-    {id:'security_type',  label:'Cozum Tipi',               type:'select', req:true, opts:['Endpoint Protection','SIEM','SOC Platform','DLP','PAM','IAM','Email Security','WAF','Zero Trust','Diger']},
-    {id:'deployment',     label:'Dagitim Modeli',           type:'select', opts:['On-Premise','Cloud','Hybrid','SaaS']},
-    {id:'os_support',     label:'Desteklenen OS',           type:'text',   ph:'Windows, Linux, macOS...'},
-    {id:'certifications', label:'Sertifikasyonlar',         type:'text',   ph:'Common Criteria, FIPS 140-2...'},
-    {id:'encryption',     label:'Sifreleme Standardi',      type:'text',   ph:'AES-256, RSA-2048...'},
-    {id:'compliance',     label:'Uyumluluk',                type:'text',   ph:'GDPR, ISO 27001, KVKK...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['Kullanici Basi','Cihaz Basi','Enterprise','SaaS Abonelik']},
-  ],
+
+  /* ══════════════════════════════════════════════════════
+     NETWORK EKIPMANLARI
+     Referans: Cisco Catalyst, HPE Aruba, Juniper EX datasheets
+  ══════════════════════════════════════════════════════ */
   'Network': [
-    {id:'device_type',    label:'Cihaz Tipi',               type:'select', req:true, opts:['Switch','Router','Access Point','Load Balancer','SD-WAN','Diger']},
-    {id:'port_count',     label:'Port Sayisi',              type:'number', ph:'Örn: 48', req:true},
-    {id:'port_speed',     label:'Port Hizi',                type:'select', opts:['1G','10G','25G','40G','100G','Multi-Speed']},
-    {id:'uplink_speed',   label:'Uplink Hizi',              type:'text',   ph:'Örn: 4x25G SFP28'},
-    {id:'poe_support',    label:'PoE Destegi',              type:'select', opts:['Yok','PoE','PoE+','PoE++']},
-    {id:'switching_cap',  label:'Switching Kapasitesi',     type:'text',   ph:'Örn: 960 Gbps'},
-    {id:'mgmt_protocols', label:'Yönetim Protokolleri',     type:'text',   ph:'SNMP, CLI, REST API...'},
-    {id:'stacking',       label:'Stacking Destegi',         type:'select', opts:['Evet','Hayir']},
-    {id:'form_factor',    label:'Form Faktoru',             type:'select', opts:['1U Rack','2U Rack','Masaustu','Duvar Tipi','Moduler']},
-    {id:'certifications', label:'Sertifikasyonlar',         type:'text',   ph:'BTK, CE, FCC...'},
+    {id:'device_type',        label:'Cihaz Tipi',                     type:'select', req:true, opts:['L2 Switch','L3 Switch','Çekirdek Switch','Erişim Switch','Router','Access Point','SD-WAN Edge','Load Balancer','Wireless Controller','Diğer']},
+    {id:'port_count',         label:'Port Sayısı',                    type:'number', ph:'Örn: 48',                               req:true},
+    {id:'port_speed',         label:'Port Hızı',                      type:'select', opts:['100Mbps','1G','2.5G','5G','10G','25G','40G','100G','400G','Karma']},
+    {id:'uplink_ports',       label:'Uplink Port',                    type:'text',   ph:'Örn: 4x 25G SFP28 + 2x 100G QSFP28'},
+    {id:'switching_capacity', label:'Switching Kapasitesi (Tbps)',    type:'text',   ph:'Örn: 3.6 Tbps'},
+    {id:'forwarding_rate',    label:'Forwarding Rate (Mpps)',         type:'text',   ph:'Örn: 2,678 Mpps'},
+    {id:'mac_table',          label:'MAC Adres Tablosu',              type:'text',   ph:'Örn: 256,000 girdi'},
+    {id:'vlan_support',       label:'VLAN Desteği',                   type:'text',   ph:'Örn: 4,094 VLAN (802.1Q)'},
+    {id:'routing_support',    label:'Yönlendirme Protokolleri',       type:'text',   ph:'OSPF, BGP, EIGRP, RIP, IS-IS, PBR'},
+    {id:'poe_support',        label:'PoE Desteği',                    type:'select', opts:['PoE (802.3af)','PoE+ (802.3at)','PoE++ (802.3bt)','UPOE','Yok']},
+    {id:'poe_budget',         label:'Toplam PoE Güç Bütçesi (W)',    type:'text',   ph:'Örn: 1,440W'},
+    {id:'stacking',           label:'Stacking/Kümeleme',              type:'select', opts:['Evet (StackWise)','Evet (IRF)','Evet (VSF)','Hayır']},
+    {id:'buffer_memory',      label:'Tampon Bellek',                  type:'text',   ph:'Örn: 32 MB'},
+    {id:'qos',                label:'QoS',                           type:'select', opts:['Tam QoS (8 kuyruk)','Basit QoS (4 kuyruk)','Hayır']},
+    {id:'security_features',  label:'Güvenlik Özellikleri',          type:'text',   ph:'802.1X, DAI, IPSG, DHCP Snooping, MACsec'},
+    {id:'management',         label:'Yönetim',                       type:'text',   ph:'SNMP v3, CLI, REST API, NetConf, Cisco DNA Center'},
+    {id:'form_factor',        label:'Form Faktörü',                   type:'select', opts:['1U Fixed','Modüler Şasi','Masaüstü','Duvar Tipi','Outdoor']},
+    {id:'power_supply',       label:'Güç Kaynağı',                   type:'select', opts:['Tekli AC','Çift AC (Redundant)','DC','AC+DC']},
+    {id:'certifications',     label:'Sertifikasyonlar',               type:'text',   ph:'BTK, CE, FCC, UL, TAA'},
   ],
+
+  /* ══════════════════════════════════════════════════════
+     SUNUCU SİSTEMLERİ
+     Referans: HPE ProLiant DL380 Gen11, Dell PowerEdge R760 datasheets
+  ══════════════════════════════════════════════════════ */
   'Server': [
-    {id:'form_factor',    label:'Form Faktoru',             type:'select', req:true, opts:['Rack 1U','Rack 2U','Rack 4U','Tower','Blade','HCI']},
-    {id:'processor',      label:'Islemci',                  type:'text',   ph:'Örn: Intel Xeon Silver 4314 2x', req:true},
-    {id:'max_ram',        label:'Maks. RAM',                type:'text',   ph:'Örn: 3TB DDR4 ECC'},
-    {id:'storage_bays',   label:'Depolama Yuvasi',          type:'text',   ph:'Örn: 24x SFF, 12x LFF'},
-    {id:'storage_type',   label:'Desteklenen Depolama',     type:'text',   ph:'NVMe SSD, SAS, SATA...'},
-    {id:'raid_support',   label:'RAID Kontrolcu',           type:'text',   ph:'Örn: HPE Smart Array P408i'},
-    {id:'network_ports',  label:'Ag Portlari',              type:'text',   ph:'Örn: 4x 1GbE + 2x 10GbE'},
-    {id:'power_supply',   label:'Guc Kaynagi',              type:'text',   ph:'Örn: 2x 800W Redundant'},
-    {id:'os_support',     label:'Desteklenen OS/Hypervisor',type:'text',   ph:'VMware ESXi, Windows Server...'},
-    {id:'warranty',       label:'Garanti',                  type:'text',   ph:'Örn: 3 yil yerinde NBD'},
+    {id:'form_factor',        label:'Form Faktörü',                   type:'select', req:true, opts:['1U Rack','2U Rack','4U Rack','Tower','Blade (Half-Height)','Blade (Full-Height)','HCI Node']},
+    {id:'socket_count',       label:'Soket Sayısı',                   type:'select', opts:['1 Soket','2 Soket (2P)','4 Soket (4P)']},
+    {id:'processor_family',   label:'İşlemci Ailesi',                 type:'select', req:true, opts:['Intel Xeon Scalable 4.Gen','Intel Xeon Scalable 5.Gen','AMD EPYC 4.Gen (Genoa)','AMD EPYC 5.Gen (Turin)','ARM Neoverse']},
+    {id:'max_cores',          label:'Soket Başına Maks. Çekirdek',    type:'text',   ph:'Örn: 64 çekirdek @ 350W TDP'},
+    {id:'dimm_slots',         label:'DIMM Slot Sayısı',               type:'text',   ph:'Örn: 32 DIMM (16 kanal/soket)'},
+    {id:'max_ram',            label:'Maks. RAM Kapasitesi',           type:'text',   ph:'Örn: 8 TB DDR5'},
+    {id:'ram_speed',          label:'RAM Hızı',                       type:'text',   ph:'Örn: DDR5-5600 MHz ECC'},
+    {id:'storage_bays_front', label:'Ön Depolama Yuvası',             type:'text',   ph:'Örn: 8/12/24 SFF veya 8/12 LFF'},
+    {id:'storage_types',      label:'Desteklenen Depolama Tipleri',   type:'text',   ph:'NVMe U.3, SAS 12G, SATA 6G, EDSFF'},
+    {id:'max_drives',         label:'Maks. Drive Sayısı',             type:'text',   ph:'Örn: 30 SFF (24 ön + 6 arka)'},
+    {id:'pcie_slots',         label:'PCIe Slot Sayısı/Nesli',         type:'text',   ph:'Örn: 8x PCIe 5.0 + 2x OCP 3.0'},
+    {id:'raid_controller',    label:'RAID Kontrolcü',                 type:'text',   ph:'Örn: HPE MR416i-o / Broadcom RAID'},
+    {id:'network_embedded',   label:'Gömülü Ağ',                      type:'text',   ph:'Örn: 4x 1GbE veya OCP 3.0 seçenekli'},
+    {id:'gpu_support',        label:'GPU Desteği',                    type:'text',   ph:'Örn: Maks 3x çift geniş veya 8x tek geniş GPU'},
+    {id:'power_supply',       label:'Güç Kaynağı Seçenekleri',       type:'text',   ph:'Örn: 800W / 1000W / 1600W Flex Slot Redundant'},
+    {id:'mgmt_card',          label:'Uzaktan Yönetim',                type:'text',   ph:'Örn: HPE iLO 6, Dell iDRAC 10, Lenovo XCC3'},
+    {id:'tpm',                label:'TPM Desteği',                    type:'select', opts:['TPM 2.0 Gömülü','TPM 2.0 Modül','TPM 1.2','Yok']},
+    {id:'os_support',         label:'Desteklenen OS/Hypervisor',      type:'text',   ph:'VMware ESXi 8, Windows Server 2025, RHEL 9, Ubuntu...'},
+    {id:'warranty',           label:'Standart Garanti',               type:'text',   ph:'Örn: 3 Yıl 3-3-3 Yerinde NBD'},
+    {id:'certifications',     label:'Sertifikasyonlar',               type:'text',   ph:'ENERGY STAR, EPEAT, RoHS, TAA, CE, FCC'},
   ],
+
+  /* ══════════════════════════════════════════════════════
+     DEPOLAMA
+     Referans: HPE Primera/Alletra, NetApp AFF, Pure Storage FlashArray datasheets
+  ══════════════════════════════════════════════════════ */
   'Storage': [
-    {id:'storage_type',   label:'Depolama Tipi',            type:'select', req:true, opts:['All-Flash Array','Hybrid Array','HDD Array','NAS','SAN','Object Storage','Hyperconverged']},
-    {id:'raw_capacity',   label:'Ham Kapasite',             type:'text',   ph:'Örn: 100TB', req:true},
-    {id:'usable_capacity',label:'Kullanilabilir Kapasite',  type:'text',   ph:'Örn: 50TB (dedup sonrasi)'},
-    {id:'iops',           label:'Maks. IOPS',               type:'text',   ph:'Örn: 2M IOPS'},
-    {id:'latency',        label:'Gecikme',                  type:'text',   ph:'Örn: <1ms'},
-    {id:'throughput',     label:'Bant Genisligi',           type:'text',   ph:'Örn: 20 GB/s'},
-    {id:'protocols',      label:'Desteklenen Protokoller',  type:'text',   ph:'NFS, SMB, iSCSI, FC, NVMe-oF...'},
-    {id:'dedup_compress', label:'Dedup/Sikistirma',         type:'select', opts:['Inline Her Ikisi','Post-Process','Sadece Dedup','Hayir']},
-    {id:'ha_support',     label:'HA Destegi',               type:'select', opts:['Aktif-Aktif','Aktif-Pasif','Hayir']},
-    {id:'cloud_tiering',  label:'Bulut Katmanlama',         type:'select', opts:['Evet (AWS/Azure/GCP)','Evet (Ozel)','Hayir']},
+    {id:'storage_type',       label:'Depolama Tipi',                  type:'select', req:true, opts:['All-Flash Array (AFA)','Hybrid Flash Array','HDD Array','NAS (Ağa Bağlı Depolama)','SAN (Storage Area Network)','Object Storage','Hyperconverged (HCI)','Software-Defined Storage']},
+    {id:'raw_capacity',       label:'Ham Kapasite',                   type:'text',   ph:'Örn: 4.8 PB raw',                      req:true},
+    {id:'usable_capacity',    label:'Kullanılabilir Kapasite',        type:'text',   ph:'Örn: 2 PB (3:1 dedup+compress)'},
+    {id:'max_iops',           label:'Maks. IOPS',                     type:'text',   ph:'Örn: 2.1M IOPS (4K Random Read)'},
+    {id:'latency',            label:'Gecikme (µs)',                   type:'text',   ph:'Örn: <150 µs yazma, <500 µs okuma'},
+    {id:'throughput',         label:'Bant Genişliği (GB/s)',          type:'text',   ph:'Örn: 22 GB/s okuma, 18 GB/s yazma'},
+    {id:'drive_types',        label:'Desteklenen Drive Tipi',         type:'text',   ph:'NVMe SSD, NL-SAS 12G, SAS 12G, SATA 6G'},
+    {id:'max_drives',         label:'Maks. Drive Sayısı',             type:'text',   ph:'Örn: 24 NVMe SSD'},
+    {id:'host_protocols',     label:'Host Protokolleri',              type:'text',   ph:'NFS v4.1, SMB 3.x, iSCSI, FC 32G, NVMe-oF'},
+    {id:'dedup_compress',     label:'Veri Azaltma',                   type:'select', opts:['Always-On Inline Dedup+Compress','Post-Process Dedup','Sadece Compress','Yok']},
+    {id:'data_reduction',     label:'Ortalama Veri Azaltma Oranı',   type:'text',   ph:'Örn: 5:1 (4:1 dedup + 2:1 compress)'},
+    {id:'ha_topology',        label:'HA Topolojisi',                  type:'select', opts:['Aktif-Aktif (sıfır kesinti)','Aktif-Pasif','Metro Cluster','Stretched Cluster','Hayır']},
+    {id:'replication',        label:'Replikasyon',                    type:'text',   ph:'Senkron, Asenkron, Snap-based, ActiveDR'},
+    {id:'encryption',         label:'Şifreleme',                      type:'select', opts:['AES-256 Donanım (FIPS 140-2)','AES-256 Yazılım','Hayır']},
+    {id:'cloud_tiering',      label:'Bulut Katmanlama',               type:'text',   ph:'AWS S3, Azure Blob, GCP, Wasabi...'},
+    {id:'snapshots',          label:'Snapshot Yeteneği',              type:'text',   ph:'Örn: 512K snapshot/volume, değiştirilemez'},
+    {id:'mgmt_platform',      label:'Yönetim Platformu',              type:'text',   ph:'HPE GreenLake, Pure1, NetApp ONTAP...'},
+    {id:'certifications',     label:'Sertifikasyonlar',               type:'text',   ph:'FIPS 140-2, Common Criteria, HIPAA, PCI-DSS'},
   ],
+
+  /* ══════════════════════════════════════════════════════
+     YEDEKLEME ÇÖZÜMLERİ
+     Referans: Veeam, Commvault, Veritas NetBackup datasheets
+  ══════════════════════════════════════════════════════ */
   'Yedekleme': [
-    {id:'backup_type',    label:'Cozum Tipi',               type:'select', req:true, opts:['Yazilim','Yazilim+Donanim','Cloud-Native','SaaS','Hyperconverged']},
-    {id:'backup_targets', label:'Yedekleme Hedefleri',      type:'text',   ph:'Disk, Tape, Cloud, Deduplication...', req:true},
-    {id:'workloads',      label:'Desteklenen Ortamlar',     type:'text',   ph:'VMware, Hyper-V, AWS, Azure, SQL...'},
-    {id:'rpo',            label:'RPO (Kurtarma Noktasi)',   type:'text',   ph:'Örn: 15 dakika'},
-    {id:'rto',            label:'RTO (Kurtarma Suresi)',    type:'text',   ph:'Örn: 1 saat'},
-    {id:'dedup_ratio',    label:'Deduplikasyon Orani',      type:'text',   ph:'Örn: 20:1'},
-    {id:'cloud_support',  label:'Bulut Entegrasyonu',       type:'text',   ph:'AWS S3, Azure Blob, GCP...'},
-    {id:'immutability',   label:'Degistirilemez Yedek',     type:'select', opts:['WORM','Air-Gap','Her Ikisi','Hayir']},
-    {id:'ransomware',     label:'Ransomware Korumasi',      type:'select', opts:['Anomali Tespiti','Anlik Kurtarma','Her Ikisi','Hayir']},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['Kapasite Bazli','Workload Basi','VM Basi','Abonelik']},
+    {id:'solution_type',      label:'Çözüm Tipi',                     type:'select', req:true, opts:['Yazılım (Agent-Based)','Yazılım (Agentless)','Donanım Appliance','Yazılım+Donanım','Cloud-Native Backup','SaaS Backup','Deduplication Appliance']},
+    {id:'supported_workloads',label:'Desteklenen Ortamlar',           type:'text',   ph:'VMware vSphere, Hyper-V, Nutanix AHV, KVM, AWS, Azure, GCP, Oracle, SQL, SAP HANA...', req:true},
+    {id:'backup_methods',     label:'Yedekleme Yöntemleri',           type:'text',   ph:'Image-Level, Agent-Based, CDP, Snapshot, Application-Consistent'},
+    {id:'rpo',                label:'RPO (En düşük)',                 type:'text',   ph:'Örn: Saniyeler (CDP), 15 dakika (Snapshots)'},
+    {id:'rto',                label:'RTO (En düşük)',                 type:'text',   ph:'Örn: Anında (Instant Recovery), <15 dk'},
+    {id:'instant_recovery',   label:'Anında Kurtarma',                type:'select', opts:['VM Seviyesi','Disk Seviyesi','Uygulama Seviyesi (DB)','Tümü','Hayır']},
+    {id:'dedup_ratio',        label:'Deduplikasyon Oranı',            type:'text',   ph:'Örn: 20:1 tipik, 100:1 maks.'},
+    {id:'backup_targets',     label:'Yedekleme Hedefleri',            type:'text',   ph:'Disk, Tape, Object Storage, Dedup Appliance, Cloud'},
+    {id:'cloud_integration',  label:'Bulut Entegrasyonu',             type:'text',   ph:'AWS S3/Glacier, Azure Blob, GCP, Wasabi, BackBlaze B2'},
+    {id:'immutable_backup',   label:'Değiştirilemez Yedek',           type:'select', opts:['S3 Object Lock','WORM Disk','Air-Gap','Her İkisi','Hayır']},
+    {id:'ransomware_protect', label:'Fidye Yazılımı Koruması',        type:'text',   ph:'Anomali tespiti, Secure Restore, Malware Scan, YARA'},
+    {id:'granular_recovery',  label:'Granüler Kurtarma',              type:'text',   ph:'Dosya, E-posta öğesi, DB satırı, Uygulama nesnesi'},
+    {id:'orchestration',      label:'DR Orkestrasyon',                type:'select', opts:['Tam Otomasyon (Veeam Orchestrator)','Manuel Failover','Runbook','Hayır']},
+    {id:'encryption',         label:'Şifreleme',                      type:'select', opts:['AES-256 (Transit+Rest)','AES-256 (Rest)','Hayır']},
+    {id:'max_scale',          label:'Maks. Ölçek',                    type:'text',   ph:'Örn: Sınırsız (Scale-Out Repository), 1M+ VM'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Workload (VM/Server) Başı','Kapasite (TB) Başı','Instance Bazlı','Socket Bazlı','SaaS Abonelik']},
+    {id:'certifications',     label:'Uyumluluk/Sertifikasyon',        type:'text',   ph:'SOC2, ISO 27001, FIPS 140-2, HIPAA, GDPR, KVKK'},
   ],
-  'Yazilim': [
-    {id:'software_type',  label:'Yazilim Tipi',             type:'select', req:true, opts:['ERP','CRM','HRM','Muhasebe','Proje Yonetimi','Otomasyon','Analitik/BI','Middleware','Diger']},
-    {id:'deployment',     label:'Dagitim Modeli',           type:'select', req:true, opts:['On-Premise','SaaS','Cloud','Hybrid']},
-    {id:'os_support',     label:'Platform/OS Destegi',      type:'text',   ph:'Windows, Linux, macOS, Web...'},
-    {id:'integration',    label:'Entegrasyonlar',           type:'text',   ph:'SAP, Oracle, REST API...'},
-    {id:'max_users',      label:'Maks. Kullanici',          type:'text',   ph:'Örn: Sinırsız veya 500'},
-    {id:'language',       label:'Dil Destegi',              type:'text',   ph:'Turkce, Ingilizce...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['Kullanici Basi','Site Lisansi','Abonelik','Perpetual','Acik Kaynak']},
-    {id:'sla',            label:'SLA / Uptime',             type:'text',   ph:'Örn: %99.9'},
-    {id:'certifications', label:'Uyumluluk/Sertifikasyon',  type:'text',   ph:'ISO 27001, SOC2, KVKK...'},
+
+  /* ══════════════════════════════════════════════════════
+     GÜVENLİK ÇÖZÜMLERİ
+     Referans: CrowdStrike Falcon, Palo Alto Cortex XDR, Microsoft Defender datasheets
+  ══════════════════════════════════════════════════════ */
+  'Guvenlik': [
+    {id:'security_category',  label:'Güvenlik Kategorisi',            type:'select', req:true, opts:['EDR (Endpoint Detection & Response)','EPP (Endpoint Protection)','XDR (Extended Detection & Response)','CNAPP (Cloud-Native App Protection)','DLP','PAM (Privileged Access)','IAM/SSO','Email Security','WAF (Web App Firewall)','Zero Trust / SASE','API Security','Diğer']},
+    {id:'deployment_model',   label:'Dağıtım Modeli',                 type:'select', req:true, opts:['SaaS (Bulut-Native)','On-Premise','Hybrid','MSSP Yönetimli']},
+    {id:'supported_os',       label:'Desteklenen Platformlar',        type:'text',   ph:'Windows, macOS, Linux, iOS, Android, ChromeOS'},
+    {id:'detection_engine',   label:'Tespit Motoru',                  type:'text',   ph:'AI/ML, Davranış Analizi, İmza, IOA, MITRE ATT&CK'},
+    {id:'prevention_capability',label:'Önleme Kapasitesi',            type:'text',   ph:'Malware, Ransomware, Zero-Day, Fileless, Supply Chain'},
+    {id:'response_capability',label:'Yanıt Kapasitesi',               type:'text',   ph:'Otomatik İzolasyon, Remote Shell, Process Kill, Rollback'},
+    {id:'threat_intel',       label:'Tehdit İstihbaratı',             type:'select', opts:['Global Bulut Tabanlı','Yerel Tehdit Zekası','ISAC Entegrasyonu','Hybrid']},
+    {id:'incident_response',  label:'Olay Müdahale Süresi',          type:'text',   ph:'Örn: <1 dakika otomatik izolasyon'},
+    {id:'max_endpoints',      label:'Maks. Endpoint Yönetimi',        type:'text',   ph:'Örn: 500,000+ endpoint'},
+    {id:'console',            label:'Yönetim Konsolu',                type:'text',   ph:'Tek cam ekranı, Multi-tenant, API-First'},
+    {id:'integrations',       label:'Entegrasyonlar',                 type:'text',   ph:'SIEM, SOAR, Ticketing, EDR, IAM, ITSM, 300+ konnektör'},
+    {id:'compliance',         label:'Uyumluluk Desteği',              type:'text',   ph:'GDPR, KVKK, PCI-DSS, ISO 27001, HIPAA, NIST'},
+    {id:'certifications',     label:'Test/Sertifikasyon',             type:'text',   ph:'MITRE ATT&CK Evaluation, AV-TEST, SE Labs, NSS Labs'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Endpoint Başı','Kullanıcı Başı','Cihaz Başı','Veri Hacmi','SaaS Abonelik']},
+    {id:'support_tier',       label:'Destek Seviyesi',                type:'select', opts:['7x24 Kritik Destek','Managed Detection & Response (MDR)','İş Günleri','Topluluk']},
   ],
-  'Veritabani': [
-    {id:'db_type',        label:'Veritabani Tipi',          type:'select', req:true, opts:['Iliskisel (SQL)','NoSQL Dokuman','NoSQL Key-Value','NoSQL Graf','Time-Series','NewSQL','Kolon Bazli','Cok Modelli']},
-    {id:'deployment',     label:'Dagitim Modeli',           type:'select', req:true, opts:['On-Premise','Cloud-Native','Hybrid','SaaS/DBaaS']},
-    {id:'engine',         label:'Motor / Versiyon',         type:'text',   ph:'PostgreSQL 15, MySQL 8.0...'},
-    {id:'max_connections',label:'Maks. Baglanti',           type:'number', ph:'Örn: 10000'},
-    {id:'ha_replication', label:'HA / Replikasyon',         type:'select', opts:['Senkron','Asenkron','Active-Active','Sharding','Hayir']},
-    {id:'encryption',     label:'Sifreleme',                type:'select', opts:['Dinlenme (AES-256)','Iletim (TLS)','Her Ikisi','Hayir']},
-    {id:'backup_support', label:'Yedekleme Entegrasyonu',   type:'text',   ph:'Built-in, PITR, Ucuncu Taraf...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['Acik Kaynak','Ticari','Cekirdek Bazli','Kullanici Bazli','DBaaS']},
-    {id:'compliance',     label:'Uyumluluk',                type:'text',   ph:'GDPR, PCI-DSS, KVKK...'},
-    {id:'performance',    label:'Performans (TPS)',         type:'text',   ph:'Örn: 100K TPS'},
-  ],
+
+  /* ══════════════════════════════════════════════════════
+     SANALLAŞTIRMA
+     Referans: VMware vSphere, Nutanix AHV, Proxmox datasheets
+  ══════════════════════════════════════════════════════ */
   'Sanallastirma': [
-    {id:'virt_type',      label:'Sanallastirma Tipi',       type:'select', req:true, opts:['Hypervisor Type-1','Hypervisor Type-2','Konteyner Platformu','HCI','VDI','Uygulama Sanallastirma']},
-    {id:'deployment',     label:'Dagitim',                  type:'select', req:true, opts:['Bare-Metal','Cloud','Hybrid']},
-    {id:'max_vms',        label:'Maks. VM/Konteyner',       type:'text',   ph:'Örn: 1024 VM/host'},
-    {id:'live_migration', label:'Canli Tasima (vMotion)',   type:'select', opts:['Evet','Hayir']},
-    {id:'ha_drs',         label:'HA/DRS Destegi',           type:'select', opts:['Tam HA+DRS','Sadece HA','Hayir']},
-    {id:'storage_support',label:'Desteklenen Depolama',     type:'text',   ph:'vSAN, NFS, iSCSI, FC...'},
-    {id:'mgmt_platform',  label:'Yonetim Platformu',        type:'text',   ph:'vCenter, Proxmox, Nutanix Prism...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['CPU/Soket Bazli','Cekirdek Bazli','VM Bazli','Abonelik']},
+    {id:'platform_type',      label:'Platform Tipi',                  type:'select', req:true, opts:['Hypervisor Type-1 (Bare-Metal)','Hypervisor Type-2 (Hosted)','Konteyner Platformu (Kubernetes)','HCI (Hyperconverged)','VDI (Virtual Desktop)','uygulama Sanallaştırma']},
+    {id:'deployment_model',   label:'Dağıtım Modeli',                 type:'select', req:true, opts:['On-Premise','Cloud (VMware Cloud)','Hybrid','SaaS (vSphere+)']},
+    {id:'max_vcpu_per_vm',    label:'VM Başına Maks. vCPU',           type:'text',   ph:'Örn: vSphere: 768 vCPU/VM'},
+    {id:'max_ram_per_vm',     label:'VM Başına Maks. vRAM',           type:'text',   ph:'Örn: 24 TB RAM/VM'},
+    {id:'max_vms_per_host',   label:'Host Başına Maks. VM',           type:'text',   ph:'Örn: 1,024 VM/host (vSphere)'},
+    {id:'live_migration',     label:'Canlı Taşıma',                   type:'select', opts:['vMotion (VMware)','Live Migration (Hyper-V)','Canlı Taşıma (Nutanix)','Hayır']},
+    {id:'ha_drs',             label:'HA / DRS',                       type:'select', opts:['Tam HA+DRS (Otomatik)','HA Var / DRS Yok','Sadece HA','Hayır']},
+    {id:'storage_support',    label:'Desteklenen Depolama',           type:'text',   ph:'vSAN, NFS, VMFS, RDM, iSCSI, FC, vVol'},
+    {id:'networking',         label:'Sanal Ağ',                       type:'text',   ph:'vDS, NSX-T, Opaque Network, SR-IOV, RDMA'},
+    {id:'security',           label:'Güvenlik Özellikleri',           type:'text',   ph:'VM Encryption, vTPM 2.0, Secure Boot, Guest Hardening'},
+    {id:'gpu_virtualization', label:'GPU Sanallaştırma',              type:'select', opts:['NVIDIA vGPU','AMD MxGPU','DirectPath I/O (Pass-through)','Hayır']},
+    {id:'backup_integration', label:'Yedekleme Entegrasyonu',         type:'text',   ph:'VADP (VMware), VSS (Hyper-V), NBD, SAN Transport'},
+    {id:'mgmt_platform',      label:'Yönetim Platformu',              type:'text',   ph:'vCenter, VMware Aria, Nutanix Prism, Proxmox VE'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Çekirdek Bazlı (vSphere Foundation)','Soket Bazlı','VM Bazlı (VVF)','Abonelik','Açık Kaynak (Proxmox)']},
+    {id:'certifications',     label:'Sertifikasyonlar',               type:'text',   ph:'VMware HCL, FIPS 140-2, Common Criteria, IL5'},
   ],
+
+  /* ══════════════════════════════════════════════════════
+     DEVOPS ARAÇLARI
+     Referans: GitLab, Jenkins, Kubernetes, HashiCorp datasheets
+  ══════════════════════════════════════════════════════ */
   'DevOps': [
-    {id:'devops_type',    label:'Arac Tipi',                type:'select', req:true, opts:['CI/CD Pipeline','Konteyner Orkestrasyon','IaC','Monitoring/Observability','Log Yonetimi','Artifact Repository','Code Review','DevSecOps','Diger']},
-    {id:'deployment',     label:'Dagitim Modeli',           type:'select', req:true, opts:['SaaS','On-Premise','Cloud','Self-Hosted']},
-    {id:'integration',    label:'Entegrasyonlar',           type:'text',   ph:'GitHub, GitLab, Jenkins, Kubernetes...'},
-    {id:'cloud_support',  label:'Desteklenen Cloud',        type:'text',   ph:'AWS, Azure, GCP, On-Prem...'},
-    {id:'container_sup',  label:'Konteyner Destegi',        type:'select', opts:['Docker','Kubernetes','Her Ikisi','Hayir']},
-    {id:'lang_support',   label:'Dil/Platform Destegi',     type:'text',   ph:'Java, Python, .NET, Node.js...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['Acik Kaynak','SaaS Abonelik','Kullanici Bazli','Kurumsal']},
-    {id:'sla',            label:'SLA / Uptime',             type:'text',   ph:'Örn: %99.9'},
+    {id:'tool_category',      label:'Araç Kategorisi',                type:'select', req:true, opts:['CI/CD Platform','Source Code Management (SCM)','Konteyner Orkestrasyon (K8s)','Container Registry','IaC (Terraform/Ansible)','Artifact & Package Repository','Monitoring & Observability','Log Yönetimi (ELK/Splunk)','Secret & Config Management','DevSecOps / SAST / DAST','Diğer']},
+    {id:'deployment_model',   label:'Dağıtım Modeli',                 type:'select', req:true, opts:['SaaS (Cloud-Hosted)','Self-Managed On-Premise','Self-Managed Cloud (Bring Your Own)','Hybrid']},
+    {id:'scm_integration',    label:'SCM Entegrasyonu',               type:'text',   ph:'GitHub, GitLab, Bitbucket, Azure DevOps, SVN'},
+    {id:'pipeline_features',  label:'Pipeline Özellikleri',           type:'text',   ph:'YAML Pipeline, Parallel Jobs, Matrix Build, Auto DevOps'},
+    {id:'container_support',  label:'Konteyner Desteği',              type:'text',   ph:'Docker, Kubernetes, OpenShift, Helm, Podman'},
+    {id:'cloud_integrations', label:'Cloud Entegrasyonları',          type:'text',   ph:'AWS EKS, Azure AKS, GKE, Rancher, VMware Tanzu'},
+    {id:'security_scanning',  label:'Güvenlik Tarama',                type:'text',   ph:'SAST, DAST, Container Scanning, License Compliance, Secret Detection'},
+    {id:'languages',          label:'Desteklenen Diller',             type:'text',   ph:'Java, Python, .NET, Node.js, Go, Ruby, PHP...'},
+    {id:'runners',            label:'Çalıştırıcı Altyapısı',          type:'text',   ph:'Shared Runners, Hosted, On-Premise, K8s Executor'},
+    {id:'max_concurrent_jobs',label:'Maks. Eş Zamanlı Job',           type:'text',   ph:'Örn: Sınırsız (Enterprise), 400 dakika/ay (Free)'},
+    {id:'artifacts',          label:'Artifact/Paket Yönetimi',        type:'text',   ph:'Maven, npm, PyPI, Docker, Helm, Conan, Debian...'},
+    {id:'monitoring',         label:'Monitoring/Alerting',            type:'text',   ph:'Prometheus, Grafana, Jaeger, OTEL, Error Tracking'},
+    {id:'compliance',         label:'Uyumluluk',                      type:'text',   ph:'SOC2 Type II, ISO 27001, GDPR, FedRAMP, HIPAA'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Açık Kaynak (CE)','Tiered SaaS (Free/Premium/Ultimate)','Self-Managed Subscription','Kullanıcı Başı']},
+    {id:'sla',                label:'SLA / Uptime',                   type:'text',   ph:'Örn: %99.95 (GitLab.com Premium)'},
   ],
-  'Cloud': [
-    {id:'cloud_type',     label:'Hizmet Tipi',              type:'select', req:true, opts:['IaaS','PaaS','SaaS','FaaS Serverless','CDN','Managed Service','Hybrid Cloud']},
-    {id:'provider',       label:'Bulut Saglayici',          type:'text',   ph:'AWS, Azure, GCP, Kamunet...', req:true},
-    {id:'regions',        label:'Veri Merkezi Bölgeleri',   type:'text',   ph:'Turkiye, Avrupa, Global...'},
-    {id:'compliance',     label:'Uyumluluk/Sertifikasyon',  type:'text',   ph:'ISO 27001, SOC2, KVKK...'},
-    {id:'sla',            label:'SLA / Uptime',             type:'text',   ph:'Örn: %99.99'},
-    {id:'pricing_model',  label:'Fiyatlandirma Modeli',     type:'select', opts:['Kullanim Bazli','Sabit Aylik','Rezervasyon','Spot']},
-    {id:'support_level',  label:'Destek Seviyesi',          type:'select', opts:['7x24 Premium','Is Gunleri','Topluluk','SLA Bazli']},
-    {id:'migration_sup',  label:'Goc Destegi',              type:'select', opts:['Tam Destek','Arac Seti','Hayir']},
-  ],
-  'Endpoint': [
-    {id:'endpoint_type',  label:'Cozum Tipi',               type:'select', req:true, opts:['EDR','EPP','XDR','MDM/EMM','DLP Endpoint','USB Kontrol','Disk Sifreleme','Guvenli Browser']},
-    {id:'os_support',     label:'Desteklenen OS',           type:'text',   ph:'Windows, macOS, Linux, iOS, Android...', req:true},
-    {id:'max_endpoints',  label:'Maks. Cihaz Sayisi',       type:'number', ph:'Örn: 50000'},
-    {id:'detection_method',label:'Tespit Yontemi',          type:'text',   ph:'AI/ML, Imza Bazli, Davranis Analizi...'},
-    {id:'response',       label:'Otomatik Tepki',           type:'select', opts:['Tam Otomatik','Yari Otomatik','Manuel']},
-    {id:'cloud_console',  label:'Bulut Yonetim Konsolu',    type:'select', opts:['Evet (SaaS)','Hayir (On-Premise)','Her Ikisi']},
-    {id:'certifications', label:'Sertifikasyonlar',         type:'text',   ph:'MITRE ATT&CK, AV-TEST...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['Cihaz Basi','Kullanici Basi','Site Lisansi','Abonelik']},
-  ],
+
+  /* ══════════════════════════════════════════════════════
+     SIEM / SOC PLATFORMLARI
+     Referans: Splunk, IBM QRadar, Microsoft Sentinel, Elastic SIEM datasheets
+  ══════════════════════════════════════════════════════ */
   'SIEM': [
-    {id:'siem_type',      label:'Platform Tipi',            type:'select', req:true, opts:['SIEM','SOAR','UEBA','XDR','Threat Intelligence','Log Yonetimi','SIEM+SOAR']},
-    {id:'deployment',     label:'Dagitim Modeli',           type:'select', req:true, opts:['On-Premise','SaaS','Cloud','Hybrid']},
-    {id:'log_sources',    label:'Log Kaynaklari',           type:'text',   ph:'Firewall, AD, Cloud, Endpoint...'},
-    {id:'eps',            label:'EPS (Olay/Saniye)',         type:'text',   ph:'Örn: 100K EPS'},
-    {id:'retention',      label:'Log Saklama Suresi',       type:'text',   ph:'Örn: 1 yil hot, 5 yil cold'},
-    {id:'correlation',    label:'Korelasyon Motor',         type:'select', opts:['AI/ML Destekli','Kural Bazli','Her Ikisi']},
-    {id:'playbooks',      label:'SOAR Playbook Sayisi',     type:'text',   ph:'Örn: 500+ hazir playbook'},
-    {id:'compliance',     label:'Uyumluluk Raporlari',      type:'text',   ph:'PCI-DSS, ISO 27001, KVKK...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['EPS Bazli','Veri Hacmi','Cihaz Bazli','Abonelik']},
+    {id:'platform_type',      label:'Platform Tipi',                  type:'select', req:true, opts:['SIEM','SOAR','UEBA','XDR','Threat Intelligence Platform','Log Yönetimi & Analytics','SIEM+SOAR (Birleşik)','Next-Gen SIEM (Cloud-Native)']},
+    {id:'deployment_model',   label:'Dağıtım Modeli',                 type:'select', req:true, opts:['On-Premise (Self-Managed)','SaaS (Bulut-Native)','Hybrid','MSSP/MDR Yönetimli']},
+    {id:'eps_capacity',       label:'EPS Kapasitesi (Olay/Saniye)',   type:'text',   ph:'Örn: 100K EPS (on-prem), Sınırsız (cloud)', req:true},
+    {id:'log_sources',        label:'Desteklenen Log Kaynakları',     type:'text',   ph:'Firewall, AD, Cloud, Endpoint, IDS/IPS, App, DB — 500+ konnektör'},
+    {id:'data_retention',     label:'Veri Saklama',                   type:'text',   ph:'Hot: 90 gün SSD, Warm: 1 yıl, Cold: 7 yıl (S3)'},
+    {id:'search_performance', label:'Arama Performansı',              type:'text',   ph:'Örn: 1 TB/saat sorgu hızı, SPL/KQL/YARA'},
+    {id:'correlation_engine', label:'Korelasyon Motoru',              type:'select', opts:['AI/ML Destekli (Anomali+Kural)','Kural Bazlı','Davranış Analizi (UEBA)','Graf Tabanlı','Karma']},
+    {id:'threat_intel',       label:'Tehdit İstihbaratı',             type:'text',   ph:'MISP, STIX/TAXII, VirusTotal, CrowdStrike Falcon Intel...'},
+    {id:'mitre_coverage',     label:'MITRE ATT&CK Kapsamı',          type:'text',   ph:'Örn: >90% Taktik, >85% Teknik'},
+    {id:'soar_playbooks',     label:'SOAR Playbook Sayısı',           type:'text',   ph:'Örn: 500+ hazır, özelleştirilebilir'},
+    {id:'automation',         label:'Otomasyon Kapasitesi',           type:'text',   ph:'Otomatik triage, karantina, ticket oluşturma'},
+    {id:'dashboards',         label:'Dashboard/Raporlama',            type:'text',   ph:'Özelleştirilebilir, PCI-DSS, ISO 27001, GDPR hazır şablonlar'},
+    {id:'api_integration',    label:'API/Entegrasyon',                type:'text',   ph:'REST API, Webhook, Syslog, CEF, LEEF, JSON, 300+ entegrasyon'},
+    {id:'compliance_reports', label:'Uyumluluk Raporları',            type:'text',   ph:'GDPR, KVKK, PCI-DSS, ISO 27001, HIPAA, SOX, NIST'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['EPS Bazlı','Veri Hacmi (GB/gün)','Workload Başı','Kullanıcı Bazlı','SaaS Abonelik (Ingest)']},
   ],
+
+  /* ══════════════════════════════════════════════════════
+     YAZILIM / KURUMSAL YAZILIM
+     Referans: SAP, Microsoft, Oracle enterprise product datasheets
+  ══════════════════════════════════════════════════════ */
+  'Yazilim': [
+    {id:'software_category',  label:'Yazılım Kategorisi',             type:'select', req:true, opts:['ERP (Kurumsal Kaynak Planlama)','CRM (Müşteri İlişkileri)','HCM/HRM (İnsan Kaynakları)','SCM (Tedarik Zinciri)','Muhasebe/Finans','BI/Analytics','BPM/İş Süreç Yönetimi','ESB/Middleware','E-İmza/E-Belge','Proje Yönetimi','Diğer Kurumsal']},
+    {id:'deployment_model',   label:'Dağıtım Modeli',                 type:'select', req:true, opts:['On-Premise','SaaS (Multi-Tenant)','SaaS (Single-Tenant)','Cloud (Private Cloud)','Hybrid (On-Prem+Cloud)']},
+    {id:'supported_platforms',label:'Desteklenen Platformlar',        type:'text',   ph:'Windows Server, Linux (RHEL/Ubuntu), Docker, Kubernetes'},
+    {id:'database_support',   label:'Veritabanı Desteği',             type:'text',   ph:'Oracle, MS SQL, PostgreSQL, MySQL, SAP HANA'},
+    {id:'integration',        label:'Entegrasyon Kapasitesi',         type:'text',   ph:'REST API, SOAP, EDI, SAP BTP, MuleSoft, Zapier, 500+ konnektör'},
+    {id:'concurrent_users',   label:'Eş Zamanlı Kullanıcı',          type:'text',   ph:'Örn: 10,000 eş zamanlı, sınırsız toplam'},
+    {id:'multi_language',     label:'Dil Desteği',                    type:'text',   ph:'Türkçe, İngilizce, Almanca, Arapça, 20+ dil'},
+    {id:'multi_currency',     label:'Çoklu Para Birimi',              type:'select', opts:['Evet (Otomatik Kur)','Evet (Manuel)','Hayır']},
+    {id:'mobile_support',     label:'Mobil Destek',                   type:'select', opts:['Native iOS+Android','PWA/Responsive','Yalnızca Web','Hayır']},
+    {id:'customization',      label:'Özelleştirme',                   type:'text',   ph:'Low-code, No-code, API Extension, Custom Workflow'},
+    {id:'reporting',          label:'Raporlama/BI',                   type:'text',   ph:'Gömülü Analytics, Power BI, Crystal Reports entegrasyonu'},
+    {id:'compliance',         label:'Yasal/Uyumluluk',                type:'text',   ph:'KVKK, e-Fatura, e-Arşiv, e-İrsaliye, e-Defter (Türkiye)'},
+    {id:'uptime_sla',         label:'SLA / Uptime Garantisi',        type:'text',   ph:'Örn: %99.9 SLA, 4 saatlik RTO'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Kullanıcı Başı (Named)','Eş Zamanlı Kullanıcı','Modül Bazlı','Enterprise Site Lisansı','SaaS Abonelik (PEPM/PUPM)']},
+    {id:'certifications',     label:'Uyumluluk Sertifikaları',        type:'text',   ph:'ISO 27001, SOC2 Type II, ISO 9001, SAP Certified'},
+  ],
+
+  /* ══════════════════════════════════════════════════════
+     VERİTABANI
+     Referans: Oracle, PostgreSQL, MongoDB, Microsoft SQL Server datasheets
+  ══════════════════════════════════════════════════════ */
+  'Veritabani': [
+    {id:'db_type',            label:'Veritabanı Modeli',              type:'select', req:true, opts:['İlişkisel (RDBMS/SQL)','Döküman (MongoDB, CouchDB)','Key-Value (Redis, DynamoDB)','Geniş Kolon (Cassandra, HBase)','Graf (Neo4j, ArangoDB)','Zaman Serisi (InfluxDB, TimescaleDB)','NewSQL (CockroachDB, YugabyteDB)','Çok Modelli','HTAP (OLTP+OLAP)']},
+    {id:'deployment_model',   label:'Dağıtım Modeli',                 type:'select', req:true, opts:['On-Premise','Cloud (DBaaS)','Self-Managed Cloud','Hybrid','Serverless']},
+    {id:'engine_version',     label:'Motor / Versiyon',               type:'text',   ph:'Örn: Oracle 23c, PostgreSQL 17, SQL Server 2022'},
+    {id:'max_db_size',        label:'Maks. Veritabanı Boyutu',        type:'text',   ph:'Örn: Sınırsız (bölümleme ile)'},
+    {id:'max_connections',    label:'Maks. Bağlantı Sayısı',          type:'text',   ph:'Örn: 100,000 bağlantı (pgBouncer ile)'},
+    {id:'oltp_performance',   label:'OLTP Performansı (TPS)',         type:'text',   ph:'Örn: 1M+ TPS (Oracle Exadata)'},
+    {id:'olap_performance',   label:'OLAP Performansı',               type:'text',   ph:'Örn: PB ölçeğinde sorgu, 100x hız (Columnar)'},
+    {id:'ha_architecture',    label:'HA Mimarisi',                    type:'select', opts:['Active-Active Cluster','Primary-Standby (Sync)','Primary-Standby (Async)','Multi-Master','Shared-Nothing Cluster','Galera/Patroni']},
+    {id:'replication_modes',  label:'Replikasyon Modları',            type:'text',   ph:'Streaming, Logical, Physical, Cross-Region, CDC'},
+    {id:'sharding',           label:'Sharding/Yatay Ölçekleme',      type:'select', opts:['Otomatik Sharding','Manuel Sharding','Partitioning','Hayır']},
+    {id:'backup_methods',     label:'Yedekleme Yöntemleri',           type:'text',   ph:'Hot Backup, RMAN, Dump/Export, WAL Shipping, PITR'},
+    {id:'encryption',         label:'Şifreleme',                      type:'select', opts:['TDE (Transparent Data Encryption)','Column-Level','In-Transit (TLS)','TDE+TLS','Hayır']},
+    {id:'row_level_security', label:'Satır/Sütun Güvenliği',          type:'select', opts:['Row Level Security (RLS)','Column Masking','Her İkisi','Hayır']},
+    {id:'sql_standards',      label:'SQL/Standart Uyumluluğu',       type:'text',   ph:'SQL:2023, ANSI SQL, Oracle PL/SQL, T-SQL, PL/pgSQL'},
+    {id:'extensions',         label:'Uzantı/Eklenti Ekosistemi',      type:'text',   ph:'PostGIS, TimescaleDB, pgvector, Citus, 100+ eklenti'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Açık Kaynak (PostgreSQL/MySQL)','Ticari Lisans (Oracle/SQL Server)','Çekirdek Bazlı','Kullanıcı CAL','DBaaS Tüketim Bazlı']},
+    {id:'compliance',         label:'Uyumluluk',                      type:'text',   ph:'GDPR, KVKK, HIPAA, PCI-DSS, FedRAMP, FIPS 140-2'},
+  ],
+
+  /* ══════════════════════════════════════════════════════
+     CLOUD / BULUT PLATFORMLARI
+     Referans: AWS, Azure, GCP, Kamunet datasheets
+  ══════════════════════════════════════════════════════ */
+  'Cloud': [
+    {id:'service_model',      label:'Hizmet Modeli',                  type:'select', req:true, opts:['IaaS (Sanal Makineler/Storage)','PaaS (Managed App Platform)','SaaS (Hazır Yazılım)','CaaS (Konteyner Servisi)','FaaS (Serverless)','DaaS (Desktop as a Service)','DBaaS (Veritabanı)','Hybrid Cloud Platform']},
+    {id:'provider_platform',  label:'Sağlayıcı / Platform',          type:'text',   ph:'AWS, Azure, GCP, OCI, Alibaba, Kamunet, Türkiye Bulut...', req:true},
+    {id:'data_center_regions',label:'Veri Merkezi Bölgeleri',         type:'text',   ph:'Türkiye (İstanbul), Avrupa (Amsterdam/Frankfurt), Global'},
+    {id:'compute_options',    label:'Hesaplama Seçenekleri',          type:'text',   ph:'General Purpose, Compute Optimized, Memory Optimized, GPU, Spot/Preemptible'},
+    {id:'storage_options',    label:'Depolama Seçenekleri',           type:'text',   ph:'Block (SSD/HDD), Object (S3-uyumlu), NFS/SMB, Archive'},
+    {id:'networking',         label:'Ağ Servisleri',                  type:'text',   ph:'VPC, CDN, Load Balancer, DNS, ExpressRoute/Direct Connect'},
+    {id:'managed_services',   label:'Yönetilen Servisler',            type:'text',   ph:'Kubernetes (AKS/EKS/GKE), Serverless, AI/ML, IoT, Queue'},
+    {id:'security_services',  label:'Güvenlik Servisleri',            type:'text',   ph:'IAM, WAF, DDoS Protection, KMS, CSPM, Cloud Security Hub'},
+    {id:'compliance_certs',   label:'Uyumluluk Sertifikaları',        type:'text',   ph:'ISO 27001, SOC2 Type II, PCI-DSS, KVKK, FedRAMP, HIPAA'},
+    {id:'connectivity',       label:'Bağlantı Seçenekleri',           type:'text',   ph:'Direct Connect, VPN, SD-WAN Entegrasyonu, Peer Connect'},
+    {id:'sla_uptime',         label:'SLA / Uptime Garantisi',        type:'text',   ph:'Örn: %99.99 (Compute), %99.999 (Storage)'},
+    {id:'support_plans',      label:'Destek Planları',                type:'text',   ph:'Basic, Developer, Business (7x24), Enterprise, TAM'},
+    {id:'pricing_model',      label:'Fiyatlandırma Modeli',           type:'select', opts:['Kullanım Bazlı (Pay-as-you-go)','Rezervasyon (1/3 Yıl)','Tasarruf Planı','Spot/Preemptible','Abonelik (Sabit)']},
+    {id:'migration_support',  label:'Göç Araçları',                   type:'text',   ph:'Migration Service, Database Migration, TCO Calculator'},
+  ],
+
+  /* ══════════════════════════════════════════════════════
+     ENDPOINT GÜVENLİK
+  ══════════════════════════════════════════════════════ */
+  'Endpoint': [
+    {id:'solution_type',      label:'Çözüm Tipi',                     type:'select', req:true, opts:['EPP (Antivirus+Firewall)','EDR (Detect & Respond)','XDR (Extended DR)','MDM/EMM (Mobil Cihaz)','DLP (Data Loss Prevention)','USB Kontrol & Device Management','Full Disk Encryption','Privileged Access (PAW)']},
+    {id:'supported_os',       label:'Desteklenen İşletim Sistemleri', type:'text',   ph:'Windows 10/11, macOS 12+, Linux (RHEL/Ubuntu/Debian), iOS 16+, Android 12+', req:true},
+    {id:'max_endpoints',      label:'Maks. Yönetilen Endpoint',       type:'text',   ph:'Örn: 500,000+ endpoint'},
+    {id:'agent_footprint',    label:'Agent Boyutu / Yükü',            type:'text',   ph:'Örn: <60 MB RAM, <3% CPU kullanımı'},
+    {id:'detection_methods',  label:'Tespit Yöntemleri',              type:'text',   ph:'AI/ML Davranış Analizi, IOA, IOC, Mem. Tarama, Fileless'},
+    {id:'prevention',         label:'Önleme Kapasitesi',              type:'text',   ph:'Malware, Ransomware, Zero-Day, Exploit, ROP Chain, LOLBIN'},
+    {id:'response_actions',   label:'Yanıt Aksiyonları',              type:'text',   ph:'Otomatik İzolasyon, Kill Process, Quarantine, Rollback, Remote Shell'},
+    {id:'threat_hunting',     label:'Threat Hunting',                 type:'select', opts:['Proaktif (AI/Bulut Destekli)','Manuel (Query-Based)','MDR Servisi','Hayır']},
+    {id:'forensics',          label:'Forensics/Araştırma',            type:'text',   ph:'Process Tree, Timeline, Memory Dump, Artifact Collection'},
+    {id:'deception',          label:'Aldatma (Deception)',            type:'select', opts:['Honeypot/Honey Token','Active Deception','Hayır']},
+    {id:'cloud_console',      label:'Yönetim Konsolu',                type:'select', opts:['SaaS (Bulut-Native)','On-Premise','Hybrid']},
+    {id:'offline_protection', label:'Çevrimdışı Koruma',              type:'select', opts:['Tam Koruma (Local ML)','Kısmi','Hayır']},
+    {id:'certifications',     label:'Test/Sertifikasyon',             type:'text',   ph:'MITRE ATT&CK Evaluation, AV-TEST, SE Labs, Gartner MQ'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Endpoint Başı/Yıl','Kullanıcı Başı','Cihaz Tipi Bazlı','Toplam Koruma Bundle','MDR Abonelik']},
+  ],
+
+  /* ══════════════════════════════════════════════════════
+     DİĞER
+  ══════════════════════════════════════════════════════ */
   'Diger': [
-    {id:'product_type',   label:'Urun/Cozum Tipi',         type:'text',   ph:'Cozum tipini aciklayın', req:true},
-    {id:'deployment',     label:'Dagitim Modeli',           type:'select', opts:['On-Premise','Cloud','SaaS','Hybrid','Fiziksel Cihaz']},
-    {id:'target_audience',label:'Hedef Kitle',              type:'text',   ph:'KOBI, Kurumsal, Telekom, Kamu...'},
-    {id:'integration',    label:'Entegrasyonlar',           type:'text',   ph:'Mevcut entegrasyonlar...'},
-    {id:'license_model',  label:'Lisans Modeli',            type:'select', opts:['Perpetual','Abonelik','Kullanim Bazli','Acik Kaynak','Diger']},
-    {id:'certifications', label:'Sertifikasyonlar',         type:'text',   ph:'Varsa sertifikasyonlar...'},
+    {id:'product_type',       label:'Ürün/Çözüm Tipi',               type:'text',   ph:'Çözüm tipini açıklayın', req:true},
+    {id:'target_segment',     label:'Hedef Segment',                  type:'select', opts:['KOBİ (<250 çalışan)','Mid-Market (250-1000)','Kurumsal (1000+)','Kamu','Telekom/ISP','Sağlık','Finans/Bankacılık']},
+    {id:'deployment_model',   label:'Dağıtım Modeli',                 type:'select', opts:['On-Premise','Cloud/SaaS','Hybrid','Fiziksel Cihaz']},
+    {id:'integration',        label:'Entegrasyonlar',                 type:'text',   ph:'Mevcut entegrasyon ekosistemi'},
+    {id:'performance_metrics',label:'Temel Performans Metrikleri',    type:'text',   ph:'Çözüme özgü temel performans değerleri'},
+    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Perpetual','Abonelik','Kullanım Bazlı','Açık Kaynak','OEM/Bundle']},
+    {id:'certifications',     label:'Sertifikasyonlar',               type:'text',   ph:'İlgili sektör sertifikaları'},
+    {id:'support',            label:'Destek Modeli',                  type:'text',   ph:'7x24, NBD, Partner Destekli...'},
   ],
 };
 
@@ -4622,7 +4800,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.9.2</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.0</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
