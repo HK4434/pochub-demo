@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.0 | pochub.co -->
+<!-- PoCHub v4.0.1 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.0</title>
+<title>PoCHub.co — v4.0.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.0';
+const VERSION = 'v4.0.1';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
@@ -571,7 +571,7 @@ async function getCategories() {
     _catCache = cats;
     return cats;
   } catch(e) {
-    return ['Firewall','Güvenlik','Network','Server','Storage','Yazılım','Yedekleme','Diğer'].map(function(n,i){return {name:n,order:i,id:n};});
+    return ['Cloud','DevOps','Endpoint','Firewall','Güvenlik','Network','SIEM','Sanallaştırma','Server','Storage','Veritabanı','Yazılım','Yedekleme','Diğer'].map(function(n,i){return {name:n,order:i,id:n};});
   }
 }
 function invalidateCatCache() { _catCache = null; }
@@ -4800,7 +4800,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.0</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.0.1</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -5401,7 +5401,8 @@ async function admCategories(m) {
       '<h2 style="font-size:18px;font-weight:700">Kategori Yönetimi <span id="cat-cnt" style="font-size:13px;color:#7c87a0;font-weight:400"></span></h2>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
       '<input class="inp" id="cat-search" placeholder="Kategori ara..." style="width:220px;font-size:12.5px">' +
-      '<button class="btn-p btn-sm" id="add-cat-btn">+ Yeni Kategori</button>' +
+      '<button class="btn-g btn-sm" id="sync-cats-btn" style="font-size:12px">🔄 Eksik Kategorileri Ekle</button>' +
+      '<button class="btn-p btn-sm" id="add-cat-btn" style="margin-left:6px">+ Yeni Kategori</button>' +
       '</div></div>' +
       '<div style="background:#0f1117;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden">' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
@@ -5411,7 +5412,25 @@ async function admCategories(m) {
       '<th style="background:#1c1f2a;padding:9px 14px;text-align:center;font-size:10.5px;text-transform:uppercase;color:#5a6278">İşlem</th>' +
       '</tr></thead><tbody id="cat-tbody"></tbody></table></div>';
 
+    var ALL_CATS_V4 = ['Cloud','DevOps','Endpoint','Firewall','Güvenlik','Network','SIEM','Sanallaştırma','Server','Storage','Veritabanı','Yazılım','Yedekleme','Diğer'];
+    var existingCatNames = cats.map(function(ct){ return ct.name; });
+    var missingCats = ALL_CATS_V4.filter(function(n){ return !existingCatNames.includes(n); });
+
     m.querySelector('#add-cat-btn').addEventListener('click', function() { openCatModal(null); });
+    m.querySelector('#sync-cats-btn')?.addEventListener('click', async function() {
+      if (!missingCats.length) { showToast('Tüm kategoriler mevcut.'); return; }
+      var btn = this; btn.disabled = true; btn.textContent = 'Ekleniyor...';
+      try {
+        for (var i = 0; i < missingCats.length; i++) {
+          await addDoc(collection(db,'categories'), {
+            name: missingCats[i], description: '', order: existingCatNames.length + i, createdAt: serverTimestamp()
+          });
+        }
+        invalidateCatCache();
+        showToast(missingCats.length + ' kategori eklendi!');
+        admCategories(m);
+      } catch(e) { showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='🔄 Eksik Kategorileri Ekle'; }
+    });
     m.querySelector('#cat-search').addEventListener('input', function() {
       var q = this.value.toLowerCase();
       renderRows(q ? cats.filter(function(cat) {
