@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.2.1 | pochub.co -->
+<!-- PoCHub v4.3 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.2.1</title>
+<title>PoCHub.co — v4.3</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.2.1';
+const VERSION = 'v4.3';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
@@ -1753,6 +1753,7 @@ window.closeModal = closeModal;
 window.go = go;
 window.openAuthModal = openAuthModal;
 window.openMultiVendorPocModal = openMultiVendorPocModal;
+window.openProductDetailModal = openProductDetailModal;
 window.openSendOfferModal = openSendOfferModal;
 window.openChatModal = openChatModal;
 window.openEventDetail = openEventDetail;
@@ -2038,6 +2039,108 @@ async function renderHome() {
 /* ══════════════════════════════════════════════════════
    ÖNE ÇIKAN ÜRÜNLER — Featured Products Carousel (v4.2)
 ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   ÜRÜN DETAY MODAL (v4.3)
+══════════════════════════════════════════════════════ */
+async function openProductDetailModal(productId) {
+  if (!productId) return;
+  try {
+    var snap = await getDoc(doc(db,'products', productId));
+    if (!snap.exists()) { showToast('Ürün bulunamadı.','err'); return; }
+    var p = Object.assign({id: snap.id}, snap.data());
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-bg on';
+    modal.id = 'prod-detail-modal';
+
+    // catFields alanlarını güzel göster
+    var catFieldsHtml = '';
+    if (p.catFields && Object.keys(p.catFields).length) {
+      var fields = getCatFields(p.category||'');
+      var fieldMap = {};
+      fields.forEach(function(f){ fieldMap[f.id] = f.label; });
+      catFieldsHtml = '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)">' +
+        '<div style="font-size:11px;color:#5a6278;font-weight:700;letter-spacing:.6px;margin-bottom:12px">TEKNİK ÖZELLİKLER</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px">';
+      Object.entries(p.catFields).forEach(function(kv) {
+        var label = fieldMap[kv[0]] || kv[0].replace(/_/g,' ');
+        catFieldsHtml += '<div style="display:flex;flex-direction:column;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+          '<span style="font-size:10.5px;color:#5a6278;margin-bottom:2px">'+label+'</span>' +
+          '<span style="font-size:13px;font-weight:600">'+kv[1]+'</span></div>';
+      });
+      catFieldsHtml += '</div></div>';
+    }
+
+    var canPoc = CUR_USER && CUR_PROFILE?.role !== 'vendor';
+    var pocBtnHtml = CUR_USER
+      ? (CUR_PROFILE?.role === 'vendor'
+          ? '<div style="font-size:12px;color:#5a6278">PoC talebi müşteri hesabıyla oluşturulur.</div>'
+          : '<button class="btn-p" id="prod-detail-poc-btn" style="width:100%;padding:12px;font-size:14px;margin-top:4px">PoC / Demo Talebi Oluştur →</button>')
+      : '<button class="btn-p" id="prod-detail-login-btn" style="width:100%;padding:12px;font-size:14px;margin-top:4px">Giriş Yaparak PoC Talebi Oluştur →</button>';
+
+    modal.innerHTML =
+      '<div class="modal" style="max-width:700px;width:95vw;padding:0;border-radius:14px;display:flex;flex-direction:column;max-height:88vh">' +
+
+      // Başlık
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">' +
+      '<div>' +
+      '<div style="font-size:11px;color:#7db4ff;font-weight:700;letter-spacing:.5px;margin-bottom:6px">'+(p.category||'')+'</div>' +
+      '<div style="font-size:20px;font-weight:700;margin-bottom:4px">'+(p.name||'')+'</div>' +
+      '<div style="font-size:13px;color:#9ca3af">'+(p.vendorName||'')+'</div>' +
+      '</div>' +
+      '<button id="close-prod-detail" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:22px;padding:4px;flex-shrink:0">×</button>' +
+      '</div>' +
+
+      // İçerik — scrollable
+      '<div style="padding:20px 24px;overflow-y:auto;flex:1">' +
+
+      // Rozetler
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">' +
+      '<span style="font-size:11.5px;padding:4px 10px;border-radius:6px;background:rgba(255,255,255,.06);color:#9ca3af">' +
+      cc(p.country||'TR') + ' ' + (p.country||'TR') + '</span>' +
+      '<span style="font-size:11.5px;padding:4px 10px;border-radius:6px;background:rgba(255,255,255,.06);color:#9ca3af">' +
+      (p.supportModel==='inhouse'?'🏢 Kendi Bünyesi':p.supportModel==='outsource'?'🤝 Dış Kaynak':'🔄 Hibrit') + '</span>' +
+      (p.featured ? '<span style="font-size:11.5px;padding:4px 10px;border-radius:6px;background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">⭐ Öne Çıkan Ürün</span>' : '') +
+      '</div>' +
+
+      // Açıklama
+      (p.description ? '<div style="font-size:14px;color:#c8cfdb;line-height:1.7;margin-bottom:16px">'+(p.description)+'</div>' : '') +
+
+      // Teknik özellikler
+      catFieldsHtml +
+      '</div>' +
+
+      // Alt bar — PoC butonu
+      '<div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0">' +
+      pocBtnHtml +
+      '</div>' +
+      '</div>';
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('#close-prod-detail').addEventListener('click', function(){ modal.remove(); });
+    modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+
+    var pocBtn = modal.querySelector('#prod-detail-poc-btn');
+    if (pocBtn) {
+      pocBtn.addEventListener('click', function() {
+        modal.remove();
+        openMultiVendorPocModal(productId);
+      });
+    }
+    var loginBtn = modal.querySelector('#prod-detail-login-btn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', function() {
+        modal.remove();
+        openAuthModal('customer','');
+      });
+    }
+  } catch(e2) {
+    showToast('Ürün detayı yüklenemedi: '+e2.message,'err');
+  }
+}
+
+
 async function loadFeaturedProducts() {
   var section = el('featured-carousel-section');
   if (!section) return;
@@ -2137,12 +2240,12 @@ async function loadFeaturedProducts() {
       section.querySelectorAll('.feat-dot').forEach(function(dot) {
         dot.addEventListener('click', function(e) { e.stopPropagation(); showCard(parseInt(dot.dataset.i)); });
       });
-      // Kart tıklama → katalog
+      // Kart tıklama → ürün detay modal
       var card = section.querySelector('.featured-card');
       if (card) {
         card.addEventListener('click', function(e) {
           if (e.target.closest('.feat-poc-btn') || e.target.closest('.feat-dot')) return;
-          go('catalog');
+          openProductDetailModal(card.dataset.pid);
         });
       }
       // PoC butonu
@@ -2150,14 +2253,10 @@ async function loadFeaturedProducts() {
       if (pocBtn) {
         pocBtn.addEventListener('click', function(e) {
           e.stopPropagation();
-          if (!CUR_USER) { openAuthModal(); return; }
+          if (!CUR_USER) { openAuthModal('customer',''); return; }
+          if (CUR_PROFILE?.role === 'vendor') { showToast('PoC talebi müşteri hesabıyla oluşturulur.','err'); return; }
           var c2 = pocBtn.closest('.featured-card');
-          openMultiVendorPocModal([{
-            id: c2.dataset.pid,
-            name: c2.dataset.pn,
-            vendorId: c2.dataset.vid,
-            vendorName: c2.dataset.vn
-          }]);
+          openMultiVendorPocModal(c2.dataset.pid);
         });
       }
     }
@@ -2550,9 +2649,19 @@ async function loadCatalog() {
     });
   }
 
-    gridEl.querySelectorAll('.poc-req-btn').forEach(b => b.addEventListener('click', () => {
+    // Kart tıklaması → ürün detay modal
+    gridEl.querySelectorAll('.prod-card').forEach(function(card) {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', function(e) {
+        if (e.target.closest('.poc-req-btn') || e.target.closest('.prod-select-cb')) return;
+        openProductDetailModal(card.dataset.id);
+      });
+    });
+
+    gridEl.querySelectorAll('.poc-req-btn').forEach(b => b.addEventListener('click', function(e) {
+      e.stopPropagation();
       if (!CUR_USER) { openAuthModal('customer',''); return; }
-      if (CUR_PROFILE?.role !== 'customer') { showToast('PoC talebi oluşturmak için müşteri hesabı gerekli.','err'); return; }
+      if (CUR_PROFILE?.role === 'vendor') { showToast('PoC talebi müşteri hesabıyla oluşturulur.','err'); return; }
       openMultiVendorPocModal(b.dataset.id);
     }));
   } catch(e) {
@@ -5317,7 +5426,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.2.1</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.3</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
