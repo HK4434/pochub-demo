@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v3.8 | pochub.co -->
+<!-- PoCHub v3.9 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v3.8</title>
+<title>PoCHub.co — v3.9</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v3.8';
+const VERSION = 'v3.9';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
@@ -4241,76 +4241,162 @@ async function openEditEventModal(evId, evData) {
   });
 }
 
-async function openAddProductModal() {
-  const modal = document.createElement('div');
+async function openAddProductModal(prefillCat) {
+  var cats = await getCategories();
+  var modal = document.createElement('div');
   modal.className = 'modal-bg on';
-  modal.innerHTML = `<div class="modal" style="max-width:500px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-      <h3 style="font-size:15px;font-weight:700">Yeni Ürün Ekle</h3>
-      <button style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px" id="close-prod-modal">×</button>
-    </div>
-    <label class="lbl">Ürün Adı *</label><input class="inp" id="pr-name" placeholder="Ürün adı">
-    <label class="lbl">Kategori *</label>
-    <select class="inp" id="pr-cat"><option value="">Yükleniyor...</option></select>
-    <label class="lbl">Menşei Ülke</label>
-    <div id="pr-country-cont" style="margin-bottom:4px"></div>
-      <input type="hidden" id="pr-country-val" value="TR">
-    </div>
-    <label class="lbl">Açıklama</label>
-    <textarea class="inp" id="pr-desc" rows="3" placeholder="Genel ürün açıklaması..." style="resize:none"></textarea>
-    <label class="lbl">Destek Modeli</label>
-    <select class="inp" id="pr-support"><option value="inhouse">Kendi bünyesi</option><option value="outsource">Dış kaynak</option><option value="hybrid">Hibrit</option></select>
-    <div id="pr-cat-fields"></div>
-    <div id="pr-err" style="margin-top:10px"></div>
-    <button class="btn-p" id="pr-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Admin Onayına Gönder</button>
-  </div>`;
+  modal.innerHTML =
+    '<div class="modal" style="max-width:860px;width:95vw;padding:0;overflow:hidden;border-radius:14px">' +
+
+    // ── Başlık ──
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.08);background:#151821">' +
+    '<div>' +
+    '<h3 style="font-size:16px;font-weight:700;margin-bottom:2px">Yeni Ürün Ekle</h3>' +
+    '<div style="font-size:12px;color:#5a6278">Tüm zorunlu alanları doldurun. Ürün admin onayına gönderilecek.</div>' +
+    '</div>' +
+    '<button id="close-prod-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:22px;line-height:1">×</button>' +
+    '</div>' +
+
+    // ── İki sütunlu gövde ──
+    '<div style="display:grid;grid-template-columns:320px 1fr;min-height:460px;max-height:75vh;overflow:hidden">' +
+
+    // Sol panel — temel bilgiler
+    '<div style="padding:20px 22px;border-right:1px solid rgba(255,255,255,.08);overflow-y:auto;background:#1a1d27">' +
+    '<div style="font-size:10.5px;color:#5a6278;font-weight:700;letter-spacing:.6px;margin-bottom:14px">TEMEL BİLGİLER</div>' +
+
+    '<label class="lbl">Ürün Adı <span style="color:#ff7070">*</span></label>' +
+    '<input class="inp" id="pr-name" placeholder="Ürün adı" style="margin-bottom:12px">' +
+
+    '<label class="lbl">Kategori <span style="color:#ff7070">*</span></label>' +
+    '<select class="inp" id="pr-cat" style="margin-bottom:12px"><option value="">Kategori seçin...</option>' +
+    cats.map(function(ct){ return '<option value="'+ct.name+'"'+(prefillCat===ct.name?' selected':'')+'>'+ct.name+'</option>'; }).join('') +
+    '</select>' +
+
+    '<label class="lbl">Menşei Ülke</label>' +
+    '<div id="pr-country-cont" style="margin-bottom:12px"></div>' +
+    '<input type="hidden" id="pr-country-val" value="TR">' +
+
+    '<label class="lbl">Kısa Açıklama</label>' +
+    '<textarea class="inp" id="pr-desc" rows="4" placeholder="Ürün hakkında genel açıklama..." style="resize:vertical;margin-bottom:12px"></textarea>' +
+
+    '<label class="lbl">Destek Modeli</label>' +
+    '<select class="inp" id="pr-support" style="margin-bottom:4px">' +
+    '<option value="inhouse">Kendi Bünyesi</option>' +
+    '<option value="outsource">Dış Kaynak</option>' +
+    '<option value="hybrid">Hibrit</option>' +
+    '</select>' +
+    '</div>' +
+
+    // Sağ panel — kategori alanları
+    '<div id="pr-cat-fields-panel" style="padding:20px 22px;overflow-y:auto;background:#1c1f2a">' +
+    '<div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;color:#5a6278;text-align:center">' +
+    '<div style="font-size:32px;margin-bottom:12px">🏷️</div>' +
+    '<div style="font-size:13px">Kategori seçin</div>' +
+    '<div style="font-size:12px;margin-top:4px">Teknik özellik alanları burada görünecek</div>' +
+    '</div>' +
+    '</div>' +
+    '</div>' +
+
+    // ── Alt bar ──
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-top:1px solid rgba(255,255,255,.08);background:#151821">' +
+    '<div id="pr-err" style="font-size:12.5px;color:#ff7070;flex:1"></div>' +
+    '<div style="display:flex;gap:10px">' +
+    '<button class="btn-g" id="pr-cancel" style="padding:10px 20px">Vazgeç</button>' +
+    '<button class="btn-p" id="pr-submit" style="padding:10px 28px;font-size:14px">Admin Onayına Gönder →</button>' +
+    '</div>' +
+    '</div>' +
+    '</div>';
+
   document.body.appendChild(modal);
   modal.querySelector('#close-prod-modal').addEventListener('click', () => modal.remove());
+  modal.querySelector('#pr-cancel').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 
-  fillCatSelect(modal.querySelector('#pr-cat'), '');
   buildCountryInput('pr-country-cont','pr-country-inp','pr-country-val','TR');
 
-  // Kategori değişince dinamik alanları güncelle
+  // Kategori değişince sağ paneli güncelle
+  function updateCatPanel(cat) {
+    var panel = modal.querySelector('#pr-cat-fields-panel');
+    if (!cat) {
+      panel.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;color:#5a6278;text-align:center">' +
+        '<div style="font-size:32px;margin-bottom:12px">🏷️</div>' +
+        '<div style="font-size:13px">Kategori seçin</div>' +
+        '<div style="font-size:12px;margin-top:4px">Teknik özellik alanları burada görünecek</div>' +
+        '</div>';
+      return;
+    }
+    var fields = getCatFields(cat);
+    var reqCount = fields.filter(function(f){ return f.req; }).length;
+    panel.innerHTML =
+      '<div style="font-size:10.5px;color:#5a6278;font-weight:700;letter-spacing:.6px;margin-bottom:14px">' +
+      cat.toUpperCase() + ' — TEKNİK ÖZELLİKLER' +
+      '<span style="font-size:11px;font-weight:400;margin-left:8px;color:#5a6278">' + fields.length + ' alan · ' + reqCount + ' zorunlu</span>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px">' +
+      fields.map(function(f) {
+        var inp = '';
+        if (f.type === 'select') {
+          inp = '<select class="inp cat-field" data-fid="'+f.id+'" style="font-size:12.5px">' +
+            '<option value="">Seçin...</option>' +
+            (f.opts||[]).map(function(o){ return '<option value="'+o+'">'+o+'</option>'; }).join('') +
+            '</select>';
+        } else {
+          inp = '<input class="inp cat-field" type="'+(f.type==='number'?'number':'text')+'" data-fid="'+f.id+'" placeholder="'+(f.ph||'')+'" style="font-size:12.5px">';
+        }
+        return '<div>' +
+          '<label class="lbl" style="font-size:11.5px">' + f.label +
+          (f.req ? ' <span style="color:#ff7070">*</span>' : '') + '</label>' +
+          inp + '</div>';
+      }).join('') +
+      '</div>';
+  }
+
+  // Başlangıçta prefill varsa göster
+  if (prefillCat) updateCatPanel(prefillCat);
+
   modal.querySelector('#pr-cat').addEventListener('change', function() {
-    var catFieldsEl = modal.querySelector('#pr-cat-fields');
-    if (catFieldsEl) catFieldsEl.innerHTML = renderCatFields(this.value, null);
+    updateCatPanel(this.value);
   });
 
   modal.querySelector('#pr-submit').addEventListener('click', async () => {
-    const name = modal.querySelector('#pr-name').value.trim();
-    const cat = modal.querySelector('#pr-cat').value;
-    if (!name) { modal.querySelector('#pr-err').innerHTML='<div class="alert alert-err">Ürün adı zorunludur.</div>'; return; }
-    if (!cat)  { modal.querySelector('#pr-err').innerHTML='<div class="alert alert-err">Kategori seçimi zorunludur.</div>'; return; }
-    // Zorunlu kategori alanlarını kontrol et
+    var name = modal.querySelector('#pr-name').value.trim();
+    var cat  = modal.querySelector('#pr-cat').value;
+    var errDiv = modal.querySelector('#pr-err');
+    if (!name) { errDiv.textContent = 'Ürün adı zorunludur.'; return; }
+    if (!cat)  { errDiv.textContent = 'Kategori seçimi zorunludur.'; return; }
     var catMissing = validateCatFields(modal, cat);
     if (catMissing.length) {
-      modal.querySelector('#pr-err').innerHTML='<div class="alert alert-err">Eksik zorunlu alanlar: ' + catMissing.join(', ') + '</div>';
+      errDiv.textContent = 'Eksik zorunlu alanlar: ' + catMissing.join(', ');
       return;
     }
     var catData = collectCatFields(modal);
-    const btn = modal.querySelector('#pr-submit');
-    btn.disabled=true; btn.textContent='Gönderiliyor...';
+    var btn = modal.querySelector('#pr-submit');
+    btn.disabled = true; btn.textContent = 'Gönderiliyor...';
     try {
       await addDoc(collection(db,'products'), {
-        vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
-        vendorEmail: CUR_USER.email,
-        name, category: cat,
-        country: modal.querySelector('#pr-country-val').value || 'TR',
-        description: modal.querySelector('#pr-desc').value,
+        vendorId:     CUR_USER.uid,
+        vendorName:   CUR_PROFILE?.displayName||CUR_USER.email,
+        vendorEmail:  CUR_USER.email,
+        name,
+        category:     cat,
+        country:      modal.querySelector('#pr-country-val')?.value || 'TR',
+        description:  modal.querySelector('#pr-desc').value.trim(),
         supportModel: modal.querySelector('#pr-support').value,
-        catFields: catData,
-        status: 'pending',
-        createdAt: serverTimestamp()
+        catFields:    catData,
+        status:       'pending',
+        createdAt:    serverTimestamp(),
       });
       modal.remove();
       showToast('Ürün admin onayına gönderildi!');
+      loadVendTab();
     } catch(e) {
-      modal.querySelector('#pr-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
-      btn.disabled=false; btn.textContent='Admin Onayına Gönder';
+      errDiv.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Admin Onayına Gönder →';
     }
   });
 }
+
 
 async function openNewEventModal() {
   var modal = document.createElement('div');
@@ -4528,7 +4614,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.8</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v3.9</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
