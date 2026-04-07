@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.2 | pochub.co -->
+<!-- PoCHub v4.2.1 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.2</title>
+<title>PoCHub.co — v4.2.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.2';
+const VERSION = 'v4.2.1';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
@@ -2053,7 +2053,18 @@ async function loadFeaturedProducts() {
       var until = p.featuredUntil.toDate ? p.featuredUntil.toDate() : new Date(p.featuredUntil);
       return until >= now;
     });
-    if (!featured.length) { section.innerHTML = ''; return; }
+    if (!featured.length) {
+      // Fallback: onaylı ürünlerden ilk 3'ü göster (featured yokken)
+      var fallSnap = await getDocs(query(
+        collection(db,'products'),
+        where('status','==','active')
+      ));
+      var fallDocs = fallSnap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+      if (!fallDocs.length) { section.innerHTML = ''; return; }
+      // Max 3 ürün, karışık sıra
+      featured = fallDocs.sort(function(){ return Math.random()-.5; }).slice(0,3);
+      featured.forEach(function(p){ p.featuredBadge = 'Öne Çıkan Ürün'; });
+    }
 
     var cur = 0;
     var total = featured.length;
@@ -4053,60 +4064,122 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
 }
 
 
-function openEditProd(prodId, name, category, country, description, supportModel) {
+function openEditProd(prodId, name, category, country, description, supportModel, catFieldsData) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
-  modal.innerHTML = '<div class="modal" style="max-width:500px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
-    '<h3 style="font-size:15px;font-weight:700">Ürün Düzenle</h3>' +
-    '<button id="ep-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:18px">×</button>' +
+  modal.id = 'prod-edit-modal';
+
+  // window scope — onchange için
+  window._updateEditCatPanel = function(cat) {
+    var panel = document.querySelector('#prod-edit-modal #edit-right-panel');
+    if (!panel) return;
+    if (!cat) { panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:180px;flex-direction:column;color:#5a6278"><div style="font-size:32px;margin-bottom:10px">🏷️</div><div>Kategori seçin</div></div>'; return; }
+    var fields = getCatFields(cat);
+    if (!fields || !fields.length) { panel.innerHTML = '<div style="padding:20px;color:#5a6278">Bu kategori için alan yok.</div>'; return; }
+    var existing = catFieldsData || {};
+    var html = '<div style="font-size:10.5px;color:#7db4ff;font-weight:700;letter-spacing:.6px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(59,124,255,.2)">' + cat.toUpperCase() + ' — TEKNİK ÖZELLİKLER</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px">';
+    fields.forEach(function(f) {
+      var val = existing[f.id] || '';
+      var inp = '';
+      if (f.type === 'select') {
+        inp = '<select class="inp cat-field" data-fid="'+f.id+'" style="font-size:12.5px"><option value="">Seçin...</option>' +
+          (f.opts||[]).map(function(o){ return '<option value="'+o+'"'+(val===o?' selected':'')+'>'+o+'</option>'; }).join('') + '</select>';
+      } else {
+        inp = '<input class="inp cat-field" type="'+(f.type==='number'?'number':'text')+'" data-fid="'+f.id+'" placeholder="'+(f.ph||'')+'" value="'+(val||'')+'" style="font-size:12.5px">';
+      }
+      html += '<div><label class="lbl" style="font-size:11.5px">'+f.label+(f.req?' <span style="color:#ff7070">*</span>':'')+' </label>'+inp+'</div>';
+    });
+    html += '</div>';
+    panel.innerHTML = html;
+  };
+
+  modal.innerHTML =
+    '<div class="modal" style="max-width:880px;width:96vw;padding:0;border-radius:14px;display:flex;flex-direction:column;max-height:90vh">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">' +
+    '<div><div style="font-size:16px;font-weight:700">Ürün Düzenle</div>' +
+    '<div style="font-size:12px;color:#5a6278;margin-top:2px">Kategori değiştirirseniz teknik alanlar güncellenir</div></div>' +
+    '<button id="close-edit-modal" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:22px">×</button>' +
     '</div>' +
-    '<label class="lbl">Ürün Adı *</label><input class="inp" id="ep-name" value="'+name+'">' +
-    '<label class="lbl">Kategori</label><select class="inp" id="ep-cat"></select>' +
-    '<label class="lbl">Menşei Ülke</label><div id="ep-country-cont" style="margin-bottom:4px"></div>' +
-    '<label class="lbl">Açıklama</label><textarea class="inp" id="ep-desc" rows="3" style="resize:none">'+description+'</textarea>' +
-    '<label class="lbl">Destek Modeli</label>' +
-    '<select class="inp" id="ep-sup">' +
-    '<option value="inhouse"'+(supportModel==='inhouse'?' selected':'')+'>Kendi bünyesi</option>' +
-    '<option value="outsource"'+(supportModel==='outsource'?' selected':'')+'>Dış kaynak</option>' +
+    '<div style="display:grid;grid-template-columns:300px 1fr;flex:1;overflow:hidden">' +
+
+    // Sol — temel
+    '<div style="padding:20px;border-right:1px solid rgba(255,255,255,.08);overflow-y:auto;background:#1a1d27">' +
+    '<div style="font-size:10px;color:#5a6278;font-weight:700;letter-spacing:.8px;margin-bottom:14px">TEMEL BİLGİLER</div>' +
+    '<label class="lbl" style="font-size:12px">Ürün Adı <span style="color:#ff7070">*</span></label>' +
+    '<input class="inp" id="edit-name" value="'+(name||'')+'" style="margin-bottom:12px">' +
+    '<label class="lbl" style="font-size:12px">Kategori</label>' +
+    '<select class="inp" id="edit-cat" style="margin-bottom:12px;font-size:13px" onchange="window._updateEditCatPanel(this.value)">' +
+    '<option value="">Kategori seçin...</option>' +
+    '</select>' +
+    '<label class="lbl" style="font-size:12px">Menşei Ülke</label>' +
+    '<div id="edit-country-cont" style="margin-bottom:12px"></div>' +
+    '<input type="hidden" id="edit-country-val" value="'+(country||'TR')+'">' +
+    '<label class="lbl" style="font-size:12px">Açıklama</label>' +
+    '<textarea class="inp" id="edit-desc" rows="4" style="resize:vertical;margin-bottom:12px;font-size:13px">'+(description||'')+'</textarea>' +
+    '<label class="lbl" style="font-size:12px">Destek Modeli</label>' +
+    '<select class="inp" id="edit-support" style="font-size:13px">' +
+    '<option value="inhouse"'+(supportModel==='inhouse'?' selected':'')+'>Kendi Bünyesi</option>' +
+    '<option value="outsource"'+(supportModel==='outsource'?' selected':'')+'>Dış Kaynak</option>' +
     '<option value="hybrid"'+(supportModel==='hybrid'?' selected':'')+'>Hibrit</option>' +
     '</select>' +
-    '<div id="ep-err" style="margin-top:10px"></div>' +
-    '<button class="btn-p" id="ep-save" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Güncelle</button>' +
+    '</div>' +
+
+    // Sağ — kategori alanları
+    '<div id="edit-right-panel" style="padding:20px;overflow-y:auto;background:#1c1f2a">' +
+    '<div style="display:flex;align-items:center;justify-content:center;height:180px;flex-direction:column;color:#5a6278">' +
+    '<div style="font-size:32px;margin-bottom:10px">🏷️</div><div>Kategori seçin</div></div>' +
+    '</div></div>' +
+
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0">' +
+    '<div id="edit-err" style="font-size:12.5px;color:#ff7070;flex:1;margin-right:12px"></div>' +
+    '<button class="btn-g" id="edit-cancel" style="padding:9px 20px;margin-right:8px">Vazgeç</button>' +
+    '<button class="btn-p" id="edit-submit" style="padding:9px 24px;font-size:14px">Güncelle</button>' +
+    '</div>' +
     '</div>';
+
   document.body.appendChild(modal);
-  modal.querySelector('#ep-close').addEventListener('click', function(){modal.remove();});
-  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
-  fillCatSelect(modal.querySelector('#ep-cat'), category);
-  buildCountryInput('ep-country-cont', 'ep-country-inp', 'ep-country-val', country||'TR');
-  modal.querySelector('#ep-save').addEventListener('click', async function() {
-    var nm = modal.querySelector('#ep-name').value.trim();
-    if(!nm){modal.querySelector('#ep-err').innerHTML='<div class="alert alert-err">Ad zorunlu.</div>';return;}
-    var btn=modal.querySelector('#ep-save'); btn.disabled=true; btn.textContent='Güncelleniyor...';
+  modal.querySelector('#close-edit-modal').addEventListener('click', function(){ modal.remove(); delete window._updateEditCatPanel; });
+  modal.querySelector('#edit-cancel').addEventListener('click', function(){ modal.remove(); delete window._updateEditCatPanel; });
+  modal.addEventListener('click', function(e){ if(e.target===modal){ modal.remove(); delete window._updateEditCatPanel; } });
+
+  buildCountryInput('edit-country-cont','edit-country-inp','edit-country-val', country||'TR');
+  fillCatSelect(modal.querySelector('#edit-cat'), category);
+
+  // Kategori yüklendikten sonra mevcut alanları göster
+  setTimeout(function() {
+    if (category) window._updateEditCatPanel(category);
+  }, 300);
+
+  modal.querySelector('#edit-submit').addEventListener('click', async function() {
+    var newName = modal.querySelector('#edit-name').value.trim();
+    var newCat  = modal.querySelector('#edit-cat').value;
+    var errDiv  = modal.querySelector('#edit-err');
+    if (!newName) { errDiv.textContent = 'Ürün adı zorunludur.'; return; }
+    var newCatData = collectCatFields(modal);
+    var btn = modal.querySelector('#edit-submit');
+    btn.disabled = true; btn.textContent = 'Güncelleniyor...';
     try {
-      await updateDoc(doc(db,'products',prodId),{
-        name:nm, category:modal.querySelector('#ep-cat').value,
-        country:document.getElementById('ep-country-val')?.value||country,
-        description:modal.querySelector('#ep-desc').value,
-        supportModel:modal.querySelector('#ep-sup').value,
-        updatedAt:serverTimestamp()
+      await updateDoc(doc(db,'products',prodId), {
+        name:         newName,
+        category:     newCat,
+        country:      modal.querySelector('#edit-country-val')?.value || country || 'TR',
+        description:  modal.querySelector('#edit-desc').value.trim(),
+        supportModel: modal.querySelector('#edit-support').value,
+        catFields:    newCatData,
       });
-      modal.remove(); showToast('Güncellendi!'); loadVendTab();
+      modal.remove();
+      delete window._updateEditCatPanel;
+      showToast('Ürün güncellendi!');
+      loadVendTab();
     } catch(e) {
-      modal.querySelector('#ep-err').innerHTML='<div class="alert alert-err">'+e.message+'</div>';
-      btn.disabled=false; btn.textContent='Güncelle';
+      errDiv.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Güncelle';
     }
   });
 }
 
-/* ═══════════════════════════════════════════════════════
-   PORTFÖY SİSTEMİ (v2.2)
-═══════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════
-   VENDOR PROAKTİF DAVET SİSTEMİ (v2.6)
-   Vendor → Müşteriye PoC daveti gönderir
-   Firestore: poc_invites koleksiyonu
-═══════════════════════════════════════════════════════ */
+
 async function vendInvites(m) {
   const snap = await getDocs(query(collection(db,'poc_invites'), where('vendorId','==',CUR_USER.uid)));
   var invites = snap.docs.map(d=>({...d.data(),id:d.id}));
@@ -5244,7 +5317,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.2</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.2.1</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -5510,26 +5583,13 @@ async function admProducts(m) {
   var all = snap.docs.map(d=>({...d.data(),id:d.id}));
   all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   var stFilter='';
-  var pFilter='upcoming'; // Default: yaklaşan
-
-  function applyPeriod(items) {
-    var now3 = new Date();
-    var thisMonthStart = new Date(now3.getFullYear(), now3.getMonth(), 1);
-    var lastMonthStart = new Date(now3.getFullYear(), now3.getMonth()-1, 1);
-    var lastMonthEnd   = new Date(now3.getFullYear(), now3.getMonth(), 1);
-    var thisYearStart  = new Date(now3.getFullYear(), 0, 1);
-    return items.filter(function(e) {
-      var ed = e.eventDate?.toDate ? e.eventDate.toDate() : null;
-      if (!ed || !pFilter) return true;
-      if (pFilter === 'upcoming')    return ed >= now3;
-      if (pFilter === 'past')        return ed < now3;
-      if (pFilter === 'this_month')  return ed >= thisMonthStart && ed < new Date(now3.getFullYear(), now3.getMonth()+1, 1);
-      if (pFilter === 'last_month')  return ed >= lastMonthStart && ed < lastMonthEnd;
-      if (pFilter === 'this_year')   return ed >= thisYearStart;
-      return true;
-    });
+  function applyFilter() {
+    var q = (m.querySelector('#p-search')?.value||'').toLowerCase();
+    renderRows(all.filter(function(p){
+      return (!stFilter||p.status===stFilter) &&
+        (!q||(p.name||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q));
+    }));
   }
-
   function renderRows(items) {
     var tbody=m.querySelector('#p-tbody');
     var cnt=m.querySelector('#p-cnt');
@@ -5638,7 +5698,7 @@ async function admProducts(m) {
         if (prod2) { prod2.featured=false; prod2.featuredUntil=null; }
         showToast('Öne çıkarma kaldırıldı.');
       }
-      applyFilter();
+      renderRows(all);
     }
   });
 }
