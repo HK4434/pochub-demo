@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.6.1</title>
+<title>PoCHub.co — v4.7</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{min-height:100%;background:#07080d}body{min-height:100%;background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.6.1';
+const VERSION = 'v4.7';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
@@ -1331,6 +1331,7 @@ let CUR_ADM_TAB = 'dashboard';
    AUTH
 ══════════════════════════════════════ */
 onAuthStateChanged(auth, async user => {
+  window._authResolved = true;
   CUR_USER = user;
   if (user) {
     const snap = await getDoc(doc(db, 'users', user.uid));
@@ -4261,6 +4262,12 @@ window.closePocModal = () => el('poc-modal')?.classList.remove('on');
    MÜŞTERİ PANELİ
 ══════════════════════════════════════ */
 function renderCustomer() {
+  // Firebase auth async yükleme — CUR_USER henüz set edilmediyse bekle
+  if (!CUR_USER && !window._authResolved) {
+    el('scr-customer').innerHTML = '<div class="wrap"><div class="empty"><div class="empty-icon">⏳</div>Yükleniyor...</div></div>';
+    setTimeout(() => renderCustomer(), 600);
+    return;
+  }
   if (!CUR_USER || CUR_PROFILE?.role !== 'customer') {
     el('scr-customer').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme erişmek için müşteri hesabıyla giriş yapın.<br><br><button class="btn-p" onclick="openAuthModal('customer','')">Giriş Yap / Kayıt Ol</button></div></div>`;
     return;
@@ -4367,7 +4374,7 @@ async function loadCustTab() {
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Etkinlik Kayıtlarım</h2>
     <table><thead><tr><th>Etkinlik</th><th>Durum</th><th>Kayıt Tarihi</th></tr></thead><tbody>
     ${snap.docs.map(d=>{const r={...d.data(),id:d.id};
-      return `<tr><td style="font-weight:600">${r.eventId}</td><td>${statusBadge(r.status)}</td><td style="color:#7c87a0;font-size:12px">${fmt(r.createdAt)}</td></tr>`;
+      return `<tr><td style="font-weight:600">${escHtml(r.eventTitle||r.eventId||'—')}</td><td>${statusBadge(r.status||'registered')}</td><td style="color:#7c87a0;font-size:12px">${fmt(r.createdAt)}</td></tr>`;
     }).join('')}
     </tbody></table>`;
   }
@@ -4487,6 +4494,11 @@ async function loadOffersWithComparison(m) {
    VENDOR PANELİ
 ══════════════════════════════════════ */
 function renderVendor() {
+  if (!CUR_USER && !window._authResolved) {
+    el('scr-vendor').innerHTML = '<div class="wrap"><div class="empty"><div class="empty-icon">⏳</div>Yükleniyor...</div></div>';
+    setTimeout(() => renderVendor(), 600);
+    return;
+  }
   if (!CUR_USER || CUR_PROFILE?.role !== 'vendor') {
     el('scr-vendor').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme vendor hesabıyla giriş yapın.</div></div>`;
     return;
@@ -6179,6 +6191,11 @@ async function openNewEventModal() {
 
 
 function renderAdmin() {
+  if (!CUR_USER && !window._authResolved) {
+    el('scr-admin').innerHTML = '<div class="wrap"><div class="empty"><div class="empty-icon">⏳</div>Yükleniyor...</div></div>';
+    setTimeout(() => renderAdmin(), 600);
+    return;
+  }
   if (!CUR_USER || !isAdminLike(CUR_PROFILE?.role)) {
     el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme erişim yetkiniz yok.</div></div>`;
     return;
@@ -6198,7 +6215,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.6.1</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.7</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
