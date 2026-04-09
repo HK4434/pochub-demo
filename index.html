@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.7</title>
+<title>PoCHub.co — v4.7.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{min-height:100%;background:#07080d}body{min-height:100%;background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.7';
+const VERSION = 'v4.7.1';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
@@ -4371,11 +4371,15 @@ async function loadCustTab() {
   else if (CUR_CUST_TAB === 'registrations') {
     const snap = await getDocs(query(collection(db,'registrations'), where('userId','==',CUR_USER.uid)));
     if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>Henüz etkinlik kaydınız yok.<br><br><button class="btn-p btn-sm" onclick="go(\'events\')">Etkinlikleri Gör</button></div>'; return; }
+    var regsData = snap.docs.map(d=>({...d.data(),id:d.id}));
+    // eventTitle yoksa public_events'ten başlığı çek
+    await Promise.all(regsData.filter(r=>!r.eventTitle && r.eventId).map(async r=>{
+      var evDoc = await getDoc(doc(db,'public_events',r.eventId));
+      if(evDoc.exists()) r.eventTitle = cleanTitle(evDoc.data().title||'');
+    }));
     m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Etkinlik Kayıtlarım</h2>
     <table><thead><tr><th>Etkinlik</th><th>Durum</th><th>Kayıt Tarihi</th></tr></thead><tbody>
-    ${snap.docs.map(d=>{const r={...d.data(),id:d.id};
-      return `<tr><td style="font-weight:600">${escHtml(r.eventTitle||r.eventId||'—')}</td><td>${statusBadge(r.status||'registered')}</td><td style="color:#7c87a0;font-size:12px">${fmt(r.createdAt)}</td></tr>`;
-    }).join('')}
+    ${regsData.map(r=>`<tr><td style="font-weight:600">${escHtml(r.eventTitle||r.eventId||'—')}</td><td>${statusBadge(r.status||'registered')}</td><td style="color:#7c87a0;font-size:12px">${fmt(r.createdAt)}</td></tr>`).join('')}
     </tbody></table>`;
   }
 
@@ -6215,7 +6219,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.7</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.7.1</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
