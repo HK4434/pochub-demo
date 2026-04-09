@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.5 | pochub.co -->
+<!-- PoCHub v4.5.1 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.5</title>
+<title>PoCHub.co — v4.5.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.5';
+const VERSION = 'v4.5.1';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
@@ -2411,6 +2411,156 @@ async function openEventCancelModal(eventId, eventTitle, registeredCount) {
 }
 
 
+/* ══════════════════════════════════════════════════════
+   ETKİNLİK KATILIMCI LİSTESİ MODAL — v4.5.1
+   Vendor ve Admin için — PDF export ile
+══════════════════════════════════════════════════════ */
+async function openEventAttendeesModal(eventId, eventTitle) {
+  // Yükleniyor modalı göster
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:680px;width:95vw;padding:0;border-radius:14px;display:flex;flex-direction:column;max-height:88vh">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">' +
+    '<div>' +
+    '<div style="font-size:16px;font-weight:700">Katılımcı Listesi</div>' +
+    '<div style="font-size:12px;color:#5a6278;margin-top:3px">' + (eventTitle||'Etkinlik') + '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;align-items:center">' +
+    '<button id="ea-pdf" class="btn-g btn-sm" style="font-size:12px">📄 PDF İndir</button>' +
+    '<button id="ea-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:22px">×</button>' +
+    '</div>' +
+    '</div>' +
+    '<div id="ea-body" style="padding:20px 24px;overflow-y:auto;flex:1">' +
+    '<div style="text-align:center;padding:40px;color:#5a6278">Yükleniyor...</div>' +
+    '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#ea-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+
+  try {
+    // registrations koleksiyonundan bu etkinliğin kayıtlarını çek
+    var regSnap = await getDocs(query(
+      collection(db,'registrations'),
+      where('eventId','==',eventId)
+    ));
+
+    var regs = regSnap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    regs.sort(function(a,b){ return (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0); });
+
+    var body = modal.querySelector('#ea-body');
+
+    if (!regs.length) {
+      body.innerHTML =
+        '<div style="text-align:center;padding:48px;color:#5a6278">' +
+        '<div style="font-size:36px;margin-bottom:12px">📭</div>' +
+        '<div>Bu etkinliğe henüz kayıt yok.</div>' +
+        '</div>';
+      modal.querySelector('#ea-pdf').disabled = true;
+      return;
+    }
+
+    // Özet satır
+    var summaryHtml =
+      '<div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap">' +
+      '<div style="padding:10px 16px;background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.2);border-radius:8px;text-align:center">' +
+      '<div style="font-size:22px;font-weight:700;color:#7db4ff">' + regs.length + '</div>' +
+      '<div style="font-size:11px;color:#5a6278;margin-top:2px">Toplam Kayıt</div></div>' +
+      '<div style="padding:10px 16px;background:rgba(34,208,120,.08);border:1px solid rgba(34,208,120,.2);border-radius:8px;text-align:center">' +
+      '<div style="font-size:22px;font-weight:700;color:#22d078">' + regs.filter(function(r){ return r.status !== 'cancelled'; }).length + '</div>' +
+      '<div style="font-size:11px;color:#5a6278;margin-top:2px">Aktif Kayıt</div></div>' +
+      '</div>';
+
+    // Tablo
+    var tableHtml =
+      '<table style="width:100%;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:1px solid rgba(255,255,255,.1)">' +
+      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:#5a6278;font-weight:700">#</th>' +
+      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:#5a6278;font-weight:700">AD SOYAD / FİRMA</th>' +
+      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:#5a6278;font-weight:700">E-POSTA</th>' +
+      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:#5a6278;font-weight:700">KAYIT TARİHİ</th>' +
+      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:#5a6278;font-weight:700">DURUM</th>' +
+      '</tr></thead><tbody>';
+
+    regs.forEach(function(r, i) {
+      var rowBg = i % 2 === 0 ? 'rgba(255,255,255,.02)' : 'transparent';
+      tableHtml +=
+        '<tr style="border-bottom:1px solid rgba(255,255,255,.04);background:' + rowBg + '">' +
+        '<td style="padding:9px 10px;font-size:12.5px;color:#5a6278">' + (i+1) + '</td>' +
+        '<td style="padding:9px 10px">' +
+          '<div style="font-size:13px;font-weight:600">' + (r.userName||r.userEmail||'—') + '</div>' +
+          (r.userCompany ? '<div style="font-size:11.5px;color:#7c87a0">' + r.userCompany + '</div>' : '') +
+        '</td>' +
+        '<td style="padding:9px 10px;font-size:12.5px;color:#9ca3af">' + (r.userEmail||'—') + '</td>' +
+        '<td style="padding:9px 10px;font-size:12px;color:#7c87a0">' + fmt(r.createdAt) + '</td>' +
+        '<td style="padding:9px 10px">' + statusBadge(r.status||'active') + '</td>' +
+        '</tr>';
+    });
+    tableHtml += '</tbody></table>';
+
+    body.innerHTML = summaryHtml + tableHtml;
+
+    // PDF export
+    modal.querySelector('#ea-pdf').addEventListener('click', function() {
+      var printWin = window.open('', '_blank', 'width=900,height=700');
+      var now = new Date().toLocaleDateString('tr-TR');
+
+      var rows = regs.map(function(r, i) {
+        return '<tr>' +
+          '<td>' + (i+1) + '</td>' +
+          '<td><strong>' + (r.userName||r.userEmail||'—') + '</strong>' +
+            (r.userCompany ? '<br><small>' + r.userCompany + '</small>' : '') + '</td>' +
+          '<td>' + (r.userEmail||'—') + '</td>' +
+          '<td>' + fmt(r.createdAt) + '</td>' +
+          '<td>' + (r.status==='cancelled'?'İptal':'Aktif') + '</td>' +
+          '</tr>';
+      }).join('');
+
+      printWin.document.write(
+        '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">' +
+        '<title>Katılımcı Listesi — ' + (eventTitle||'Etkinlik') + '</title>' +
+        '<style>' +
+          'body { font-family: Arial, sans-serif; color: #1a1a2e; padding: 32px; font-size: 13px; }' +
+          'h1 { font-size: 20px; margin-bottom: 4px; color: #1a1a2e; }' +
+          '.subtitle { color: #666; font-size: 12px; margin-bottom: 24px; }' +
+          '.summary { display: flex; gap: 16px; margin-bottom: 24px; }' +
+          '.stat { border: 1px solid #ddd; border-radius: 8px; padding: 12px 20px; text-align: center; }' +
+          '.stat-val { font-size: 24px; font-weight: 700; color: #3b7cff; }' +
+          '.stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }' +
+          'table { width: 100%; border-collapse: collapse; }' +
+          'th { background: #f0f4ff; padding: 10px 12px; text-align: left; font-size: 11px; color: #555; border-bottom: 2px solid #ddd; }' +
+          'td { padding: 9px 12px; border-bottom: 1px solid #eee; vertical-align: top; }' +
+          'tr:nth-child(even) td { background: #f9fafb; }' +
+          '.footer { margin-top: 32px; font-size: 11px; color: #aaa; text-align: right; }' +
+          '@media print { body { padding: 0; } .no-print { display: none; } }' +
+        '</style></head><body>' +
+        '<h1>Katılımcı Listesi</h1>' +
+        '<div class="subtitle">' + (eventTitle||'Etkinlik') + ' · Oluşturulma: ' + now + '</div>' +
+        '<div class="summary">' +
+          '<div class="stat"><div class="stat-val">' + regs.length + '</div><div class="stat-lbl">Toplam Kayıt</div></div>' +
+          '<div class="stat"><div class="stat-val">' + regs.filter(function(r){ return r.status !== 'cancelled'; }).length + '</div><div class="stat-lbl">Aktif Kayıt</div></div>' +
+          '<div class="stat"><div class="stat-val">' + regs.filter(function(r){ return r.status === 'cancelled'; }).length + '</div><div class="stat-lbl">İptal</div></div>' +
+        '</div>' +
+        '<table><thead><tr>' +
+          '<th>#</th><th>Ad Soyad / Firma</th><th>E-posta</th><th>Kayıt Tarihi</th><th>Durum</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<div class="footer">PoCHub.co · pochub.co</div>' +
+        '</body></html>'
+      );
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(function(){ printWin.print(); }, 500);
+    });
+
+  } catch(e) {
+    modal.querySelector('#ea-body').innerHTML =
+      '<div style="padding:24px;color:#ff7070">Hata: ' + e.message + '</div>';
+  }
+}
+
+
 async function loadFeaturedProducts() {
   var section = el('featured-carousel-section');
   if (!section) return;
@@ -4262,6 +4412,7 @@ async function loadVendTab() {
         <td style="color:#7c87a0">${e.registeredCount||0} / ${e.capacity||0}</td>
         <td>${statusBadge(e.status)}</td>
         <td style="white-space:nowrap">
+          <button class="btn-g btn-sm vev-attendees" data-id="${e.id}" data-title="${(e.title||'').replace(/"/g,'')}" style="font-size:11.5px;margin-right:4px">👥 ${e.registeredCount||0}</button>
           ${canEdit ? `<button class="btn-g btn-sm vev-edit" data-id="${e.id}" style="font-size:11.5px;margin-right:4px">✏️ Düzenle</button>` : ''}
           ${canEdit ? `<button class="btn-red btn-sm vev-cancel" data-id="${e.id}" data-title="${(e.title||'').replace(/"/g,'')}" data-count="${e.registeredCount||0}" style="font-size:11.5px">✕ İptal</button>` : ''}
         </td>
@@ -4269,6 +4420,13 @@ async function loadVendTab() {
     }).join('')}
     </tbody></table>`}`;
     el('v-add-ev2')?.addEventListener('click', openNewEventModal);
+
+    // Katılımcı listesi
+    m.querySelectorAll('.vev-attendees').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openEventAttendeesModal(btn.dataset.id, btn.dataset.title);
+      });
+    });
 
     // Etkinlik düzenle
     var evDataMap = {};
@@ -5780,7 +5938,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.5</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.5.1</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -6248,8 +6406,17 @@ async function admEvents(m) {
         '<td style="color:#7c87a0">'+(e.format||'—')+'</td>'+
         '<td style="color:#7c87a0">'+(e.registeredCount||0)+'/'+(e.capacity||0)+'</td>'+
         '<td>'+statusBadge(e.status)+'</td>'+
-        '<td>'+(e.status==='published'?'<button class="btn-red btn-sm ev-cancel" data-id="'+e.id+'">İptal</button>':'—')+'</td></tr>';
+        '<td style="white-space:nowrap">'+
+        '<button class="btn-g btn-sm ev-attendees" data-id="'+e.id+'" data-title="'+(e.title||'').replace(/"/g,'')+'" data-count="'+(e.registeredCount||0)+'" style="font-size:11.5px;margin-right:4px">👥 '+(e.registeredCount||0)+'</button>'+
+        (e.status==='published'?'<button class="btn-red btn-sm ev-cancel" data-id="'+e.id+'">İptal</button>':'—')+
+        '</td></tr>';
     }).join(''):'<tr><td colspan="7" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
+    m.querySelectorAll('.ev-attendees').forEach(function(b){
+      b.addEventListener('click', function() {
+        openEventAttendeesModal(b.dataset.id, b.dataset.title);
+      });
+    });
+
     m.querySelectorAll('.ev-cancel').forEach(function(b){b.addEventListener('click',async function(){
       if(!confirm('Etkinliği iptal etmek istiyor musunuz?')) return;
       await updateDoc(doc(db,'public_events',b.dataset.id),{status:'cancelled'});
