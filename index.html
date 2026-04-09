@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.5.1 | pochub.co -->
+<!-- PoCHub v4.5.2 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.5.1</title>
+<title>PoCHub.co — v4.5.2</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07080d;color:#e9ecf3;font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -142,7 +142,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.5.1';
+const VERSION = 'v4.5.2';
 console.log('PoCHub', VERSION, '| pochub.co');
 
 /* ═══════════════════════════════════════════════════════
@@ -2427,6 +2427,7 @@ async function openEventAttendeesModal(eventId, eventTitle) {
     '<div style="font-size:12px;color:#5a6278;margin-top:3px">' + (eventTitle||'Etkinlik') + '</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;align-items:center">' +
+    '<button id="ea-mail" class="btn-g btn-sm" style="font-size:12px;margin-right:4px">📧 Mail Gönder</button>' +
     '<button id="ea-pdf" class="btn-g btn-sm" style="font-size:12px">📄 PDF İndir</button>' +
     '<button id="ea-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:22px">×</button>' +
     '</div>' +
@@ -2502,6 +2503,11 @@ async function openEventAttendeesModal(eventId, eventTitle) {
 
     body.innerHTML = summaryHtml + tableHtml;
 
+    // Mail gönder
+    modal.querySelector('#ea-mail').addEventListener('click', function() {
+      openEventAttendeesMailModal(eventTitle, regs);
+    });
+
     // PDF export
     modal.querySelector('#ea-pdf').addEventListener('click', function() {
       var printWin = window.open('', '_blank', 'width=900,height=700');
@@ -2558,6 +2564,155 @@ async function openEventAttendeesModal(eventId, eventTitle) {
     modal.querySelector('#ea-body').innerHTML =
       '<div style="padding:24px;color:#ff7070">Hata: ' + e.message + '</div>';
   }
+}
+
+
+/* ══════════════════════════════════════════════════════
+   ETKİNLİK KATILIMCI LİSTESİ — MAİL GÖNDER (v4.5.2)
+   Çoklu alıcı, özelleştirilebilir mesaj, liste ekte özet
+══════════════════════════════════════════════════════ */
+function openEventAttendeesMailModal(eventTitle, regs) {
+  var activeRegs = regs.filter(function(r){ return r.status !== 'cancelled'; });
+  var total = regs.length;
+  var active = activeRegs.length;
+
+  // Liste özetini hazırla
+  var listSummary = regs.map(function(r, i) {
+    return (i+1) + '. ' + (r.userName||r.userEmail||'—') +
+      (r.userCompany ? ' / ' + r.userCompany : '') +
+      ' <' + (r.userEmail||'') + '>' +
+      (r.status==='cancelled' ? ' [İptal]' : '');
+  }).join('\n');
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.id = 'ea-mail-modal';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:560px;width:95vw">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">' +
+    '<div>' +
+    '<div style="font-size:16px;font-weight:700">Katılımcı Listesini Gönder</div>' +
+    '<div style="font-size:12px;color:#5a6278;margin-top:3px">' + (eventTitle||'Etkinlik') + ' · ' + active + ' aktif, ' + total + ' toplam kayıt</div>' +
+    '</div>' +
+    '<button id="eam-close" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:22px">×</button>' +
+    '</div>' +
+
+    // Alıcılar
+    '<label class="lbl">Alıcı E-posta Adresleri <span style="color:#ff7070">*</span></label>' +
+    '<div style="font-size:11.5px;color:#5a6278;margin-bottom:6px">Birden fazla alıcı için virgül veya Enter ile ayırın</div>' +
+    '<textarea class="inp" id="eam-recipients" rows="3" placeholder="ornek@firma.com, yetkili@sirket.com" style="resize:vertical;margin-bottom:4px"></textarea>' +
+    '<div id="eam-rec-tags" style="display:flex;gap:6px;flex-wrap:wrap;min-height:20px;margin-bottom:12px"></div>' +
+
+    // Konu
+    '<label class="lbl">Mail Konusu</label>' +
+    '<input class="inp" id="eam-subject" value="' + (eventTitle||'Etkinlik') + ' — Katılımcı Listesi" style="margin-bottom:12px">' +
+
+    // Mesaj
+    '<label class="lbl">Ek Mesaj <span style="font-weight:400;color:#5a6278">(isteğe bağlı)</span></label>' +
+    '<textarea class="inp" id="eam-message" rows="3" placeholder="Ek mesaj veya açıklama..." style="resize:vertical;margin-bottom:12px"></textarea>' +
+
+    // Liste önizleme
+    '<div style="background:#1c1f2a;border-radius:8px;padding:12px 14px;margin-bottom:16px">' +
+    '<div style="font-size:11px;color:#5a6278;font-weight:700;letter-spacing:.5px;margin-bottom:8px">MAIL İÇERİĞİNE EKLENECEK LİSTE ÖNİZLEMESİ</div>' +
+    '<div style="font-size:12px;color:#9ca3af;line-height:1.8;max-height:120px;overflow-y:auto;white-space:pre-wrap">' + listSummary + '</div>' +
+    '</div>' +
+
+    '<div id="eam-err" style="font-size:12px;color:#ff7070;margin-bottom:10px"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn-g" id="eam-back" style="flex:1;padding:10px">Vazgeç</button>' +
+    '<button class="btn-p" id="eam-send" style="flex:2;padding:10px;font-size:14px">📧 Gönder</button>' +
+    '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#eam-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#eam-back').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+
+  // Alıcı tag sistemi — virgül veya enter ile ekle
+  var recipients = [];
+  var tagsEl = modal.querySelector('#eam-rec-tags');
+  var recInput = modal.querySelector('#eam-recipients');
+
+  function renderTags() {
+    tagsEl.innerHTML = recipients.map(function(email, i) {
+      return '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(59,124,255,.12);border:1px solid rgba(59,124,255,.25);border-radius:20px;padding:3px 10px 3px 12px;font-size:12px;color:#7db4ff">' +
+        email +
+        '<button data-i="'+i+'" style="background:none;border:none;color:#7c87a0;cursor:pointer;font-size:14px;padding:0;line-height:1">×</button>' +
+        '</span>';
+    }).join('');
+    tagsEl.querySelectorAll('button[data-i]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        recipients.splice(parseInt(btn.dataset.i), 1);
+        renderTags();
+      });
+    });
+  }
+
+  function parseAndAdd(raw) {
+    var emails = raw.split(/[,\n]+/).map(function(e){ return e.trim().toLowerCase(); }).filter(function(e){ return e.includes('@'); });
+    emails.forEach(function(email) {
+      if (!recipients.includes(email)) recipients.push(email);
+    });
+    recInput.value = '';
+    renderTags();
+  }
+
+  recInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      parseAndAdd(recInput.value);
+    }
+  });
+  recInput.addEventListener('blur', function() {
+    if (recInput.value.trim()) parseAndAdd(recInput.value);
+  });
+
+  // Gönder
+  modal.querySelector('#eam-send').addEventListener('click', async function() {
+    // Son girilen değeri de ekle
+    if (recInput.value.trim()) parseAndAdd(recInput.value);
+
+    if (!recipients.length) {
+      modal.querySelector('#eam-err').textContent = 'En az bir alıcı e-posta adresi girin.';
+      return;
+    }
+
+    var subject = modal.querySelector('#eam-subject').value.trim() || (eventTitle + ' — Katılımcı Listesi');
+    var extraMsg = modal.querySelector('#eam-message').value.trim();
+    var btn = modal.querySelector('#eam-send');
+    btn.disabled = true; btn.textContent = 'Gönderiliyor...';
+
+    // Mail içeriği oluştur
+    var mailBody =
+      (extraMsg ? extraMsg + '\n\n---\n\n' : '') +
+      'ETKİNLİK: ' + (eventTitle||'') + '\n' +
+      'TOPLAM KAYIT: ' + total + ' (' + active + ' aktif)\n\n' +
+      'KATILIMCI LİSTESİ:\n' +
+      listSummary + '\n\n' +
+      '---\nPoCHub.co\nBu mail otomatik olarak gönderilmiştir.';
+
+    var sent = 0;
+    var failed = [];
+
+    for (var i = 0; i < recipients.length; i++) {
+      var email = recipients[i];
+      try {
+        sendEmail(email, email, subject, mailBody, '');
+        sent++;
+      } catch(e2) {
+        failed.push(email);
+      }
+      // Rate limit önlemi
+      if (i < recipients.length - 1) await new Promise(function(r){ setTimeout(r, 200); });
+    }
+
+    modal.remove();
+    if (failed.length) {
+      showToast(sent + ' alıcıya gönderildi. ' + failed.length + ' başarısız: ' + failed.join(', '), 'err');
+    } else {
+      showToast('📧 Katılımcı listesi ' + sent + ' alıcıya gönderildi!');
+    }
+  });
 }
 
 
@@ -5938,7 +6093,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.5.1</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.5.2</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
