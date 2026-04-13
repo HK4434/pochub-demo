@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.10.5</title>
+<title>PoCHub.co — v4.11</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.10.5';
+const VERSION = 'v4.11';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -385,6 +385,7 @@ const VERSION = 'v4.10.5';
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.11':  ['MINOR: Etkinlik fiyat badge bozukluğu düzeltildi, carousel yeniden tasarlandı, katalog dışı ürün PoC talebi eklendi'],
   'v4.10.5':['MINOR: Carousel kart tamamen yeniden tasarlandı — açık kart, sol aksan çizgi, net okunabilirlik'],
   'v4.10.4':['PATCH: Hero/carousel metin renkleri düzeltildi — koyu zemin üstünde beyaz metin'],
   'v4.10.3':  ['PATCH: Carousel kart metin rengi düzeltildi — koyu zemin üzerinde beyaz metin'],
@@ -3138,6 +3139,15 @@ async function loadFeaturedProducts() {
     function showCard(i) {
       cur = (i + total) % total;
       var p = featured[cur];
+      var catIconMap = {
+        'Firewall':'🛡️','Network':'🌐','Sunucu Sistemleri (Servers)':'🖥️','Depolama':'💾',
+        'Yedekleme & Felaket Kurtarma (DR)':'💿','Güvenlik Çözümleri':'🔐','Sanallaştırma (Virtualization)':'☁️',
+        'DevOps Araçları':'⚙️','SIEM & SOC Platformları':'🔍','Kurumsal Yazılımlar (ERP/CRM)':'📊',
+        'Veritabanı':'🗄️','Hibrit Bulut Çözümleri':'🌩️','Endpoint Güvenlik':'💻','Kimlik Yönetimi (IAM)':'🔑',
+        'Büyük Veri (Big Data)':'📈','Makine Öğrenmesi (ML Platformları)':'🤖','Kurumsal Mesajlaşma':'💬',
+        'ITSM & Proje Yönetimi':'📋','Yapay Zeka & Otomasyon':'🤖'
+      };
+      var catIcon = catIconMap[p.category] || '📦';
       var color = CAT_COLORS[p.category] || '#3b7bff';
       var rgb = hexRgb(color);
       var badge = p.featuredBadge || 'Öne Çıkan Ürün';
@@ -3159,35 +3169,48 @@ async function loadFeaturedProducts() {
 
       section.innerHTML =
         '<div>' +
-        '<div style="font-size:10.5px;color:var(--text-muted);font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">★ Haftanın Öne Çıkan Ürünü</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+        '<span style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">HAFTANIN ÖNE ÇIKAN ÜRÜNÜ</span>' +
+        '<div style="flex:1;height:1px;background:var(--border)"></div>' +
+        '<div style="display:flex;gap:4px">'+dots+'</div>' +
+        '</div>' +
         '<div class="featured-card" data-pid="'+p.id+'" data-vid="'+(p.vendorId||'')+'" data-pn="'+(p.name||'').replace(/"/g,'&quot;')+'" data-vn="'+(p.vendorName||'').replace(/"/g,'&quot;')+'" style="' +
-          'background:#ffffff;' +
-          'border:1px solid rgba(0,0,0,.1);border-left:4px solid '+color+';border-radius:8px;padding:20px 24px;' +
-          'position:relative;cursor:pointer;color:var(--text-primary);' +
-          'box-shadow:0 1px 4px rgba(0,0,0,.08)">' +
+          'background:#ffffff;border:1px solid rgba(0,0,0,.1);border-radius:10px;overflow:hidden;cursor:pointer;' +
+          'box-shadow:0 2px 8px rgba(0,0,0,.08);transition:box-shadow .2s">' +
 
-          '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">' +
-          '<div>' +
-          '<span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:'+color+';' +
-          'background:rgba('+rgb+',0.08);padding:3px 9px;border-radius:4px;margin-bottom:8px">'+
-          '⭐ '+badge+'</span><br>' +
-          '<span style="font-size:20px;font-weight:700;color:var(--text-primary);line-height:1.2">'+(p.name||'')+'</span>' +
-          '</div>' +
-          '<span style="font-size:11px;font-weight:600;color:var(--text-muted);background:var(--bg-elevated);padding:3px 10px;border-radius:4px;white-space:nowrap;margin-left:12px">'+(p.category||'')+'</span>' +
-          '</div>' +
+          // Header şerit — gradient
+          '<div style="height:5px;background:linear-gradient(90deg,'+color+',rgba('+rgb+',.3))"></div>' +
 
-          '<div style="font-size:12.5px;color:'+color+';font-weight:600;margin-bottom:8px">'+(p.vendorName||'')+'</div>' +
-          (slogan ? '<div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px">'+slogan+'</div>' : '<div style="margin-bottom:16px"></div>') +
+          '<div style="display:flex;gap:0">' +
 
-          '<div style="display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid rgba(0,0,0,.08)">' +
-          '<button class="feat-poc-btn btn-p btn-sm" style="font-size:12px;background:'+color+'">Demo / PoC Talep Et</button>' +
-          '<div style="display:flex;align-items:center;gap:8px">' +
-          '<div style="display:flex;gap:5px">'+dots+'</div>' +
-          (untilStr ? '<span style="font-size:10.5px;color:var(--text-muted)">'+untilStr+'</span>' : '') +
-          '</div>' +
+            // SOL: İçerik
+            '<div style="flex:1;padding:20px 22px">' +
+              '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+                '<span style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;' +
+                'color:'+color+';background:rgba('+rgb+',.1);padding:3px 10px;border-radius:4px;border:1px solid rgba('+rgb+',.25)">⭐ '+badge+'</span>' +
+                '<span style="font-size:11px;font-weight:600;color:var(--text-muted);background:var(--bg-elevated);' +
+                'padding:2px 9px;border-radius:4px">'+(p.category||'')+'</span>' +
+              '</div>' +
+              '<div style="font-size:20px;font-weight:800;color:var(--text-primary);line-height:1.25;margin-bottom:5px;letter-spacing:-.3px">'+(p.name||'')+'</div>' +
+              '<div style="font-size:12.5px;font-weight:600;color:'+color+';margin-bottom:10px">'+(p.vendorName||'')+'</div>' +
+              (slogan ? '<div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">'+slogan+'</div>' : '<div style="margin-bottom:14px"></div>') +
+              '<div style="display:flex;align-items:center;gap:10px">' +
+                '<button class="feat-poc-btn btn-p btn-sm" style="font-size:12px;background:'+color+';border:none;padding:7px 16px">Demo / PoC Talep Et →</button>' +
+                (untilStr ? '<span style="font-size:10.5px;color:var(--text-muted)">'+untilStr+'</span>' : '') +
+              '</div>' +
+            '</div>' +
+
+            // SAĞ: Renk bloku
+            '<div style="width:120px;flex-shrink:0;background:linear-gradient(180deg,rgba('+rgb+',.12) 0%,rgba('+rgb+',.04) 100%);' +
+            'display:flex;align-items:center;justify-content:center;border-left:1px solid rgba('+rgb+',.15)">' +
+              '<div style="text-align:center;padding:16px">' +
+                '<div style="font-size:32px;margin-bottom:8px">'+catIcon+'</div>' +
+                '<div style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:'+color+';opacity:.8">'+(p.category||'')+'</div>' +
+              '</div>' +
+            '</div>' +
+
           '</div>' +
         '</div></div>';
-
       // Dot tıklama
       section.querySelectorAll('.feat-dot').forEach(function(dot) {
         dot.addEventListener('click', function(e) { e.stopPropagation(); showCard(parseInt(dot.dataset.i)); });
@@ -3310,7 +3333,8 @@ async function openEventDetail(eventId) {
             <span class="bdg" style="background:var(--bg-elevated);color:#7c87a0">${e.category||'—'}</span>
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
             <span class="bdg" style="background:${feeBg};color:${feeCol}">${feeLabel}</span>
-            ${e.language?('<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">'+langLabel(e.language)+'</span>'):''}2d078'}">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
+            ${e.language?('<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">'+langLabel(e.language)+'</span>'):''}
+            <span class="bdg" style="background:rgba(34,208,120,.12);color:#16a34a">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
           </div>
           <h2 style="font-size:17px;font-weight:700;line-height:1.3">${escHtml(cleanTitle(e.title))}</h2>
         </div>
@@ -3669,6 +3693,123 @@ async function loadCatalog() {
 
 // Katalog'dan "PoC Talebi Oluştur" butonu — ürün bazlı (tek vendor)
 // Yeni akış: Kategori → Çoklu Ürün/Vendor Seçimi
+function openCustomPoCModal() {
+  // Katalog dışı ürün için PoC talebi — boş modal aç
+  el('poc-modal').style.display = 'flex';
+  el('poc-modal').classList.add('on');
+  
+  // Doğrudan step 3'e benzer bir form aç — ürün adı manuel girişli
+  el('poc-step1').style.display = 'none';
+  el('poc-step2') && (el('poc-step2').style.display = 'none');
+  el('poc-step3') && (el('poc-step3').style.display = 'none');
+  
+  // Özel "katalog dışı" form
+  var customStep = el('poc-custom-step');
+  if (customStep) {
+    customStep.style.display = 'block';
+    return;
+  }
+  
+  // Form oluştur
+  var modal = el('poc-modal').querySelector('.modal');
+  var customDiv = document.createElement('div');
+  customDiv.id = 'poc-custom-step';
+  customDiv.innerHTML = `
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Katalog Dışı Ürün — PoC Talebi</div>
+    <div style="background:#f0f7ff;border-left:3px solid #0066cc;padding:8px 12px;border-radius:4px;margin-bottom:16px;font-size:12px;color:#0066cc">
+      Katalogda bulunmayan bir ürün için PoC talebi oluşturuyorsunuz. Bilgileri girin, sistem en uygun vendor ile eşleştirmeye çalışacak.
+    </div>
+    <label class="lbl">Ürün / Çözüm Adı *</label>
+    <input class="inp" id="cpoc-product-name" placeholder="örn: Sophos XGS 2100 Firewall" style="margin-bottom:10px">
+    <label class="lbl">Vendor / Marka (biliyorsanız)</label>
+    <input class="inp" id="cpoc-vendor-name" placeholder="örn: Sophos, Palo Alto, CrowdStrike..." style="margin-bottom:10px">
+    <label class="lbl">Kategori *</label>
+    <select class="inp" id="cpoc-category" style="margin-bottom:10px">
+      <option value="">Kategori seçin...</option>
+      <option>Firewall</option><option>Network</option><option>Sunucu Sistemleri (Servers)</option>
+      <option>Yedekleme & Felaket Kurtarma (DR)</option><option>Güvenlik Çözümleri</option>
+      <option>Sanallaştırma (Virtualization)</option><option>SIEM & SOC Platformları</option>
+      <option>Endpoint Güvenlik</option><option>Kurumsal Yazılımlar (ERP/CRM)</option>
+      <option>Kimlik Yönetimi (IAM)</option><option>Hibrit Bulut Çözümleri</option>
+      <option>Veritabanı</option><option>Yapay Zeka & Otomasyon</option><option>Diğer</option>
+    </select>
+    <label class="lbl">PoC Talebi Açıklaması *</label>
+    <textarea class="inp" id="cpoc-desc" rows="3" placeholder="Ne test etmek istiyorsunuz? Beklentileriniz neler?" style="resize:vertical;margin-bottom:10px"></textarea>
+    <label class="lbl">Lokasyon</label>
+    <select class="inp" id="cpoc-location" style="margin-bottom:16px">
+      <option value="Müşteri Lokasyonu">Müşteri Lokasyonu</option>
+      <option value="Online">Online / Uzak</option>
+      <option value="Vendor Lokasyonu">Vendor Lokasyonu</option>
+    </select>
+    <div id="cpoc-err" style="margin-bottom:8px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeCustomPoCStep()" class="btn-g" style="flex:1">← Geri</button>
+      <button onclick="submitCustomPoC()" class="btn-p" style="flex:2">Talebi Gönder</button>
+    </div>
+  `;
+  modal.appendChild(customDiv);
+}
+
+function closeCustomPoCStep() {
+  var cs = el('poc-custom-step');
+  if (cs) cs.style.display = 'none';
+  el('poc-step1').style.display = 'block';
+}
+
+async function submitCustomPoC() {
+  var productName = el('cpoc-product-name')?.value.trim();
+  var vendorName  = el('cpoc-vendor-name')?.value.trim() || 'Belirtilmedi';
+  var category    = el('cpoc-category')?.value;
+  var desc        = el('cpoc-desc')?.value.trim();
+  var location    = el('cpoc-location')?.value || 'Müşteri Lokasyonu';
+  
+  if (!productName || !category || !desc) {
+    el('cpoc-err').innerHTML = '<div class="alert alert-err">Ürün adı, kategori ve açıklama zorunludur.</div>';
+    return;
+  }
+  
+  try {
+    var btn = document.querySelector('#poc-custom-step .btn-p');
+    btn.disabled = true; btn.textContent = 'Gönderiliyor...';
+    
+    await addDoc(collection(db, 'poc_requests'), {
+      customerId:    CUR_USER.uid,
+      customerEmail: CUR_USER.email,
+      customerName:  CUR_PROFILE?.displayName || CUR_USER.email,
+      productId:     'custom_' + Date.now(),
+      productName:   productName,
+      vendorId:      '',
+      vendorName:    vendorName,
+      vendorEmail:   '',
+      category:      category,
+      description:   desc,
+      location:      location,
+      status:        'pending',
+      isCustomProduct: true,
+      createdAt:     serverTimestamp(),
+    });
+    
+    // EmailJS bildirimi
+    try {
+      await emailjs.send('service_k3gfuw2','template_bavhw8b',{
+        to_email: CUR_USER.email,
+        subject: 'PoC Talebiniz Alındı — ' + productName,
+        details: 'Katalog dışı ürün PoC talebiniz alındı.\n\nÜrün: ' + productName + '\nVendor: ' + vendorName + '\nKategori: ' + category
+      });
+    } catch(e) {}
+    
+    closePocModal();
+    showToast('PoC talebiniz başarıyla gönderildi!');
+    CUR_CUST_TAB = 'requests';
+    loadCustTab();
+    
+  } catch(e) {
+    el('cpoc-err').innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
+    var btn = document.querySelector('#poc-custom-step .btn-p');
+    if (btn) { btn.disabled = false; btn.textContent = 'Talebi Gönder'; }
+  }
+}
+
 function openPocModal(productId, productName, vendorId, vendorName, vendorEmail) {
   // Eski tek-vendor modal yerine çoklu seçime yönlendir
   // Seçili ürünü pre-select ederek aç
@@ -4215,6 +4356,13 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
     
     <div id="poc-step1">
       <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Adım 1 / 3 — Kategori Seçin</div>
+      <div style="background:#f0f7ff;border:1px solid rgba(0,102,204,.2);border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#0066cc;margin-bottom:2px">Ürün katalogda yok mu?</div>
+          <div style="font-size:11px;color:var(--text-muted)">Katalog dışı ürünler için de PoC talebi oluşturabilirsiniz</div>
+        </div>
+        <button onclick="openCustomPoCModal()" style="background:#0066cc;color:#fff;border:none;border-radius:5px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:12px">Manuel Giriş →</button>
+      </div>
       <div id="poc-cats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
         <div class="loading"><div class="spinner"></div>Yükleniyor...</div>
       </div>
@@ -6512,7 +6660,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.10.5</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.11</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
