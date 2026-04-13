@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.13</title>
+<title>PoCHub.co — v4.13.1</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.13';
+const VERSION = 'v4.13.1';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -385,6 +385,7 @@ const VERSION = 'v4.13';
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.13.1':['PATCH: openCustomPoCModal modal açma fix, admin cat fields JSON parse fix, initFields mevcut alanlar'],
   'v4.13':  ['MINOR: Etkinlik fiyat duplicate fix, katalog Manuel PoC, admin mevcut field listeleme+düzenleme'],
   'v4.12':  ['MINOR: Carousel premium yeniden tasarım, katalog dışı PoC fix, admin kategori+özellik yönetimi'],
   'v4.11':  ['MINOR: Etkinlik fiyat badge bozukluğu düzeltildi, carousel yeniden tasarlandı, katalog dışı ürün PoC talebi eklendi'],
@@ -3707,58 +3708,114 @@ function closeMultiPocAndOpenCustom() {
 }
 
 function openCustomPoCModal() {
-  // Katalog dışı ürün için PoC talebi — özel modal aç
-  
-  // Doğrudan step 3'e benzer bir form aç — ürün adı manuel girişli
-  el('poc-step1').style.display = 'none';
-  el('poc-step2') && (el('poc-step2').style.display = 'none');
-  el('poc-step3') && (el('poc-step3').style.display = 'none');
-  
-  // Özel "katalog dışı" form
-  var customStep = el('poc-custom-step');
-  if (customStep) {
-    customStep.style.display = 'block';
-    return;
-  }
-  
-  // Form oluştur
-  var modal = el('poc-modal').querySelector('.modal');
-  var customDiv = document.createElement('div');
-  customDiv.id = 'poc-custom-step';
-  customDiv.innerHTML = `
-    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Katalog Dışı Ürün — PoC Talebi</div>
-    <div style="background:#f0f7ff;border-left:3px solid #0066cc;padding:8px 12px;border-radius:4px;margin-bottom:16px;font-size:12px;color:#0066cc">
-      Katalogda bulunmayan bir ürün için PoC talebi oluşturuyorsunuz. Bilgileri girin, sistem en uygun vendor ile eşleştirmeye çalışacak.
-    </div>
-    <label class="lbl">Ürün / Çözüm Adı *</label>
-    <input class="inp" id="cpoc-product-name" placeholder="örn: Sophos XGS 2100 Firewall" style="margin-bottom:10px">
-    <label class="lbl">Vendor / Marka (biliyorsanız)</label>
-    <input class="inp" id="cpoc-vendor-name" placeholder="örn: Sophos, Palo Alto, CrowdStrike..." style="margin-bottom:10px">
-    <label class="lbl">Kategori *</label>
-    <select class="inp" id="cpoc-category" style="margin-bottom:10px">
-      <option value="">Kategori seçin...</option>
-      <option>Firewall</option><option>Network</option><option>Sunucu Sistemleri (Servers)</option>
-      <option>Yedekleme & Felaket Kurtarma (DR)</option><option>Güvenlik Çözümleri</option>
-      <option>Sanallaştırma (Virtualization)</option><option>SIEM & SOC Platformları</option>
-      <option>Endpoint Güvenlik</option><option>Kurumsal Yazılımlar (ERP/CRM)</option>
-      <option>Kimlik Yönetimi (IAM)</option><option>Hibrit Bulut Çözümleri</option>
-      <option>Veritabanı</option><option>Yapay Zeka & Otomasyon</option><option>Diğer</option>
-    </select>
-    <label class="lbl">PoC Talebi Açıklaması *</label>
-    <textarea class="inp" id="cpoc-desc" rows="3" placeholder="Ne test etmek istiyorsunuz? Beklentileriniz neler?" style="resize:vertical;margin-bottom:10px"></textarea>
-    <label class="lbl">Lokasyon</label>
-    <select class="inp" id="cpoc-location" style="margin-bottom:16px">
-      <option value="Müşteri Lokasyonu">Müşteri Lokasyonu</option>
-      <option value="Online">Online / Uzak</option>
-      <option value="Vendor Lokasyonu">Vendor Lokasyonu</option>
-    </select>
-    <div id="cpoc-err" style="margin-bottom:8px"></div>
-    <div style="display:flex;gap:8px">
-      <button onclick="closeCustomPoCStep()" class="btn-g" style="flex:1">← Geri</button>
-      <button onclick="submitCustomPoC()" class="btn-p" style="flex:2">Talebi Gönder</button>
+  // Mevcut açık modalları kapat
+  var multi = el('poc-multi-modal');
+  if (multi) multi.remove();
+
+  // Eğer custom modal zaten açıksa, sadece göster
+  var existing = el('poc-custom-modal');
+  if (existing) { existing.style.display = 'flex'; return; }
+
+  // Custom PoC modal oluştur — bağımsız, poc-modal'dan bağımsız
+  var modal = document.createElement('div');
+  modal.id = 'poc-custom-modal';
+  modal.className = 'modal-bg on';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:500px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div>
+          <h3 style="font-size:15px;font-weight:700">Katalog Dışı Ürün — PoC Talebi</h3>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Katalogda bulunmayan ürünler için PoC başlatın</div>
+        </div>
+        <button id="close-custom-poc" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px">×</button>
+      </div>
+      <div style="background:#eff6ff;border-left:3px solid #0066cc;padding:9px 13px;border-radius:4px;margin-bottom:16px;font-size:12px;color:#1d4ed8">
+        Bilgileri girin — ekibimiz en uygun vendor ile eşleştirmeye çalışacak.
+      </div>
+      <label class="lbl">Ürün / Çözüm Adı *</label>
+      <input class="inp" id="cpoc-product-name" placeholder="örn: Sophos XGS 2100 Firewall" style="margin-bottom:10px">
+      <label class="lbl">Vendor / Marka (biliyorsanız)</label>
+      <input class="inp" id="cpoc-vendor-name" placeholder="örn: Sophos, Palo Alto, CrowdStrike..." style="margin-bottom:10px">
+      <label class="lbl">Kategori *</label>
+      <select class="inp" id="cpoc-category" style="margin-bottom:10px">
+        <option value="">Kategori seçin...</option>
+        <option>Firewall</option><option>Ağ Çözümleri (Networking)</option>
+        <option>Sunucu Sistemleri (Servers)</option><option>Veri Depolama (Storage)</option>
+        <option>Yedekleme & Felaket Kurtarma (DR)</option><option>Güvenlik Çözümleri</option>
+        <option>Sanallaştırma (Virtualization)</option><option>SIEM & SOC Platformları</option>
+        <option>Endpoint Güvenlik</option><option>Kimlik Yönetimi (IAM)</option>
+        <option>Kurumsal Yazılımlar (ERP/CRM)</option><option>Veritabanı</option>
+        <option>Hibrit Bulut Çözümleri</option><option>Yapay Zeka & Otomasyon</option>
+        <option>Diğer</option>
+      </select>
+      <label class="lbl">PoC Talebi Açıklaması *</label>
+      <textarea class="inp" id="cpoc-desc" rows="3" placeholder="Ne test etmek istiyorsunuz? Beklentileriniz neler?" style="resize:vertical;margin-bottom:10px"></textarea>
+      <label class="lbl">Lokasyon</label>
+      <select class="inp" id="cpoc-location" style="margin-bottom:16px">
+        <option value="Müşteri Lokasyonu">Müşteri Lokasyonu</option>
+        <option value="Online">Online / Uzak</option>
+        <option value="Vendor Lokasyonu">Vendor Lokasyonu</option>
+      </select>
+      <div id="cpoc-err" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px">
+        <button id="cpoc-cancel" class="btn-g" style="flex:1">İptal</button>
+        <button id="cpoc-submit" class="btn-p" style="flex:2">Talebi Gönder</button>
+      </div>
     </div>
   `;
-  modal.appendChild(customDiv);
+  document.body.appendChild(modal);
+
+  modal.querySelector('#close-custom-poc').onclick = () => modal.remove();
+  modal.querySelector('#cpoc-cancel').onclick = () => modal.remove();
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+  modal.querySelector('#cpoc-submit').addEventListener('click', async function() {
+    if (!CUR_USER) { modal.remove(); openAuthModal('customer',''); return; }
+    var productName = el('cpoc-product-name')?.value.trim();
+    var vendorName  = el('cpoc-vendor-name')?.value.trim() || 'Belirtilmedi';
+    var category    = el('cpoc-category')?.value;
+    var desc        = el('cpoc-desc')?.value.trim();
+    var location    = el('cpoc-location')?.value || 'Müşteri Lokasyonu';
+    var errEl       = el('cpoc-err');
+    if (!productName || !category || !desc) {
+      errEl.innerHTML = '<div class="alert alert-err">Ürün adı, kategori ve açıklama zorunludur.</div>';
+      return;
+    }
+    var btn = modal.querySelector('#cpoc-submit');
+    btn.disabled = true; btn.textContent = 'Gönderiliyor...';
+    try {
+      await addDoc(collection(db,'poc_requests'), {
+        customerId:      CUR_USER.uid,
+        customerEmail:   CUR_USER.email,
+        customerName:    CUR_PROFILE?.displayName || CUR_USER.email,
+        productId:       'custom_' + Date.now(),
+        productName:     productName,
+        vendorId:        '',
+        vendorName:      vendorName,
+        vendorEmail:     '',
+        category:        category,
+        description:     desc,
+        location:        location,
+        status:          'pending',
+        isCustomProduct: true,
+        createdAt:       serverTimestamp(),
+      });
+      try {
+        await emailjs.send('service_k3gfuw2','template_bavhw8b',{
+          to_email: CUR_USER.email,
+          subject:  'PoC Talebiniz Alındı — ' + productName,
+          details:  'Katalog dışı PoC talebiniz alındı.\n\nÜrün: ' + productName + '\nVendor: ' + vendorName + '\nKategori: ' + category
+        });
+      } catch(e) {}
+      modal.remove();
+      showToast('PoC talebiniz başarıyla gönderildi!');
+      if (CUR_PROFILE?.role === 'customer') { CUR_CUST_TAB = 'requests'; loadCustTab(); }
+    } catch(e) {
+      errEl.innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
+      btn.disabled = false; btn.textContent = 'Talebi Gönder';
+    }
+  });
 }
 
 function closeCustomPoCStep() {
@@ -6671,7 +6728,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.13</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.13.1</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -7280,14 +7337,14 @@ async function admCategories(m) {
           '<td style="padding:11px 14px;color:var(--text-secondary);font-family:monospace">' + (cat.order||0) + '</td>' +
           '<td style="padding:11px 14px;color:var(--text-secondary);font-size:12px">' + (cat.description||'—') + '</td>' +
           '<td style="padding:11px 14px;text-align:center;white-space:nowrap">' +
-          '<button class="btn-g btn-sm edit-cat-btn" data-id="' + cat.id + '" data-name="' + cat.name + '" data-order="' + (cat.order||0) + '" data-desc="' + (cat.description||'') + '" data-fields="' + JSON.stringify(cat.fields||[]) + '" style="margin-right:6px">Düzenle</button>' +
+          '<button class="btn-g btn-sm edit-cat-btn" data-id="' + cat.id + '" data-name="' + cat.name + '" data-order="' + (cat.order||0) + '" data-desc="' + (cat.description||'') + '" data-fields="' + btoa(unescape(encodeURIComponent(JSON.stringify(cat.fields||[])))) + '" style="margin-right:6px">Düzenle</button>' +
           '<button class="btn-red btn-sm del-cat-btn" data-id="' + cat.id + '" data-name="' + cat.name + '">Sil</button>' +
           '</td></tr>';
       }).join('');
 
       m.querySelectorAll('.edit-cat-btn').forEach(function(b) {
         b.addEventListener('click', function() {
-          openCatModal({id:b.dataset.id, name:b.dataset.name, order:parseInt(b.dataset.order)||0, description:b.dataset.desc, fields:JSON.parse(b.dataset.fields||'[]')});
+          openCatModal({id:b.dataset.id, name:b.dataset.name, order:parseInt(b.dataset.order)||0, description:b.dataset.desc, fields:JSON.parse(decodeURIComponent(escape(atob(b.dataset.fields||'W10='))))});
         });
       });
       m.querySelectorAll('.del-cat-btn').forEach(function(b) {
@@ -7383,6 +7440,18 @@ function openCatModal(existing) {
   var fieldsList = modal.querySelector('#cat-fields-list');
   var existingFields = (existing && existing.fields) ? existing.fields : [];
 
+  // Edit modunda Firestore'dan güncel fields çek
+  if (isEdit && existing.id) {
+    fieldsList.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:6px 0">Mevcut özellikler yükleniyor...</div>';
+    getDoc(doc(db,'categories',existing.id)).then(function(dsnap) {
+      existingFields = (dsnap.exists() && dsnap.data().fields) ? dsnap.data().fields : existingFields;
+      initFields();
+    }).catch(function() { initFields(); });
+  } else {
+    // Kısa setTimeout — modal DOM'a eklensin
+    setTimeout(initFields, 0);
+  }
+
   function renderFieldRow(f) {
     var row = document.createElement('div');
     row.className = 'cat-field-row';
@@ -7410,8 +7479,6 @@ function openCatModal(existing) {
       fieldsList.innerHTML = '<div class="empty-fields-msg" style="font-size:11px;color:var(--text-muted);padding:4px 0">Henüz alan yok. Yukarıdaki "+ Alan Ekle" ile ekleyin.</div>';
     }
   }
-  initFields();
-
   modal.querySelector('#add-field-btn').addEventListener('click', () => {
     var emptyMsg = fieldsList.querySelector('.empty-fields-msg');
     if (emptyMsg) emptyMsg.remove();
