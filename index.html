@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.12</title>
+<title>PoCHub.co — v4.13</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.12';
+const VERSION = 'v4.13';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -385,6 +385,7 @@ const VERSION = 'v4.12';
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.13':  ['MINOR: Etkinlik fiyat duplicate fix, katalog Manuel PoC, admin mevcut field listeleme+düzenleme'],
   'v4.12':  ['MINOR: Carousel premium yeniden tasarım, katalog dışı PoC fix, admin kategori+özellik yönetimi'],
   'v4.11':  ['MINOR: Etkinlik fiyat badge bozukluğu düzeltildi, carousel yeniden tasarlandı, katalog dışı ürün PoC talebi eklendi'],
   'v4.10.5':['MINOR: Carousel kart tamamen yeniden tasarlandı — açık kart, sol aksan çizgi, net okunabilirlik'],
@@ -3338,7 +3339,7 @@ async function openEventDetail(eventId) {
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
             <span class="bdg" style="background:${feeBg};color:${feeCol}">${feeLabel}</span>
             ${e.language?('<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">'+langLabel(e.language)+'</span>'):''}
-            <span class="bdg" style="background:rgba(34,208,120,.12);color:#16a34a">${e.fee>0?'₺'+e.fee:'Ücretsiz'}</span>
+            
           </div>
           <h2 style="font-size:17px;font-weight:700;line-height:1.3">${escHtml(cleanTitle(e.title))}</h2>
         </div>
@@ -3524,6 +3525,7 @@ async function renderCatalog() {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
       <h2 style="font-size:20px;font-weight:700">Ürün Kataloğu</h2>
       <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-g btn-sm" onclick="openCustomPoCModal()" style="font-size:12px;border-color:var(--color-primary);color:var(--color-primary)">📦 Katalogda Yok? Manuel Talep</button>
         <span id="cat-sel-info" style="font-size:12.5px;color:var(--text-secondary);display:none"><span id="cat-sel-num" style="color:#3b7cff;font-weight:700">0</span> ürün seçildi</span>
         <button class="btn-p btn-sm" id="cat-poc-start" style="display:none">Seçilenlerle PoC Başlat →</button>
       </div>
@@ -6669,7 +6671,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.12</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.13</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -7278,14 +7280,14 @@ async function admCategories(m) {
           '<td style="padding:11px 14px;color:var(--text-secondary);font-family:monospace">' + (cat.order||0) + '</td>' +
           '<td style="padding:11px 14px;color:var(--text-secondary);font-size:12px">' + (cat.description||'—') + '</td>' +
           '<td style="padding:11px 14px;text-align:center;white-space:nowrap">' +
-          '<button class="btn-g btn-sm edit-cat-btn" data-id="' + cat.id + '" data-name="' + cat.name + '" data-order="' + (cat.order||0) + '" data-desc="' + (cat.description||'') + '" style="margin-right:6px">Düzenle</button>' +
+          '<button class="btn-g btn-sm edit-cat-btn" data-id="' + cat.id + '" data-name="' + cat.name + '" data-order="' + (cat.order||0) + '" data-desc="' + (cat.description||'') + '" data-fields="' + JSON.stringify(cat.fields||[]) + '" style="margin-right:6px">Düzenle</button>' +
           '<button class="btn-red btn-sm del-cat-btn" data-id="' + cat.id + '" data-name="' + cat.name + '">Sil</button>' +
           '</td></tr>';
       }).join('');
 
       m.querySelectorAll('.edit-cat-btn').forEach(function(b) {
         b.addEventListener('click', function() {
-          openCatModal({id:b.dataset.id, name:b.dataset.name, order:parseInt(b.dataset.order)||0, description:b.dataset.desc});
+          openCatModal({id:b.dataset.id, name:b.dataset.name, order:parseInt(b.dataset.order)||0, description:b.dataset.desc, fields:JSON.parse(b.dataset.fields||'[]')});
         });
       });
       m.querySelectorAll('.del-cat-btn').forEach(function(b) {
