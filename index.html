@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.11</title>
+<title>PoCHub.co — v4.12</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.11';
+const VERSION = 'v4.12';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -385,6 +385,7 @@ const VERSION = 'v4.11';
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.12':  ['MINOR: Carousel premium yeniden tasarım, katalog dışı PoC fix, admin kategori+özellik yönetimi'],
   'v4.11':  ['MINOR: Etkinlik fiyat badge bozukluğu düzeltildi, carousel yeniden tasarlandı, katalog dışı ürün PoC talebi eklendi'],
   'v4.10.5':['MINOR: Carousel kart tamamen yeniden tasarlandı — açık kart, sol aksan çizgi, net okunabilirlik'],
   'v4.10.4':['PATCH: Hero/carousel metin renkleri düzeltildi — koyu zemin üstünde beyaz metin'],
@@ -3168,49 +3169,52 @@ async function loadFeaturedProducts() {
       }
 
       section.innerHTML =
-        '<div>' +
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
-        '<span style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">HAFTANIN ÖNE ÇIKAN ÜRÜNÜ</span>' +
-        '<div style="flex:1;height:1px;background:var(--border)"></div>' +
-        '<div style="display:flex;gap:4px">'+dots+'</div>' +
-        '</div>' +
-        '<div class="featured-card" data-pid="'+p.id+'" data-vid="'+(p.vendorId||'')+'" data-pn="'+(p.name||'').replace(/"/g,'&quot;')+'" data-vn="'+(p.vendorName||'').replace(/"/g,'&quot;')+'" style="' +
-          'background:#ffffff;border:1px solid rgba(0,0,0,.1);border-radius:10px;overflow:hidden;cursor:pointer;' +
-          'box-shadow:0 2px 8px rgba(0,0,0,.08);transition:box-shadow .2s">' +
+        '<div style="position:relative">' +
 
-          // Header şerit — gradient
-          '<div style="height:5px;background:linear-gradient(90deg,'+color+',rgba('+rgb+',.3))"></div>' +
+        // Kart
+        '<div class="featured-card" data-pid="'+p.id+'" data-vid="'+(p.vendorId||'')+'" data-pn="'+(p.name||'').replace(/"/g,"&quot;")+'" data-vn="'+(p.vendorName||'').replace(/"/g,"&quot;")+'" style="'+
+          'background:linear-gradient(135deg,#0f1623 0%,#16203a 55%,'+color+' 200%);'+
+          'border:1px solid rgba('+rgb+',.35);border-radius:12px;overflow:hidden;cursor:pointer;'+
+          'box-shadow:0 4px 24px rgba('+rgb+',.25),0 1px 4px rgba(0,0,0,.3);position:relative">' +
 
-          '<div style="display:flex;gap:0">' +
+          // Arka plan doku
+          '<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba('+rgb+',.18) 0%,transparent 65%);pointer-events:none"></div>' +
 
-            // SOL: İçerik
-            '<div style="flex:1;padding:20px 22px">' +
-              '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
-                '<span style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;' +
-                'color:'+color+';background:rgba('+rgb+',.1);padding:3px 10px;border-radius:4px;border:1px solid rgba('+rgb+',.25)">⭐ '+badge+'</span>' +
-                '<span style="font-size:11px;font-weight:600;color:var(--text-muted);background:var(--bg-elevated);' +
-                'padding:2px 9px;border-radius:4px">'+(p.category||'')+'</span>' +
-              '</div>' +
-              '<div style="font-size:20px;font-weight:800;color:var(--text-primary);line-height:1.25;margin-bottom:5px;letter-spacing:-.3px">'+(p.name||'')+'</div>' +
-              '<div style="font-size:12.5px;font-weight:600;color:'+color+';margin-bottom:10px">'+(p.vendorName||'')+'</div>' +
-              (slogan ? '<div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">'+slogan+'</div>' : '<div style="margin-bottom:14px"></div>') +
+          // İçerik
+          '<div style="position:relative;padding:22px 24px">' +
+
+            // Üst satır: badge sol, dot + tarih sağ
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+              '<span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;'+
+              'color:'+color+';background:rgba('+rgb+',.15);padding:4px 11px;border-radius:20px;border:1px solid rgba('+rgb+',.3)">'+
+              '⭐ '+badge+'</span>' +
               '<div style="display:flex;align-items:center;gap:10px">' +
-                '<button class="feat-poc-btn btn-p btn-sm" style="font-size:12px;background:'+color+';border:none;padding:7px 16px">Demo / PoC Talep Et →</button>' +
-                (untilStr ? '<span style="font-size:10.5px;color:var(--text-muted)">'+untilStr+'</span>' : '') +
+                (untilStr ? '<span style="font-size:10px;color:rgba(255,255,255,.4)">'+untilStr+'</span>' : '') +
+                '<div style="display:flex;gap:5px">'+dots+'</div>' +
               '</div>' +
             '</div>' +
 
-            // SAĞ: Renk bloku
-            '<div style="width:120px;flex-shrink:0;background:linear-gradient(180deg,rgba('+rgb+',.12) 0%,rgba('+rgb+',.04) 100%);' +
-            'display:flex;align-items:center;justify-content:center;border-left:1px solid rgba('+rgb+',.15)">' +
-              '<div style="text-align:center;padding:16px">' +
-                '<div style="font-size:32px;margin-bottom:8px">'+catIcon+'</div>' +
-                '<div style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:'+color+';opacity:.8">'+(p.category||'')+'</div>' +
-              '</div>' +
+            // Kategori chip
+            '<div style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;'+
+            'color:rgba(255,255,255,.55);margin-bottom:8px">'+
+              catIcon+' <span>'+(p.category||'')+'</span>'+
             '</div>' +
+
+            // Ürün adı
+            '<div style="font-size:22px;font-weight:800;color:#ffffff;line-height:1.2;margin-bottom:5px;letter-spacing:-.4px">'+(p.name||'')+'</div>' +
+
+            // Vendor
+            '<div style="font-size:12.5px;font-weight:600;color:rgba('+rgb+',1);margin-bottom:12px">'+(p.vendorName||'')+'</div>' +
+
+            // Açıklama
+            (slogan ? '<div style="font-size:13px;color:rgba(255,255,255,.65);line-height:1.6;margin-bottom:16px;max-width:520px">'+slogan+'</div>' : '<div style="margin-bottom:16px"></div>') +
+
+            // CTA
+            '<button class="feat-poc-btn btn-p btn-sm" style="font-size:12.5px;font-weight:700;background:'+color+';border:none;padding:8px 20px;border-radius:6px;letter-spacing:.2px">Demo / PoC Talep Et →</button>' +
 
           '</div>' +
         '</div></div>';
+
       // Dot tıklama
       section.querySelectorAll('.feat-dot').forEach(function(dot) {
         dot.addEventListener('click', function(e) { e.stopPropagation(); showCard(parseInt(dot.dataset.i)); });
@@ -3693,10 +3697,15 @@ async function loadCatalog() {
 
 // Katalog'dan "PoC Talebi Oluştur" butonu — ürün bazlı (tek vendor)
 // Yeni akış: Kategori → Çoklu Ürün/Vendor Seçimi
+function closeMultiPocAndOpenCustom() {
+  // Multi vendor modalı kapat, custom PoC formunu aç
+  var multiModal = el('poc-multi-modal');
+  if (multiModal) multiModal.remove();
+  openCustomPoCModal();
+}
+
 function openCustomPoCModal() {
-  // Katalog dışı ürün için PoC talebi — boş modal aç
-  el('poc-modal').style.display = 'flex';
-  el('poc-modal').classList.add('on');
+  // Katalog dışı ürün için PoC talebi — özel modal aç
   
   // Doğrudan step 3'e benzer bir form aç — ürün adı manuel girişli
   el('poc-step1').style.display = 'none';
@@ -6660,7 +6669,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.11</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.12</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -7353,19 +7362,80 @@ function openCatModal(existing) {
     <input class="inp" id="cat-order" type="number" value="${existing?.order||0}">
     <label class="lbl">Açıklama</label>
     <input class="inp" id="cat-desc" value="${existing?.description||''}" placeholder="Kısa açıklama (opsiyonel)">
-    <div id="cat-err" style="margin-top:10px"></div>
-    <button class="btn-p" id="cat-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">${isEdit?'Güncelle':'Ekle'}</button>
+    <div style="border-top:1px solid rgba(0,0,0,.1);margin:14px 0 10px;padding-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">Teknik Özellik Alanları</span>
+        <button type="button" id="add-field-btn" style="background:var(--color-primary);color:#fff;border:none;border-radius:4px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer">+ Alan Ekle</button>
+      </div>
+      <div id="cat-fields-list" style="display:flex;flex-direction:column;gap:5px;max-height:190px;overflow-y:auto"></div>
+      <div style="font-size:10.5px;color:var(--text-muted);margin-top:5px">ID · Etiket · Birim · Tür</div>
+    </div>
+    <div id="cat-err" style="margin-top:8px"></div>
+    <button class="btn-p" id="cat-submit" style="width:100%;padding:11px;font-size:14px;margin-top:10px">${isEdit?'Güncelle':'Ekle'}</button>
   </div>`;
   document.body.appendChild(modal);
   modal.querySelector('#close-cat-modal').addEventListener('click', () => modal.remove());
   modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+
+  // ── Fields init ──────────────────────────────────────
+  var fieldsList = modal.querySelector('#cat-fields-list');
+  var existingFields = (existing && existing.fields) ? existing.fields : [];
+
+  function renderFieldRow(f) {
+    var row = document.createElement('div');
+    row.className = 'cat-field-row';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 70px 90px 28px;gap:4px;align-items:center;margin-bottom:2px';
+    row.innerHTML =
+      '<input class="inp fi-id"   placeholder="ID (örn: fw_mbps)" value="'+(f.id||'')+'"    style="font-size:11px;padding:5px 7px">'  +
+      '<input class="inp fi-lbl"  placeholder="Etiket"             value="'+(f.label||'')+'"  style="font-size:11px;padding:5px 7px">'  +
+      '<input class="inp fi-unit" placeholder="Birim"              value="'+(f.unit||'')+'"   style="font-size:11px;padding:5px 7px">'  +
+      '<select class="inp fi-type" style="font-size:11px;padding:5px 7px">'  +
+        ['text','number','select','textarea'].map(t =>
+          '<option value="'+t+'"'+(f.type===t?' selected':'')+'>'+
+          {text:'Metin',number:'Sayı',select:'Seçim',textarea:'Uzun Metin'}[t]+'</option>'
+        ).join('') +
+      '</select>' +
+      '<button type="button" class="del-field-btn" style="background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:4px;cursor:pointer;font-size:16px;line-height:1;padding:2px 7px">×</button>';
+    row.querySelector('.del-field-btn').onclick = () => row.remove();
+    return row;
+  }
+
+  function initFields() {
+    fieldsList.innerHTML = '';
+    if (existingFields.length > 0) {
+      existingFields.forEach(f => fieldsList.appendChild(renderFieldRow(f)));
+    } else {
+      fieldsList.innerHTML = '<div class="empty-fields-msg" style="font-size:11px;color:var(--text-muted);padding:4px 0">Henüz alan yok. Yukarıdaki "+ Alan Ekle" ile ekleyin.</div>';
+    }
+  }
+  initFields();
+
+  modal.querySelector('#add-field-btn').addEventListener('click', () => {
+    var emptyMsg = fieldsList.querySelector('.empty-fields-msg');
+    if (emptyMsg) emptyMsg.remove();
+    fieldsList.appendChild(renderFieldRow({}));
+    fieldsList.scrollTop = fieldsList.scrollHeight;
+  });
+  // ── Fields init sonu ─────────────────────────────────
+
   modal.querySelector('#cat-submit').addEventListener('click', async () => {
     const name = modal.querySelector('#cat-name').value.trim();
     if (!name) { modal.querySelector('#cat-err').innerHTML='<div class="alert alert-err">Kategori adı zorunludur.</div>'; return; }
     const btn = modal.querySelector('#cat-submit');
     btn.disabled=true; btn.textContent=isEdit?'Güncelleniyor...':'Ekleniyor...';
     try {
-      const data = { name, order: parseInt(modal.querySelector('#cat-order').value)||0, description: modal.querySelector('#cat-desc').value, updatedAt: serverTimestamp() };
+      // Fields topla
+      var fieldRows = modal.querySelectorAll('.cat-field-row');
+      var fields = [];
+      fieldRows.forEach(function(row) {
+        var fid   = (row.querySelector('.fi-id')?.value||'').trim();
+        var flbl  = (row.querySelector('.fi-lbl')?.value||'').trim();
+        var funit = (row.querySelector('.fi-unit')?.value||'').trim();
+        var ftype = row.querySelector('.fi-type')?.value || 'text';
+        var freq  = row.querySelector('.fi-req')?.checked || false;
+        if (fid && flbl) fields.push({id:fid, label:flbl, unit:funit, type:ftype, required:freq});
+      });
+      const data = { name, order: parseInt(modal.querySelector('#cat-order').value)||0, description: modal.querySelector('#cat-desc').value, fields: fields, updatedAt: serverTimestamp() };
       if (isEdit) { await updateDoc(doc(db,'categories',existing.id), data); showToast('Kategori güncellendi!'); }
       else { data.createdAt = serverTimestamp(); await addDoc(collection(db,'categories'), data); showToast('Kategori eklendi!'); }
       invalidateCatCache();
