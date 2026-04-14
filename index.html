@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.13.2</title>
+<title>PoCHub.co — v4.13.3</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.13.2';
+const VERSION = 'v4.13.3';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -385,6 +385,7 @@ const VERSION = 'v4.13.2';
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.13.3':['PATCH: Admin kategori modal — Firestore fields yoksa CATEGORY_FIELDS fallback, mevcut alanlar gösterilir'],
   'v4.13.2':['PATCH: closeMultiPocAndOpenCustom onclick fix, openCustomPoCModal standalone modal, admin fields Firestore fetch'],
   'v4.13.1':['PATCH: openCustomPoCModal modal açma fix, admin cat fields JSON parse fix, initFields mevcut alanlar'],
   'v4.13':  ['MINOR: Etkinlik fiyat duplicate fix, katalog Manuel PoC, admin mevcut field listeleme+düzenleme'],
@@ -6729,7 +6730,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.13.2</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.13.3</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -7445,9 +7446,30 @@ function openCatModal(existing) {
   if (isEdit && existing.id) {
     fieldsList.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:6px 0">Mevcut özellikler yükleniyor...</div>';
     getDoc(doc(db,'categories',existing.id)).then(function(dsnap) {
-      existingFields = (dsnap.exists() && dsnap.data().fields) ? dsnap.data().fields : existingFields;
+      var fsFields = dsnap.exists() ? (dsnap.data().fields || []) : [];
+      if (fsFields.length > 0) {
+        // Firestore'da fields varsa kullan
+        existingFields = fsFields;
+      } else if (existingFields.length > 0) {
+        // existing.fields varsa kullan (data-fields'ten gelen)
+        existingFields = existingFields;
+      } else {
+        // Her ikisi de boşsa CATEGORY_FIELDS koddan al — fallback
+        var catName = existing.name || '';
+        var staticFields = CATEGORY_FIELDS[catName] || [];
+        existingFields = staticFields.map(function(f) {
+          return { id: f.id, label: f.label, unit: f.unit || '', type: f.type || 'text' };
+        });
+      }
       initFields();
-    }).catch(function() { initFields(); });
+    }).catch(function() {
+      // Hata durumunda CATEGORY_FIELDS fallback
+      var staticFields = CATEGORY_FIELDS[existing.name||''] || [];
+      existingFields = staticFields.map(function(f) {
+        return { id: f.id, label: f.label, unit: f.unit || '', type: f.type || 'text' };
+      });
+      initFields();
+    });
   } else {
     // Kısa setTimeout — modal DOM'a eklensin
     setTimeout(initFields, 0);
