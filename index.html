@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.13.6</title>
+<title>PoCHub.co — v4.14</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.13.6';
+const VERSION = 'v4.14';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -1950,11 +1950,104 @@ function renderAuthForm() {
 
   let html = '';
   if (AUTH_MODE === 'register') {
+    // ── Ortak temel alanlar ──────────────────────────────────────────
     html += `<label class="lbl">Ad Soyad <span style="color:#ff7070">*</span></label><input class="inp" id="a-name" placeholder="Ad Soyad (zorunlu)"><br>`;
     html += `<label class="lbl">Şirket Adı <span style="color:#ff7070">*</span></label><input class="inp" id="a-company" placeholder="Şirket adı (zorunlu)"><br>`;
     html += `<label class="lbl">Şirket Telefonu <span style="color:#ff7070">*</span></label><input class="inp" id="a-phone" placeholder="+90 212 xxx xx xx (zorunlu)"><br>`;
     html += `<label class="lbl">Şirket Adresi <span style="color:#ff7070">*</span></label><textarea class="inp" id="a-address" rows="2" placeholder="Mahalle, Sokak No, İlçe, İl (zorunlu)" style="resize:none"></textarea><br>`;
+    html += `<label class="lbl">Şirket Web Sitesi <span style="color:var(--text-muted);font-size:11px">(opsiyonel)</span></label><input class="inp" id="a-website" placeholder="https://www.sirket.com"><br>`;
     html += `<label class="lbl">Vergi No / TC No <span style="color:var(--text-muted);font-size:11px">(opsiyonel)</span></label><input class="inp" id="a-taxno" placeholder="Vergi kimlik numarası"><br>`;
+
+    // ── ÜRETİCİ'ye özel alanlar ──────────────────────────────────────
+    if (AUTH_VTYPE === 'ureticid') {
+      html += `
+      <div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.15);border-radius:8px;padding:14px;margin:10px 0">
+        <div style="font-size:11px;font-weight:700;color:#7db4ff;letter-spacing:.6px;margin-bottom:12px">ÜRETİCİ BİLGİLERİ</div>
+
+        <label class="lbl">Menşei <span style="color:#ff7070">*</span></label>
+        <div style="display:flex;gap:12px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text-primary)">
+            <input type="radio" name="a-origin" id="a-origin-domestic" value="domestic" checked onchange="window._authOriginChange(this.value)">
+            🇹🇷 Yerli Üretici
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text-primary)">
+            <input type="radio" name="a-origin" id="a-origin-foreign" value="foreign" onchange="window._authOriginChange(this.value)">
+            🌍 Yabancı Üretici
+          </label>
+        </div>
+
+        <div id="a-foreign-section" style="display:none">
+          <label class="lbl">Menşei Ülke <span style="color:#ff7070">*</span></label>
+          <input class="inp" id="a-country" placeholder="örn: ABD, Almanya, İsrail..." style="margin-bottom:10px">
+
+          <label class="lbl">Platform Distribütörlerinden Seç veya Yaz <span style="color:#ff7070">*</span> <span style="color:var(--text-muted);font-weight:400">(en az 1)</span></label>
+          <div id="a-dist-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+          <button type="button" id="a-add-dist-btn" style="background:rgba(59,124,255,.1);color:#7db4ff;border:1px solid rgba(59,124,255,.25);border-radius:5px;padding:5px 12px;font-size:12px;cursor:pointer;width:100%">+ Distribütör Ekle</button>
+          <div style="font-size:10.5px;color:var(--text-muted);margin-top:5px">Yabancı üretici en az 1 distribütör seçmek zorundadır.</div>
+        </div>
+
+        <label class="lbl" style="margin-top:10px">Ürün Kategorileri <span style="color:var(--text-muted);font-size:11px">(opsiyonel)</span></label>
+        <div id="a-cats-container" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">
+          ${['Firewall','Ağ Çözümleri (Networking)','Sunucu Sistemleri (Servers)','Veri Depolama (Storage)',
+             'Yedekleme & Felaket Kurtarma (DR)','Güvenlik Çözümleri','Sanallaştırma (Virtualization)',
+             'SIEM & SOC Platformları','Endpoint Güvenlik','Kimlik Yönetimi (IAM)',
+             'Kurumsal Yazılımlar (ERP/CRM)','Veritabanı','Hibrit Bulut Çözümleri','Yapay Zeka & Otomasyon']
+            .map(cat => `<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:20px;color:var(--text-secondary)">
+              <input type="checkbox" class="a-cat-chk" value="${cat}" style="width:12px;height:12px"> ${cat}
+            </label>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    // ── DİSTRİBÜTÖR'e özel alanlar ───────────────────────────────────
+    if (AUTH_VTYPE === 'distributor') {
+      html += `
+      <div style="background:rgba(240,164,41,.06);border:1px solid rgba(240,164,41,.15);border-radius:8px;padding:14px;margin:10px 0">
+        <div style="font-size:11px;font-weight:700;color:#f0a429;letter-spacing:.6px;margin-bottom:12px">DİSTRİBÜTÖR BİLGİLERİ</div>
+
+        <label class="lbl">Temsil Ettiğiniz Markalar / Üreticiler <span style="color:var(--text-muted);font-size:11px">(opsiyonel — sonradan güncellenebilir)</span></label>
+        <textarea class="inp" id="a-brands" rows="2" placeholder="örn: Fortinet, HPE, Veeam... (virgülle ayırın)" style="resize:none;margin-bottom:10px"></textarea>
+
+        <label class="lbl">Faaliyet Bölgeleri</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+          ${['İstanbul','Ankara','İzmir','Bursa','Antalya','Türkiye Geneli']
+            .map(r => `<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:20px;color:var(--text-secondary)">
+              <input type="checkbox" class="a-region-chk" value="${r}" style="width:12px;height:12px"> ${r}
+            </label>`).join('')}
+        </div>
+
+        <label class="lbl">Entegratör / İş Ortakları <span style="color:var(--text-muted);font-size:11px">(opsiyonel — sonradan eklenebilir)</span></label>
+        <div id="a-int-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
+        <button type="button" id="a-add-int-btn" style="background:rgba(240,164,41,.1);color:#f0a429;border:1px solid rgba(240,164,41,.25);border-radius:5px;padding:5px 12px;font-size:12px;cursor:pointer;width:100%">+ Entegratör / İş Ortağı Ekle</button>
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:5px">Distribütörler doğrudan müşteriye satış yapamaz; en az 1 entegratör/iş ortağı gereklidir.</div>
+      </div>`;
+    }
+
+    // ── ENTEGRATÖR'e özel alanlar ─────────────────────────────────────
+    if (AUTH_VTYPE === 'integrator') {
+      html += `
+      <div style="background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.15);border-radius:8px;padding:14px;margin:10px 0">
+        <div style="font-size:11px;font-weight:700;color:#22d078;letter-spacing:.6px;margin-bottom:12px">ENTEGRATÖR / İŞ ORTAĞI BİLGİLERİ</div>
+
+        <label class="lbl">Uzmanlık Alanları <span style="color:var(--text-muted);font-size:11px">(opsiyonel)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+          ${['Firewall','Ağ Çözümleri (Networking)','Sunucu Sistemleri (Servers)','Veri Depolama (Storage)',
+             'Yedekleme & Felaket Kurtarma (DR)','Güvenlik Çözümleri','Sanallaştırma (Virtualization)',
+             'SIEM & SOC Platformları','Endpoint Güvenlik','Kimlik Yönetimi (IAM)',
+             'Kurumsal Yazılımlar (ERP/CRM)','Veritabanı','Yapay Zeka & Otomasyon']
+            .map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:20px;color:var(--text-secondary)">
+              <input type="checkbox" class="a-spec-chk" value="${s}" style="width:12px;height:12px"> ${s}
+            </label>`).join('')}
+        </div>
+
+        <label class="lbl">Çalıştığınız Markalar / Üreticiler <span style="color:var(--text-muted);font-size:11px">(opsiyonel)</span></label>
+        <textarea class="inp" id="a-brands" rows="2" placeholder="örn: Cisco, Microsoft, VMware... (virgülle ayırın)" style="resize:none;margin-bottom:10px"></textarea>
+
+        <label class="lbl">Proje Referansları / Sektörler <span style="color:var(--text-muted);font-size:11px">(opsiyonel)</span></label>
+        <textarea class="inp" id="a-refs" rows="2" placeholder="örn: Bankacılık, Sağlık, Kamu sektörü projeleri..." style="resize:none"></textarea>
+      </div>`;
+    }
+
     html += `<div style="background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.2);border-radius:7px;padding:10px;font-size:12px;color:#7db4ff;margin-bottom:4px">ℹ Kayıt için kurumsal e-posta adresi zorunludur. (Gmail, Hotmail vb. kabul edilmez)</div>`;
   }
   html += `<label class="lbl">E-posta *</label><input class="inp" id="a-email" type="email" placeholder="ornek@sirket.com"><br>`;
@@ -1970,6 +2063,44 @@ function renderAuthForm() {
   el('auth-form').innerHTML = html;
   el('a-submit').addEventListener('click', handleAuth);
   [el('a-email'), el('a-pass')].forEach(inp => inp?.addEventListener('keydown', e => { if(e.key==='Enter') handleAuth(); }));
+
+  // ── Üretici: Menşei değişimi ──────────────────────────────────────
+  window._authOriginChange = function(val) {
+    var sec = document.getElementById('a-foreign-section');
+    if (sec) sec.style.display = val === 'foreign' ? 'block' : 'none';
+  };
+
+  // ── Üretici: Distribütör satırı ekle ──────────────────────────────
+  function _addDistRow(name, email) {
+    var list = document.getElementById('a-dist-list');
+    if (!list) return;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 28px;gap:6px;align-items:center';
+    row.innerHTML =
+      '<input class="inp a-dist-name" placeholder="Distribütör Şirket Adı" value="'+(name||'')+'" style="font-size:12px;padding:6px 8px">' +
+      '<input class="inp a-dist-email" placeholder="E-posta (opsiyonel)" value="'+(email||'')+'" style="font-size:12px;padding:6px 8px">' +
+      '<button type="button" style="background:rgba(220,38,38,.1);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:4px;cursor:pointer;font-size:14px;padding:2px 6px">×</button>';
+    row.querySelector('button').onclick = () => row.remove();
+    list.appendChild(row);
+  }
+  var addDistBtn = document.getElementById('a-add-dist-btn');
+  if (addDistBtn) addDistBtn.addEventListener('click', () => _addDistRow('',''));
+
+  // ── Distribütör: Entegratör satırı ekle ──────────────────────────
+  function _addIntRow(name, email) {
+    var list = document.getElementById('a-int-list');
+    if (!list) return;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 28px;gap:6px;align-items:center';
+    row.innerHTML =
+      '<input class="inp a-int-name" placeholder="Entegratör / İş Ortağı Adı" value="'+(name||'')+'" style="font-size:12px;padding:6px 8px">' +
+      '<input class="inp a-int-email" placeholder="E-posta (opsiyonel)" value="'+(email||'')+'" style="font-size:12px;padding:6px 8px">' +
+      '<button type="button" style="background:rgba(220,38,38,.1);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:4px;cursor:pointer;font-size:14px;padding:2px 6px">×</button>';
+    row.querySelector('button').onclick = () => row.remove();
+    list.appendChild(row);
+  }
+  var addIntBtn = document.getElementById('a-add-int-btn');
+  if (addIntBtn) addIntBtn.addEventListener('click', () => _addIntRow('',''));
 }
 
 window.toggleAuthMode = function() {
@@ -2026,8 +2157,59 @@ async function handleAuth() {
       }
 
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      // ── Rol bazlı ek alanları topla ───────────────────────────────────
+      const website   = el('a-website')?.value.trim() || '';
+      const origin    = document.querySelector('input[name="a-origin"]:checked')?.value || 'domestic';
+      const country   = el('a-country')?.value.trim() || '';
+
+      // Kategoriler (üretici)
+      const catChecks = document.querySelectorAll('.a-cat-chk:checked');
+      const categories = Array.from(catChecks).map(cb => cb.value);
+
+      // Uzmanlık (entegratör)
+      const specChecks = document.querySelectorAll('.a-spec-chk:checked');
+      const specializations = Array.from(specChecks).map(cb => cb.value);
+
+      // Bölgeler (distribütör)
+      const regionChecks = document.querySelectorAll('.a-region-chk:checked');
+      const regions = Array.from(regionChecks).map(cb => cb.value);
+
+      // Markalar (distribütör/entegratör)
+      const brands = (el('a-brands')?.value||'').split(',').map(s=>s.trim()).filter(Boolean);
+
+      // Referanslar (entegratör)
+      const refs = el('a-refs')?.value.trim() || '';
+
+      // Distribütörler (üretici - yabancı)
+      const distRows = document.querySelectorAll('#a-dist-list > div');
+      const distributors = Array.from(distRows).map(row => ({
+        name:  row.querySelector('.a-dist-name')?.value.trim() || '',
+        email: row.querySelector('.a-dist-email')?.value.trim() || '',
+      })).filter(d => d.name);
+
+      // Entegratörler (distribütör)
+      const intRows = document.querySelectorAll('#a-int-list > div');
+      const integrators = Array.from(intRows).map(row => ({
+        name:  row.querySelector('.a-int-name')?.value.trim() || '',
+        email: row.querySelector('.a-int-email')?.value.trim() || '',
+      })).filter(i => i.name);
+
+      // ── Yabancı üretici doğrulama ────────────────────────────────
+      if (AUTH_VTYPE === 'ureticid' && origin === 'foreign') {
+        if (!country) {
+          errDiv.innerHTML = '<div class="alert alert-err">Yabancı üretici için menşei ülke zorunludur.</div>';
+          btn.disabled=false; btn.textContent='Kayıt Ol'; return;
+        }
+        if (distributors.length === 0) {
+          errDiv.innerHTML = '<div class="alert alert-err">Yabancı üretici en az 1 distribütör seçmek zorundadır.</div>';
+          btn.disabled=false; btn.textContent='Kayıt Ol'; return;
+        }
+      }
+
       await setDoc(doc(db, 'users', cred.user.uid), {
         email, displayName: name, company, phone, address, taxNo: taxno,
+        website, origin, country, categories, specializations, regions, brands, refs,
+        distributors, integrators,
         role: AUTH_ROLE, vendorType: AUTH_VTYPE,
         emailVerified: false,
         createdAt: serverTimestamp()
@@ -6732,7 +6914,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.13.6</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.14</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
