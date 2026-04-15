@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.16</title>
+<title>PoCHub.co — v4.17</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.16';
+const VERSION = 'v4.17';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -1681,23 +1681,38 @@ let NOTIF_UNSUB = null;
 
 function startNotifListener() {
   if (!CUR_USER || !CUR_PROFILE) return;
-  if (NOTIF_UNSUB) NOTIF_UNSUB(); // önceki listener'ı kapat
+  if (NOTIF_UNSUB) NOTIF_UNSUB();
 
   const role = CUR_PROFILE.role;
-  let q;
-  if (role === 'customer') {
-    q = query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid));
-  } else if (role === 'vendor') {
-    q = query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid), where('status','==','pending'));
-  } else {
-    // Admin — bekleyen ürün onayları
-    q = query(collection(db,'products'), where('status','==','pending'));
-  }
 
-  NOTIF_UNSUB = onSnapshot(q, snap => {
+  // ── Kullanıcıya gelen notifications (tüm roller) ─────────────────
+  const userNotifsQ = query(
+    collection(db,'notifications'),
+    where('userId','==',CUR_USER.uid),
+    where('read','==',false)
+  );
+
+  NOTIF_UNSUB = onSnapshot(userNotifsQ, snap => {
     NOTIF_COUNT = snap.size;
     updateNotifBadge();
   });
+
+  // ── Admin için ek: bekleyen ürün onayları ─────────────────────────
+  if (role === 'admin') {
+    const pendingProdsQ = query(
+      collection(db,'products'), where('status','==','pending')
+    );
+    onSnapshot(pendingProdsQ, snap => {
+      // Admin badge'e bekleyen ürün sayısını da ekle
+      var el_badge = document.getElementById('notif-badge');
+      if (el_badge && snap.size > 0) {
+        var cur = parseInt(el_badge.textContent) || 0;
+        var total = NOTIF_COUNT + snap.size;
+        el_badge.textContent = total > 9 ? '9+' : total;
+        el_badge.style.display = 'inline';
+      }
+    });
+  }
 }
 
 function stopNotifListener() {
@@ -1741,8 +1756,20 @@ async function openNotifPanel() {
     notifs.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
 
     var typeIcons = {
-      new_message: '💬', poc_invite: '📨', poc_accepted: '✅',
-      poc_rejected: '❌', offer_received: '💼', cancellation: '🚫',
+      new_message:        '💬',
+      poc_invite:         '📨',
+      poc_accepted:       '✅',
+      poc_rejected:       '❌',
+      offer_received:     '💼',
+      cancellation:       '🚫',
+      product_assigned:   '📦',
+      integrator_assigned:'⚙️',
+      schedule_proposed:  '📅',
+      event_cancelled:    '🚫',
+      poc_request:        '🔍',
+      product_approved:   '🎉',
+      product_rejected:   '❌',
+      admin_pending:      '⏳',
     };
 
     var listEl = panel.querySelector('#notif-list');
@@ -1752,11 +1779,11 @@ async function openNotifPanel() {
       listEl.innerHTML = notifs.slice(0,20).map(function(n) {
         var icon = typeIcons[n.type] || '🔔';
         var isRead = n.read;
-        return '<div class="notif-item" data-id="'+n.id+'" data-type="'+n.type+'" data-poc-id="'+(n.pocId||'')+'" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;background:'+(isRead?'transparent':'rgba(59,124,255,.05)')+';display:flex;gap:12px;align-items:start">' +
+        return '<div class="notif-item" data-id="'+n.id+'" data-type="'+n.type+'" data-poc-id="'+(n.pocId||'')+'" data-product-id="'+(n.productId||'')+'" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;background:'+(isRead?'transparent':'rgba(59,124,255,.05)')+';display:flex;gap:12px;align-items:start">' +
           '<div style="font-size:20px;flex-shrink:0;margin-top:2px">'+icon+'</div>' +
           '<div style="flex:1">' +
           '<div style="font-size:13px;font-weight:'+(isRead?'400':'700')+'">'+( n.title||'Bildirim')+'</div>' +
-          '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;line-height:1.5">'+(n.body||'')+'</div>' +
+          '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;line-height:1.5">'+(n.message||n.body||'')+'</div>' +
           '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">'+fmt(n.createdAt)+'</div>' +
           '</div>' +
           (!isRead?'<div style="width:8px;height:8px;border-radius:50%;background:#3b7cff;flex-shrink:0;margin-top:6px"></div>':'') +
@@ -1779,6 +1806,7 @@ async function openNotifPanel() {
           overlay.remove(); panel.remove();
 
           // Tipe göre yönlendir
+          var prodId = item.dataset.productId || '';
           if (nType === 'new_message' && pocId) {
             var pd = (await getDoc(doc(db,'poc_requests',pocId))).data();
             if (pd) openChatModal(pocId, pd.vendorId, pd.vendorName||'Vendor', pd.productName||'PoC');
@@ -1787,9 +1815,24 @@ async function openNotifPanel() {
           } else if (nType === 'schedule_proposed' && pocId) {
             var pd2 = (await getDoc(doc(db,'poc_requests',pocId))).data();
             if (pd2) openPocTimeline({...pd2, id:pocId});
+          } else if (nType === 'product_assigned') {
+            // Distribütöre atanan ürün → distribütör panel ürünlerim
+            go('vendor'); CUR_VEND_TAB='products'; renderVendor();
+          } else if (nType === 'integrator_assigned') {
+            // Entegratöre atanan ürün → vendor panel
+            go('vendor'); CUR_VEND_TAB='products'; renderVendor();
+          } else if (nType === 'product_approved') {
+            // Ürün onaylandı → vendor ürünlerim
+            go('vendor'); CUR_VEND_TAB='products'; renderVendor();
+          } else if (nType === 'product_rejected') {
+            go('vendor'); CUR_VEND_TAB='products'; renderVendor();
+          } else if (nType === 'admin_pending') {
+            // Admin bekleyen → admin panel
+            go('admin'); CUR_ADM_TAB='products'; renderAdmin();
           } else {
             if (CUR_PROFILE?.role==='customer') { go('customer'); CUR_CUST_TAB='requests'; renderCustomer(); }
             else if (CUR_PROFILE?.role==='vendor') { go('vendor'); CUR_VEND_TAB='requests'; renderVendor(); }
+            else if (CUR_PROFILE?.role==='admin') { go('admin'); CUR_ADM_TAB='products'; renderAdmin(); }
           }
         });
       });
@@ -1817,24 +1860,30 @@ async function openNotifPanel() {
 
 async function updateNotifBadge() {
   const badge = document.getElementById('notif-badge');
-  if (!badge || !CUR_USER) return;
+  if (!badge) return;
+  if (!CUR_USER) { badge.style.display = 'none'; return; }
   try {
-    var snap = await getDocs(query(collection(db,'notifications'),
-      where('userId','==',CUR_USER.uid), where('read','==',false)));
-    var count = snap.size;
-    if (count > 0) {
+    var snap = await getDocs(query(
+      collection(db,'notifications'),
+      where('userId','==',CUR_USER.uid),
+      where('read','==',false)
+    ));
+    NOTIF_COUNT = snap.size;
+    if (NOTIF_COUNT > 0) {
       badge.style.display = 'inline';
-      badge.textContent = count > 9 ? '9+' : count;
+      badge.textContent = NOTIF_COUNT > 9 ? '9+' : NOTIF_COUNT;
+    } else {
+      badge.style.display = 'none';
+      badge.textContent = '';
+    }
+  } catch(e) {
+    // Fallback — NOTIF_COUNT ile güncelle
+    if (NOTIF_COUNT > 0) {
+      badge.style.display = 'inline';
+      badge.textContent = NOTIF_COUNT > 9 ? '9+' : NOTIF_COUNT;
     } else {
       badge.style.display = 'none';
     }
-    return;
-  } catch(e) {}
-  // Fallback — eski mantık
-  const badge2 = document.getElementById('notif-badge');
-  if (badge) {
-    badge.textContent = NOTIF_COUNT > 0 ? NOTIF_COUNT : '';
-    badge.style.display = NOTIF_COUNT > 0 ? 'inline' : 'none';
   }
 }
 
@@ -7240,6 +7289,24 @@ async function openAddProductModal(prefillCat) {
         createdAt:     serverTimestamp(),
       });
 
+      // ── Admin'e yeni ürün bildirimi ─────────────────────────────────
+      try {
+        // Admin kullanıcılarını bul
+        var admSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
+        for (var admDoc of admSnap.docs) {
+          await addDoc(collection(db,'notifications'),{
+            userId:      admDoc.id,
+            type:        'admin_pending',
+            title:       'Yeni Ürün Onay Bekliyor',
+            message:     '"' + name + '" ürünü ' + (CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Bir üretici') + ' tarafından eklendi, onayınızı bekliyor.',
+            productId:   prodRef.id,
+            productName: name,
+            fromUserId:  CUR_USER.uid,
+            read:        false,
+            createdAt:   serverTimestamp(),
+          });
+        }
+      } catch(e2) {}
       // ── Distribütörlere bildirim + mail ──────────────────────────────
       if (distributors.length > 0) {
         for (const dist of distributors) {
@@ -7512,7 +7579,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.16</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.17</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -7892,6 +7959,23 @@ async function admProducts(m) {
         status:'active', publishStatus:'ready', approvedAt:serverTimestamp()
       });
       all = all.map(p => p.id===appBtn.dataset.id ? {...p, status:'active', publishStatus:'ready'} : p);
+      // Üreticiye panel bildirimi
+      try {
+        var prodDoc = await getDoc(doc(db,'products',appBtn.dataset.id));
+        if (prodDoc.exists()) {
+          await addDoc(collection(db,'notifications'),{
+            userId:      prodDoc.data().vendorId,
+            type:        'product_approved',
+            title:       'Ürününüz Onaylandı 🎉',
+            message:     '"' + appBtn.dataset.pn + '" ürününüz incelendi ve PoCHub kataloğunda yayınlandı!',
+            productId:   appBtn.dataset.id,
+            productName: appBtn.dataset.pn,
+            fromUserId:  CUR_USER.uid,
+            read:        false,
+            createdAt:   serverTimestamp(),
+          });
+        }
+      } catch(e2) {}
       if(appBtn.dataset.ve) sendEmail(appBtn.dataset.ve, appBtn.dataset.vn,
               'Ürününüz Onaylandı — PoCHub',
               appBtn.dataset.pn + ' ürününüz onaylandı ve PoCHub katalogunda yayınlandı!\n\n' +
@@ -7902,6 +7986,23 @@ async function admProducts(m) {
     }
     if (rejBtn) {
       await updateDoc(doc(db,'products',rejBtn.dataset.id),{status:'rejected',rejectedAt:serverTimestamp()});
+      // Üreticiye ret bildirimi
+      try {
+        var rDoc = await getDoc(doc(db,'products',rejBtn.dataset.id));
+        if (rDoc.exists()) {
+          await addDoc(collection(db,'notifications'),{
+            userId:      rDoc.data().vendorId,
+            type:        'product_rejected',
+            title:       'Ürün Başvurusu Hakkında',
+            message:     '"' + rejBtn.dataset.pn + '" ürününüz incelendi ancak şu an için onaylanamadı.',
+            productId:   rejBtn.dataset.id,
+            productName: rejBtn.dataset.pn,
+            fromUserId:  CUR_USER.uid,
+            read:        false,
+            createdAt:   serverTimestamp(),
+          });
+        }
+      } catch(e2) {}
       if(rejBtn.dataset.ve) sendEmail(rejBtn.dataset.ve,rejBtn.dataset.vn,'Ürün Başvurusu Hakkında — PoCHub',rejBtn.dataset.pn+' ürününüz incelendi ancak onaylanamadı.','');
       showToast('Reddedildi.'); all=all.map(p=>p.id===rejBtn.dataset.id?{...p,status:'rejected'}:p); applyFilter();
     }
