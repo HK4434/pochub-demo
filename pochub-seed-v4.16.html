@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>PoCHub Test Suite v4.16.1</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: monospace; background: #0a0d14; color: #e9ecf3; padding: 24px; }
+h1 { font-size: 20px; margin-bottom: 6px; color: #3b7cff; }
+.sub { color: #7c87a0; font-size: 13px; margin-bottom: 20px; }
+.sections { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.section { background: #1c1f2a; border-radius: 10px; padding: 16px; border: 1px solid rgba(255,255,255,.08); }
+.section h2 { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: #f0a429; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 8px; }
+.btn { display: block; width: 100%; padding: 8px 12px; margin-bottom: 6px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: monospace; text-align: left; transition: .15s; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn-blue  { background: rgba(59,124,255,.2);  color: #7db4ff;  border: 1px solid rgba(59,124,255,.3); }
+.btn-green { background: rgba(34,208,120,.2);  color: #22d078;  border: 1px solid rgba(34,208,120,.3); }
+.btn-red   { background: rgba(255,77,77,.2);   color: #ff7070;  border: 1px solid rgba(255,77,77,.3); }
+.btn-orange{ background: rgba(240,164,41,.2);  color: #f0a429;  border: 1px solid rgba(240,164,41,.3); }
+.btn-purple{ background: rgba(139,92,246,.2);  color: #c4a8ff;  border: 1px solid rgba(139,92,246,.3); }
+.btn-gray  { background: rgba(255,255,255,.05);color: #7c87a0;  border: 1px solid rgba(255,255,255,.1); }
+.btn:not(:disabled):hover { filter: brightness(1.2); }
+#log { background: #0f1117; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 16px; margin-top: 16px; min-height: 220px; max-height: 420px; overflow-y: auto; white-space: pre-wrap; font-size: 12px; line-height: 1.8; }
+.ok   { color: #22d078; } .err { color: #ff7070; }
+.info { color: #7db4ff; } .warn{ color: #f0a429; }
+.sep  { color: #3a3f52; }
+.status-bar { background: #1c1f2a; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; }
+.status-item { color: #7c87a0; }
+.status-item span { color: #e9ecf3; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>PoCHub Test Suite v4.16.1</h1>
+<p class="sub">Kıdemli analist test paketi v3.9 — Mesaj bildirimi, tarih/saat, çakışma, davet. Sırayla çalıştırın.</p>
+
+<div class="status-bar" id="status-bar">
+  <div class="status-item">Müşteri: <span id="s-cust">—</span></div>
+  <div class="status-item">Üretici: <span id="s-ureticid">—</span></div>
+  <div class="status-item">Distribütör: <span id="s-dist">—</span></div>
+  <div class="status-item">Entegratör: <span id="s-integ">—</span></div>
+  <div class="status-item">Ürün: <span id="s-prod">—</span></div>
+  <div class="status-item">PoC: <span id="s-poc">—</span></div>
+</div>
+
+<div class="sections">
+
+  <!-- BÖLÜM 1: HAZIRLIK -->
+  <div class="section">
+    <h2>🔧 1. HAZIRLIK — Temizlik & Kontrol</h2>
+    <button class="btn btn-gray" id="btn-check">Kullanıcıları & Ürünleri Kontrol Et</button>
+    <button class="btn btn-red"  id="btn-clean-poc">🗑 Tüm Test PoC Taleplerini Sil</button>
+    <button class="btn btn-red"  id="btn-clean-offers">🗑 Tüm Test Teklifleri Sil</button>
+    <button class="btn btn-red"  id="btn-clean-invites">🗑 Tüm Test Davetlerini Sil</button>
+    <button class="btn btn-red"  id="btn-clean-all">🗑 TÜMÜNÜ TEMİZLE (PoC+Teklif+Davet)</button>
+    <button class="btn btn-blue" id="btn-assign">📦 Ürünleri Test Kullanıcılarına Ata</button>
+  </div>
+
+  <!-- BÖLÜM 2: PoC AKIŞI -->
+  <div class="section">
+    <h2>📋 2. PoC TALEBİ AKIŞI</h2>
+    <button class="btn btn-blue"  id="btn-poc-pending">Müşteri → Üretici'ye Talep (pending)</button>
+    <button class="btn btn-blue"  id="btn-poc-dist">Müşteri → Distribütör'e Talep (pending)</button>
+    <button class="btn btn-blue"  id="btn-poc-integ">Müşteri → Entegratör'e Talep (pending)</button>
+    <button class="btn btn-green" id="btn-poc-accept">Üretici → Talebi Kabul Et (active)</button>
+    <button class="btn btn-orange" id="btn-poc-offer">Üretici → Teklif Gönder (offer_sent)</button>
+    <button class="btn btn-green" id="btn-poc-complete">Teklif → Kabul (completed)</button>
+    <button class="btn btn-red"   id="btn-poc-cancel">Müşteri → İptal (açıklamalı)</button>
+    <button class="btn btn-purple" id="btn-poc-full">🔄 TAM AKIŞ (pending→active→offer→complete)</button>
+  </div>
+
+  <!-- BÖLÜM 3: DAVET AKIŞI -->
+  <div class="section">
+    <h2>📨 3. DAVET AKIŞI</h2>
+    <button class="btn btn-blue"  id="btn-invite-send">Üretici → Müşteriye Davet Gönder</button>
+    <button class="btn btn-green" id="btn-invite-accept">Müşteri → Daveti Kabul Et (PoC oluşur)</button>
+    <button class="btn btn-red"   id="btn-invite-decline">Müşteri → Daveti Reddet</button>
+    <button class="btn btn-purple" id="btn-invite-full">🔄 TAM DAVET AKIŞI (gönder→kabul→PoC)</button>
+  </div>
+
+  <!-- BÖLÜM 4: ÜRÜN AKIŞI -->
+  <div class="section">
+    <h2>📦 4. ÜRÜN YÖNETİMİ</h2>
+    <button class="btn btn-blue"  id="btn-prod-add">Üretici → Yeni Ürün Ekle (pending)</button>
+    <button class="btn btn-green" id="btn-prod-approve">Admin → Ürünü Onayla (active)</button>
+    <button class="btn btn-red"   id="btn-prod-reject">Admin → Ürünü Reddet</button>
+    <button class="btn btn-orange" id="btn-prod-portfolio">Distribütör → Portföye Ekle</button>
+    <button class="btn btn-purple" id="btn-prod-full">🔄 TAM ÜRÜN AKIŞI (ekle→onayla→portföy)</button>
+  </div>
+
+  <!-- BÖLÜM 5: ETKİNLİK AKIŞI -->
+  <div class="section">
+    <h2>📅 5. ETKİNLİK AKIŞI</h2>
+    <button class="btn btn-blue"  id="btn-ev-create">Üretici → Etkinlik Oluştur (published)</button>
+    <button class="btn btn-green" id="btn-ev-register">Müşteri → Etkinliğe Kayıt</button>
+    <button class="btn btn-red"   id="btn-ev-cancel">Admin → Etkinliği İptal Et</button>
+    <button class="btn btn-purple" id="btn-ev-full">🔄 TAM ETKİNLİK AKIŞI</button>
+    <button class="btn btn-green" id="btn-ev-multilang">🌍 5.5 Çok Dilli Etkinlikler Oluştur (TR/EN/DE/FR)</button>
+  </div>
+
+  <!-- BÖLÜM 6: ÇOKLU VENDOR -->
+  <div class="section">
+    <h2>🔀 6. ÇOKLU VENDOR SENARYOSU</h2>
+    <button class="btn btn-blue"  id="btn-multi-poc">Müşteri → 3 Vendor'a Aynı PoC</button>
+    <button class="btn btn-green" id="btn-multi-accept">2 Vendor Kabul, 1 Red</button>
+    <button class="btn btn-orange" id="btn-multi-offers">2 Vendor Teklif Gönder</button>
+    <button class="btn btn-purple" id="btn-multi-full">🔄 TAM ÇOKLU VENDOR AKIŞI</button>
+  </div>
+
+  <!-- BÖLÜM 7: EDGE CASES -->
+  <div class="section">
+    <h2>⚠ 7. EDGE CASE TESTLERİ</h2>
+    <button class="btn btn-orange" id="btn-edge-cancel-reason">İptal — Açıklama Eksik Testi</button>
+    <button class="btn btn-orange" id="btn-edge-double-poc">Aynı Vendor'a 2. Talep (çakışma)</button>
+    <button class="btn btn-orange" id="btn-edge-invite-vendor">Vendor'a Davet (engellenmeli)</button>
+    <button class="btn btn-orange" id="btn-edge-portfolio-dup">Portföy Duplikat Testi</button>
+    <button class="btn btn-orange" id="btn-edge-no-date">Tarifsiz PoC (engellenmeli)</button>
+    <button class="btn btn-orange" id="btn-edge-conflict">Tarih Çakışması Testi</button>
+  </div>
+
+  <!-- BÖLÜM 8: BİLDİRİM TESTLERİ -->
+  <div class="section">
+    <h2>🔔 8. BİLDİRİM TESTLERİ (v3.9)</h2>
+    <button class="btn btn-blue"   id="btn-notif-send">Mesaj Gönder → Vendor'a Bildirim</button>
+    <button class="btn btn-blue"   id="btn-notif-schedule">Tarih Belirlendi → Müşteriye Bildirim</button>
+    <button class="btn btn-blue"   id="btn-notif-invite">Davet Bildirimi → Müşteriye</button>
+    <button class="btn btn-red"    id="btn-notif-clear">🗑 Tüm Bildirimleri Temizle</button>
+  </div>
+
+  <!-- BÖLÜM 9: DURUM RAPORU -->
+  <div class="section">
+    <h2>📊 9. DURUM RAPORU</h2>
+    <button class="btn btn-blue" id="btn-report">Platform Durum Raporu Al</button>
+    <button class="btn btn-gray" id="btn-report-poc">PoC Talepleri Özeti</button>
+    <button class="btn btn-gray" id="btn-report-offers">Teklifler Özeti</button>
+    <button class="btn btn-gray" id="btn-report-invites">Davetler Özeti</button>
+    <button class="btn btn-gray" id="btn-clear-log">Log Temizle</button>
+  </div>
+
+</div>
+
+<div id="log">Hazır. Test paketini çalıştırmaya başlayın.
+
+TEST KULLANICILARI:
+  Müşteri:    <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="5e2a3b2d2a70332b2d2a3b2c371e2a3b2d2a2e313d362b3c703d3133">[email&#160;protected]</a>
+  Üretici:    <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="077362747329727562736e646e6347736274737768646f72652964686a">[email&#160;protected]</a>
+  Distribütör:<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b3c7d6c0c79dd7dac0c7c1dad1c6c7dcc1f3c7d6c0c7c3dcd0dbc6d19dd0dcde">[email&#160;protected]</a>
+  Entegratör: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="7e0a1b0d0a5017100a1b190c1f0a110c3e0a1b0d0a0e111d160b1c501d1113">[email&#160;protected]</a>
+  Şifre:      PoCHub_Test_2026!
+</div>
+
+
+
+<div class="section">
+  <h2>📊 11. DEĞERLENDİRME & PUAN TESTİ (v4.16)</h2>
+  <button class="btn btn-green" id="btn-seed-eval">🌱 11.1 Değerlendirme Verileri Oluştur (PoC + Puan)</button>
+  <button class="btn btn-blue" id="btn-update-ratings">🔄 11.2 Tüm Ürün Puanlarını Güncelle</button>
+  <p class="info">Butona bastıktan sonra Katalog → "En Yüksek Puan" ile sırala. Kartlarda ⭐ puan görmeli.</p>
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js">
+// ── BÖLÜM 11: Değerlendirme & Puan Testleri ──────────────────────────────
+
+async function createCompletedPoc(vendorKey, rating, decision, evalNote) {
+  await loadUsers(); await loadProducts();
+  const cust = USERS.customer, vendor = USERS[vendorKey];
+  if (!cust || !vendor) { err('Kullanıcı bulunamadı'); return null; }
+  const prod = PRODUCTS.find(p => p.vendorId === vendor.id) || PRODUCTS[0];
+  if (!prod) { err('Ürün bulunamadı'); return null; }
+  try {
+    const pocRef = await addDoc(collection(db, 'poc_requests'), {
+      customerId:      cust.id,
+      customerName:    cust.displayName || cust.email,
+      customerEmail:   cust.email,
+      customerCompany: cust.company || 'Test Firma',
+      vendorId:        vendor.id,
+      vendorName:      vendor.displayName || vendor.email,
+      vendorEmail:     vendor.email,
+      productId:       prod.id,
+      productName:     prod.name,
+      category:        prod.category || '',
+      title:           prod.name + ' PoC - Tamamlandı',
+      status:          'completed',
+      rating:          rating,
+      purchaseDecision: decision,
+      evalNote:        evalNote,
+      completedAt:     serverTimestamp(),
+      completedBy:     cust.id,
+      acceptedAt:      serverTimestamp(),
+      createdAt:       serverTimestamp(),
+      vendorNote:      'PoC süreci başarıyla tamamlandı. Ürün gereksinimleri karşılandı.',
+      vendorResult:    'success',
+    });
+    ok(`Tamamlanmış PoC oluşturuldu — Puan: ${rating}/5, Karar: ${decision}`);
+    return pocRef.id;
+  } catch(e) { err('Hata: ' + e.message); return null; }
+}
+
+async function updateProductRating(productId) {
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'poc_requests'),
+      where('productId', '==', productId),
+      where('status', '==', 'completed')
+    ));
+    const ratings = snap.docs.map(d => d.data().rating).filter(Boolean);
+    if (!ratings.length) { info('Bu ürün için henüz değerlendirme yok.'); return; }
+    const avg = ratings.reduce((a,b) => a+b, 0) / ratings.length;
+    await updateDoc(doc(db, 'products', productId), {
+      avgRating: Math.round(avg * 10) / 10,
+      ratingCount: ratings.length
+    });
+    ok(`Ürün puanı güncellendi: ${Math.round(avg*10)/10}/5 (${ratings.length} değerlendirme)`);
+  } catch(e) { err('Hata: ' + e.message); }
+}
+
+async function seedEvaluations() {
+  sep('BÖLÜM 11: Değerlendirme Verileri Oluşturuluyor');
+  await loadUsers(); await loadProducts();
+
+  if (!PRODUCTS.length) { err('Önce ürünler yüklenmeli.'); return; }
+
+  // Birden fazla tamamlanmış PoC oluştur — farklı puanlar
+  const vendors = ['ureticid', 'distributor', 'integrator'];
+  const decisions = ['purchased', 'evaluating', 'not_purchased'];
+  const ratings = [5, 4, 3];
+  const notes = [
+    'Ürün performans testlerinde beklentileri aştı. Throughput değerleri yüksek. Satın alma kararı verildi.',
+    'Teknik özellikler yeterliyken entegrasyon sürecinde bazı zorluklar yaşandı. Değerlendirme devam ediyor.',
+    'Temel gereksinimler karşılandı ancak ücretlendirme modeli bütçeyle uyumlu değil.'
+  ];
+
+  var updatedProducts = new Set();
+  for (let i = 0; i < Math.min(vendors.length, PRODUCTS.length); i++) {
+    const prod = PRODUCTS[i] || PRODUCTS[0];
+    await createCompletedPoc(vendors[i % vendors.length], ratings[i], decisions[i], notes[i]);
+    updatedProducts.add(prod.id);
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  // Her ürünün avgRating'ini güncelle
+  sep('Ürün Puanları Güncelleniyor');
+  for (const pid of updatedProducts) {
+    await updateProductRating(pid);
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  // Tüm aktif ürünlerin puanını güncelle
+  for (const prod of PRODUCTS.slice(0, 6)) {
+    await updateProductRating(prod.id);
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  ok('Değerlendirme verileri hazır! Katalog sayfasını yenile.');
+  info('Katalog → "En Yüksek Puan" sıralamasında puanlı ürünler üste gelmeli.');
+  info('Ürün kartlarında ⭐ puan ve değerlendirme sayısı görünmeli.');
+}
+
+</script><script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { getFirestore, collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+const app = initializeApp({
+  apiKey: "AIzaSyCZ76Ga8DCGAUy33kb0Jk-wEDTHsOzRWDk",
+  authDomain: "pochub-co.firebaseapp.com",
+  projectId: "pochub-co",
+  storageBucket: "pochub-co.firebasestorage.app",
+  messagingSenderId: "970891427053",
+  appId: "1:970891427053:web:30a98a281e9fe2260c20e4"
+});
+const db = getFirestore(app);
+
+// ── LOG ──
+const logEl = document.getElementById('log');
+function log(msg, cls='') { logEl.innerHTML += `<span class="${cls}">${msg}</span>\n`; logEl.scrollTop = logEl.scrollHeight; }
+function sep(title) { log(`\n${'─'.repeat(50)}`, 'sep'); log(`  ${title}`, 'info'); log(`${'─'.repeat(50)}`, 'sep'); }
+function ok(msg)   { log('  ✓ ' + msg, 'ok'); }
+function err(msg)  { log('  ✗ ' + msg, 'err'); }
+function warn(msg) { log('  ⚠ ' + msg, 'warn'); }
+function info(msg) { log('  ℹ ' + msg, 'info'); }
+
+// ── KULLANICILAR ──
+const EMAILS = {
+  customer:    'test.musteri@testpochub.com',
+  ureticid:    'test.ureticid@testpochub.com',
+  distributor: 'test.distributor@testpochub.com',
+  integrator:  'test.integrator@testpochub.com',
+};
+let USERS = {};
+let PRODUCTS = [];
+let lastPocId = null;
+let lastOfferId = null;
+let lastInviteId = null;
+let lastEventId = null;
+let lastTestProdId = null;
+
+async function loadUsers() {
+  const snap = await getDocs(collection(db,'users'));
+  USERS = {};
+  snap.docs.forEach(d => {
+    const u = d.data();
+    Object.entries(EMAILS).forEach(([k,e]) => { if(u.email===e) USERS[k]={...u,id:d.id}; });
+  });
+  document.getElementById('s-cust').textContent    = USERS.customer    ? '✓' : '✗';
+  document.getElementById('s-ureticid').textContent = USERS.ureticid    ? '✓' : '✗';
+  document.getElementById('s-dist').textContent     = USERS.distributor ? '✓' : '✗';
+  document.getElementById('s-integ').textContent    = USERS.integrator  ? '✓' : '✗';
+  return USERS;
+}
+
+async function loadProducts() {
+  const snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
+  PRODUCTS = snap.docs.map(d=>({...d.data(),id:d.id}));
+  document.getElementById('s-prod').textContent = PRODUCTS.length + ' aktif';
+  return PRODUCTS;
+}
+
+function btn(id, fn) {
+  document.getElementById(id).addEventListener('click', async function() {
+    this.disabled = true;
+    try { await fn(this); }
+    catch(e) { err('Beklenmedik hata: ' + e.message); }
+    this.disabled = false;
+  });
+}
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 1: HAZIRLIK
+// ════════════════════════════════════════════════════
+btn('btn-check', async () => {
+  sep('KULLANICI & ÜRÜN KONTROLÜ');
+  await loadUsers();
+  await loadProducts();
+  Object.entries(USERS).forEach(([k,u]) => ok(`${k}: ${u.email} (id:${u.id.substring(0,8)}...)`));
+  if (!Object.keys(USERS).length) err('Test kullanıcıları bulunamadı!');
+  info(`${PRODUCTS.length} aktif ürün bulundu`);
+  PRODUCTS.slice(0,3).forEach(p => info(`  - ${p.name} (${p.vendorName||'?'})`));
+});
+
+async function deleteCollection(colName, userId, field='customerId') {
+  const snap = await getDocs(query(collection(db,colName), where(field,'==',userId)));
+  let n = 0;
+  for(const d of snap.docs) { await deleteDoc(d.ref); n++; }
+  return n;
+}
+
+btn('btn-clean-poc', async () => {
+  sep('POC TEMİZLİK');
+  await loadUsers();
+  if (!USERS.customer) { err('Müşteri bulunamadı'); return; }
+  let total = 0;
+  for (const [k,u] of Object.entries(USERS)) {
+    const n1 = await deleteCollection('poc_requests', u.id, 'customerId');
+    const n2 = await deleteCollection('poc_requests', u.id, 'vendorId');
+    if(n1||n2) ok(`${k}: ${n1} müşteri + ${n2} vendor PoC silindi`);
+    total += n1+n2;
+  }
+  ok(`Toplam ${total} PoC talebi silindi`);
+  document.getElementById('s-poc').textContent = '0';
+});
+
+btn('btn-clean-offers', async () => {
+  sep('TEKLİF TEMİZLİK');
+  await loadUsers();
+  let total = 0;
+  for (const [k,u] of Object.entries(USERS)) {
+    const n1 = await deleteCollection('offers', u.id, 'customerId');
+    const n2 = await deleteCollection('offers', u.id, 'vendorId');
+    total += n1+n2;
+  }
+  ok(`Toplam ${total} teklif silindi`);
+});
+
+btn('btn-clean-invites', async () => {
+  sep('DAVET TEMİZLİK');
+  await loadUsers();
+  let total = 0;
+  for (const [k,u] of Object.entries(USERS)) {
+    const n1 = await deleteCollection('poc_invites', u.id, 'vendorId');
+    const n2 = await deleteCollection('poc_invites', u.id, 'customerId');
+    total += n1+n2;
+  }
+  ok(`Toplam ${total} davet silindi`);
+});
+
+btn('btn-clean-all', async () => {
+  if(!confirm('Tüm test verileri (PoC, Teklif, Davet, Etkinlik) silinecek. Emin misiniz?')) return;
+  sep('TÜMÜNÜ TEMİZLE');
+  await loadUsers();
+  let total = 0;
+  for (const [k,u] of Object.entries(USERS)) {
+    total += await deleteCollection('poc_requests', u.id, 'customerId');
+    total += await deleteCollection('poc_requests', u.id, 'vendorId');
+    total += await deleteCollection('offers', u.id, 'customerId');
+    total += await deleteCollection('offers', u.id, 'vendorId');
+    total += await deleteCollection('poc_invites', u.id, 'vendorId');
+    total += await deleteCollection('poc_invites', u.id, 'customerId');
+    total += await deleteCollection('public_events', u.id, 'vendorId');
+    total += await deleteCollection('registrations', u.id, 'userId');
+    total += await deleteCollection('vendor_products', u.id, 'vendorId');
+  }
+  ok(`Toplam ${total} kayıt silindi`);
+  document.getElementById('s-poc').textContent = '0';
+});
+
+btn('btn-assign', async () => {
+  sep('ÜRÜN ATAMASI');
+  await loadUsers();
+  await loadProducts();
+  if(!PRODUCTS.length) { err('Aktif ürün yok'); return; }
+
+  for (const key of ['distributor','integrator']) {
+    const u = USERS[key];
+    if(!u) { warn(`${key} bulunamadı`); continue; }
+    const existing = await getDocs(query(collection(db,'vendor_products'), where('vendorId','==',u.id)));
+    const existIds = new Set(existing.docs.map(d=>d.data().productId));
+    let added=0;
+    for(const p of PRODUCTS) {
+      if(p.vendorId===u.id||existIds.has(p.id)) continue;
+      await addDoc(collection(db,'vendor_products'),{
+        vendorId:u.id, vendorName:u.displayName||u.email, vendorEmail:u.email, vendorType:u.vendorType||'',
+        productId:p.id, productName:p.name, productCategory:p.category||'',
+        originalVendorId:p.vendorId, originalVendorName:p.vendorName||'', originalVendorEmail:p.vendorEmail||'',
+        role:key==='distributor'?'Distribütör':'Entegratör', status:'active', createdAt:serverTimestamp()
+      });
+      added++;
+    }
+    ok(`${key}: ${added} ürün portföye eklendi`);
+  }
+});
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 2: PoC AKIŞI
+// ════════════════════════════════════════════════════
+async function createPoc(vendorKey, title, status='pending') {
+  await loadUsers(); await loadProducts();
+  const cust = USERS.customer, vendor = USERS[vendorKey];
+  if(!cust||!vendor) { err(`Kullanıcı bulunamadı: customer=${!!cust} ${vendorKey}=${!!vendor}`); return null; }
+  const prod = PRODUCTS.find(p=>p.vendorId===vendor.id) || PRODUCTS[0];
+  if(!prod) { err('Ürün bulunamadı'); return null; }
+  // Tercih tarihleri — bugün+7 ve bugün+14
+  var pref1 = new Date(Date.now()+7*86400000);
+  pref1.setHours(10,0,0,0);
+  var pref2 = new Date(Date.now()+14*86400000);
+  pref2.setHours(14,0,0,0);
+  var scheduled = status!=='pending' ? new Date(Date.now()+7*86400000) : null;
+  if(scheduled) scheduled.setHours(10,0,0,0);
+
+  const pocRef = await addDoc(collection(db,'poc_requests'),{
+    customerId:cust.id, customerName:cust.displayName||cust.email,
+    customerEmail:cust.email, customerCompany:cust.company||'Test Firma',
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email,
+    vendorEmail:vendor.email, vendorType:vendor.vendorType||'',
+    productId:prod.id, productName:prod.name, category:prod.category||'',
+    title, requirements:'Test gereksinimi.', location:'online', status,
+    preferredDateTime1: Timestamp.fromDate(pref1),
+    preferredDateTime2: Timestamp.fromDate(pref2),
+    preferredDates: pref1.toISOString().split('T')[0]+'T10:00 / '+pref2.toISOString().split('T')[0]+'T14:00',
+    conflictNote: '',
+    ...(status!=='pending'?{acceptedAt:serverTimestamp(), scheduledDate:scheduled?Timestamp.fromDate(scheduled):null, scheduledDuration:120, vendorNote:'Test kabul notu.'}:{}),
+    ...(status==='offer_sent'?{offerSentAt:serverTimestamp()}:{}),
+    ...(status==='completed'?{completedAt:serverTimestamp()}:{}),
+    createdAt:serverTimestamp()
+  });
+  lastPocId = pocRef.id;
+  document.getElementById('s-poc').textContent = lastPocId.substring(0,8)+'...';
+  return pocRef.id;
+}
+
+btn('btn-poc-pending', async () => {
+  sep('PoC TALEP — BEKLEYEN');
+  const id = await createPoc('ureticid','Firewall PoC Test Talebi');
+  if(id) ok(`PoC oluşturuldu: ${id.substring(0,8)}... (status: pending)`);
+});
+
+btn('btn-poc-dist', async () => {
+  sep('PoC TALEP — DAĞITICI');
+  const id = await createPoc('distributor','Network Altyapı PoC');
+  if(id) ok(`Distribütör PoC: ${id.substring(0,8)}... (status: pending)`);
+});
+
+btn('btn-poc-integ', async () => {
+  sep('PoC TALEP — ENTEGRATÖR');
+  const id = await createPoc('integrator','Entegrasyon PoC Talebi');
+  if(id) ok(`Entegratör PoC: ${id.substring(0,8)}... (status: pending)`);
+});
+
+btn('btn-poc-accept', async () => {
+  sep('PoC KABUL + TARİH BELİRLE (pending → active)');
+  if(!lastPocId) { warn('Önce PoC talebi oluşturun'); return; }
+  var sched = new Date(Date.now()+7*86400000); sched.setHours(10,0,0,0);
+  await updateDoc(doc(db,'poc_requests',lastPocId),{
+    status:'active', acceptedAt:serverTimestamp(),
+    scheduledDate:Timestamp.fromDate(sched),
+    scheduledDuration:120, vendorNote:'Seed: Zoom linki gönderilecek.',
+  });
+  ok(`PoC kabul edildi + tarih: ${sched.toLocaleDateString('tr-TR')}`);
+  info('Test: Müşteriye "Tarih Belirlendi" bildirimi gitmiş olmalı');
+  info('Test: Timeline "Tarih Belirlendi" adımı dolu görünmeli');
+  info('Test: Vendor kartında müşteri tercih tarihi görünmeli');
+});
+
+btn('btn-poc-offer', async () => {
+  sep('TEKLİF GÖNDER (active → offer_sent)');
+  if(!lastPocId) { warn('Önce PoC talebi oluşturun'); return; }
+  await loadUsers();
+  const cust = USERS.customer, vendor = USERS.ureticid;
+  const ref = await addDoc(collection(db,'offers'),{
+    pocId:lastPocId, customerId:cust.id, customerEmail:cust.email, customerName:cust.displayName||cust.email,
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email, vendorEmail:vendor.email,
+    vendorType:vendor.vendorType||'', productName:'Test Ürünü',
+    offerType:'direct', offerTypeLabel:'Doğrudan Üretici Teklifi',
+    billingModel:'direct_vendor', billingLabel:'Doğrudan Üretici',
+    amount:125000, currency:'TRY', currencySymbol:'₺',
+    hasChannelFee:false, validityDays:30,
+    validUntil:Timestamp.fromDate(new Date(Date.now()+30*86400000)),
+    delivery:'included', certification:'BTK Onaylı, FIPS 140-2',
+    warranty:'3 Yıl Yerinde Garanti', supportLevel:'7x24',
+    notes:'Proje bazında özel fiyatlandırma yapılabilir.',
+    status:'pending', createdAt:serverTimestamp()
+  });
+  lastOfferId = ref.id;
+  await updateDoc(doc(db,'poc_requests',lastPocId),{status:'offer_sent',offerSentAt:serverTimestamp()});
+  ok(`Teklif gönderildi: ${ref.id.substring(0,8)}...`);
+  ok(`PoC durumu: offer_sent`);
+  info('Müşteri: "Teklifler" sekmesinde görünmeli');
+  info('Teklif detayı: ₺125.000 | BTK Onaylı | 7x24 Destek');
+});
+
+btn('btn-poc-complete', async () => {
+  sep('TEKLİF KABUL (offer_sent → completed)');
+  if(!lastOfferId) { warn('Önce teklif gönderin'); return; }
+  await updateDoc(doc(db,'offers',lastOfferId),{status:'accepted',acceptedAt:serverTimestamp()});
+  if(lastPocId) await updateDoc(doc(db,'poc_requests',lastPocId),{status:'completed',completedAt:serverTimestamp()});
+  ok(`Teklif kabul edildi, PoC tamamlandı`);
+  info('Test: Timeline son adım "Karar Verildi" tamamlanmış görünmeli');
+});
+
+btn('btn-poc-cancel', async () => {
+  sep('PoC İPTAL — AÇIKLAMALI');
+  if(!lastPocId) { warn('Önce PoC talebi oluşturun'); return; }
+  await loadUsers();
+  const vendor = USERS.ureticid;
+  await updateDoc(doc(db,'poc_requests',lastPocId),{
+    status:'cancelled', cancelledAt:serverTimestamp(),
+    cancelReason:'Proje bütçesi bu çeyrek donduruldu. Bir sonraki çeyrekte tekrar değerlendirmeyi planlıyoruz.',
+    cancelCategory:'budget', cancelCategoryLabel:'Bütçe/Finansal',
+    reopenRequest:'3month', reopenLabel:'3 ay sonra'
+  });
+  await addDoc(collection(db,'poc_messages'),{
+    pocId:lastPocId, senderId:USERS.customer?.id||'test',
+    senderName:'Test Müşteri', senderRole:'customer',
+    text:'[IPTAL BILDIRIMI] Neden: Proje bütçesi bu çeyrek donduruldu. | Kategori: Bütçe/Finansal | Yeniden görüşme: 3 ay sonra',
+    type:'cancellation', createdAt:serverTimestamp()
+  });
+  ok(`PoC iptal edildi (açıklamalı)`);
+  info('Test: Vendor panelinde kırmızı banner + iptal nedeni görünmeli');
+  info('Test: Admin listesinde "Bütçe/Finansal" etiketi görünmeli');
+  info('Test: Timeline son adımda iptal açıklaması görünmeli');
+  if(vendor) info(`Test: ${vendor.email} adresine iptal maili gitmeli`);
+});
+
+btn('btn-poc-full', async () => {
+  sep('TAM PoC AKIŞI — pending → active → offer_sent → completed');
+  const id = await createPoc('ureticid','[TAM AKIŞ] Kapsamlı PoC Testi');
+  if(!id) return;
+  ok(`1/4 PoC oluşturuldu (pending)`);
+  await updateDoc(doc(db,'poc_requests',id),{status:'active',acceptedAt:serverTimestamp()});
+  ok(`2/4 Kabul edildi (active)`);
+  await loadUsers();
+  const offRef = await addDoc(collection(db,'offers'),{
+    pocId:id, customerId:USERS.customer.id, customerEmail:USERS.customer.email,
+    customerName:USERS.customer.displayName||USERS.customer.email,
+    vendorId:USERS.ureticid.id, vendorName:USERS.ureticid.displayName||USERS.ureticid.email,
+    vendorEmail:USERS.ureticid.email, vendorType:'ureticid', productName:'Test Ürünü',
+    offerType:'direct', offerTypeLabel:'Doğrudan Üretici Teklifi',
+    billingModel:'direct_vendor', billingLabel:'Doğrudan Üretici',
+    amount:85000, currency:'TRY', currencySymbol:'₺',
+    hasChannelFee:false, validityDays:60,
+    validUntil:Timestamp.fromDate(new Date(Date.now()+60*86400000)),
+    delivery:'included', certification:'CC EAL4+', warranty:'2 Yıl', supportLevel:'8x5',
+    notes:'Tam akış testi teklifi.', status:'pending', createdAt:serverTimestamp()
+  });
+  await updateDoc(doc(db,'poc_requests',id),{status:'offer_sent',offerSentAt:serverTimestamp()});
+  ok(`3/4 Teklif gönderildi (offer_sent) — ₺85.000`);
+  await updateDoc(doc(db,'offers',offRef.id),{status:'accepted',acceptedAt:serverTimestamp()});
+  await updateDoc(doc(db,'poc_requests',id),{status:'completed',completedAt:serverTimestamp()});
+  ok(`4/4 Tamamlandı (completed)`);
+  lastPocId = id; lastOfferId = offRef.id;
+  info('Test: Timeline tüm adımlar yeşil görünmeli');
+  info('Test: Admin dashboard "Tamamlanan" sayısı +1 olmalı');
+});
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 3: DAVET AKIŞI
+// ════════════════════════════════════════════════════
+btn('btn-invite-send', async () => {
+  sep('DAVET GÖNDER — Üretici → Müşteri');
+  await loadUsers(); await loadProducts();
+  const vendor = USERS.ureticid, cust = USERS.customer;
+  if(!vendor||!cust) { err('Kullanıcı bulunamadı'); return; }
+  const prod = PRODUCTS.find(p=>p.vendorId===vendor.id)||PRODUCTS[0];
+  const ref = await addDoc(collection(db,'poc_invites'),{
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email,
+    vendorEmail:vendor.email, vendorType:'ureticid', vendorCompany:vendor.company||'',
+    customerEmail:cust.email, customerName:cust.displayName||cust.email,
+    customerId:cust.id, productId:prod?.id||'', productName:prod?.name||'Test Ürünü',
+    productCategory:prod?.category||'', message:'Test davet mesajı. Ürünümüzü test etmenizi öneririz.',
+    location:'online', status:'pending', isRegistered:true,
+    createdAt:serverTimestamp(), expiresAt:new Date(Date.now()+30*86400000)
+  });
+  lastInviteId = ref.id;
+  ok(`Davet oluşturuldu: ${ref.id.substring(0,8)}...`);
+  info('Test: Müşteri paneli "Gelen Davetler" sekmesinde görünmeli');
+  info('Test: Müşteri dashboard\'da sarı uyarı çıkmalı');
+});
+
+btn('btn-invite-accept', async () => {
+  sep('DAVET KABUL — Müşteri → PoC oluşur');
+  if(!lastInviteId) { warn('Önce davet gönderin'); return; }
+  await loadUsers();
+  const invSnap = await getDoc(doc(db,'poc_invites',lastInviteId));
+  if(!invSnap.exists()) { err('Davet bulunamadı'); return; }
+  const inv = invSnap.data();
+  const pocRef = await addDoc(collection(db,'poc_requests'),{
+    customerId:USERS.customer.id, customerName:USERS.customer.displayName||USERS.customer.email,
+    customerEmail:USERS.customer.email, customerCompany:USERS.customer.company||'',
+    vendorId:inv.vendorId, vendorName:inv.vendorName, vendorEmail:inv.vendorEmail, vendorType:inv.vendorType||'',
+    productId:inv.productId, productName:inv.productName, category:inv.productCategory||'',
+    title:inv.productName+' PoC — Davet Kabul', requirements:'', location:inv.location||'online',
+    status:'active', source:'invite', acceptedAt:serverTimestamp(), createdAt:serverTimestamp()
+  });
+  await updateDoc(doc(db,'poc_invites',lastInviteId),{status:'accepted',pocRequestId:pocRef.id,acceptedAt:serverTimestamp()});
+  lastPocId = pocRef.id;
+  ok(`Davet kabul edildi → PoC oluştu: ${pocRef.id.substring(0,8)}...`);
+  info('Test: Müşteri "PoC Taleplerim"de görünmeli');
+  info('Test: Vendor "Davetlerim"de "Kabul Edildi" + "PoC Gör" butonu görünmeli');
+});
+
+btn('btn-invite-decline', async () => {
+  sep('DAVET REDDET');
+  if(!lastInviteId) { warn('Önce davet gönderin'); return; }
+  await updateDoc(doc(db,'poc_invites',lastInviteId),{status:'declined',declinedAt:serverTimestamp()});
+  ok('Davet reddedildi');
+  info('Test: Vendor "Davetlerim"de "Reddedildi" görünmeli');
+});
+
+btn('btn-invite-full', async () => {
+  sep('TAM DAVET AKIŞI — gönder → kabul → PoC');
+  await loadUsers(); await loadProducts();
+  const vendor=USERS.ureticid, cust=USERS.customer;
+  const prod=PRODUCTS[0];
+  const invRef = await addDoc(collection(db,'poc_invites'),{
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email, vendorEmail:vendor.email,
+    vendorType:'ureticid', customerEmail:cust.email, customerName:cust.displayName||cust.email,
+    customerId:cust.id, productId:prod?.id||'', productName:prod?.name||'Test',
+    productCategory:prod?.category||'', message:'Tam davet akış testi.',
+    location:'online', status:'pending', isRegistered:true,
+    createdAt:serverTimestamp(), expiresAt:new Date(Date.now()+30*86400000)
+  });
+  ok('1/3 Davet gönderildi');
+  const pocRef = await addDoc(collection(db,'poc_requests'),{
+    customerId:cust.id, customerName:cust.displayName||cust.email, customerEmail:cust.email,
+    customerCompany:cust.company||'', vendorId:vendor.id, vendorName:vendor.displayName||vendor.email,
+    vendorEmail:vendor.email, vendorType:'ureticid',
+    productId:prod?.id||'', productName:prod?.name||'Test', category:prod?.category||'',
+    title:(prod?.name||'Test')+' PoC — Tam Davet Testi', requirements:'', location:'online',
+    status:'active', source:'invite', acceptedAt:serverTimestamp(), createdAt:serverTimestamp()
+  });
+  await updateDoc(doc(db,'poc_invites',invRef.id),{status:'accepted',pocRequestId:pocRef.id,acceptedAt:serverTimestamp()});
+  ok('2/3 Davet kabul edildi');
+  ok('3/3 PoC oluştu: '+pocRef.id.substring(0,8)+'...');
+  lastPocId=pocRef.id; lastInviteId=invRef.id;
+});
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 4: ÜRÜN AKIŞI
+// ════════════════════════════════════════════════════
+btn('btn-prod-add', async () => {
+  sep('ÜRÜN EKLE (pending — admin onayı bekler)');
+  await loadUsers();
+  const vendor = USERS.ureticid;
+  if(!vendor) { err('Üretici bulunamadı'); return; }
+  const ref = await addDoc(collection(db,'products'),{
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email, vendorEmail:vendor.email,
+    name:'[TEST] Yeni Güvenlik Ürünü '+Date.now().toString().slice(-4),
+    category:'Güvenlik', country:'TR',
+    description:'Test amaçlı eklenen ürün. Admin onayı bekleniyor.',
+    supportModel:'inhouse', status:'pending', createdAt:serverTimestamp()
+  });
+  lastTestProdId = ref.id;
+  ok(`Ürün eklendi (pending): ${ref.id.substring(0,8)}...`);
+  info('Test: Admin "Ürün Onayları" sekmesinde "Bekleyen" filterinde görünmeli');
+});
+
+btn('btn-prod-approve', async () => {
+  sep('ÜRÜN ONAYLA (pending → active)');
+  if(!lastTestProdId) { warn('Önce ürün ekleyin'); return; }
+  await updateDoc(doc(db,'products',lastTestProdId),{status:'active',approvedAt:serverTimestamp()});
+  ok(`Ürün onaylandı: ${lastTestProdId.substring(0,8)}...`);
+  info('Test: Katalogda görünmeli, PoC talebinde seçilebilmeli');
+  await loadProducts();
+});
+
+btn('btn-prod-reject', async () => {
+  sep('ÜRÜN REDDET');
+  if(!lastTestProdId) {
+    // Pending ürün yarat ve reddet
+    await loadUsers();
+    const vendor=USERS.ureticid;
+    const ref=await addDoc(collection(db,'products'),{
+      vendorId:vendor.id, vendorName:vendor.displayName||vendor.email, vendorEmail:vendor.email,
+      name:'[TEST-RED] Reddedilecek Ürün', category:'Diğer', country:'TR',
+      description:'Red testi.', supportModel:'inhouse', status:'pending', createdAt:serverTimestamp()
+    });
+    lastTestProdId=ref.id;
+  }
+  await updateDoc(doc(db,'products',lastTestProdId),{status:'rejected',rejectedAt:serverTimestamp()});
+  ok(`Ürün reddedildi: ${lastTestProdId.substring(0,8)}...`);
+  info('Test: Vendor "Ürünlerim" sekmesinde "Reddedildi" görünmeli');
+  info('Test: Katalogda görünmemeli');
+});
+
+btn('btn-prod-portfolio', async () => {
+  sep('PORTFÖYE ÜRÜN EKLE — Distribütör');
+  await loadUsers(); await loadProducts();
+  const vendor=USERS.distributor;
+  if(!vendor) { err('Distribütör bulunamadı'); return; }
+  const prod=PRODUCTS.find(p=>p.vendorId!==vendor.id);
+  if(!prod) { err('Uygun ürün bulunamadı'); return; }
+  const existing=await getDocs(query(collection(db,'vendor_products'),where('vendorId','==',vendor.id),where('productId','==',prod.id)));
+  if(!existing.empty) { warn(`"${prod.name}" zaten portföyde`); return; }
+  await addDoc(collection(db,'vendor_products'),{
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email, vendorEmail:vendor.email, vendorType:'distributor',
+    productId:prod.id, productName:prod.name, productCategory:prod.category||'',
+    originalVendorId:prod.vendorId, originalVendorName:prod.vendorName||'', originalVendorEmail:prod.vendorEmail||'',
+    role:'Distribütör', status:'active', createdAt:serverTimestamp()
+  });
+  ok(`"${prod.name}" distribütör portföyüne eklendi`);
+  info('Test: Distribütör "Portföyüm" sekmesinde görünmeli');
+  info('Test: Orijinal üreticiye bildirim maili gitmeli');
+});
+
+btn('btn-prod-full', async () => {
+  sep('TAM ÜRÜN AKIŞI — ekle → onayla → portföy');
+  await loadUsers();
+  const vendor=USERS.ureticid, dist=USERS.distributor;
+  const ref=await addDoc(collection(db,'products'),{
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email, vendorEmail:vendor.email,
+    name:'[TAM AKIŞ] Firewall Pro '+Date.now().toString().slice(-4),
+    category:'Firewall', country:'IL', description:'Tam akış test ürünü.',
+    supportModel:'hybrid', status:'pending', createdAt:serverTimestamp()
+  });
+  ok('1/3 Ürün eklendi (pending)');
+  await updateDoc(doc(db,'products',ref.id),{status:'active',approvedAt:serverTimestamp()});
+  ok('2/3 Admin onayladı (active)');
+  if(dist) {
+    await addDoc(collection(db,'vendor_products'),{
+      vendorId:dist.id, vendorName:dist.displayName||dist.email, vendorEmail:dist.email, vendorType:'distributor',
+      productId:ref.id, productName:'Firewall Pro', productCategory:'Firewall',
+      originalVendorId:vendor.id, originalVendorName:vendor.displayName||vendor.email, originalVendorEmail:vendor.email,
+      role:'Distribütör', status:'active', createdAt:serverTimestamp()
+    });
+    ok('3/3 Distribütör portföye ekledi');
+  }
+  lastTestProdId=ref.id;
+  info('Test: Katalogda görünmeli, distribütör etkinliğinde kullanabilmeli');
+});
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 5: ETKİNLİK AKIŞI
+// ════════════════════════════════════════════════════
+btn('btn-ev-create', async () => {
+  sep('ETKİNLİK OLUŞTUR');
+  await loadUsers(); await loadProducts();
+  const vendor=USERS.ureticid;
+  if(!vendor) { err('Üretici bulunamadı'); return; }
+  const prod=PRODUCTS.find(p=>p.vendorId===vendor.id)||PRODUCTS[0];
+  const evDate=new Date(Date.now()+7*86400000);
+  const ref=await addDoc(collection(db,'public_events'),{
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email, vendorEmail:vendor.email, vendorType:'ureticid',
+    title:'[TEST] Canlı PoC Webinar — '+( prod?.name||'Ürün'),
+    description:'Test etkinliği. Ürünün canlı demonstrasyonu yapılacak.',
+    productName:prod?.name||'Test Ürünü', productId:prod?.id||'',
+    category:prod?.category||'Diğer', language:'tr',
+    eventDate:Timestamp.fromDate(evDate),
+    capacity:50, fee:0, format:'online',
+    location:'https://zoom.us/test', onlineUrl:'https://zoom.us/test',
+    physicalAddress:'', registeredCount:0, status:'published', createdAt:serverTimestamp()
+  });
+  lastEventId=ref.id;
+  ok(`Etkinlik oluşturuldu: ${ref.id.substring(0,8)}... (${evDate.toLocaleDateString('tr-TR')})`);
+  info('Test: Ana sayfada "Yaklaşan Etkinlikler"de görünmeli');
+  info('Test: "Etkinlikler" sayfasında listelenμeli');
+  info('Test: Dil filtresi "Türkçe"de görünmeli');
+});
+
+btn('btn-ev-register', async () => {
+  sep('ETKİNLİĞE KAYIT');
+  if(!lastEventId) { warn('Önce etkinlik oluşturun'); return; }
+  await loadUsers();
+  const cust=USERS.customer;
+  const existing=await getDocs(query(collection(db,'registrations'),where('eventId','==',lastEventId),where('userId','==',cust.id)));
+  if(!existing.empty) { warn('Müşteri zaten kayıtlı'); return; }
+  await addDoc(collection(db,'registrations'),{
+    eventId:lastEventId, userId:cust.id,
+    userName:cust.displayName||cust.email, userEmail:cust.email,
+    userCompany:cust.company||'', registeredAt:serverTimestamp()
+  });
+  await updateDoc(doc(db,'public_events',lastEventId),{registeredCount:1});
+  ok('Müşteri etkinliğe kayıt oldu');
+  info('Test: Müşteri "Etkinlik Kayıtlarım" sekmesinde görünmeli');
+  info('Test: Vendor etkinlik detayında kayıtlı sayısı 1 olmalı');
+});
+
+btn('btn-ev-cancel', async () => {
+  sep('ETKİNLİK İPTAL');
+  if(!lastEventId) { warn('Önce etkinlik oluşturun'); return; }
+  await updateDoc(doc(db,'public_events',lastEventId),{status:'cancelled',cancelledAt:serverTimestamp()});
+  ok('Etkinlik iptal edildi');
+  info('Test: Ana sayfada ve listede görünmemeli');
+  info('Test: Admin "Etkinlikler" sekmesinde "İptal" filterinde görünmeli');
+});
+
+btn('btn-ev-full', async () => {
+  sep('TAM ETKİNLİK AKIŞI — oluştur → kayıt → iptal');
+  await loadUsers(); await loadProducts();
+  const vendor=USERS.ureticid, cust=USERS.customer;
+  const prod=PRODUCTS[0];
+  const evDate=new Date(Date.now()+14*86400000);
+  const evRef=await addDoc(collection(db,'public_events'),{
+    vendorId:vendor.id, vendorName:vendor.displayName||vendor.email, vendorEmail:vendor.email, vendorType:'ureticid',
+    title:'[TAM AKIŞ] Etkinlik Testi', description:'Tam akış etkinlik testi.',
+    productName:prod?.name||'Test', productId:prod?.id||'', category:prod?.category||'Diğer', language:'en',
+    eventDate:Timestamp.fromDate(evDate), capacity:30, fee:500, format:'hybrid',
+    location:'İstanbul Ofis | https://zoom.us/test', onlineUrl:'https://zoom.us/test',
+    physicalAddress:'İstanbul Ofis', registeredCount:0, status:'published', createdAt:serverTimestamp()
+  });
+  ok('1/3 Etkinlik oluşturuldu (İngilizce, Hibrit, ₺500)');
+  await addDoc(collection(db,'registrations'),{
+    eventId:evRef.id, userId:cust.id, userName:cust.displayName||cust.email,
+    userEmail:cust.email, userCompany:cust.company||'', registeredAt:serverTimestamp()
+  });
+  await updateDoc(doc(db,'public_events',evRef.id),{registeredCount:1});
+  ok('2/3 Müşteri kayıt oldu');
+  lastEventId=evRef.id;
+  info('3/3 → Test: Dil filtresinde "İngilizce" seçince görünmeli');
+  info('Test: Ücretli etkinlik badge görünmeli');
+});
+
+btn('btn-ev-multilang', async () => {
+  sep('ÇOK DİLLİ ETKİNLİKLER OLUŞTURULUYOR');
+  await loadUsers(); await loadProducts();
+  const vendor = USERS.ureticid || USERS.distributor;
+  if (!vendor) { err('Vendor bulunamadı'); return; }
+  const cats = ['Firewall','Yedekleme','Server','Network','Güvenlik','Yazılım'];
+  const langs = [
+    {code:'tr', name:'Türkçe'},
+    {code:'en', name:'İngilizce'},
+    {code:'de', name:'Almanca'},
+    {code:'fr', name:'Fransızca'},
+  ];
+  const formats = ['online','onsite','hybrid'];
+  var created = 0;
+  for (let i = 0; i < langs.length; i++) {
+    const lang = langs[i];
+    const cat = cats[i % cats.length];
+    const prod = PRODUCTS.find(p => p.category === cat) || PRODUCTS[i % PRODUCTS.length] || PRODUCTS[0];
+    const evDate = new Date(Date.now() + (i+1) * 5 * 86400000);
+    try {
+      await addDoc(collection(db,'public_events'), {
+        vendorId: vendor.id,
+        vendorName: vendor.displayName || vendor.email,
+        vendorEmail: vendor.email,
+        vendorType: vendor.vendorType || 'ureticid',
+        title: '[TEST-' + lang.code.toUpperCase() + '] ' + (prod?.name||cat) + ' Demo',
+        description: lang.name + ' dilinde ' + cat + ' kategorisinde test etkinliği.',
+        productName: prod?.name || cat,
+        productId: prod?.id || '',
+        category: cat,
+        language: lang.code,
+        eventDate: Timestamp.fromDate(evDate),
+        capacity: 40, fee: i % 2 === 0 ? 0 : 250,
+        format: formats[i % formats.length],
+        location: formats[i % formats.length] !== 'online' ? 'İstanbul Levent' : 'https://zoom.us/test',
+        onlineUrl: 'https://zoom.us/test',
+        physicalAddress: formats[i % formats.length] !== 'online' ? 'İstanbul Levent' : '',
+        registeredCount: 0,
+        status: 'published',
+        createdAt: serverTimestamp(),
+      });
+      ok(lang.name + ' / ' + cat + ' etkinliği oluşturuldu');
+      created++;
+    } catch(e) { err('Hata (' + lang.code + '): ' + e.message); }
+    await new Promise(r => setTimeout(r, 200));
+  }
+  ok(created + ' çok dilli etkinlik oluşturuldu!');
+  info('Etkinlikler sayfasında dil filtresiyle test edin: TR / EN / DE / FR');
+});
+
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 6: ÇOKLU VENDOR
+// ════════════════════════════════════════════════════
+btn('btn-multi-poc', async () => {
+  sep('ÇOKLU VENDOR — Müşteri → 3 Vendor\'a Aynı PoC');
+  await loadUsers(); await loadProducts();
+  const cust=USERS.customer;
+  const vendors=[USERS.ureticid, USERS.distributor, USERS.integrator];
+  const prod=PRODUCTS[0];
+  const ids=[];
+  for(const v of vendors) {
+    if(!v) continue;
+    const r=await addDoc(collection(db,'poc_requests'),{
+      customerId:cust.id, customerName:cust.displayName||cust.email,
+      customerEmail:cust.email, customerCompany:cust.company||'',
+      vendorId:v.id, vendorName:v.displayName||v.email, vendorEmail:v.email, vendorType:v.vendorType||'',
+      productId:prod?.id||'', productName:prod?.name||'Test', category:prod?.category||'',
+      title:'[ÇOKLU] Karşılaştırmalı PoC — '+( prod?.name||'Test'),
+      requirements:'3 farklı vendor karşılaştırması.', location:'online', status:'pending', createdAt:serverTimestamp()
+    });
+    ids.push(r.id);
+    ok(`PoC → ${v.email.split('@')[0]}: ${r.id.substring(0,8)}...`);
+  }
+  lastPocId=ids[0];
+  info('Test: Her vendor kendi panelinde bu talebi görmeli (diğerlerini görmemeli)');
+  info('Test: Müşteri "Tüm Teklifler" sekmesinde 3 farklı vendor görünmeli');
+});
+
+btn('btn-multi-accept', async () => {
+  sep('ÇOKLU VENDOR — 2 Kabul, 1 Red');
+  await loadUsers();
+  const snap=await getDocs(query(collection(db,'poc_requests'),where('customerId','==',USERS.customer.id),where('status','==','pending')));
+  const pocs=snap.docs.map(d=>({...d.data(),id:d.id}));
+  if(pocs.length<2) { warn(`Yeterli pending PoC yok (${pocs.length} var, en az 2 gerek)`); return; }
+  await updateDoc(doc(db,'poc_requests',pocs[0].id),{status:'active',acceptedAt:serverTimestamp()});
+  ok(`Kabul: ${pocs[0].vendorName||pocs[0].id.substring(0,8)}`);
+  if(pocs[1]) {
+    await updateDoc(doc(db,'poc_requests',pocs[1].id),{status:'active',acceptedAt:serverTimestamp()});
+    ok(`Kabul: ${pocs[1].vendorName||pocs[1].id.substring(0,8)}`);
+  }
+  if(pocs[2]) {
+    await updateDoc(doc(db,'poc_requests',pocs[2].id),{status:'rejected',rejectedAt:serverTimestamp()});
+    ok(`Red: ${pocs[2].vendorName||pocs[2].id.substring(0,8)}`);
+  }
+});
+
+btn('btn-multi-offers', async () => {
+  sep('ÇOKLU VENDOR — 2 Vendor Teklif Gönder');
+  await loadUsers();
+  const snap=await getDocs(query(collection(db,'poc_requests'),where('customerId','==',USERS.customer.id),where('status','==','active')));
+  const pocs=snap.docs.map(d=>({...d.data(),id:d.id}));
+  if(!pocs.length) { warn('Aktif PoC yok'); return; }
+  const amounts=[95000, 115000];
+  for(let i=0; i<Math.min(pocs.length,2); i++) {
+    const p=pocs[i], v=USERS[p.vendorType==='ureticid'?'ureticid':p.vendorType==='distributor'?'distributor':'integrator']||USERS.ureticid;
+    await addDoc(collection(db,'offers'),{
+      pocId:p.id, customerId:USERS.customer.id, customerEmail:USERS.customer.email,
+      customerName:USERS.customer.displayName||USERS.customer.email,
+      vendorId:p.vendorId, vendorName:p.vendorName, vendorEmail:p.vendorEmail, vendorType:p.vendorType||'',
+      productName:p.productName||'Test',
+      offerType:i===0?'direct':'distributor',
+      offerTypeLabel:i===0?'Doğrudan Üretici':'Distribütör Teklifi',
+      billingModel:i===0?'direct_vendor':'local_distributor',
+      billingLabel:i===0?'Doğrudan Üretici':'Türkiye Distribütörü',
+      amount:amounts[i], currency:'TRY', currencySymbol:'₺',
+      hasChannelFee:i===1, validityDays:i===0?30:60,
+      validUntil:Timestamp.fromDate(new Date(Date.now()+(i===0?30:60)*86400000)),
+      delivery:'included', certification:i===0?'FIPS 140-2':'BTK Onaylı',
+      warranty:i===0?'3 Yıl':'2 Yıl', supportLevel:i===0?'7x24':'8x5',
+      notes:i===0?'En uygun fiyat garantisi.':'Kurulum desteği dahil.',
+      status:'pending', createdAt:serverTimestamp()
+    });
+    await updateDoc(doc(db,'poc_requests',p.id),{status:'offer_sent',offerSentAt:serverTimestamp()});
+    ok(`Teklif ${i+1}: ₺${amounts[i].toLocaleString('tr-TR')} — ${p.vendorName||'?'}`);
+  }
+  info('Test: Müşteri "Teklifler"de karşılaştırma tablosu görünmeli');
+  info('Test: En düşük ₺95.000 teklif "EN DÜŞÜK" badge almalı');
+});
+
+btn('btn-multi-full', async () => {
+  sep('TAM ÇOKLU VENDOR AKIŞI');
+  // Önce temizle
+  await loadUsers();
+  for(const u of Object.values(USERS)) {
+    const s=await getDocs(query(collection(db,'poc_requests'),where('customerId','==',USERS.customer.id),where('title','like','%ÇOKLU%')));
+  }
+  // 3 vendor'a PoC gönder
+  document.getElementById('btn-multi-poc').click();
+  setTimeout(async()=>{
+    document.getElementById('btn-multi-accept').click();
+    setTimeout(()=>document.getElementById('btn-multi-offers').click(), 1500);
+  },1500);
+  info('Sırayla çalışıyor — 5 saniye bekleyin');
+});
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 7: EDGE CASES
+// ════════════════════════════════════════════════════
+btn('btn-edge-cancel-reason', async () => {
+  sep('EDGE: İptal — Açıklama Eksik');
+  info('Manuel test: Müşteri panelinde bir PoC talebi için "İptal" butonuna bas');
+  info('Beklenen: "İptal nedeni en az 20 karakter" hatası çıkmalı');
+  info('Beklenen: Buton açıklama dolmadan aktif olmamalı');
+  warn('Bu test manuel yapılmalı — seed otomatik test edemez');
+});
+
+btn('btn-edge-double-poc', async () => {
+  sep('EDGE: Aynı Vendor\'a 2. Talep');
+  const id1 = await createPoc('ureticid','[EDGE] İlk Talep');
+  if(!id1) return;
+  ok('1. talep oluşturuldu');
+  // 2. talebi oluşturmaya çalış
+  const id2 = await createPoc('ureticid','[EDGE] 2. Talep');
+  if(id2) {
+    ok('2. talep de oluşturuldu (sistem izin verdi)');
+    info('Not: Çakışma kontrolü vendor kapasitesi (3 aktif) ile sınırlıdır');
+  }
+});
+
+btn('btn-edge-invite-vendor', async () => {
+  sep('EDGE: Vendor\'a Davet (engellenmeli)');
+  info('Manuel test: Vendor panelinde "Davet Gönder" modalını aç');
+  info('test.ureticid@testpochub.com adresini gir');
+  info('Beklenen: "Bu kullanıcı müşteri değil (Üretici)" uyarısı çıkmalı');
+  info('Beklenen: Gönder butonu disabled kalmalı');
+  info('v2.9 fix: Sadece customer rolüne davet gönderilebilir');
+  warn('Bu test manuel yapılmalı');
+});
+
+btn('btn-edge-no-date', async () => {
+  sep('EDGE: Tarih Seçilmeden PoC Gönderme (engellenmeli)');
+  info('Manuel test: "Yeni PoC Talebi" butonuna bas');
+  info('Adım 2\'de tarih alanlarını BOŞ bırak');
+  info('Beklenen: "Tercih edilen tarih ve saat zorunludur" hatası çıkmalı');
+  info('v3.9 fix: 1. tercih tarihi zorunlu alan');
+  warn('Bu test manuel yapılmalı');
+});
+
+btn('btn-edge-conflict', async () => {
+  sep('EDGE: Tarih Çakışması Uyarısı');
+  await loadUsers();
+  if(!USERS.ureticid) { err('Üretici bulunamadı'); return; }
+  // Bugün+7 tarihinde aktif PoC oluştur
+  var id = await createPoc('ureticid','[EDGE-ÇAKIŞMA] Mevcut PoC','active');
+  if(!id) return;
+  ok('Bugün+7 tarihli aktif PoC oluşturuldu');
+  info('Manuel test: Yeni PoC talebi aç → Adım 2\'de aynı tarihi seç');
+  info('Beklenen: Sarı çakışma uyarısı görünmeli');
+  info('Beklenen: Devam edebilirsiniz ama vendor uyarıyla görür');
+});
+
+btn('btn-edge-portfolio-dup', async () => {
+  sep('EDGE: Portföy Duplikat Testi');
+  await loadUsers(); await loadProducts();
+  const dist=USERS.distributor, prod=PRODUCTS[0];
+  if(!dist||!prod) { err('Kullanıcı/ürün bulunamadı'); return; }
+  // İlk ekleme
+  const existing=await getDocs(query(collection(db,'vendor_products'),where('vendorId','==',dist.id),where('productId','==',prod.id)));
+  if(!existing.empty) { warn(`"${prod.name}" zaten portföyde — duplikat engelleme testi başarılı`); return; }
+  await addDoc(collection(db,'vendor_products'),{
+    vendorId:dist.id, vendorName:dist.displayName||dist.email, vendorEmail:dist.email, vendorType:'distributor',
+    productId:prod.id, productName:prod.name, productCategory:prod.category||'',
+    originalVendorId:prod.vendorId, originalVendorName:prod.vendorName||'', originalVendorEmail:prod.vendorEmail||'',
+    role:'Distribütör', status:'active', createdAt:serverTimestamp()
+  });
+  ok('1. ekleme başarılı');
+  info('Manuel test: Şimdi aynı ürünü "Portföye Ekle" modalından eklemeye çalış');
+  info('Beklenen: "Bu ürün zaten portföyünüzde" hatası çıkmalı');
+});
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 8: RAPOR
+// ════════════════════════════════════════════════════
+btn('btn-report', async () => {
+  sep('PLATFORM DURUM RAPORU (v3.9)');
+  await loadUsers(); await loadProducts();
+  const [pocSnap,offSnap,invSnap,evSnap,userSnap,notifSnap] = await Promise.all([
+    getDocs(collection(db,'poc_requests')),
+    getDocs(collection(db,'offers')),
+    getDocs(collection(db,'poc_invites')),
+    getDocs(collection(db,'public_events')),
+    getDocs(collection(db,'users')),
+    getDocs(collection(db,'notifications')),
+  ]);
+  const pocs=pocSnap.docs.map(d=>d.data());
+  const offs=offSnap.docs.map(d=>d.data());
+  const invs=invSnap.docs.map(d=>d.data());
+  const evs=evSnap.docs.map(d=>d.data());
+  log('\n  KULLANICILAR', 'info');
+  log(`    Toplam: ${userSnap.size} | Müşteri: ${userSnap.docs.filter(d=>d.data().role==='customer').length} | Vendor: ${userSnap.docs.filter(d=>d.data().role==='vendor').length}`);
+  log('\n  ÜRÜNLER', 'info');
+  const prodAll=await getDocs(collection(db,'products'));
+  const prods=prodAll.docs.map(d=>d.data());
+  ['pending','active','rejected','archived'].forEach(s=>{
+    const n=prods.filter(p=>p.status===s).length;
+    if(n) log(`    ${s}: ${n}`);
+  });
+  log('\n  PoC TALEPLERİ', 'info');
+  ['pending','active','offer_sent','completed','cancelled','rejected'].forEach(s=>{
+    const n=pocs.filter(p=>p.status===s).length;
+    if(n) log(`    ${s}: ${n}`);
+  });
+  log('\n  TEKLİFLER', 'info');
+  ['pending','accepted','rejected'].forEach(s=>{
+    const n=offs.filter(o=>o.status===s).length;
+    if(n) log(`    ${s}: ${n}`);
+  });
+  log('\n  DAVETLER', 'info');
+  ['pending','accepted','declined'].forEach(s=>{
+    const n=invs.filter(i=>i.status===s).length;
+    if(n) log(`    ${s}: ${n}`);
+  });
+  log('\n  ETKİNLİKLER', 'info');
+  ['published','cancelled'].forEach(s=>{
+    const n=evs.filter(e=>e.status===s).length;
+    if(n) log(`    ${s}: ${n}`);
+  });
+  const notifs=notifSnap.docs.map(d=>d.data());
+  log('\n  BİLDİRİMLER (v3.9)', 'info');
+  log(`    Toplam: ${notifs.length} | Okunmamış: ${notifs.filter(n=>!n.read).length}`);
+  ['new_message','schedule_proposed','poc_invite'].forEach(t=>{
+    const n=notifs.filter(x=>x.type===t).length;
+    if(n) log(`    ${t}: ${n}`);
+  });
+  const scheds=pocSnap.docs.filter(d=>d.data().scheduledDate).length;
+  log('\n  PLANLANAN PoC\'lar (v3.9)', 'info');
+  log(`    Tarihi belirlenmiş: ${scheds} / ${pocSnap.size}`);
+});
+
+btn('btn-report-poc', async () => {
+  sep('PoC TALEPLERİ ÖZETİ');
+  const snap=await getDocs(collection(db,'poc_requests'));
+  snap.docs.forEach(d=>{
+    const r=d.data();
+    log(`  [${r.status}] ${r.title||r.productName||'?'} → ${r.vendorName||'?'} (${r.customerName||'?'})`);
+  });
+  log(`\n  Toplam: ${snap.size}`);
+});
+
+btn('btn-report-offers', async () => {
+  sep('TEKLİFLER ÖZETİ');
+  const snap=await getDocs(collection(db,'offers'));
+  snap.docs.forEach(d=>{
+    const o=d.data();
+    log(`  [${o.status}] ${o.currencySymbol||'₺'}${(o.amount||0).toLocaleString('tr-TR')} — ${o.vendorName||'?'} → ${o.customerName||'?'} | ${o.offerTypeLabel||'?'}`);
+  });
+  log(`\n  Toplam: ${snap.size}`);
+});
+
+btn('btn-report-invites', async () => {
+  sep('DAVETLER ÖZETİ');
+  const snap=await getDocs(collection(db,'poc_invites'));
+  snap.docs.forEach(d=>{
+    const i=d.data();
+    log(`  [${i.status}] ${i.vendorName||'?'} → ${i.customerEmail||'?'} | ${i.productName||'?'}`);
+  });
+  log(`\n  Toplam: ${snap.size}`);
+});
+
+btn('btn-notif-send', async () => {
+  sep('BİLDİRİM: Mesaj → Vendor\'a bildirim');
+  await loadUsers();
+  if(!lastPocId) { const id=await createPoc('ureticid','[BİLDİRİM TEST]'); if(id) lastPocId=id; }
+  if(!USERS.ureticid) { err('Üretici bulunamadı'); return; }
+  await addDoc(collection(db,'poc_messages'),{
+    pocId:lastPocId, senderId:USERS.customer?.id||'x',
+    senderName:'Test Müşteri', senderRole:'customer',
+    text:'Test mesajı — '+new Date().toLocaleTimeString('tr-TR'), createdAt:serverTimestamp()
+  });
+  await addDoc(collection(db,'notifications'),{
+    userId:USERS.ureticid.id, type:'new_message', title:'Yeni Mesaj',
+    body:'Test Müşteri: Test mesajı', pocId:lastPocId,
+    senderId:USERS.customer?.id||'', senderName:'Test Müşteri', read:false, createdAt:serverTimestamp()
+  });
+  ok('Mesaj + bildirim oluşturuldu');
+  info('Test (Üretici): Zilde sayı görünmeli → tıklayınca panel açılmalı → mesaja tıklayınca chat açılmalı');
+});
+
+btn('btn-notif-schedule', async () => {
+  sep('BİLDİRİM: Tarih → Müşteriye bildirim');
+  await loadUsers();
+  if(!USERS.customer) { err('Müşteri bulunamadı'); return; }
+  var sched=new Date(Date.now()+5*86400000); sched.setHours(14,0,0,0);
+  await addDoc(collection(db,'notifications'),{
+    userId:USERS.customer.id, type:'schedule_proposed',
+    title:'PoC Tarihi Belirlendi',
+    body:(USERS.ureticid?.displayName||'Test Üretici')+' tarih belirledi: '+sched.toLocaleDateString('tr-TR'),
+    pocId:lastPocId||'', read:false, createdAt:serverTimestamp()
+  });
+  ok('Müşteriye tarih bildirimi gönderildi');
+  info('Test (Müşteri): Zilde bildirim → tıklayınca timeline açılmalı');
+});
+
+btn('btn-notif-invite', async () => {
+  sep('BİLDİRİM: Davet → Müşteriye bildirim');
+  await loadUsers(); await loadProducts();
+  if(!USERS.customer) { err('Müşteri bulunamadı'); return; }
+  await addDoc(collection(db,'notifications'),{
+    userId:USERS.customer.id, type:'poc_invite', title:'Yeni PoC Daveti',
+    body:(USERS.ureticid?.displayName||'Test Üretici')+' sizi "'+( PRODUCTS[0]?.name||'Test')+'" için davet etti.',
+    inviteId:'test', read:false, createdAt:serverTimestamp()
+  });
+  ok('Davet bildirimi oluşturuldu');
+'Müşteri bildirimler panelinde daveti görmeli');
+});
+
+// ════════════════════════════════════════════════════
+// BÖLÜM 11: DEĞERLENDİRME & PUAN (v4.16)
+// ════════════════════════════════════════════════════
+btn('btn-seed-eval', async () => {
+  await seedEvaluations();
+});
+
+btn('btn-update-ratings', async () => {
+  sep('Tüm Ürün Puanları Güncelleniyor');
+  await loadProducts();
+  var updated = 0;
+  for (const prod of PRODUCTS) {
+    await updateProductRating(prod.id);
+    updated++;
+    await new Promise(r => setTimeout(r, 150));
+  }
+  ok(updated + ' ürünün puanı güncellendi. Katalog sayfasını yenile.');
+});
+
+</script>
+</body>
+</html>

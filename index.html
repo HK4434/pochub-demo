@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.15</title>
+<title>PoCHub.co — v4.16</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.15';
+const VERSION = 'v4.16';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -1331,23 +1331,41 @@ function cc(c) {
 
 function statusBadge(s) {
   const m = {
-    pending:    ['rgba(240,164,41,.12)', '#f0a429','Bekliyor'],
-    active:     ['rgba(34,208,120,.12)', '#22d078','Aktif'],
-    registered: ['rgba(34,208,120,.12)', '#22d078','Aktif'],
-    published:  ['rgba(34,208,120,.12)', '#22d078','Yayında'],
-    offer_sent: ['rgba(139,92,246,.12)','#c4a8ff','Teklif Gönderildi'],
-    completed:  ['rgba(59,124,255,.12)', '#7db4ff','Tamamlandı'],
-    cancelled:  ['rgba(255,77,77,.12)',  '#ff7070','İptal'],
-    rejected:   ['rgba(255,77,77,.12)',  '#ff7070','Reddedildi'],
-    accepted:   ['rgba(34,208,120,.12)', '#22d078','Kabul Edildi'],
-    declined:   ['rgba(255,77,77,.12)',  '#ff7070','Reddedildi'],
-    expired:    ['#1c1f2a',              '#5a6278','Süresi Doldu'],
-    archived:   ['#1c1f2a',             '#5a6278','Arşiv'],
-    draft:      ['#1c1f2a',             '#7c87a0','Taslak'],
-    published:  ['rgba(34,208,120,.12)', '#22d078','Yayında'],
+    pending:              ['rgba(240,164,41,.12)', '#f0a429','Bekliyor'],
+    active:               ['rgba(34,208,120,.12)', '#22d078','Aktif'],
+    registered:           ['rgba(34,208,120,.12)', '#22d078','Aktif'],
+    published:            ['rgba(34,208,120,.12)', '#22d078','Yayında'],
+    offer_sent:           ['rgba(139,92,246,.12)','#c4a8ff','Teklif Gönderildi'],
+    completed:            ['rgba(59,124,255,.12)', '#7db4ff','Tamamlandı'],
+    cancelled:            ['rgba(255,77,77,.12)',  '#ff7070','İptal'],
+    rejected:             ['rgba(255,77,77,.12)',  '#ff7070','Reddedildi'],
+    accepted:             ['rgba(34,208,120,.12)', '#22d078','Kabul Edildi'],
+    declined:             ['rgba(255,77,77,.12)',  '#ff7070','Reddedildi'],
+    expired:              ['#1c1f2a',              '#5a6278','Süresi Doldu'],
+    archived:             ['#1c1f2a',              '#5a6278','Arşiv'],
+    draft:                ['#1c1f2a',              '#7c87a0','Taslak'],
+    // publishStatus değerleri
+    awaiting_integrator:  ['rgba(240,164,41,.12)', '#d97706','Entegratör Bekleniyor'],
+    awaiting_admin:       ['rgba(59,124,255,.12)', '#2563eb','Admin Onayı Bekleniyor'],
+    ready:                ['rgba(34,208,120,.12)', '#16a34a','Yayına Hazır'],
   };
   const [bg,col,lbl] = m[s]||['#1c1f2a','#7c87a0',s];
   return `<span class="status-badge" style="background:${bg};color:${col}">${lbl}</span>`;
+}
+
+// publishStatus badge — zincir durumu
+function publishStatusBadge(ps, origin, distCount, intCount) {
+  if (!ps) ps = 'awaiting_admin';
+  const badges = {
+    awaiting_integrator: ['rgba(240,164,41,.1)', '#d97706', '⏳ Entegratör Bekleniyor'],
+    awaiting_admin:      ['rgba(59,124,255,.1)', '#2563eb', '🔍 Admin Onayı Bekliyor'],
+    ready:               ['rgba(34,208,120,.1)', '#16a34a', '✅ Yayına Hazır'],
+  };
+  const [bg,col,lbl] = badges[ps] || ['#1c1f2a','#7c87a0', ps];
+  const chain = origin === 'foreign'
+    ? ` <small style="color:#94a3b8">(${distCount||0} dist / ${intCount||0} int)</small>`
+    : '';
+  return `<span class="status-badge" style="background:${bg};color:${col}">${lbl}${chain}</span>`;
 }
 
 
@@ -3754,7 +3772,9 @@ async function loadCatalog() {
   if (!gridEl) return;
   try {
     const snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
-    let prods = snap.docs.map(d => ({...d.data(), id:d.id}));
+    let prods = snap.docs.map(d => ({...d.data(), id:d.id}))
+      // publishStatus kontrolü: ready veya publishStatus alanı olmayan eski ürünler göster
+      .filter(p => !p.publishStatus || p.publishStatus === 'ready' || p.publishStatus === 'awaiting_admin');
 
     const search = el('cat-search')?.value?.toLowerCase()||'';
     const cat = el('cat-category')?.value||'';
@@ -7492,7 +7512,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.15</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.16</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -7720,12 +7740,39 @@ async function openAdmProdEditModal(prodId, name, cat, desc, country) {
     '<textarea class="inp" id="ape-desc" rows="3" style="resize:none">'+( desc||'')+'</textarea>' +
     '<div id="ape-err" style="margin-top:10px"></div>' +
     '<div style="display:flex;gap:8px;margin-top:16px">' +
+    '<div id="ape-chain" style="margin-bottom:12px;padding:10px;background:var(--bg-elevated);border-radius:6px;font-size:12px;color:var(--text-secondary)">Zincir bilgisi yükleniyor...</div>' +
     '<button class="btn-g" id="ape-cancel" style="flex:1;padding:10px">Vazgeç</button>' +
     '<button class="btn-p" id="ape-save" style="flex:2;padding:10px">Kaydet</button>' +
     '</div></div>';
 
   document.body.appendChild(modal);
   modal.querySelector('#ape-close').addEventListener('click',()=>modal.remove());
+
+  // Zincir bilgisi yükle
+  (async function() {
+    var chainEl = modal.querySelector('#ape-chain');
+    if (!chainEl) return;
+    try {
+      var pSnap = await getDoc(doc(db,'products',prodId));
+      if (!pSnap.exists()) { chainEl.textContent='Ürün bulunamadı.'; return; }
+      var pd = pSnap.data();
+      var origin = pd.origin||'domestic';
+      var dists  = pd.distributors||[];
+      var ints   = pd.integrators||[];
+      var ps     = pd.publishStatus||'awaiting_admin';
+      var html   = publishStatusBadge(ps, origin, dists.length, ints.length);
+      if (origin==='foreign' && dists.length>0) {
+        html += ' · <b>Dist:</b> ' + dists.map(d=>d.name).join(', ');
+      }
+      if (ints.length>0) {
+        html += ' · <b>Int:</b> ' + ints.map(i=>i.name).join(', ');
+      }
+      if (origin==='foreign' && dists.length===0) {
+        html += ' <span style="color:#dc2626;font-size:11px">⚠ Distribütör atanmamış</span>';
+      }
+      chainEl.innerHTML = html;
+    } catch(e2) { chainEl.textContent='Zincir yüklenemedi.'; }
+  })();
   modal.querySelector('#ape-cancel').addEventListener('click',()=>modal.remove());
   modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
 
@@ -7757,11 +7804,12 @@ async function admProducts(m) {
   const snap = await getDocs(collection(db,'products'));
   var all = snap.docs.map(d=>({...d.data(),id:d.id}));
   all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  var stFilter='';
+  var stFilter='', psFilter='';
   function applyFilter() {
     var q = (m.querySelector('#p-search')?.value||'').toLowerCase();
     renderRows(all.filter(function(p){
       return (!stFilter||p.status===stFilter) &&
+        (!psFilter||(p.publishStatus||'awaiting_admin')===psFilter) &&
         (!q||(p.name||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q));
     }));
   }
@@ -7776,6 +7824,7 @@ async function admProducts(m) {
         '<td style="color:var(--text-secondary)">'+(p.category||'—')+'</td>'+
         '<td>'+cc(p.country||'TR')+'</td>'+
         '<td>'+statusBadge(p.status)+'</td>'+
+        '<td>'+publishStatusBadge(p.publishStatus, p.origin, (p.distributors||[]).length, (p.integrators||[]).length)+'</td>'+
         '<td style="text-align:center">'+
         '<button class="feat-toggle btn-sm" data-id="'+p.id+'" data-featured="'+(p.featured?'1':'0')+'" '+
         'style="font-size:12px;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid;transition:all .2s;'+
@@ -7786,14 +7835,15 @@ async function admProducts(m) {
           (p.featuredUntil.toDate ? p.featuredUntil.toDate() : new Date(p.featuredUntil)).toLocaleDateString('tr-TR')+' kadar</div>' : '')+
         '</td>'+
         '<td style="white-space:nowrap">'+(p.status==='pending'?
-          '<button class="btn-gr btn-sm p-appr" data-id="'+p.id+'" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+'" data-pn="'+p.name+'" style="margin-right:4px">Onayla</button>'+
+          '<button class="btn-gr btn-sm p-appr" data-id="'+p.id+'" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+'" data-pn="'+p.name+'" data-ps="'+(p.publishStatus||'awaiting_admin')+'" data-origin="'+(p.origin||'domestic')+'" style="margin-right:4px">Onayla</button>'+
           '<button class="btn-red btn-sm p-rej" data-id="'+p.id+'" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+'" data-pn="'+p.name+'">Reddet</button>':
           p.status==='active'?'<button class="btn-red btn-sm p-arc" data-id="'+p.id+'">Arşivle</button>':'—')+
           '<button class="btn-g btn-sm p-edit" data-id="'+p.id+'" data-name="'+p.name+'" data-cat="'+(p.category||'')+'" data-desc="'+(p.description||'')+'" data-country="'+(p.country||'')+'" style="margin-left:4px">Düzenle</button>'+
           (p.status!=='active'?'<button class="btn-red btn-sm p-del" data-id="'+p.id+'" data-name="'+p.name+'" style="margin-left:4px">Sil</button>':'')+'</td></tr>';
     }).join(''):'<tr><td colspan="6" style="text-align:center;padding:24px;color:#5a6278">Sonuç bulunamadı.</td></tr>';
     m.querySelectorAll('.p-appr').forEach(function(b){b.addEventListener('click',async function(){
-      await updateDoc(doc(db,'products',b.dataset.id),{status:'active'});
+      if (b.dataset.ps === 'awaiting_integrator') { showToast('Zincir eksik: distribütörün entegratör ataması gerekli!', 'err'); return; }
+      await updateDoc(doc(db,'products',b.dataset.id),{status:'active', publishStatus:'ready', approvedAt:serverTimestamp()});
       showToast('Ürün onaylandı!');
       if(b.dataset.ve) sendEmail(b.dataset.ve,b.dataset.vn,'Ürününüz Onaylandı',b.dataset.pn+' ürününüz onaylandı.','');
       admProducts(m);
@@ -7809,11 +7859,19 @@ async function admProducts(m) {
     '<button class="btn-g btn-sm p-sf" data-s="pending">Bekleyen</button>'+
     '<button class="btn-g btn-sm p-sf" data-s="active">Aktif</button>'+
     '<button class="btn-g btn-sm p-sf" data-s="rejected">Reddedilen</button></div>'+
-    '<table><thead><tr><th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th style="color:#f59e0b">⭐ Öne Çıkar</th><th>İşlem</th></tr></thead><tbody id="p-tbody"></tbody></table>';
+    '<table><thead><tr><th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Menşei</th><th>Durum</th><th>Yayın Zinciri</th><th style="color:#f59e0b">⭐ Öne Çıkar</th><th>İşlem</th></tr></thead><tbody id="p-tbody"></tbody></table>';
   renderRows(all);
   m.querySelector('#p-search').addEventListener('input', applyFilter);
   m.querySelectorAll('.p-sf').forEach(function(b){b.addEventListener('click',function(){
     m.querySelectorAll('.p-sf').forEach(function(x){x.className='btn-g btn-sm p-sf';});
+  m.querySelectorAll('.p-psf').forEach(function(b){
+    b.addEventListener('click',function(){
+      psFilter=b.dataset.ps;
+      m.querySelectorAll('.p-psf').forEach(x=>x.classList.replace('btn-p','btn-g'));
+      b.classList.replace('btn-g','btn-p');
+      applyFilter();
+    });
+  });
     b.className='btn-p btn-sm p-sf'; stFilter=b.dataset.s; applyFilter();
   });});
 
@@ -7825,7 +7883,15 @@ async function admProducts(m) {
     var editBtn = e.target.closest('.p-edit');
     var delBtn  = e.target.closest('.p-del');
     if (appBtn) {
-      await updateDoc(doc(db,'products',appBtn.dataset.id),{status:'active',approvedAt:serverTimestamp()});
+      // publishStatus kontrolü
+      if (appBtn.dataset.ps === 'awaiting_integrator') {
+        showToast('Zincir eksik: bu ürün için önce entegratör ataması yapılmalıdır!', 'err');
+        return;
+      }
+      await updateDoc(doc(db,'products',appBtn.dataset.id),{
+        status:'active', publishStatus:'ready', approvedAt:serverTimestamp()
+      });
+      all = all.map(p => p.id===appBtn.dataset.id ? {...p, status:'active', publishStatus:'ready'} : p);
       if(appBtn.dataset.ve) sendEmail(appBtn.dataset.ve, appBtn.dataset.vn,
               'Ürününüz Onaylandı — PoCHub',
               appBtn.dataset.pn + ' ürününüz onaylandı ve PoCHub katalogunda yayınlandı!\n\n' +
