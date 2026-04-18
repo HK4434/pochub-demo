@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.18.1</title>
+<title>PoCHub.co — v4.18.2</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.18.1';
+const VERSION = 'v4.18.2';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -7077,7 +7077,7 @@ async function openAddProductModal(prefillCat) {
     '<input class="inp" id="pr-name" placeholder="Ürün adı" style="margin-bottom:14px;font-size:13px;background:#1c1f2a;border-color:rgba(255,255,255,.15);color:#e9ecf3">' +
 
     '<label class="lbl" style="font-size:12px;color:rgba(255,255,255,.8)">Kategori <span style="color:#ff7070">*</span></label>' +
-    '<select class="inp" id="pr-cat" style="margin-bottom:14px;font-size:13px;background:#1c1f2a;border-color:rgba(255,255,255,.15);color:#e9ecf3" onchange="window._updateProdCatPanel(this.value)">' +
+    '<select class="inp" id="pr-cat" style="margin-bottom:14px;font-size:13px;background:#1c1f2a;border-color:rgba(255,255,255,.15);color:#e9ecf3">' +
     '<option value="">Kategori seçin...</option>' +
     cats.map(function(ct){
       return '<option value="'+ct.name+'"'+(prefillCat===ct.name?' selected':'')+'>'+ct.name+'</option>';
@@ -7104,17 +7104,17 @@ async function openAddProductModal(prefillCat) {
     '<label class="lbl" style="font-size:12px;color:rgba(255,255,255,.8)">Ürün Menşei <span style="color:#ff7070">*</span></label>' +
     '<div style="display:flex;gap:10px;margin-bottom:12px">' +
       '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:rgba(255,255,255,.8)">' +
-        '<input type="radio" name="pr-origin" id="pr-origin-dom" value="domestic" checked onchange="window._prOriginChange(this.value)"> 🇹🇷 Yerli' +
+        '<input type="radio" name="pr-origin" id="pr-origin-dom" value="domestic" checked> 🇹🇷 Yerli' +
       '</label>' +
       '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:rgba(255,255,255,.8)">' +
-        '<input type="radio" name="pr-origin" id="pr-origin-for" value="foreign" onchange="window._prOriginChange(this.value)"> 🌍 Yabancı' +
+        '<input type="radio" name="pr-origin" id="pr-origin-for" value="foreign"> 🌍 Yabancı' +
       '</label>' +
     '</div>' +
 
     // Yerli üretici — doğrudan satış seçeneği
     '<div id="pr-direct-sale-row" style="margin-bottom:10px">' +
       '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;color:rgba(255,255,255,.85)">' +
-        '<input type="checkbox" id="pr-direct-sale" onchange="window._prDirectSaleChange(this.checked)" style="width:15px;height:15px;cursor:pointer">' +
+        '<input type="checkbox" id="pr-direct-sale" style="width:15px;height:15px;cursor:pointer">' +
         '<span>Doğrudan satış yapabiliyorum <span style="font-size:11px;color:rgba(255,255,255,.45)">(distribütöre ihtiyaç duymuyorum)</span></span>' +
       '</label>' +
     '</div>' +
@@ -7152,6 +7152,19 @@ async function openAddProductModal(prefillCat) {
   modal.querySelector('#close-prod-modal').addEventListener('click', function(){ modal.remove(); delete window._updateProdCatPanel; });
   modal.querySelector('#pr-cancel').addEventListener('click', function(){ modal.remove(); delete window._updateProdCatPanel; });
   modal.addEventListener('click', function(e){ if(e.target===modal){ modal.remove(); delete window._updateProdCatPanel; } });
+
+  // pr-cat, pr-origin, pr-direct-sale — addEventListener ile bağla (inline onchange yok)
+  modal.querySelector('#pr-cat')?.addEventListener('change', function() {
+    window._updateProdCatPanel(this.value);
+  });
+  modal.querySelectorAll('input[name="pr-origin"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      window._prOriginChange(this.value);
+    });
+  });
+  modal.querySelector('#pr-direct-sale')?.addEventListener('change', function() {
+    window._prDirectSaleChange(this.checked);
+  });
 
   buildCountryInput('pr-country-cont','pr-country-inp','pr-country-val','TR');
 
@@ -7283,6 +7296,7 @@ async function openAddProductModal(prefillCat) {
     var name = modal.querySelector('#pr-name').value.trim();
     var cat  = modal.querySelector('#pr-cat').value;
     var errDiv = modal.querySelector('#pr-err');
+    if (!errDiv) { showToast('Form hatası — lütfen sayfayı yenileyin.','err'); return; }
     if (!name) { errDiv.textContent = 'Ürün adı zorunludur.'; return; }
     if (!cat)  { errDiv.textContent = 'Kategori seçimi zorunludur.'; return; }
     var catMissing = validateCatFields(modal, cat);
@@ -7400,7 +7414,9 @@ async function openAddProductModal(prefillCat) {
       showToast('Ürün admin onayına gönderildi!');
       loadVendTab();
     } catch(e) {
-      errDiv.textContent = e.message;
+      var msg = e?.message || String(e) || 'Bilinmeyen hata';
+      if (errDiv) errDiv.textContent = 'Hata: ' + msg;
+      showToast('Hata: ' + msg, 'err');
       btn.disabled=false; btn.textContent='Admin Onayına Gönder →';
     }
   });
@@ -7629,7 +7645,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.18.1</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.18.2</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
