@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.18.6</title>
+<title>PoCHub.co — v4.19</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -140,9 +140,9 @@ td{padding:11px 14px;border-top:1px solid var(--border)}
 tr:hover td{background:rgba(37,99,235,.04)}
 .status-badge{padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap}
 .msg-bubble{max-width:72%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.55;word-break:break-word}
-.msg-mine{background:var(--color-primary);color:#fff;border-bottom-right-radius:3px;align-self:flex-end}
-.msg-other{background:#f1f5f9;color:var(--text-primary);border-bottom-left-radius:3px;align-self:flex-start}
-.msg-time{font-size:10px;color:var(--text-muted);margin-top:3px}
+.msg-mine{background:#2563eb;color:#fff;border-bottom-right-radius:3px;align-self:flex-end}
+.msg-other{background:#1c2235;color:#e9ecf3;border:1px solid rgba(255,255,255,.1);border-bottom-left-radius:3px;align-self:flex-start}
+.msg-time{font-size:10px;color:rgba(255,255,255,.4);margin-top:3px}
 .notif-dot{width:8px;height:8px;background:#ff4d4d;border-radius:50%;position:absolute;top:2px;right:2px}
 .notif-badge{background:#ff4d4d;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px}
 
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.18.6';
+const VERSION = 'v4.19';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -1423,6 +1423,97 @@ function filterVendorProducts(q) {
 let ACTIVE_CHAT_UNSUB = null;
 let ACTIVE_CHAT_POC_ID = null;
 
+// ══════════════════════════════════════════════════════
+// MESAJLAR SEKMESİ — Tüm aktif PoC yazışmaları
+// ══════════════════════════════════════════════════════
+async function loadMessagesTab(m, role) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
+  try {
+    // Bu kullanıcının dahil olduğu PoC'leri çek
+    let pocQuery;
+    if (role === 'customer') {
+      pocQuery = query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid));
+    } else {
+      pocQuery = query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid));
+    }
+    const pocSnap = await getDocs(pocQuery);
+    const pocs = pocSnap.docs.map(d => ({...d.data(), id:d.id}))
+      .filter(p => p.status === 'active' || p.status === 'pending');
+    pocs.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+    m.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h2 style="font-size:18px;font-weight:700">💬 Mesajlar</h2>
+        <span style="font-size:12px;color:var(--text-muted)">${pocs.length} aktif yazışma</span>
+      </div>
+    `;
+
+    if (!pocs.length) {
+      m.innerHTML += '<div class="empty"><div class="empty-icon">💬</div>Henüz aktif yazışma yok.<br><small>PoC talepleriniz aktifleşince burada görünür.</small></div>';
+      return;
+    }
+
+    // Her PoC için son mesajı çek
+    const listEl = document.createElement('div');
+    listEl.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+    for (const poc of pocs) {
+      // Son mesajı çek
+      let lastMsg = null;
+      let unreadCount = 0;
+      try {
+        const msgSnap = await getDocs(query(
+          collection(db,'poc_messages'),
+          where('pocId','==',poc.id)
+        ));
+        const msgs = msgSnap.docs.map(d => ({...d.data(), id:d.id}))
+          .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+        lastMsg = msgs[0] || null;
+        // Okunmamış: kendi göndermediğim mesajlar (basit yaklaşım)
+        unreadCount = msgs.filter(msg => msg.senderId !== CUR_USER?.uid && !msg.read).length;
+      } catch(e) {}
+
+      // Karşı taraf adı
+      const otherName = role === 'customer'
+        ? (poc.vendorCompany || poc.vendorName || 'Vendor')
+        : (poc.customerCompany || poc.customerName || 'Müşteri');
+
+      const lastMsgText = lastMsg
+        ? ((lastMsg.senderId === CUR_USER?.uid ? 'Siz: ' : '') + (lastMsg.text||'').substring(0,60) + ((lastMsg.text||'').length > 60 ? '...' : ''))
+        : 'Henüz mesaj yok';
+      const lastMsgTime = lastMsg?.createdAt?.toDate
+        ? lastMsg.createdAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+        : '';
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s';
+      row.innerHTML = `
+        <div style="width:42px;height:42px;border-radius:50%;background:rgba(59,124,255,.15);border:1px solid rgba(59,124,255,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💬</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <div style="font-size:13.5px;font-weight:700;color:var(--text-primary)">${otherName}</div>
+            <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:8px">${lastMsgTime}</div>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${lastMsgText}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">${poc.productName||poc.title||'PoC Talebi'}</div>
+        </div>
+        ${unreadCount > 0 ? `<div style="min-width:20px;height:20px;border-radius:10px;background:#3b7cff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${unreadCount}</div>` : ''}
+      `;
+
+      row.addEventListener('mouseenter', () => row.style.borderColor = 'rgba(59,124,255,.4)');
+      row.addEventListener('mouseleave', () => row.style.borderColor = 'var(--border)');
+      row.addEventListener('click', () => {
+        openChatModal(poc.id, poc.productName||poc.title||'PoC', otherName);
+      });
+      listEl.appendChild(row);
+    }
+    m.appendChild(listEl);
+
+  } catch(e) {
+    m.innerHTML = `<div class="alert alert-err">Yüklenemedi: ${e.message}</div>`;
+  }
+}
+
 function openChatModal(pocId, pocTitle, otherName) {
   // Önceki listener kapat
   if (ACTIVE_CHAT_UNSUB) { ACTIVE_CHAT_UNSUB(); ACTIVE_CHAT_UNSUB=null; }
@@ -1431,13 +1522,13 @@ function openChatModal(pocId, pocTitle, otherName) {
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.id = 'chat-modal';
-  modal.innerHTML = `<div class="modal" style="max-width:580px;padding:0;display:flex;flex-direction:column;height:80vh">
-    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+  modal.innerHTML = `<div class="modal" style="max-width:580px;padding:0;display:flex;flex-direction:column;height:80vh;background:#0f1623;border:1px solid rgba(59,124,255,.2)">
+    <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#16203a">
       <div>
-        <div style="font-size:14px;font-weight:700">${pocTitle||'PoC Mesajlaşması'}</div>
-        <div style="font-size:12px;color:#7c87a0">${otherName||''} ile</div>
+        <div style="font-size:14px;font-weight:700;color:#ffffff">${pocTitle||'PoC Mesajlaşması'}</div>
+        <div style="font-size:12px;color:rgba(59,124,255,.9);font-weight:600;margin-top:2px">💬 ${otherName||'Karşı Taraf'} ile</div>
       </div>
-      <button id="close-chat" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px">×</button>
+      <button id="close-chat" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:20px">×</button>
     </div>
     <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px">
       <div class="loading"><div class="spinner"></div>Mesajlar yükleniyor...</div>
@@ -1470,7 +1561,7 @@ function openChatModal(pocId, pocTitle, otherName) {
 
   ACTIVE_CHAT_UNSUB = onSnapshot(msgQuery, snap => {
     if (snap.empty) {
-      msgsEl.innerHTML = '<div class="empty" style="padding:32px">Henüz mesaj yok. İlk mesajı gönderin.</div>';
+      msgsEl.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,.35);font-size:13px">💬 Henüz mesaj yok.<br>İlk mesajı gönderin.</div>';
       return;
     }
     msgsEl.innerHTML = snap.docs.map(d => {
@@ -1498,7 +1589,7 @@ function openChatModal(pocId, pocTitle, otherName) {
       await addDoc(collection(db,'poc_messages'), {
         pocId,
         senderId: CUR_USER.uid,
-        senderName: CUR_PROFILE?.displayName || CUR_USER.email,
+        senderName: CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email,
         senderRole: CUR_PROFILE?.role || '',
         text,
         createdAt: serverTimestamp()
@@ -4442,7 +4533,7 @@ function openCustomPoCModal() {
       await addDoc(collection(db,'poc_requests'), {
         customerId:      CUR_USER.uid,
         customerEmail:   CUR_USER.email,
-        customerName:    CUR_PROFILE?.displayName || CUR_USER.email,
+        customerName:    CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email,
         productId:       'custom_' + Date.now(),
         productName:     productName,
         vendorId:        '',
@@ -5435,7 +5526,7 @@ function renderCustomer() {
   }
   if (el('cust-main')) { loadCustTab(); return; }
   const tabs = [
-    ['dashboard','Dashboard'],['invites','Gelen Davetler'],['requests','PoC Taleplerim'],['registrations','Etkinlik Kayıtlarım'],['offers','Teklifler'],
+    ['dashboard','Dashboard'],['invites','Gelen Davetler'],['requests','PoC Taleplerim'],['registrations','Etkinlik Kayıtlarım'],['offers','Teklifler'],['messages','💬 Mesajlar'],
   ];
   el('scr-customer').innerHTML = `<div class="dash">
     <div class="sbar">
@@ -5459,7 +5550,8 @@ async function loadCustTab() {
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
 
-  if (CUR_CUST_TAB === 'invites') { await custInvites(m); return; }
+  if (CUR_CUST_TAB === 'invites')  { await custInvites(m); return; }
+  if (CUR_CUST_TAB === 'messages') { await loadMessagesTab(m, 'customer'); return; }
   if (CUR_CUST_TAB === 'dashboard') {
     const [pocSnap,regSnap,offSnap] = await Promise.all([
       getDocs(query(collection(db,'poc_requests'),where('customerId','==',CUR_USER.uid))),
@@ -5525,7 +5617,7 @@ async function loadCustTab() {
 
     // Mesaj
     m.querySelectorAll('.chat-poc-btn').forEach(b => b.addEventListener('click', () => {
-      openChatModal(b.dataset.id, b.dataset.title, b.dataset.vendor);
+      openChatModal(b.dataset.id, b.dataset.title, b.dataset.vendor || 'Vendor');
     }));
   }
 
@@ -5675,7 +5767,7 @@ function renderVendor() {
   const tabs = [
     ['dashboard','Dashboard'],['requests','PoC Talepleri'],['calendar','Takvim'],
     ['products','Ürünlerim'],['portfolio','Portföyüm'],
-    ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','Gönderilen Teklifler'],
+    ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','Gönderilen Teklifler'],['messages','💬 Mesajlar'],
   ];
   el('scr-vendor').innerHTML = `<div class="dash">
     <div class="sbar">
@@ -5704,6 +5796,7 @@ async function loadVendTab() {
 
   if (CUR_VEND_TAB === 'portfolio') { await vendPortfolio(m); return; }
   if (CUR_VEND_TAB === 'invites')   { await vendInvites(m);   return; }
+  if (CUR_VEND_TAB === 'messages')  { await loadMessagesTab(m, 'vendor'); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     const [pocSnap,evSnap,offSnap,prodSnap] = await Promise.all([
       getDocs(query(collection(db,'poc_requests'),where('vendorId','==',CUR_USER.uid))),
@@ -5780,7 +5873,7 @@ async function loadVendTab() {
       openSendOfferModal(b.dataset.id, b.dataset.cid, b.dataset.cemail, b.dataset.cname, b.dataset.pname);
     }));
     m.querySelectorAll('.vend-chat-btn').forEach(b => b.addEventListener('click', () => {
-      openChatModal(b.dataset.id, b.dataset.title, b.dataset.cname);
+      openChatModal(b.dataset.id, b.dataset.title, b.dataset.cname || b.dataset.cemail || 'Müşteri');
     }));
   }
 
@@ -7650,7 +7743,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.18.6</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.19</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
