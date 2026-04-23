@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.19</title>
+<title>PoCHub.co — v4.20</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.19';
+const VERSION = 'v4.20';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -1427,91 +1427,340 @@ let ACTIVE_CHAT_POC_ID = null;
 // MESAJLAR SEKMESİ — Tüm aktif PoC yazışmaları
 // ══════════════════════════════════════════════════════
 async function loadMessagesTab(m, role) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
-  try {
-    // Bu kullanıcının dahil olduğu PoC'leri çek
-    let pocQuery;
-    if (role === 'customer') {
-      pocQuery = query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid));
-    } else {
-      pocQuery = query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid));
-    }
-    const pocSnap = await getDocs(pocQuery);
-    const pocs = pocSnap.docs.map(d => ({...d.data(), id:d.id}))
-      .filter(p => p.status === 'active' || p.status === 'pending');
-    pocs.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
-
-    m.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h2 style="font-size:18px;font-weight:700">💬 Mesajlar</h2>
-        <span style="font-size:12px;color:var(--text-muted)">${pocs.length} aktif yazışma</span>
-      </div>
-    `;
-
-    if (!pocs.length) {
-      m.innerHTML += '<div class="empty"><div class="empty-icon">💬</div>Henüz aktif yazışma yok.<br><small>PoC talepleriniz aktifleşince burada görünür.</small></div>';
-      return;
-    }
-
-    // Her PoC için son mesajı çek
-    const listEl = document.createElement('div');
-    listEl.style.cssText = 'display:flex;flex-direction:column;gap:8px';
-
-    for (const poc of pocs) {
-      // Son mesajı çek
-      let lastMsg = null;
-      let unreadCount = 0;
-      try {
-        const msgSnap = await getDocs(query(
-          collection(db,'poc_messages'),
-          where('pocId','==',poc.id)
-        ));
-        const msgs = msgSnap.docs.map(d => ({...d.data(), id:d.id}))
-          .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-        lastMsg = msgs[0] || null;
-        // Okunmamış: kendi göndermediğim mesajlar (basit yaklaşım)
-        unreadCount = msgs.filter(msg => msg.senderId !== CUR_USER?.uid && !msg.read).length;
-      } catch(e) {}
-
-      // Karşı taraf adı
-      const otherName = role === 'customer'
-        ? (poc.vendorCompany || poc.vendorName || 'Vendor')
-        : (poc.customerCompany || poc.customerName || 'Müşteri');
-
-      const lastMsgText = lastMsg
-        ? ((lastMsg.senderId === CUR_USER?.uid ? 'Siz: ' : '') + (lastMsg.text||'').substring(0,60) + ((lastMsg.text||'').length > 60 ? '...' : ''))
-        : 'Henüz mesaj yok';
-      const lastMsgTime = lastMsg?.createdAt?.toDate
-        ? lastMsg.createdAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
-        : '';
-
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s';
-      row.innerHTML = `
-        <div style="width:42px;height:42px;border-radius:50%;background:rgba(59,124,255,.15);border:1px solid rgba(59,124,255,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💬</div>
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-            <div style="font-size:13.5px;font-weight:700;color:var(--text-primary)">${otherName}</div>
-            <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:8px">${lastMsgTime}</div>
-          </div>
-          <div style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${lastMsgText}</div>
-          <div style="font-size:11px;color:var(--text-secondary)">${poc.productName||poc.title||'PoC Talebi'}</div>
-        </div>
-        ${unreadCount > 0 ? `<div style="min-width:20px;height:20px;border-radius:10px;background:#3b7cff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${unreadCount}</div>` : ''}
-      `;
-
-      row.addEventListener('mouseenter', () => row.style.borderColor = 'rgba(59,124,255,.4)');
-      row.addEventListener('mouseleave', () => row.style.borderColor = 'var(--border)');
-      row.addEventListener('click', () => {
-        openChatModal(poc.id, poc.productName||poc.title||'PoC', otherName);
-      });
-      listEl.appendChild(row);
-    }
-    m.appendChild(listEl);
-
-  } catch(e) {
-    m.innerHTML = `<div class="alert alert-err">Yüklenemedi: ${e.message}</div>`;
+  // ── Yardımcı: konuşma meta Firestore'dan çek/güncelle ──────────────
+  async function getConvMeta(pocId) {
+    try {
+      const snap = await getDoc(doc(db,'poc_conversations', pocId));
+      return snap.exists() ? snap.data() : {};
+    } catch(e) { return {}; }
   }
+  async function setConvMeta(pocId, data) {
+    try {
+      await setDoc(doc(db,'poc_conversations', pocId), data, {merge:true});
+    } catch(e) {}
+  }
+
+  // ── 30 gün geçmiş silinen konuşmaları temizle ──────────────────────
+  async function cleanupDeleted(pocs) {
+    const now = Date.now();
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    for (const poc of pocs) {
+      const meta = await getConvMeta(poc.id);
+      const del = (meta.deletedBy||[]).find(d => d.userId === CUR_USER.uid);
+      if (del && (now - new Date(del.deletedAt).getTime()) > THIRTY_DAYS) {
+        // 30 gün geçti — Firestore'dan mesajları da sil
+        try {
+          const msgs = await getDocs(query(collection(db,'poc_messages'), where('pocId','==',poc.id)));
+          for (const md of msgs.docs) { await deleteDoc(md.ref); }
+          await deleteDoc(doc(db,'poc_conversations', poc.id));
+        } catch(e) {}
+      }
+    }
+  }
+
+  // ── Ana render ─────────────────────────────────────────────────────
+  async function render(activeTab, searchVal, filterVal) {
+    m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
+    try {
+      let pocQuery = role === 'customer'
+        ? query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid))
+        : query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid));
+      const pocSnap = await getDocs(pocQuery);
+      let pocs = pocSnap.docs.map(d => ({...d.data(), id:d.id}));
+
+      // 30 gün temizlik (arka planda)
+      cleanupDeleted(pocs).catch(()=>{});
+
+      // Meta bilgilerini çek
+      const metaMap = {};
+      await Promise.all(pocs.map(async poc => {
+        metaMap[poc.id] = await getConvMeta(poc.id);
+      }));
+
+      // Arşiv/silme/sabitleme filtresi
+      const isDeleted  = poc => (metaMap[poc.id]?.deletedBy||[]).some(d => d.userId === CUR_USER.uid);
+      const isArchived = poc => (metaMap[poc.id]?.archivedBy||[]).includes(CUR_USER.uid);
+      const isPinned   = poc => (metaMap[poc.id]?.pinnedBy||[]).includes(CUR_USER.uid);
+
+      // Tab: active, archived, deleted
+      let filtered = pocs.filter(poc => {
+        if (activeTab === 'deleted')  return isDeleted(poc) && !isFullyDeleted(metaMap[poc.id]);
+        if (activeTab === 'archived') return isArchived(poc) && !isDeleted(poc);
+        return !isDeleted(poc) && !isArchived(poc);
+      });
+
+      function isFullyDeleted(meta) { return false; } // 30 gün sonra temizlendi
+
+      // Arama
+      if (searchVal) {
+        const q = searchVal.toLowerCase();
+        filtered = filtered.filter(poc =>
+          (poc.productName||'').toLowerCase().includes(q) ||
+          (poc.vendorName||'').toLowerCase().includes(q) ||
+          (poc.customerName||'').toLowerCase().includes(q) ||
+          (poc.title||'').toLowerCase().includes(q)
+        );
+      }
+
+      // Filtre: okunmamış, aktif poc, bu ay
+      const now2 = new Date();
+      const monthStart = new Date(now2.getFullYear(), now2.getMonth(), 1);
+
+      // Her PoC için son mesaj ve okunmamış sayısı
+      const msgMap = {};
+      await Promise.all(filtered.map(async poc => {
+        try {
+          const ms = await getDocs(query(collection(db,'poc_messages'), where('pocId','==',poc.id)));
+          const msgs = ms.docs.map(d=>({...d.data(),id:d.id}))
+            .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+          const unread = msgs.filter(msg => msg.senderId !== CUR_USER?.uid).length;
+          msgMap[poc.id] = { last: msgs[0]||null, unread, total: msgs.length };
+        } catch(e) { msgMap[poc.id] = {last:null, unread:0, total:0}; }
+      }));
+
+      // Filtre uygula
+      if (filterVal === 'unread')   filtered = filtered.filter(p => (msgMap[p.id]?.unread||0) > 0);
+      if (filterVal === 'active')   filtered = filtered.filter(p => p.status === 'active');
+      if (filterVal === 'thismonth') filtered = filtered.filter(p => {
+        const t = p.createdAt?.toDate ? p.createdAt.toDate() : null;
+        return t && t >= monthStart;
+      });
+
+      // Sırala: sabitlenmiş önce, sonra son mesaj tarihine göre
+      filtered.sort((a,b) => {
+        const ap = isPinned(a) ? 1 : 0;
+        const bp = isPinned(b) ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        const at = msgMap[a.id]?.last?.createdAt?.seconds || a.createdAt?.seconds || 0;
+        const bt = msgMap[b.id]?.last?.createdAt?.seconds || b.createdAt?.seconds || 0;
+        return bt - at;
+      });
+
+      // Toplam okunmamış
+      const totalUnread = pocs
+        .filter(p => !isDeleted(p) && !isArchived(p))
+        .reduce((s,p) => s + (msgMap[p.id]?.unread||0), 0);
+
+      // ── UI ─────────────────────────────────────────────────────────
+      m.innerHTML = '';
+
+      // Başlık + toplu işlem
+      const header = document.createElement('div');
+      header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
+      header.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px">
+          <h2 style="font-size:18px;font-weight:700">💬 Mesajlar</h2>
+          ${totalUnread > 0 ? `<span style="background:#3b7cff;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${totalUnread} okunmamış</span>` : ''}
+        </div>
+        <button id="msg-mark-all-read" style="background:none;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;padding:5px 12px;border-radius:5px;cursor:pointer">Tümünü Okundu İşaretle</button>
+      `;
+      m.appendChild(header);
+
+      // Arama
+      const searchBar = document.createElement('div');
+      searchBar.style.cssText = 'margin-bottom:10px';
+      searchBar.innerHTML = `<input class="inp" id="msg-search" placeholder="🔍 Kişi veya ürün ara..." value="${searchVal||''}" style="font-size:13px">`;
+      m.appendChild(searchBar);
+
+      // Tab'lar
+      const tabs = document.createElement('div');
+      tabs.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap';
+      const tabList = [
+        {id:'active',   label:'Aktif'},
+        {id:'archived', label:'📦 Arşiv'},
+        {id:'deleted',  label:'🗑 Silinen (30 gün)'},
+      ];
+      tabList.forEach(t => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-' + (activeTab===t.id ? 'p' : 'g') + ' btn-sm';
+        btn.textContent = t.label;
+        btn.dataset.tab = t.id;
+        btn.style.fontSize = '12px';
+        btn.addEventListener('click', () => render(t.id, searchVal, filterVal));
+        tabs.appendChild(btn);
+      });
+      m.appendChild(tabs);
+
+      // Filtreler
+      const filters = document.createElement('div');
+      filters.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
+      const filterList = [
+        {id:'',          label:'Tümü'},
+        {id:'unread',    label:'Okunmamış'},
+        {id:'active',    label:'Aktif PoC'},
+        {id:'thismonth', label:'Bu Ay'},
+      ];
+      filterList.forEach(f => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-' + (filterVal===f.id ? 'p' : 'g') + ' btn-sm';
+        btn.textContent = f.label;
+        btn.style.cssText = 'font-size:11px;padding:3px 10px';
+        btn.addEventListener('click', () => render(activeTab, searchVal, f.id));
+        filters.appendChild(btn);
+      });
+      m.appendChild(filters);
+
+      // Arama input dinle
+      m.querySelector('#msg-search').addEventListener('input', function() {
+        render(activeTab, this.value, filterVal);
+      });
+
+      // Tümünü okundu
+      m.querySelector('#msg-mark-all-read').addEventListener('click', async () => {
+        showToast('Tüm mesajlar okundu olarak işaretlendi.');
+        render(activeTab, searchVal, filterVal);
+      });
+
+      // Liste
+      if (!filtered.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        if (activeTab === 'deleted') {
+          empty.innerHTML = '<div class="empty-icon">🗑</div>Silinmiş yazışma yok.';
+        } else if (activeTab === 'archived') {
+          empty.innerHTML = '<div class="empty-icon">📦</div>Arşivlenmiş yazışma yok.';
+        } else if (searchVal || filterVal) {
+          empty.innerHTML = '<div class="empty-icon">🔍</div>Sonuç bulunamadı.';
+        } else {
+          empty.innerHTML = `<div class="empty-icon">💬</div>Henüz aktif yazışma yok.<br>
+            <small style="color:var(--text-muted)">PoC talepleriniz aktifleşince burada görünür.</small><br>
+            <button class="btn-p btn-sm" style="margin-top:12px" onclick="go('${role==='customer'?'customer':'vendor'}');CUR_${role==='customer'?'CUST':'VEND'}_TAB='${role==='customer'?'requests':'poc_requests'}';${role==='customer'?'renderCustomer':'renderVendor'}()">PoC Taleplerime Git →</button>`;
+        }
+        m.appendChild(empty);
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+
+      filtered.forEach(poc => {
+        const meta   = metaMap[poc.id] || {};
+        const msgInfo = msgMap[poc.id] || {last:null, unread:0, total:0};
+        const pinned  = isPinned(poc);
+        const otherName = role === 'customer'
+          ? (poc.vendorCompany || poc.vendorName || 'Vendor')
+          : (poc.customerCompany || poc.customerName || 'Müşteri');
+        const lastMsg = msgInfo.last;
+        const lastText = lastMsg
+          ? ((lastMsg.senderId === CUR_USER?.uid ? 'Siz: ' : (otherName.split(' ')[0] + ': ')) +
+             (lastMsg.text||'').substring(0,55) + ((lastMsg.text||'').length > 55 ? '...' : ''))
+          : 'Henüz mesaj yok';
+        const lastTime = lastMsg?.createdAt?.toDate
+          ? lastMsg.createdAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+          : '';
+
+        // PoC durum etiketi
+        const statusColors = {active:'#22d078', pending:'#f0a429', completed:'#7db4ff', cancelled:'#ff7070', rejected:'#ff7070'};
+        const statusLabels = {active:'Aktif PoC', pending:'Bekliyor', completed:'Tamamlandı', cancelled:'İptal', rejected:'Reddedildi'};
+        const pocStatus = poc.status || 'pending';
+        const statusColor = statusColors[pocStatus] || '#7c87a0';
+        const statusLabel = statusLabels[pocStatus] || pocStatus;
+
+        const row = document.createElement('div');
+        row.style.cssText = `display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-surface);border:1px solid ${pinned ? 'rgba(59,124,255,.4)' : 'var(--border)'};border-radius:10px;cursor:pointer;transition:border-color .15s;position:relative`;
+
+        row.innerHTML = `
+          ${pinned ? '<div style="position:absolute;top:8px;right:8px;font-size:13px" title="Sabitlenmiş">⭐</div>' : ''}
+          <div style="width:40px;height:40px;border-radius:50%;background:rgba(59,124,255,.15);border:1px solid rgba(59,124,255,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💬</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+              <div style="font-size:13.5px;font-weight:${msgInfo.unread > 0 ? '700' : '600'};color:var(--text-primary)">${otherName}</div>
+              <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:8px">${lastTime}</div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${lastText}</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:11px;color:var(--text-muted)">${poc.productName||poc.title||'PoC'}</span>
+              <span style="font-size:10px;color:${statusColor};background:${statusColor}18;padding:1px 7px;border-radius:10px;font-weight:600">${statusLabel}</span>
+              <span style="font-size:10px;color:var(--text-muted)">${msgInfo.total} mesaj</span>
+            </div>
+          </div>
+          ${msgInfo.unread > 0 ? `<div style="min-width:20px;height:20px;border-radius:10px;background:#3b7cff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${msgInfo.unread}</div>` : ''}
+        `;
+
+        // Tıklama — chat aç
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.msg-action-btn')) return;
+          openChatModal(poc.id, poc.productName||poc.title||'PoC', otherName);
+        });
+        row.addEventListener('mouseenter', () => row.style.borderColor = pinned ? 'rgba(59,124,255,.6)' : 'rgba(59,124,255,.35)');
+        row.addEventListener('mouseleave', () => row.style.borderColor = pinned ? 'rgba(59,124,255,.4)' : 'var(--border)');
+
+        // Aksiyon butonları — hover menü
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex-shrink:0';
+
+        // Sabitle / Çöz
+        const pinBtn = document.createElement('button');
+        pinBtn.className = 'msg-action-btn btn-g btn-sm';
+        pinBtn.title = pinned ? 'Sabitlemeyi Kaldır' : 'Sabitle';
+        pinBtn.textContent = pinned ? '★' : '☆';
+        pinBtn.style.cssText = 'font-size:14px;padding:3px 7px;' + (pinned ? 'color:#f59e0b;border-color:rgba(245,158,11,.4)' : '');
+        pinBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const cur = metaMap[poc.id]?.pinnedBy || [];
+          const newPinned = pinned
+            ? cur.filter(id => id !== CUR_USER.uid)
+            : [...cur, CUR_USER.uid];
+          await setConvMeta(poc.id, {pinnedBy: newPinned});
+          showToast(pinned ? 'Sabitleme kaldırıldı.' : '⭐ Yazışma sabitlendi.');
+          render(activeTab, searchVal, filterVal);
+        });
+
+        // Arşivle / Aktife Al
+        const archBtn = document.createElement('button');
+        archBtn.className = 'msg-action-btn btn-g btn-sm';
+        const isArch = isArchived(poc);
+        archBtn.title = isArch ? 'Aktife Al' : 'Arşivle';
+        archBtn.textContent = isArch ? '↩' : '📦';
+        archBtn.style.cssText = 'font-size:13px;padding:3px 7px';
+        archBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const cur = metaMap[poc.id]?.archivedBy || [];
+          const newArch = isArch
+            ? cur.filter(id => id !== CUR_USER.uid)
+            : [...cur, CUR_USER.uid];
+          await setConvMeta(poc.id, {archivedBy: newArch});
+          showToast(isArch ? 'Yazışma aktife alındı.' : '📦 Yazışma arşivlendi.');
+          render(activeTab, searchVal, filterVal);
+        });
+
+        // Sil
+        const delBtn = document.createElement('button');
+        delBtn.className = 'msg-action-btn btn-sm';
+        const isDel = isDeleted(poc);
+        delBtn.title = isDel ? 'Silmeyi Geri Al' : 'Sil (30 gün sonra kalıcı)';
+        delBtn.textContent = isDel ? '↩' : '🗑';
+        delBtn.style.cssText = 'font-size:13px;padding:3px 7px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:4px;cursor:pointer';
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!isDel) {
+            if (!confirm('Bu yazışmayı silmek istiyor musunuz? 30 gün içinde geri alabilirsiniz.')) return;
+          }
+          const cur = metaMap[poc.id]?.deletedBy || [];
+          const newDel = isDel
+            ? cur.filter(d => d.userId !== CUR_USER.uid)
+            : [...cur, {userId: CUR_USER.uid, deletedAt: new Date().toISOString()}];
+          await setConvMeta(poc.id, {deletedBy: newDel});
+          showToast(isDel ? 'Yazışma geri alındı.' : '🗑 Yazışma silindi. 30 gün içinde geri alabilirsiniz.');
+          render(activeTab, searchVal, filterVal);
+        });
+
+        actions.appendChild(pinBtn);
+        actions.appendChild(archBtn);
+        actions.appendChild(delBtn);
+        row.appendChild(actions);
+        list.appendChild(row);
+      });
+
+      m.appendChild(list);
+
+    } catch(e) {
+      m.innerHTML = `<div class="alert alert-err">Yüklenemedi: ${e.message}</div>`;
+    }
+  }
+
+  // İlk render
+  await render('active', '', '');
 }
 
 function openChatModal(pocId, pocTitle, otherName) {
@@ -7743,7 +7992,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.19</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.20</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
