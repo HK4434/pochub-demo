@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.20</title>
+<title>PoCHub.co — v4.21</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.20';
+const VERSION = 'v4.21';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -1777,7 +1777,10 @@ function openChatModal(pocId, pocTitle, otherName) {
         <div style="font-size:14px;font-weight:700;color:#ffffff">${pocTitle||'PoC Mesajlaşması'}</div>
         <div style="font-size:12px;color:rgba(59,124,255,.9);font-weight:600;margin-top:2px">💬 ${otherName||'Karşı Taraf'} ile</div>
       </div>
-      <button id="close-chat" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:20px">×</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${CUR_PROFILE?.role === 'vendor' ? `<button id="chat-send-offer" style="background:rgba(59,124,255,.2);color:#7db4ff;border:1px solid rgba(59,124,255,.3);border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:600;cursor:pointer">💰 Teklif Gönder</button>` : ''}
+        <button id="close-chat" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:20px">×</button>
+      </div>
     </div>
     <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px">
       <div class="loading"><div class="spinner"></div>Mesajlar yükleniyor...</div>
@@ -1788,6 +1791,31 @@ function openChatModal(pocId, pocTitle, otherName) {
     </div>
   </div>`;
   document.body.appendChild(modal);
+
+  // ── Chat teklif butonu ─────────────────────────────────────────
+  const chatOfferBtn = modal.querySelector('#chat-send-offer');
+  if (chatOfferBtn) {
+    chatOfferBtn.addEventListener('click', async () => {
+      // PoC'den müşteri bilgilerini çek
+      try {
+        const pocSnap = await getDoc(doc(db,'poc_requests',pocId));
+        if (pocSnap.exists()) {
+          const poc = pocSnap.data();
+          modal.remove();
+          if (ACTIVE_CHAT_UNSUB) { ACTIVE_CHAT_UNSUB(); ACTIVE_CHAT_UNSUB=null; }
+          openSendOfferModal(
+            pocId,
+            poc.customerId||'',
+            poc.customerEmail||'',
+            poc.customerName||poc.customerEmail||'Müşteri',
+            poc.productName||pocTitle||'PoC'
+          );
+        }
+      } catch(e) {
+        showToast('Teklif formu açılamadı: ' + e.message, 'err');
+      }
+    });
+  }
 
   modal.querySelector('#close-chat').addEventListener('click', () => {
     if (ACTIVE_CHAT_UNSUB) { ACTIVE_CHAT_UNSUB(); ACTIVE_CHAT_UNSUB=null; }
@@ -2111,6 +2139,9 @@ async function openNotifPanel() {
       product_approved:   '🎉',
       product_rejected:   '❌',
       admin_pending:      '⏳',
+      offer_accepted:     '✅',
+      offer_rejected:     '❌',
+      offer_revision:     '↩',
     };
 
     var listEl = panel.querySelector('#notif-list');
@@ -5945,9 +5976,11 @@ async function loadOffersWithComparison(m) {
                   <td style="padding:10px 12px;text-align:center">${statusBadge(o.status)}</td>
                   <td style="padding:10px 12px;text-align:center;white-space:nowrap">
                     ${o.status==='pending'?`
-                      <button class="btn-gr btn-sm offer-accept-btn" data-id="${o.id}" data-vemail="${o.vendorEmail||''}" data-vname="${o.vendorName||''}">Kabul</button>
-                      <button class="btn-red btn-sm offer-reject-btn" data-id="${o.id}" style="margin-left:4px">Red</button>
+                      <button class="btn-gr btn-sm offer-accept-btn" data-id="${o.id}" data-vemail="${o.vendorEmail||''}" data-vname="${o.vendorName||''}" data-vid="${o.vendorId||''}" data-pid="${o.pocId||''}" data-pname="${o.productName||''}">Kabul</button>
+                      <button class="btn-sm offer-rev-btn" data-id="${o.id}" data-vid="${o.vendorId||''}" data-vname="${o.vendorName||''}" data-pid="${o.pocId||''}" data-pname="${o.productName||''}" style="margin-left:4px;background:rgba(240,164,41,.12);color:#d97706;border:1px solid rgba(240,164,41,.3);border-radius:5px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">↩ Revizyon</button>
+                      <button class="btn-red btn-sm offer-reject-btn" data-id="${o.id}" data-vid="${o.vendorId||''}" style="margin-left:4px">Red</button>
                     `:'—'}
+                    <button class="btn-g btn-sm cust-view-offer-btn" data-id="${o.id}" style="margin-left:4px;font-size:11px">Detay</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -5977,20 +6010,94 @@ async function loadOffersWithComparison(m) {
 
     m.innerHTML = html;
 
+    // ── Kabul ──────────────────────────────────────────────────────
     m.querySelectorAll('.offer-accept-btn').forEach(b => b.addEventListener('click', async () => {
       if (!confirm('Bu teklifi kabul etmek istiyor musunuz?')) return;
-      await updateDoc(doc(db,'offers',b.dataset.id), {status:'accepted'});
-      showToast('Teklif kabul edildi!');
+      await updateDoc(doc(db,'offers',b.dataset.id), {
+        status:'accepted', respondedAt:serverTimestamp()
+      });
+      // Vendor panel bildirimi
+      if (b.dataset.vid) {
+        try {
+          await addDoc(collection(db,'notifications'), {
+            userId: b.dataset.vid, type:'offer_accepted',
+            title: 'Teklifiniz Kabul Edildi! 🎉',
+            message: (CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Müşteri') +
+              ' "' + (b.dataset.pname||'') + '" için teklifinizi kabul etti.',
+            fromUserId: CUR_USER.uid,
+            fromName: CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email,
+            read: false, createdAt: serverTimestamp(),
+          });
+        } catch(e2) {}
+      }
       if (b.dataset.vemail) sendEmail(b.dataset.vemail, b.dataset.vname,
         'Teklifiniz Kabul Edildi! — PoCHub',
-        `${CUR_PROFILE?.displayName||CUR_USER.email} teklifinizi kabul etti.`, '');
+        (CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) + ' teklifinizi kabul etti. Ürün: ' + (b.dataset.pname||''), '');
+      showToast('Teklif kabul edildi! Satıcıya bildirim gönderildi.');
       loadCustTab();
     }));
+
+    // ── Revizyon İste ───────────────────────────────────────────────
+    m.querySelectorAll('.offer-rev-btn').forEach(b => b.addEventListener('click', async () => {
+      var note = prompt('Revizyon notunuzu yazın (opsiyonel):');
+      if (note === null) return; // iptal
+      await updateDoc(doc(db,'offers',b.dataset.id), {
+        status: 'revision_requested',
+        revisionNote: note || '',
+        respondedAt: serverTimestamp()
+      });
+      // Vendor bildirimi
+      if (b.dataset.vid) {
+        try {
+          await addDoc(collection(db,'notifications'), {
+            userId: b.dataset.vid, type:'offer_revision',
+            title: 'Teklif Revizyonu İstendi',
+            message: (CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Müşteri') +
+              ' "' + (b.dataset.pname||'') + '" teklifi için revizyon talep etti.' +
+              (note ? ' Not: ' + note : ''),
+            revisionNote: note||'',
+            fromUserId: CUR_USER.uid,
+            fromName: CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email,
+            read: false, createdAt: serverTimestamp(),
+          });
+        } catch(e2) {}
+      }
+      showToast('Revizyon talebi gönderildi.');
+      loadCustTab();
+    }));
+
+    // ── Reddet ──────────────────────────────────────────────────────
     m.querySelectorAll('.offer-reject-btn').forEach(b => b.addEventListener('click', async () => {
-      await updateDoc(doc(db,'offers',b.dataset.id), {status:'rejected'});
+      if (!confirm('Bu teklifi reddetmek istiyor musunuz?')) return;
+      await updateDoc(doc(db,'offers',b.dataset.id), {
+        status:'rejected', respondedAt:serverTimestamp()
+      });
+      // Vendor bildirimi
+      if (b.dataset.vid) {
+        try {
+          await addDoc(collection(db,'notifications'), {
+            userId: b.dataset.vid, type:'offer_rejected',
+            title: 'Teklif Reddedildi',
+            message: (CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Müşteri') +
+              ' "' + (b.dataset.pname||'') + '" teklifinizi reddetti.',
+            fromUserId: CUR_USER.uid,
+            fromName: CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email,
+            read: false, createdAt: serverTimestamp(),
+          });
+        } catch(e2) {}
+      }
       showToast('Teklif reddedildi.');
       loadCustTab();
     }));
+    // ── Müşteri detay modal ──────────────────────────────────────
+    m.querySelectorAll('.cust-view-offer-btn').forEach(b => {
+      b.addEventListener('click', async () => {
+        const oSnap = await getDoc(doc(db,'offers',b.dataset.id));
+        if (!oSnap.exists()) return;
+        openOfferDetailModal({...oSnap.data(), id:oSnap.id}, 'customer');
+      });
+    });
+
   } catch(e) {
     m.innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
   }
@@ -6241,138 +6348,108 @@ async function loadVendTab() {
 
   else if (CUR_VEND_TAB === 'offers-sent') {
     const snap = await getDocs(query(collection(db,'offers'), where('vendorId','==',CUR_USER.uid)));
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Gönderilen Teklifler</h2>
-    ${snap.empty?'<div class="empty"><div class="empty-icon">💰</div>Henüz teklif göndermediniz.</div>':
-    `<table><thead><tr><th>Ürün</th><th>Müşteri</th><th>Tutar</th><th>Kanal Payı</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>
-    ${snap.docs.map(d=>{const o={...d.data(),id:d.id};
-      return `<tr><td style="font-weight:600">${o.productName||'—'}</td><td style="color:var(--text-secondary)">${o.customerName||'—'}</td>
-      <td style="font-family:monospace;font-weight:600">${o.amount?.toLocaleString('tr-TR')} ${o.currency||'₺'}</td>
-      <td>${o.hasChannelFee?'<span style="color:#f0a429">Var</span>':'<span style="color:#22d078">Yok</span>'}</td>
-      <td>${statusBadge(o.status)}</td><td style="color:var(--text-secondary);font-size:12px">${fmt(o.createdAt)}</td></tr>`;
-    }).join('')}
-    </tbody></table>`}`;
-  }
-}
+    const offers = snap.docs.map(d => ({...d.data(), id:d.id}));
+    offers.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 
-function openSendOfferModal(pocId, customerId, customerEmail, customerName, productName, vendorType) {
-  var vtype = vendorType || CUR_PROFILE?.vendorType || '';
-  var vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
-  var vtypeLabel = vtypeLabels[vtype] || 'Vendor';
+    const statusLabel = {
+      pending:            {label:'Bekliyor',         color:'#f0a429', bg:'rgba(240,164,41,.1)'},
+      accepted:           {label:'✓ Kabul Edildi',   color:'#22d078', bg:'rgba(34,208,120,.1)'},
+      rejected:           {label:'✕ Reddedildi',     color:'#ff7070', bg:'rgba(255,112,112,.1)'},
+      revision_requested: {label:'↩ Revizyon İstendi',color:'#d97706',bg:'rgba(217,119,6,.1)'},
+    };
 
-  var modal = document.createElement('div');
-  modal.className = 'modal-bg on';
-  modal.innerHTML =
-    '<div class="modal" style="max-width:520px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
-    '<h3 style="font-size:15px;font-weight:700">Teklif Gönder</h3>' +
-    '<button id="of-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px">×</button>' +
-    '</div>' +
+    m.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h2 style="font-size:18px;font-weight:700">Gönderilen Teklifler</h2>
+        <span style="font-size:12px;color:var(--text-muted)">${offers.length} teklif</span>
+      </div>
+    `;
 
-    // Müşteri + ürün bilgisi
-    '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px 14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-    '<div><div style="font-size:11px;color:#5a6278">Müşteri</div><div style="font-size:13px;font-weight:600">'+(customerName||customerEmail)+'</div></div>' +
-    '<div><div style="font-size:11px;color:#5a6278">Ürün</div><div style="font-size:13px;font-weight:600">'+(productName||'—')+'</div></div>' +
-    '</div>' +
+    if (!offers.length) {
+      m.innerHTML += '<div class="empty"><div class="empty-icon">💰</div>Henüz teklif göndermediniz.</div>';
+      return;
+    }
 
-    // Teklif tipi — kanal yapısı
-    '<label class="lbl">Teklif Tipi *</label>' +
-    '<select class="inp" id="of-type">' +
-    '<option value="distributor">Distribütör Teklifi</option>' +
-    '<option value="integrator">Entegratör Teklifi</option>' +
-    '<option value="direct">Doğrudan Üretici Teklifi</option>' +
-    '<option value="enterprise">Enterprise Anlaşma Kapsamı</option>' +
-    '</select>' +
+    const listEl = document.createElement('div');
+    listEl.style.cssText = 'display:flex;flex-direction:column;gap:10px';
 
-    // Faturalama
-    '<label class="lbl">Faturalama *</label>' +
-    '<select class="inp" id="of-billing">' +
-    '<option value="local_distributor">Türkiye Distribütörü Üzerinden</option>' +
-    '<option value="local_integrator">Entegratör Üzerinden</option>' +
-    '<option value="direct_vendor">Doğrudan Üretici</option>' +
-    '<option value="local_reseller">Yetkili Bayi Üzerinden</option>' +
-    '</select>' +
+    offers.forEach(o => {
+      const st = statusLabel[o.status] || {label:o.status, color:'#7c87a0', bg:'rgba(124,135,160,.1)'};
+      const card = document.createElement('div');
+      card.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;position:relative';
 
-    // Tutar + Para birimi
-    '<div class="g2">' +
-    '<div><label class="lbl">Teklif Tutarı *</label><input class="inp" id="of-amount" type="number" min="0" placeholder="0"></div>' +
-    '<div><label class="lbl">Para Birimi</label>' +
-    '<select class="inp" id="of-currency">' +
-    '<option value="TRY">₺ TRY</option>' +
-    '<option value="USD">$ USD</option>' +
-    '<option value="EUR">€ EUR</option>' +
-    '</select></div>' +
-    '</div>' +
+      // Revizyon notu varsa göster
+      const revNote = o.revisionNote ? `
+        <div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:6px;padding:8px 12px;margin-top:10px;font-size:12px;color:#d97706">
+          <b>Revizyon Notu:</b> ${o.revisionNote}
+        </div>` : '';
 
-    // Geçerlilik + Kanal payı
-    '<div class="g2">' +
-    '<div><label class="lbl">Geçerlilik Süresi</label>' +
-    '<select class="inp" id="of-validity">' +
-    '<option value="30">30 Gün</option>' +
-    '<option value="60">60 Gün</option>' +
-    '<option value="90">90 Gün</option>' +
-    '<option value="0">Süresiz</option>' +
-    '</select></div>' +
-    '<div><label class="lbl">Kanal Payı</label>' +
-    '<select class="inp" id="of-channel">' +
-    '<option value="no">Yok</option>' +
-    '<option value="yes">Var</option>' +
-    '</select></div>' +
-    '</div>' +
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
+          <div>
+            <div style="font-size:14px;font-weight:700">${o.productName||'—'}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">
+              Müşteri: <b>${o.customerName||o.customerEmail||'—'}</b>
+            </div>
+          </div>
+          <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;color:${st.color};background:${st.bg}">
+            ${st.label}
+          </span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+          <div style="background:var(--bg-elevated);border-radius:6px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Toplam Tutar</div>
+            <div style="font-size:14px;font-weight:700;color:var(--color-primary)">${(o.totalAmount||0).toLocaleString('tr-TR')} ${o.currency||'₺'}</div>
+          </div>
+          <div style="background:var(--bg-elevated);border-radius:6px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Teklif Tipi</div>
+            <div style="font-size:12px;font-weight:600">${o.offerTypeLabel||o.offerType||'—'}</div>
+          </div>
+          <div style="background:var(--bg-elevated);border-radius:6px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Geçerlilik</div>
+            <div style="font-size:12px;font-weight:600">${o.validDays ? o.validDays + ' gün' : (o.validUntil||'—')}</div>
+          </div>
+        </div>
+        ${revNote}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+          <div style="font-size:11px;color:var(--text-muted)">${o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('tr-TR') : '—'}</div>
+          <div style="display:flex;gap:6px">
+            ${o.status === 'revision_requested' ? `
+              <button class="btn-p btn-sm resend-offer-btn" data-id="${o.id}"
+                data-pocid="${o.pocId||''}" data-custid="${o.customerId||''}"
+                data-custemail="${o.customerEmail||''}" data-custname="${o.customerName||''}"
+                data-pname="${o.productName||''}"
+                style="font-size:12px">✏ Revize Et & Gönder</button>` : ''}
+            <button class="btn-g btn-sm view-offer-btn" data-id="${o.id}" style="font-size:12px">Detay</button>
+          </div>
+        </div>
+      `;
+      listEl.appendChild(card);
+    });
 
-    // Teslimat & Kurulum
-    '<label class="lbl">Teslimat & Kurulum</label>' +
-    '<select class="inp" id="of-delivery">' +
-    '<option value="included">Kurulum Dahil</option>' +
-    '<option value="excluded">Kurulum Hariç</option>' +
-    '<option value="optional">Opsiyonel (Ücretli)</option>' +
-    '</select>' +
+    m.appendChild(listEl);
 
-    // BTK / Sertifikasyon
-    '<label class="lbl">BTK / Sertifikasyon Notu</label>' +
-    '<input class="inp" id="of-cert" placeholder="Örn: BTK onaylı, CC EAL4+, FIPS 140-2...">' +
+    // Revize et & gönder
+    m.querySelectorAll('.resend-offer-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        openSendOfferModal(
+          b.dataset.pocid, b.dataset.custid,
+          b.dataset.custemail, b.dataset.custname,
+          b.dataset.pname
+        );
+      });
+    });
 
-    // Garanti
-    '<label class="lbl">Garanti</label>' +
-    '<input class="inp" id="of-warranty" placeholder="Örn: 3 yıl yerinde garanti">' +
-
-    // Teknik destek
-    '<label class="lbl">Teknik Destek</label>' +
-    '<select class="inp" id="of-support">' +
-    '<option value="8x5">8x5 (İş Günleri)</option>' +
-    '<option value="7x24">7x24</option>' +
-    '<option value="nbd">Next Business Day</option>' +
-    '<option value="none">Yok</option>' +
-    '</select>' +
-
-    // Notlar
-    '<label class="lbl">Ek Notlar / Açıklama</label>' +
-    '<textarea class="inp" id="of-notes" rows="3" style="resize:none" placeholder="Lisans modeli, ödeme planı, özel koşullar..."></textarea>' +
-
-    '<div id="of-err" style="margin-top:10px"></div>' +
-    '<button class="btn-p" id="of-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Teklifi Gönder</button>' +
-    '</div>';
-
-  document.body.appendChild(modal);
-  modal.querySelector('#of-close').addEventListener('click', function(){modal.remove();});
-  modal.addEventListener('click', function(e){if(e.target===modal)modal.remove();});
-
-  // Teklif tipi değişince faturalama önerisini güncelle
-  modal.querySelector('#of-type').addEventListener('change', function() {
-    var billing = modal.querySelector('#of-billing');
-    var type = this.value;
-    if (type==='direct') billing.value='direct_vendor';
-    else if (type==='integrator') billing.value='local_integrator';
-    else if (type==='enterprise') billing.value='direct_vendor';
-    else billing.value='local_distributor';
-  });
-
-  // Vendor tipine göre varsayılan seç
-  if (vtype==='ureticid') {
-    modal.querySelector('#of-type').value='direct';
-    modal.querySelector('#of-billing').value='direct_vendor';
-  } else if (vtype==='integrator') {
-    modal.querySelector('#of-type').value='integrator';
-    modal.querySelector('#of-billing').value='local_integrator';
+    // Detay modal
+    m.querySelectorAll('.view-offer-btn').forEach(b => {
+      b.addEventListener('click', async () => {
+        const oSnap = await getDoc(doc(db,'offers',b.dataset.id));
+        if (!oSnap.exists()) return;
+        const o = {...oSnap.data(), id:oSnap.id};
+        openOfferDetailModal(o, 'vendor');
+      });
+    });
+  
   }
 
   modal.querySelector('#of-submit').addEventListener('click', async function() {
@@ -7992,7 +8069,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.20</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.21</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -8900,4 +8977,98 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 
 </body>
-</html>
+</html>// ══════════════════════════════════════════════════════
+// TEKLİF DETAY MODAL — vendor ve müşteri için
+// ══════════════════════════════════════════════════════
+function openOfferDetailModal(o, viewerRole) {
+  const statusLabel = {
+    pending:            {label:'Bekliyor',            color:'#f0a429'},
+    accepted:           {label:'✓ Kabul Edildi',      color:'#22d078'},
+    rejected:           {label:'✕ Reddedildi',        color:'#ff7070'},
+    revision_requested: {label:'↩ Revizyon İstendi',  color:'#d97706'},
+  };
+  const st = statusLabel[o.status] || {label:o.status, color:'#7c87a0'};
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:500px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div>
+          <h3 style="font-size:15px;font-weight:700">Teklif Detayı</h3>
+          <span style="font-size:12px;font-weight:700;color:${st.color}">${st.label}</span>
+        </div>
+        <button id="od-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px">×</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Ürün / Hizmet</div>
+          <div style="font-size:13px;font-weight:700">${o.productName||'—'}</div>
+        </div>
+        <div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Teklif Tipi</div>
+          <div style="font-size:13px;font-weight:600">${o.offerTypeLabel||o.offerType||'—'}</div>
+        </div>
+        <div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">${viewerRole==='vendor'?'Müşteri':'Satıcı'}</div>
+          <div style="font-size:13px;font-weight:600">${viewerRole==='vendor'?(o.customerName||o.customerEmail||'—'):(o.vendorName||'—')}</div>
+        </div>
+        <div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Geçerlilik</div>
+          <div style="font-size:13px;font-weight:600">${o.validDays ? o.validDays + ' gün' : (o.validUntil||'—')}</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:12px;color:var(--text-secondary)">Birim Fiyat × Adet</div>
+          <div style="font-size:12px;color:var(--text-secondary)">${(o.unitPrice||0).toLocaleString('tr-TR')} × ${o.quantity||1}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:14px;font-weight:700">Toplam Tutar</div>
+          <div style="font-size:20px;font-weight:800;color:var(--color-primary)">${(o.totalAmount||0).toLocaleString('tr-TR')} ${o.currency||'₺'}</div>
+        </div>
+        ${o.discount ? `<div style="font-size:11px;color:#22d078;margin-top:4px">İskonto: %${o.discount}</div>` : ''}
+      </div>
+
+      ${o.notes ? `
+        <div style="background:var(--bg-elevated);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.6">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;font-weight:600">NOTLAR</div>
+          ${o.notes}
+        </div>` : ''}
+
+      ${o.revisionNote ? `
+        <div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#d97706">
+          <div style="font-size:10px;font-weight:700;margin-bottom:4px">REVİZYON NOTU</div>
+          ${o.revisionNote}
+        </div>` : ''}
+
+      <div style="font-size:11px;color:var(--text-muted);text-align:right">
+        Gönderilme: ${o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}
+        ${o.respondedAt?.toDate ? ' · Yanıt: ' + o.respondedAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}) : ''}
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="od-close2" class="btn-g" style="flex:1">Kapat</button>
+        ${viewerRole==='vendor' && o.status==='revision_requested' ? `
+          <button id="od-revise" class="btn-p" style="flex:2">✏ Revize Et & Gönder</button>` : ''}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector('#od-close').onclick  = () => modal.remove();
+  modal.querySelector('#od-close2').onclick = () => modal.remove();
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+
+  const revBtn = modal.querySelector('#od-revise');
+  if (revBtn) {
+    revBtn.addEventListener('click', () => {
+      modal.remove();
+      openSendOfferModal(o.pocId, o.customerId, o.customerEmail, o.customerName, o.productName);
+    });
+  }
+}
+
+window.openOfferDetailModal = openOfferDetailModal;
+
+
