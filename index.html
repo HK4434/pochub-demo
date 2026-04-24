@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.30';
+const VERSION = 'v4.30.1';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -6370,6 +6370,45 @@ async function loadOffersWithComparison(m) {
 }
 
 
+function renderVendor() {
+  if (!CUR_USER && !window._authResolved) {
+    el('scr-vendor').innerHTML = '<div class="wrap"><div class="empty"><div class="empty-icon">⏳</div>Yükleniyor...</div></div>';
+    setTimeout(() => renderVendor(), 600);
+    return;
+  }
+  document.body.className = 'role-vendor';
+  if (!CUR_USER || CUR_PROFILE?.role !== 'vendor') {
+    el('scr-vendor').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme vendor hesabıyla giriş yapın.</div></div>`;
+    return;
+  }
+  if (el('vend-main')) { loadVendTab(); return; }
+  const vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+  const vtypeLabel = vtypeLabels[CUR_PROFILE.vendorType]||'Vendor';
+  const tabs = [
+    ['dashboard','Dashboard'],['requests','PoC Talepleri'],['calendar','Takvim'],
+    ['products','Ürünlerim'],['portfolio','Portföyüm'],
+    ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','💰 Tekliflerim'],['messages','💬 Mesajlar'],
+  ];
+  el('scr-vendor').innerHTML = `<div class="dash">
+    <div class="sbar">
+      <div class="role-tag" style="background:rgba(59,124,255,.08);border:1px solid rgba(59,124,255,.18)">
+        <span style="color:#7db4ff">${vtypeLabel}</span>
+      </div>
+      <div class="slbl">Vendor Paneli</div>
+      ${tabs.map(([t,l])=>`<button class="si${CUR_VEND_TAB===t?' on':''}" data-t="${t}" id="vtab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
+      <div style="border-top:1px solid rgba(255,255,255,.08);margin-top:10px;padding-top:10px">
+        <button class="btn-p btn-sm" style="width:100%;margin-bottom:6px" id="v-add-product">+ Ürün Ekle</button>
+        <button class="btn-g btn-sm" style="width:100%" id="v-add-event">+ Etkinlik Oluştur</button>
+      </div>
+    </div>
+    <div class="main-content" id="vend-main"></div>
+  </div>`;
+  tabs.forEach(([t]) => el('vtab-'+t)?.addEventListener('click', () => { CUR_VEND_TAB=t; loadVendTab(); el('scr-vendor').querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t===t)); }));
+  el('v-add-product')?.addEventListener('click', function(){ openAddProductModal(); });
+  el('v-add-event')?.addEventListener('click', openNewEventModal);
+  loadVendTab();
+}
+
 async function loadVendTab() {
   LAST_SYNC_TIME = Date.now();
   const m = el('vend-main');
@@ -8973,7 +9012,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.30</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">${VERSION}</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
