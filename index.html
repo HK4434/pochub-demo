@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.21</title>
+<title>PoCHub.co — v4.22</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.21';
+const VERSION = 'v4.22';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -1364,7 +1364,7 @@ function publishStatusBadge(ps, origin, distCount, intCount) {
   };
   const [bg,col,lbl] = badges[ps] || ['#1c1f2a','#7c87a0', ps];
   const chain = origin === 'foreign'
-    ? ` <small style="color:#94a3b8">(${distCount||0} dist / ${intCount||0} int)</small>`
+    ? ' <small style="color:#94a3b8">(' + (distCount||0) + ' dist / ' + (intCount||0) + ' int)</small>'
     : '';
   return `<span class="status-badge" style="background:${bg};color:${col}">${lbl}${chain}</span>`;
 }
@@ -1550,7 +1550,7 @@ async function loadMessagesTab(m, role) {
       header.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px">
           <h2 style="font-size:18px;font-weight:700">💬 Mesajlar</h2>
-          ${totalUnread > 0 ? `<span style="background:#3b7cff;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${totalUnread} okunmamış</span>` : ''}
+          ${totalUnread > 0 ? '<span style="background:#3b7cff;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">' + totalUnread + ' okunmamış</span>' : ''}
         </div>
         <button id="msg-mark-all-read" style="background:none;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;padding:5px 12px;border-radius:5px;cursor:pointer">Tümünü Okundu İşaretle</button>
       `;
@@ -1607,7 +1607,23 @@ async function loadMessagesTab(m, role) {
 
       // Tümünü okundu
       m.querySelector('#msg-mark-all-read').addEventListener('click', async () => {
-        showToast('Tüm mesajlar okundu olarak işaretlendi.');
+        // Okunmamış bildirimleri Firestore'da okundu yap
+        try {
+          const unreadSnap = await getDocs(query(
+            collection(db,'notifications'),
+            where('userId','==',CUR_USER.uid),
+            where('read','==',false)
+          ));
+          const batch_promises = unreadSnap.docs.map(d =>
+            updateDoc(d.ref, {read: true})
+          );
+          await Promise.all(batch_promises);
+          NOTIF_COUNT = 0;
+          updateNotifBadge();
+          showToast('Tüm bildirimler okundu olarak işaretlendi.');
+        } catch(e) {
+          showToast('İşaretleme hatası: ' + e.message, 'err');
+        }
         render(activeTab, searchVal, filterVal);
       });
 
@@ -1674,7 +1690,7 @@ async function loadMessagesTab(m, role) {
               <span style="font-size:10px;color:var(--text-muted)">${msgInfo.total} mesaj</span>
             </div>
           </div>
-          ${msgInfo.unread > 0 ? `<div style="min-width:20px;height:20px;border-radius:10px;background:#3b7cff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${msgInfo.unread}</div>` : ''}
+          ${msgInfo.unread > 0 ? '<div style="min-width:20px;height:20px;border-radius:10px;background:#3b7cff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">' + msgInfo.unread + '</div>' : ''}
         `;
 
         // Tıklama — chat aç
@@ -1778,7 +1794,7 @@ function openChatModal(pocId, pocTitle, otherName) {
         <div style="font-size:12px;color:rgba(59,124,255,.9);font-weight:600;margin-top:2px">💬 ${otherName||'Karşı Taraf'} ile</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        ${CUR_PROFILE?.role === 'vendor' ? `<button id="chat-send-offer" style="background:rgba(59,124,255,.2);color:#7db4ff;border:1px solid rgba(59,124,255,.3);border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:600;cursor:pointer">💰 Teklif Gönder</button>` : ''}
+        ${CUR_PROFILE?.role === 'vendor' ? '<button id="chat-send-offer" style="background:rgba(59,124,255,.2);color:#7db4ff;border:1px solid rgba(59,124,255,.3);border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:600;cursor:pointer">💰 Teklif Gönder</button>' : ''}
         <button id="close-chat" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:20px">×</button>
       </div>
     </div>
@@ -4080,7 +4096,7 @@ async function loadEventsList() {
           <div style="font-size:15px;font-weight:700;margin-bottom:5px">${e.language ? '<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff;margin-right:4px">'+langLabel(e.language)+'</span>' : ''}${escHtml(cleanTitle(e.title))}</div>
           <div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:5px">${e.vendorName||'—'} · ${e.productName||'—'}</div>
           <div style="font-size:12px;color:#5a6278">📅 ${date}${e.location?' · 📍 '+e.location:''}</div>
-          ${e.description ? `<p style="font-size:12.5px;color:#9ca3af;margin-top:8px;line-height:1.6">${e.description}</p>` : ''}
+          ${e.description ? '<p style="font-size:12.5px;color:#9ca3af;margin-top:8px;line-height:1.6">' + e.description + '</p>' : ''}
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:12px;color:${spots<=0?'#ff7070':spots<=5?'#f0a429':'#22d078'};margin-bottom:8px;font-weight:600">${spots<=0?'Dolu':spots+' yer kaldı'}</div>
@@ -4250,7 +4266,7 @@ async function loadCatalog() {
       <div style="font-size:14.5px;font-weight:700;margin-bottom:3px">${p.name}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="font-size:12px;color:#7c87a0">${p.vendorName||'—'}</div>
-        ${p.avgRating ? `<div style="font-size:11.5px;color:#f59e0b;font-weight:600">&#11088; ${p.avgRating.toFixed(1)} <span style="color:var(--text-muted);font-weight:400">(${p.ratingCount||0})</span></div>` : ''}
+        ${p.avgRating ? '<div style="font-size:11.5px;color:#f59e0b;font-weight:600">&#11088; ' + p.avgRating.toFixed(1) + ' <span style="color:var(--text-muted);font-weight:400">(' + (p.ratingCount||0) + ')</span></div>' : ''}
       </div>
       <p style="font-size:12px;color:#9ca3af;line-height:1.5;flex:1;margin-bottom:12px">${p.description||''}</p>
       ${p.specs?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${
@@ -4368,7 +4384,7 @@ async function vendDistributorProducts(m) {
               ${myProds.map(p => {
                 const intCount = (p.integrators||[]).length;
                 const badge = intCount > 0
-                  ? `<span class="bdg" style="background:rgba(22,163,74,.1);color:#16a34a">\${intCount} entegratör</span>`
+                  ? '<span class="bdg" style="background:rgba(22,163,74,.1);color:#16a34a">' + intCount + ' entegratör</span>'
                   : `<span class="bdg" style="background:rgba(220,38,38,.1);color:#dc2626">Atanmadı</span>`;
                 const pubBadge = p.publishStatus === 'ready'
                   ? '<span class="bdg" style="background:rgba(22,163,74,.1);color:#16a34a">Hazır</span>'
@@ -6312,8 +6328,8 @@ async function loadVendTab() {
         <td>${statusBadge(e.status)}</td>
         <td style="white-space:nowrap">
           <button class="btn-g btn-sm vev-attendees" data-id="${e.id}" data-title="${(e.title||'').replace(/"/g,'')}" style="font-size:11.5px;margin-right:4px">👥 ${e.registeredCount||0}</button>
-          ${canEdit ? `<button class="btn-g btn-sm vev-edit" data-id="${e.id}" style="font-size:11.5px;margin-right:4px">✏️ Düzenle</button>` : ''}
-          ${canEdit ? `<button class="btn-red btn-sm vev-cancel" data-id="${e.id}" data-title="${(e.title||'').replace(/"/g,'')}" data-count="${e.registeredCount||0}" style="font-size:11.5px">✕ İptal</button>` : ''}
+          ${canEdit ? '<button class="btn-g btn-sm vev-edit" data-id="' + e.id + '" style="font-size:11.5px;margin-right:4px">✏️ Düzenle</button>' : ''}
+          ${canEdit ? '<button class="btn-red btn-sm vev-cancel" data-id="' + e.id + '" data-title="' + (e.title||'').replace(/"/g,'') + '" data-count="' + (e.registeredCount||0) + '" style="font-size:11.5px">✕ İptal</button>' : ''}
         </td>
       </tr>`;
     }).join('')}
@@ -6379,10 +6395,9 @@ async function loadVendTab() {
       card.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;position:relative';
 
       // Revizyon notu varsa göster
-      const revNote = o.revisionNote ? `
-        <div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:6px;padding:8px 12px;margin-top:10px;font-size:12px;color:#d97706">
-          <b>Revizyon Notu:</b> ${o.revisionNote}
-        </div>` : '';
+            const revNote = o.revisionNote
+        ? '<div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:6px;padding:8px 12px;margin-top:10px;font-size:12px;color:#d97706"><b>Revizyon Notu:</b> ' + o.revisionNote + '</div>'
+        : '';
 
       card.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
@@ -6414,12 +6429,13 @@ async function loadVendTab() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
           <div style="font-size:11px;color:var(--text-muted)">${o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('tr-TR') : '—'}</div>
           <div style="display:flex;gap:6px">
-            ${o.status === 'revision_requested' ? `
-              <button class="btn-p btn-sm resend-offer-btn" data-id="${o.id}"
-                data-pocid="${o.pocId||''}" data-custid="${o.customerId||''}"
-                data-custemail="${o.customerEmail||''}" data-custname="${o.customerName||''}"
-                data-pname="${o.productName||''}"
-                style="font-size:12px">✏ Revize Et & Gönder</button>` : ''}
+            ${o.status === 'revision_requested' ?
+              '<button class="btn-p btn-sm resend-offer-btn" data-id="' + o.id + '"' +
+              ' data-pocid="' + (o.pocId||'') + '" data-custid="' + (o.customerId||'') + '"' +
+              ' data-custemail="' + (o.customerEmail||'') + '" data-custname="' + (o.customerName||'') + '"' +
+              ' data-pname="' + (o.productName||'') + '"' +
+              ' style="font-size:12px">✏ Revize Et & Gönder</button>'
+              : ''}
             <button class="btn-g btn-sm view-offer-btn" data-id="${o.id}" style="font-size:12px">Detay</button>
           </div>
         </div>
@@ -8069,7 +8085,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.21</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.22</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -9028,20 +9044,12 @@ function openOfferDetailModal(o, viewerRole) {
           <div style="font-size:14px;font-weight:700">Toplam Tutar</div>
           <div style="font-size:20px;font-weight:800;color:var(--color-primary)">${(o.totalAmount||0).toLocaleString('tr-TR')} ${o.currency||'₺'}</div>
         </div>
-        ${o.discount ? `<div style="font-size:11px;color:#22d078;margin-top:4px">İskonto: %${o.discount}</div>` : ''}
+        ${o.discount ? '<div style="font-size:11px;color:#22d078;margin-top:4px">İskonto: %' + o.discount + '</div>' : ''}
       </div>
 
-      ${o.notes ? `
-        <div style="background:var(--bg-elevated);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.6">
-          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;font-weight:600">NOTLAR</div>
-          ${o.notes}
-        </div>` : ''}
+      ${o.notes ? '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.6"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;font-weight:600">NOTLAR</div>' + o.notes + '</div>' : ''}
 
-      ${o.revisionNote ? `
-        <div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#d97706">
-          <div style="font-size:10px;font-weight:700;margin-bottom:4px">REVİZYON NOTU</div>
-          ${o.revisionNote}
-        </div>` : ''}
+      ${o.revisionNote ? '<div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#d97706"><div style="font-size:10px;font-weight:700;margin-bottom:4px">REVİZYON NOTU</div>' + o.revisionNote + '</div>' : ''}
 
       <div style="font-size:11px;color:var(--text-muted);text-align:right">
         Gönderilme: ${o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}
@@ -9050,8 +9058,7 @@ function openOfferDetailModal(o, viewerRole) {
 
       <div style="display:flex;gap:8px;margin-top:16px">
         <button id="od-close2" class="btn-g" style="flex:1">Kapat</button>
-        ${viewerRole==='vendor' && o.status==='revision_requested' ? `
-          <button id="od-revise" class="btn-p" style="flex:2">✏ Revize Et & Gönder</button>` : ''}
+        ${viewerRole==='vendor' && o.status==='revision_requested' ? '<button id="od-revise" class="btn-p" style="flex:2">✏ Revize Et & Gönder</button>' : ''}
       </div>
     </div>
   `;
