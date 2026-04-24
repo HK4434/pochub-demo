@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.27.6</title>
+<title>PoCHub.co — v4.28</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.27.6';
+const VERSION = 'v4.28';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -2066,6 +2066,8 @@ let CUR_PROFILE = null;
 let CUR_SCREEN = 'home';
 let CUR_CUST_TAB = 'dashboard';
 let CUR_VEND_TAB = 'dashboard';
+let LAST_SYNC_TIME = Date.now();
+const STALE_THRESHOLD = 5 * 60 * 1000;
 let CUR_EV_PERIOD = 'upcoming'; // Etkinlikler dönem filtresi
 let CUR_ADM_TAB = 'dashboard';
 
@@ -2357,7 +2359,27 @@ function buildNav() {
           🔔 <span id="notif-badge" style="display:none;background:#ff4d4d;color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;margin-left:2px"></span>
         </button>
       </div>
+      <button class="btn-g btn-sm" id="sync-btn" title="Verileri yenile" style="padding:6px 10px">🔄</button>
       <button class="btn-g btn-sm" id="logout-btn">Çıkış</button>`;
+    el('sync-btn').addEventListener('click', async () => {
+      const btn = el('sync-btn');
+      btn.textContent = '⏳';
+      btn.disabled = true;
+      try {
+        LAST_SYNC_TIME = Date.now();
+        if      (CUR_SCREEN === 'customer') { await loadCustTab(); }
+        else if (CUR_SCREEN === 'vendor')   { await loadVendTab(); }
+        else if (CUR_SCREEN === 'admin')    { await loadAdmTab(); }
+        else if (CUR_SCREEN === 'catalog')  { await renderCatalog(); }
+        showToast('Veriler yenilendi ✓');
+      } catch(e) {
+        showToast('Yenileme hatası: ' + e.message, 'err');
+      } finally {
+        btn.textContent = '🔄';
+        btn.disabled = false;
+      }
+    });
+
     el('logout-btn').addEventListener('click', async () => {
       stopNotifListener();
       document.body.className = '';
@@ -2414,6 +2436,15 @@ function cleanTitle(s) {
 }
 
 function go(s) {
+  // Stale check — 5 dakika geçtiyse sync butonunu vurgula
+  if (Date.now() - LAST_SYNC_TIME > STALE_THRESHOLD) {
+    const syncBtn = el('sync-btn');
+    if (syncBtn) {
+      syncBtn.style.background = 'rgba(240,164,41,.2)';
+      syncBtn.style.borderColor = 'rgba(240,164,41,.5)';
+      syncBtn.title = 'Veriler eski olabilir — Yenilemek için tıklayın';
+    }
+  }
   CUR_SCREEN = s;
   buildNav();
   renderScreen(s);
@@ -5150,6 +5181,7 @@ async function custInvites(m) {
         }
         showToast('Davet kabul edildi!');
         loadCustTab();
+        if (el('scr-vendor')?.classList.contains('on')) loadVendTab();
       });
     });
     m.querySelectorAll('.ci-decline').forEach(function(btn) {
@@ -5877,6 +5909,7 @@ function renderCustomer() {
 }
 
 async function loadCustTab() {
+  LAST_SYNC_TIME = Date.now();
   const m = el('cust-main');
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
@@ -6086,6 +6119,7 @@ async function loadOffersWithComparison(m) {
         (CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) + ' teklifinizi kabul etti. Ürün: ' + (b.dataset.pname||''), '');
       showToast('Teklif kabul edildi! Satıcıya bildirim gönderildi.');
       loadCustTab();
+      if (el('scr-vendor')?.classList.contains('on')) loadVendTab();
     }));
 
     // ── Revizyon İste ───────────────────────────────────────────────
@@ -6139,6 +6173,7 @@ async function loadOffersWithComparison(m) {
       }
       showToast('Teklif reddedildi.');
       loadCustTab();
+      if (el('scr-vendor')?.classList.contains('on')) loadVendTab();
     }));
     // ── Müşteri detay modal ──────────────────────────────────────
     m.querySelectorAll('.cust-view-offer-btn').forEach(b => {
@@ -6211,6 +6246,7 @@ function renderVendor() {
 }
 
 async function loadVendTab() {
+  LAST_SYNC_TIME = Date.now();
   const m = el('vend-main');
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
@@ -6336,6 +6372,8 @@ async function loadVendTab() {
             (CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Vendor') + ' talibinizi kabul etti. Pochub.co panelinden detayları görebilirsiniz.', '');
           showToast('PoC talebi kabul edildi!');
           loadVendTab();
+          // Müşteri paneli açıksa onu da yenile
+          if (el('scr-customer')?.classList.contains('on')) loadCustTab();
         });
       });
       m.querySelectorAll('.vr-reject').forEach(function(b) {
@@ -8804,12 +8842,13 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
+    ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.27.6</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.28</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -8832,6 +8871,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'requests')   { await admRequests(m);   return; }
     if (CUR_ADM_TAB === 'events')     { await admEvents(m);     return; }
     if (CUR_ADM_TAB === 'offers')     { await admOffers(m);     return; }
+  if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
 
     // DASHBOARD
     const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap] = await Promise.all([
@@ -9412,6 +9452,255 @@ async function admEvents(m) {
     b.className='btn-p btn-sm ev-pf'; pFilter=b.dataset.p; applyFilter();
   });});
 }
+
+// ══════════════════════════════════════════════════════
+// ADMİN VERİ SAĞLIK PANELİ
+// ══════════════════════════════════════════════════════
+async function admDataHealth(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Veri sağlığı analiz ediliyor...</div>';
+  try {
+    const [
+      productsSnap, pocsSnap, offersSnap,
+      invitesSnap, notifsSnap, usersSnap
+    ] = await Promise.all([
+      getDocs(collection(db,'products')),
+      getDocs(collection(db,'poc_requests')),
+      getDocs(collection(db,'offers')),
+      getDocs(collection(db,'poc_invites')),
+      getDocs(collection(db,'notifications')),
+      getDocs(collection(db,'users')),
+    ]);
+
+    const products  = productsSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    const pocs      = pocsSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    const offers    = offersSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    const invites   = invitesSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    const notifs    = notifsSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    const users     = usersSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+
+    const now = Date.now();
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+    // Kontrol 1: publishStatus:ready ama status:active değil
+    var orphanProducts = products.filter(function(p) {
+      return p.publishStatus === 'ready' && p.status !== 'active';
+    });
+
+    // Kontrol 2: awaiting_admin'de 7 günden fazla bekleyen ürünler
+    var staleAdminApproval = products.filter(function(p) {
+      if (p.publishStatus !== 'awaiting_admin') return false;
+      var ts = p.createdAt?.toDate ? p.createdAt.toDate().getTime() : 0;
+      return ts && (now - ts) > 7 * 24 * 60 * 60 * 1000;
+    });
+
+    // Kontrol 3: Aktif PoC'lerde 30 günden fazla teklif yok
+    var activePocNoOffer = pocs.filter(function(p) {
+      if (p.status !== 'active') return false;
+      var ts = p.createdAt?.toDate ? p.createdAt.toDate().getTime() : 0;
+      if (!ts || (now - ts) < THIRTY_DAYS) return false;
+      return !offers.some(function(o){ return o.pocId === p.id; });
+    });
+
+    // Kontrol 4: Süresi geçmiş davetler (30 gün+) hâlâ pending
+    var expiredInvites = invites.filter(function(inv) {
+      if (inv.status !== 'pending') return false;
+      var ts = inv.createdAt?.toDate ? inv.createdAt.toDate().getTime() : 0;
+      return ts && (now - ts) > THIRTY_DAYS;
+    });
+
+    // Kontrol 5: Test kayıtları
+    var testRecords = {
+      pocs:    pocs.filter(function(p){ return p.isTestRecord; }).length,
+      offers:  offers.filter(function(o){ return o.isTestRecord; }).length,
+      notifs:  notifs.filter(function(n){ return n.isTestRecord; }).length,
+      invites: invites.filter(function(i){ return i.isTestRecord; }).length,
+    };
+    var totalTest = testRecords.pocs + testRecords.offers + testRecords.notifs + testRecords.invites;
+
+    // Kontrol 6: Okunmamış bildirim sayısı kullanıcı başına
+    var unreadByUser = {};
+    notifs.forEach(function(n) {
+      if (!n.read && n.userId) {
+        unreadByUser[n.userId] = (unreadByUser[n.userId]||0) + 1;
+      }
+    });
+    var highUnread = Object.entries(unreadByUser)
+      .filter(function(e){ return e[1] > 20; })
+      .map(function(e) {
+        var u = users.find(function(u){ return u.id === e[0]; });
+        return {email: u?.email||e[0], count: e[1]};
+      });
+
+    // ── UI ─────────────────────────────────────────────────
+    m.innerHTML = '';
+
+    // Başlık
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px';
+    header.innerHTML =
+      '<h2 style="font-size:18px;font-weight:700">🩺 Veri Sağlık Paneli</h2>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button id="health-refresh" class="btn-g btn-sm">🔄 Yenile</button>' +
+      (totalTest > 0 ? '<button id="health-clean-test" class="btn-red btn-sm">🗑 Test Kayıtlarını Temizle (' + totalTest + ')</button>' : '') +
+      (expiredInvites.length > 0 ? '<button id="health-expire-invites" class="btn-sm" style="background:rgba(240,164,41,.12);color:#f0a429;border:1px solid rgba(240,164,41,.3)">⏰ Süresi Dolmuş Davetleri Kapat (' + expiredInvites.length + ')</button>' : '') +
+      '</div>';
+    m.appendChild(header);
+
+    // Özet istatistikler
+    var statsGrid = document.createElement('div');
+    statsGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px';
+    var statItems = [
+      {val:users.length,    lbl:'Kullanıcılar',    color:'#7db4ff'},
+      {val:products.filter(function(p){return p.status==='active';}).length, lbl:'Aktif Ürünler', color:'#22d078'},
+      {val:pocs.filter(function(p){return p.status==='active';}).length, lbl:'Aktif PoC', color:'#f0a429'},
+      {val:offers.filter(function(o){return o.status==='pending';}).length, lbl:'Bekleyen Teklif', color:'#c4a8ff'},
+      {val:invites.filter(function(i){return i.status==='pending';}).length, lbl:'Bekleyen Davet', color:'#7db4ff'},
+      {val:notifs.filter(function(n){return !n.read;}).length, lbl:'Okunmamış Bildirim', color:'#ff7070'},
+    ];
+    statsGrid.innerHTML = statItems.map(function(s) {
+      return '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center">' +
+        '<div style="font-size:22px;font-weight:800;color:' + s.color + ';font-family:monospace">' + s.val + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + s.lbl + '</div>' +
+        '</div>';
+    }).join('');
+    m.appendChild(statsGrid);
+
+    // Sorunlar
+    var issues = [
+      {title:'publishStatus:ready ama status:active değil', items:orphanProducts, color:'#ff7070',
+       render:function(p){ return p.name + ' (' + p.id.substring(0,10) + '...)'; },
+       action:'fix-orphan', actionLabel:'Düzelt (active yap)'},
+      {title:'Admin onayında 7+ gün bekleyen ürünler', items:staleAdminApproval, color:'#f0a429',
+       render:function(p){ return p.name + ' — ' + Math.round((now - (p.createdAt?.toDate?.().getTime()||0)) / 86400000) + ' gün'; }},
+      {title:'Aktif PoC\u2019de 30+ gun teklif yok', items:activePocNoOffer, color:'#f0a429',
+       render:function(p){ return (p.productName||'?') + ' — ' + (p.customerName||'?'); }},
+      {title:'Süresi dolmuş bekleyen davetler (30+ gün)', items:expiredInvites, color:'#ff7070',
+       render:function(inv){ return (inv.customerEmail||'?') + ' — ' + (inv.productName||'?'); }},
+    ];
+
+    issues.forEach(function(issue) {
+      if (!issue.items.length) return;
+      var section = document.createElement('div');
+      section.style.cssText = 'background:var(--bg-surface);border:1px solid rgba(' + (issue.color==='#ff7070'?'220,38,38':'240,164,41') + ',.2);border-radius:10px;padding:16px;margin-bottom:12px';
+      section.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<div style="font-size:13px;font-weight:700;color:' + issue.color + '">' +
+        '⚠ ' + issue.title + ' <span style="font-size:11px;background:' + issue.color + '18;padding:2px 7px;border-radius:10px">' + issue.items.length + '</span>' +
+        '</div></div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px">' +
+        issue.items.slice(0,5).map(function(item) {
+          return '<div style="font-size:12px;color:var(--text-secondary);padding:4px 8px;background:rgba(255,255,255,.03);border-radius:4px">' +
+            issue.render(item) + '</div>';
+        }).join('') +
+        (issue.items.length > 5 ? '<div style="font-size:11px;color:var(--text-muted)">...ve ' + (issue.items.length-5) + ' tane daha</div>' : '') +
+        '</div>';
+      m.appendChild(section);
+    });
+
+    // Test kayıtları
+    if (totalTest > 0) {
+      var testSection = document.createElement('div');
+      testSection.style.cssText = 'background:var(--bg-surface);border:1px solid rgba(240,164,41,.2);border-radius:10px;padding:16px;margin-bottom:12px';
+      testSection.innerHTML =
+        '<div style="font-size:13px;font-weight:700;color:#f0a429;margin-bottom:10px">🧪 Test Kayıtları (isTestRecord:true)</div>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+        Object.entries(testRecords).filter(function(e){ return e[1]>0; }).map(function(e) {
+          return '<span style="background:rgba(240,164,41,.1);color:#f0a429;font-size:12px;padding:3px 10px;border-radius:6px">' + e[0] + ': ' + e[1] + '</span>';
+        }).join('') +
+        '</div>';
+      m.appendChild(testSection);
+    }
+
+    // Yüksek okunmamış bildirim
+    if (highUnread.length > 0) {
+      var notifSection = document.createElement('div');
+      notifSection.style.cssText = 'background:var(--bg-surface);border:1px solid rgba(220,38,38,.2);border-radius:10px;padding:16px;margin-bottom:12px';
+      notifSection.innerHTML =
+        '<div style="font-size:13px;font-weight:700;color:#ff7070;margin-bottom:10px">📬 Yüksek Okunmamış Bildirim (20+)</div>' +
+        highUnread.map(function(u) {
+          return '<div style="font-size:12px;color:var(--text-secondary)">' + u.email + ': <b style="color:#ff7070">' + u.count + '</b> okunmamış</div>';
+        }).join('');
+      m.appendChild(notifSection);
+    }
+
+    // Sorun yoksa
+    if (orphanProducts.length + staleAdminApproval.length + activePocNoOffer.length + expiredInvites.length === 0 && totalTest === 0) {
+      var okDiv = document.createElement('div');
+      okDiv.style.cssText = 'background:rgba(34,208,120,.08);border:1px solid rgba(34,208,120,.2);border-radius:10px;padding:20px;text-align:center';
+      okDiv.innerHTML = '<div style="font-size:24px;margin-bottom:8px">✅</div><div style="font-size:14px;font-weight:700;color:#22d078">Tüm veriler tutarlı görünüyor</div>';
+      m.appendChild(okDiv);
+    }
+
+    // Son sync
+    var syncInfo = document.createElement('div');
+    syncInfo.style.cssText = 'font-size:11px;color:var(--text-muted);text-align:right;margin-top:12px';
+    syncInfo.textContent = 'Son analiz: ' + new Date().toLocaleTimeString('tr-TR');
+    m.appendChild(syncInfo);
+
+    // Eventler
+    m.querySelector('#health-refresh')?.addEventListener('click', function() { admDataHealth(m); });
+
+    var cleanBtn = m.querySelector('#health-clean-test');
+    if (cleanBtn) {
+      cleanBtn.addEventListener('click', async function() {
+        if (!confirm(totalTest + ' test kaydını silmek istiyor musunuz?')) return;
+        cleanBtn.disabled = true; cleanBtn.textContent = 'Siliniyor...';
+        var deleted = 0;
+        var colsToClean = [
+          {snap:pocsSnap,    col:'poc_requests'},
+          {snap:offersSnap,  col:'offers'},
+          {snap:notifsSnap,  col:'notifications'},
+          {snap:invitesSnap, col:'poc_invites'},
+        ];
+        for (var ci = 0; ci < colsToClean.length; ci++) {
+          var colInfo = colsToClean[ci];
+          for (var di = 0; di < colInfo.snap.docs.length; di++) {
+            var d2 = colInfo.snap.docs[di];
+            if (d2.data().isTestRecord) {
+              try { await deleteDoc(d2.ref); deleted++; } catch(e2) {}
+            }
+          }
+        }
+        showToast(deleted + ' test kaydı silindi.');
+        admDataHealth(m);
+      });
+    }
+
+    var expireBtn = m.querySelector('#health-expire-invites');
+    if (expireBtn) {
+      expireBtn.addEventListener('click', async function() {
+        if (!confirm(expiredInvites.length + ' süresi dolmuş daveti "expired" yapacaksınız. Onaylıyor musunuz?')) return;
+        expireBtn.disabled = true;
+        for (var ei = 0; ei < expiredInvites.length; ei++) {
+          try {
+            await updateDoc(doc(db,'poc_invites',expiredInvites[ei].id), {status:'expired'});
+          } catch(e3) {}
+        }
+        showToast(expiredInvites.length + ' davet expired yapıldı.');
+        admDataHealth(m);
+      });
+    }
+
+    // Orphan ürün fix butonu
+    var fixOrphanBtn = m.querySelector('#fix-orphan');
+    if (fixOrphanBtn) {
+      fixOrphanBtn.addEventListener('click', async function() {
+        if (!confirm(orphanProducts.length + ' ürünü active yapacaksınız?')) return;
+        for (var oi = 0; oi < orphanProducts.length; oi++) {
+          try {
+            await updateDoc(doc(db,'products',orphanProducts[oi].id), {status:'active'});
+          } catch(e4) {}
+        }
+        showToast(orphanProducts.length + ' ürün active yapıldı.');
+        admDataHealth(m);
+      });
+    }
+
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Analiz hatası: ' + e.message + '</div>';
+  }
+}
+
 
 async function admOffers(m) {
   const snap = await getDocs(collection(db,'offers'));
