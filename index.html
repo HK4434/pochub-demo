@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.27.3</title>
+<title>PoCHub.co — v4.27.4</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.27.3';
+const VERSION = 'v4.27.4';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -6812,6 +6812,9 @@ async function loadVendTab() {
         billingModel:  billingModel,
         billingLabel:  billingLabels[billingModel]||billingModel,
         amount:        amount,
+        unitPrice:     amount,
+        quantity:      1,
+        totalAmount:   amount,
         currency:      currency,
         currencySymbol:currencySymbols[currency]||'₺',
         hasChannelFee: hasChannelFee,
@@ -6835,17 +6838,23 @@ async function loadVendTab() {
         );
       }
 
-      // PoC durumunu offer_sent yap
-      await updateDoc(doc(db,'poc_requests',pocId), {
-        status: 'offer_sent',
-        offerSentAt: serverTimestamp(),
-      });
+      // PoC durumunu offer_sent yap — pocId varsa
+      if (pocId) {
+        try {
+          await updateDoc(doc(db,'poc_requests',pocId), {
+            status: 'offer_sent',
+            offerSentAt: serverTimestamp(),
+          });
+        } catch(e2) {}
+      }
 
       modal.remove();
       showToast('Teklif gönderildi!');
       loadVendTab();
     } catch(e) {
-      errDiv.innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      var msg = (e && e.message) ? e.message : String(e);
+      errDiv.textContent = 'Hata: ' + msg;
+      showToast('Teklif gönderilemedi: ' + msg, 'err');
       btn.disabled=false; btn.textContent='Teklifi Gönder';
     }
   });
@@ -8800,7 +8809,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.27.3</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.27.4</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -9690,6 +9699,7 @@ function openCatModal(existing) {
 }
 
 function openSendOfferModal(pocId, customerId, customerEmail, customerName, productName, vendorType) {
+  if (!CUR_USER) { showToast('Oturum açmanız gerekiyor.', 'err'); return; }
   var vtype = vendorType || CUR_PROFILE?.vendorType || '';
   var vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
   var vtypeLabel = vtypeLabels[vtype] || 'Vendor';
@@ -9783,7 +9793,7 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
     '<label class="lbl">Ek Notlar / Açıklama</label>' +
     '<textarea class="inp" id="of-notes" rows="3" style="resize:none" placeholder="Lisans modeli, ödeme planı, özel koşullar..."></textarea>' +
 
-    '<div id="of-err" style="margin-top:10px"></div>' +
+    '<div id="of-err" style="margin-top:10px;font-size:13px;color:#ff7070;min-height:20px"></div>' +
     '<button class="btn-p" id="of-submit" style="width:100%;padding:12px;font-size:14px;margin-top:14px">Teklifi Gönder</button>' +
     '</div>';
 
@@ -9858,6 +9868,9 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
         billingModel:  billingModel,
         billingLabel:  billingLabels[billingModel]||billingModel,
         amount:        amount,
+        unitPrice:     amount,
+        quantity:      1,
+        totalAmount:   amount,
         currency:      currency,
         currencySymbol:currencySymbols[currency]||'₺',
         hasChannelFee: hasChannelFee,
@@ -9881,17 +9894,23 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
         );
       }
 
-      // PoC durumunu offer_sent yap
-      await updateDoc(doc(db,'poc_requests',pocId), {
-        status: 'offer_sent',
-        offerSentAt: serverTimestamp(),
-      });
+      // PoC durumunu offer_sent yap — pocId varsa
+      if (pocId) {
+        try {
+          await updateDoc(doc(db,'poc_requests',pocId), {
+            status: 'offer_sent',
+            offerSentAt: serverTimestamp(),
+          });
+        } catch(e2) {}
+      }
 
       modal.remove();
       showToast('Teklif gönderildi!');
       loadVendTab();
     } catch(e) {
-      errDiv.innerHTML='<div class="alert alert-err">'+e.message+'</div>';
+      var msg = (e && e.message) ? e.message : String(e);
+      errDiv.textContent = 'Hata: ' + msg;
+      showToast('Teklif gönderilemedi: ' + msg, 'err');
       btn.disabled=false; btn.textContent='Teklifi Gönder';
     }
   });
