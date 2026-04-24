@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.22</title>
+<title>PoCHub.co — v4.23</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.22';
+const VERSION = 'v4.23';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -6735,181 +6735,288 @@ async function vendInvites(m) {
   });
 }
 
-async function openSendInviteModal() {
-  // Vendor'ın ürünlerini + portföyünü çek
-  var [ownSnap, portSnap] = await Promise.all([
-    getDocs(query(collection(db,'products'), where('vendorId','==',CUR_USER.uid), where('status','==','active'))),
-    getDocs(query(collection(db,'vendor_products'), where('vendorId','==',CUR_USER.uid), where('status','==','active'))),
-  ]);
-  var products = [
-    ...ownSnap.docs.map(d=>({...d.data(),id:d.id,_src:'own'})),
-    ...portSnap.docs.map(d=>({...d.data(),id:d.id,_src:'port',name:d.data().productName})),
-  ];
 
-  var modal = document.createElement('div');
+async function openSendInviteModal() {
+  if (!CUR_USER || CUR_PROFILE?.role !== 'vendor') {
+    showToast('Bu özellik yalnızca vendor hesapları için geçerlidir.', 'err');
+    return;
+  }
+
+  const isPremium = CUR_PROFILE?.premium === true;
+  const DAILY_LIMIT = 5;
+
+  // Bugün gönderilen davet sayısı
+  let todayCount = 0;
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  try {
+    const tSnap = await getDocs(query(collection(db,'poc_invites'), where('vendorId','==',CUR_USER.uid)));
+    todayCount = tSnap.docs.filter(d => {
+      const ts = d.data().createdAt?.toDate?.();
+      return ts && ts >= todayStart;
+    }).length;
+  } catch(e) {}
+
+  // Vendor ürünleri
+  let products = [];
+  try {
+    const pSnap = await getDocs(query(collection(db,'products'), where('vendorId','==',CUR_USER.uid), where('status','==','active')));
+    products = pSnap.docs.map(d=>({...d.data(),id:d.id}));
+  } catch(e) {}
+
+  // Kayıtlı müşteriler
+  let allCustomers = [];
+  try {
+    const cSnap = await getDocs(query(collection(db,'users'), where('role','==','customer')));
+    allCustomers = cSnap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e) {}
+
+  const modal = document.createElement('div');
   modal.className = 'modal-bg on';
+
+  // Premium/ücretsiz plan bilgisi
+  const planInfo = isPremium
+    ? '<div style="margin-top:12px;background:rgba(34,208,120,.08);border:1px solid rgba(34,208,120,.2);border-radius:8px;padding:9px 13px;display:flex;align-items:center;justify-content:space-between"><div style="font-size:12px;color:#22d078">✓ Premium — Sınırsız davet gönderimi</div><span style="font-size:10px;background:rgba(34,208,120,.15);color:#22d078;padding:2px 8px;border-radius:10px;font-weight:700">PREMİUM</span></div>'
+    : '<div style="margin-top:12px;background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:9px 13px;display:flex;align-items:center;justify-content:space-between"><div style="font-size:12px;color:#f0a429">⚡ Ücretsiz plan: Bugün <b>' + todayCount + '/' + DAILY_LIMIT + '</b> davet gönderildi</div><span style="font-size:10px;background:rgba(240,164,41,.15);color:#f0a429;padding:2px 8px;border-radius:10px;font-weight:700">ÜCRETSİZ</span></div>';
+
+  // Tüm müşteriler butonu
+  const allCustBtn = isPremium
+    ? '<button id="inv-all-customers" style="background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:5px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">★ Tüm Kayıtlı Müşteriler (' + allCustomers.length + ')</button>'
+    : '<span style="font-size:11px;color:rgba(255,255,255,.35)">Premium ile tüm müşterilere gönderin</span>';
+
+  // Ürün options
+  const prodOptions = products.map(function(p) {
+    return '<option value="' + p.id + '" data-name="' + (p.name||'').replace(/"/g,'') + '" data-cat="' + (p.category||'') + '">' + p.name + ' (' + (p.category||'—') + ')</option>';
+  }).join('');
+
+  // Müşteri datalist
+  const custOptions = allCustomers.map(function(u) {
+    return '<option value="' + u.email + '">' + (u.company||u.displayName||'') + ' — ' + u.email + '</option>';
+  }).join('');
+
   modal.innerHTML =
-    '<div class="modal" style="max-width:500px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
-    '<h3 style="font-size:15px;font-weight:700">PoC Daveti Gönder</h3>' +
-    '<button id="inv-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px">×</button>' +
+    '<div class="modal" style="max-width:600px;background:#0f1623;border:1px solid rgba(59,124,255,.2);padding:0;max-height:90vh;display:flex;flex-direction:column">' +
+
+    // Başlık
+    '<div style="padding:18px 22px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+    '<div><div style="font-size:15px;font-weight:700;color:#fff">PoC Daveti Gönder</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px">Müşterileri ürününüzü test etmeye davet edin</div></div>' +
+    '<button id="inv-close" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:20px">×</button>' +
+    '</div>' + planInfo + '</div>' +
+
+    // Form
+    '<div style="flex:1;overflow-y:auto;padding:18px 22px">' +
+
+    // Ürün
+    '<label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">Davet Edilecek Ürün <span style="color:#ff7070">*</span></label>' +
+    '<select id="inv-product" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px;margin-bottom:14px">' +
+    '<option value="">Ürün seçin...</option>' + prodOptions + '</select>' +
+
+    // PoC Detayları
+    '<div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.15);border-radius:8px;padding:14px;margin-bottom:14px">' +
+    '<div style="font-size:11px;font-weight:700;color:#7db4ff;letter-spacing:.6px;margin-bottom:12px">POC DETAYLARI</div>' +
+
+    '<label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">PoC Kapsamı / Ne Test Edilecek?</label>' +
+    '<textarea id="inv-scope" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px;resize:vertical;margin-bottom:10px" rows="2" placeholder="Örn: Firewall performans testi, 1000 kullanıcı simülasyonu..."></textarea>' +
+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+    '<div><label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">Tahmini Süre</label>' +
+    '<select id="inv-duration" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px">' +
+    '<option value="1 Saat">1 Saat</option><option value="2 Saat" selected>2 Saat</option>' +
+    '<option value="Yarım Gün">Yarım Gün</option><option value="1 Gün">1 Gün</option>' +
+    '<option value="1 Hafta">1 Hafta</option><option value="Müzakereye Açık">Müzakereye Açık</option>' +
+    '</select></div>' +
+    '<div><label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">Lokasyon Tercihi</label>' +
+    '<select id="inv-location" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px">' +
+    '<option value="online">Online / Uzaktan</option><option value="customer">Müşteri Lokasyonu</option>' +
+    '<option value="vendor">Vendor Lokasyonu</option><option value="hybrid">Hibrit</option>' +
+    '</select></div></div>' +
+
+    '<label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">Özel Mesaj / Davet Notu</label>' +
+    '<textarea id="inv-message" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px;resize:vertical" rows="3" placeholder="Müşteriye iletmek istediğiniz özel notlar..."></textarea>' +
     '</div>' +
 
-    '<label class="lbl">Müşteri E-posta Adresi *</label>' +
-    '<input class="inp" id="inv-email" type="email" placeholder="musteri@firma.com">' +
-    '<div id="inv-user-check" style="font-size:12px;margin:4px 0 8px;height:16px"></div>' +
+    // Alıcılar
+    '<div style="margin-bottom:14px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+    '<label style="font-size:12px;color:rgba(255,255,255,.65);font-weight:600">Davet Edilecekler <span style="color:#ff7070">*</span></label>' +
+    allCustBtn + '</div>' +
+    '<div id="inv-tags-display" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>' +
+    '<input id="inv-email-inp" list="inv-customer-list"' +
+    ' style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px"' +
+    ' placeholder="E-posta yazın — ; veya Enter ile ekleyin">' +
+    '<datalist id="inv-customer-list">' + custOptions + '</datalist>' +
+    '<div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:5px">Birden fazla kişi için noktalı virgül (;) kullanın.' +
+    (isPremium ? '' : ' Kalan limit: ' + (DAILY_LIMIT - todayCount) + ' davet.') + '</div>' +
+    '</div>' +
 
-    '<label class="lbl">Müşteri Adı / Şirket</label>' +
-    '<input class="inp" id="inv-name" placeholder="Ali Yılmaz / ABC Teknoloji">' +
+    '<div id="inv-err" style="font-size:12.5px;color:#ff7070;margin-bottom:8px"></div>' +
+    '</div>' + // form sonu
 
-    '<label class="lbl">İlgili Ürün *</label>' +
-    '<select class="inp" id="inv-product">' +
-    '<option value="">Ürün seçin...</option>' +
-    products.map(function(p) {
-      var src = p._src==='port'?' (Portföy)':'';
-      return '<option value="'+p.id+'" data-name="'+(p.name||p.productName||'')+'" data-cat="'+(p.category||p.productCategory||'')+'">'+( p.name||p.productName||'—')+src+'</option>';
-    }).join('') +
-    '</select>' +
-
-    '<label class="lbl">Davet Mesajı *</label>' +
-    '<textarea class="inp" id="inv-msg" rows="4" style="resize:none" placeholder="Merhaba, sizi ürünümüzü ücretsiz test etmeye davet ediyoruz..."></textarea>' +
-
-    '<label class="lbl">PoC Konumu</label>' +
-    '<select class="inp" id="inv-loc">' +
-    '<option value="online">Online</option>' +
-    '<option value="customer">Müşteri Lokasyonu</option>' +
-    '<option value="vendor">Vendor Lokasyonu</option>' +
-    '<option value="hybrid">Hibrit</option>' +
-    '</select>' +
-
-    '<div id="inv-err" style="margin-top:8px"></div>' +
-    '<button class="btn-p" id="inv-submit" style="width:100%;padding:11px;font-size:14px;margin-top:14px">Daveti Gönder</button>' +
+    // Alt bar
+    '<div style="padding:14px 22px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:8px;flex-shrink:0">' +
+    '<button id="inv-cancel-btn" style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:600;cursor:pointer">Vazgeç</button>' +
+    '<button id="inv-submit" style="flex:2;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:600;cursor:pointer">📨 Davetleri Gönder</button>' +
+    '</div>' +
     '</div>';
 
   document.body.appendChild(modal);
-  modal.querySelector('#inv-close').addEventListener('click', ()=>modal.remove());
-  modal.addEventListener('click', e=>{if(e.target===modal)modal.remove();});
+  modal.querySelector('#inv-close').onclick      = () => modal.remove();
+  modal.querySelector('#inv-cancel-btn').onclick = () => modal.remove();
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
 
-  // E-posta yazılınca kullanıcı kayıtlı mı kontrol et
-  var checkTimer = null;
-  modal.querySelector('#inv-email').addEventListener('input', function() {
-    clearTimeout(checkTimer);
-    var checkEl = modal.querySelector('#inv-user-check');
-    var email = this.value.trim().toLowerCase();
-    if (!email || !email.includes('@')) { checkEl.innerHTML=''; return; }
-    checkEl.innerHTML = '<span style="color:#5a6278">Kontrol ediliyor...</span>';
-    checkTimer = setTimeout(async function() {
-      try {
-        var usersSnap = await getDocs(query(collection(db,'users'), where('email','==',email)));
-        if (!usersSnap.empty) {
-          var u = usersSnap.docs[0].data();
-          if (u.role === 'vendor' || u.role === 'admin' || u.role === 'moderator' || u.role === 'support') {
-            checkEl.innerHTML = '<span style="color:#ff7070">✗ Bu kullanıcı müşteri değil ('+getRolePerm(u.role).label+'). Davet sadece müşterilere gönderilebilir.</span>';
-            modal.querySelector('#inv-submit').disabled = true;
-          } else {
-            checkEl.innerHTML = '<span style="color:#22d078">✓ Kayıtlı müşteri — '+(u.displayName||u.company||u.email)+'</span>';
-            if (u.displayName||u.company) modal.querySelector('#inv-name').value = u.displayName||u.company;
-            modal.querySelector('#inv-submit').disabled = false;
-          }
-        } else {
-          checkEl.innerHTML = '<span style="color:#f0a429">⚠ Kayıtlı değil — davet maili gönderilecek</span>';
-          modal.querySelector('#inv-submit').disabled = false;
-        }
-      } catch(e) { checkEl.innerHTML=''; }
-    }, 600);
-  });
+  // ── Alıcı tag sistemi ─────────────────────────────────────────
+  var recipients = [];
 
-  modal.querySelector('#inv-submit').addEventListener('click', async function() {
-    var email = modal.querySelector('#inv-email').value.trim().toLowerCase();
-    var name  = modal.querySelector('#inv-name').value.trim();
-    var prodSel = modal.querySelector('#inv-product');
-    var prodId = prodSel.value;
-    var prodOpt = prodSel.options[prodSel.selectedIndex];
-    var prodName = prodOpt?.dataset?.name || prodOpt?.text || '';
-    var prodCat  = prodOpt?.dataset?.cat  || '';
-    var msg   = modal.querySelector('#inv-msg').value.trim();
-    var loc   = modal.querySelector('#inv-loc').value;
-    var errDiv = modal.querySelector('#inv-err');
-
-    if (!email || !email.includes('@')) { errDiv.innerHTML='<div class="alert alert-err">Geçerli e-posta girin.</div>'; return; }
-    if (!prodId) { errDiv.innerHTML='<div class="alert alert-err">Ürün seçin.</div>'; return; }
-    if (!msg) { errDiv.innerHTML='<div class="alert alert-err">Mesaj zorunludur.</div>'; return; }
-    if (email === CUR_USER.email) { errDiv.innerHTML='<div class="alert alert-err">Kendinize davet gönderemezsiniz.</div>'; return; }
-
-    var btn = modal.querySelector('#inv-submit');
-    btn.disabled=true; btn.textContent='Gönderiliyor...';
-
-    try {
-      // Daha önce bekleyen davet var mı?
-      var existSnap = await getDocs(query(collection(db,'poc_invites'),
-        where('vendorId','==',CUR_USER.uid),
-        where('customerEmail','==',email),
-        where('status','==','pending')
-      ));
-      if (!existSnap.empty) {
-        errDiv.innerHTML='<div class="alert alert-err">Bu müşteriye zaten bekleyen bir davetiniz var.</div>';
-        btn.disabled=false; btn.textContent='Daveti Gönder'; return;
-      }
-
-      // Kullanıcı kayıtlı mı?
-      var usersSnap = await getDocs(query(collection(db,'users'), where('email','==',email)));
-      var isRegistered = !usersSnap.empty;
-      var customerId = isRegistered ? usersSnap.docs[0].id : null;
-
-      // Davet kaydı oluştur
-      var inviteRef = await addDoc(collection(db,'poc_invites'), {
-        vendorId:    CUR_USER.uid,
-        vendorName:  CUR_PROFILE?.displayName||CUR_USER.email,
-        vendorEmail: CUR_USER.email,
-        vendorType:  CUR_PROFILE?.vendorType||'',
-        vendorCompany: CUR_PROFILE?.company||'',
-        customerEmail: email,
-        customerName:  name,
-        customerId:    customerId,
-        productId:     prodId,
-        productName:   prodName,
-        productCategory: prodCat,
-        message:       msg,
-        location:      loc,
-        status:        'pending',
-        isRegistered:  isRegistered,
-        createdAt:     serverTimestamp(),
-        expiresAt:     new Date(Date.now() + 30*24*60*60*1000), // 30 gün
+  function renderTags() {
+    var tagsEl = modal.querySelector('#inv-tags-display');
+    tagsEl.innerHTML = recipients.map(function(r, i) {
+      return '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(59,124,255,.12);border:1px solid rgba(59,124,255,.25);border-radius:20px;padding:3px 10px 3px 12px;font-size:12px;color:#7db4ff">' +
+        (r.name || r.email) +
+        '<button data-i="' + i + '" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:14px;padding:0;line-height:1">×</button>' +
+        '</span>';
+    }).join('');
+    tagsEl.querySelectorAll('button[data-i]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        recipients.splice(parseInt(btn.dataset.i), 1);
+        renderTags();
       });
+    });
+  }
 
-      // Mail gönder
-      var mailSubject = isRegistered ?
-        'Size PoC Daveti Var — PoCHub' :
-        'PoCHub Platformuna Davet Edildiniz';
+  function addEmails(raw) {
+    var parts = raw.split(/[;,\n]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    var added = 0;
+    for (var i = 0; i < parts.length; i++) {
+      var emailMatch = parts[i].match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+      if (!emailMatch) continue;
+      var email = emailMatch[0].toLowerCase();
+      if (recipients.some(function(r){ return r.email === email; })) continue;
+      var found = allCustomers.find(function(u){ return u.email === email; });
+      recipients.push({ email: email, name: found ? (found.company || found.displayName || '') : '', uid: found ? found.id : '' });
+      added++;
+    }
+    return added;
+  }
 
-            var mailBody = isRegistered ? (CUR_PROFILE?.displayName||CUR_USER.email)+' size '+prodName+' icin PoC daveti gonderdi. '+msg : (CUR_PROFILE?.displayName||CUR_USER.email)+' sizi PoCHub platformuna davet etti. '+msg+' pochub.co';
-
-      sendEmail(email, name||email, mailSubject, mailBody, '');
-
-      // Kayıtlı kullanıcıysa Firestore bildirim de ekle
-      if (customerId) {
-        await addDoc(collection(db,'notifications'), {
-          userId: customerId,
-          type: 'poc_invite',
-          title: 'Yeni PoC Daveti',
-          body: (CUR_PROFILE?.displayName||CUR_USER.email)+' sizi "'+prodName+'" için PoC sürecine davet etti.',
-          inviteId: inviteRef.id,
-          vendorName: CUR_PROFILE?.displayName||CUR_USER.email,
-          read: false,
-          createdAt: serverTimestamp()
-        });
-      }
-
-      modal.remove();
-      showToast('Davet gönderildi! '+( isRegistered ? 'Kullanıcı bildirim aldı.' : 'Kayıt daveti maili gönderildi.'));
-      CUR_VEND_TAB = 'invites';
-      loadVendTab();
-    } catch(e) {
-      errDiv.innerHTML='<div class="alert alert-err">'+e.message+'</div>';
-      btn.disabled=false; btn.textContent='Daveti Gönder';
+  var emailInp = modal.querySelector('#inv-email-inp');
+  emailInp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ';') {
+      e.preventDefault();
+      var added = addEmails(emailInp.value);
+      if (added > 0) { emailInp.value = ''; renderTags(); }
     }
   });
+  emailInp.addEventListener('blur', function() {
+    if (emailInp.value.trim()) { addEmails(emailInp.value); emailInp.value = ''; renderTags(); }
+  });
+
+  // Premium: Tüm müşteriler
+  var allBtn = modal.querySelector('#inv-all-customers');
+  if (allBtn) {
+    allBtn.addEventListener('click', function() {
+      recipients = allCustomers.map(function(u) {
+        return { email: u.email, name: u.company || u.displayName || '', uid: u.id };
+      });
+      renderTags();
+      showToast(recipients.length + ' kayıtlı müşteri eklendi.');
+    });
+  }
+
+  // ── Submit ─────────────────────────────────────────────────────
+  modal.querySelector('#inv-submit').addEventListener('click', async function() {
+    var errEl = modal.querySelector('#inv-err');
+    errEl.textContent = '';
+
+    if (emailInp.value.trim()) { addEmails(emailInp.value); emailInp.value = ''; renderTags(); }
+
+    var prodSel  = modal.querySelector('#inv-product');
+    var prodId   = prodSel.value;
+    var prodOpt  = prodSel.options[prodSel.selectedIndex];
+    var prodName = prodOpt ? (prodOpt.dataset.name || '') : '';
+    var prodCat  = prodOpt ? (prodOpt.dataset.cat  || '') : '';
+    var scope    = modal.querySelector('#inv-scope').value.trim();
+    var duration = modal.querySelector('#inv-duration').value;
+    var location = modal.querySelector('#inv-location').value;
+    var message  = modal.querySelector('#inv-message').value.trim();
+
+    if (!prodId)            { errEl.textContent = 'Lütfen bir ürün seçin.'; return; }
+    if (!recipients.length) { errEl.textContent = 'En az bir alıcı ekleyin.'; return; }
+
+    if (!isPremium && (todayCount + recipients.length) > DAILY_LIMIT) {
+      errEl.textContent = 'Günlük limit aşılıyor. ' + (DAILY_LIMIT - todayCount) + ' daha gönderebilirsiniz.';
+      return;
+    }
+
+    var btn = modal.querySelector('#inv-submit');
+    btn.disabled = true; btn.textContent = 'Gönderiliyor...';
+
+    var sent = 0, failed = 0, notified = 0;
+    var locLabels = {online:'Online', customer:'Müşteri Lok.', vendor:'Vendor Lok.', hybrid:'Hibrit'};
+
+    for (var j = 0; j < recipients.length; j++) {
+      var r = recipients[j];
+      try {
+        await addDoc(collection(db,'poc_invites'), {
+          vendorId:        CUR_USER.uid,
+          vendorName:      CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email,
+          vendorEmail:     CUR_USER.email,
+          vendorType:      CUR_PROFILE?.vendorType || '',
+          vendorCompany:   CUR_PROFILE?.company || '',
+          customerEmail:   r.email,
+          customerName:    r.name || r.email,
+          customerId:      r.uid || '',
+          productId:       prodId,
+          productName:     prodName,
+          productCategory: prodCat,
+          pocScope:        scope,
+          pocDuration:     duration,
+          pocLocation:     location,
+          message:         message,
+          status: 'pending',
+          createdAt: serverTimestamp(),
+        });
+
+        if (r.uid) {
+          try {
+            await addDoc(collection(db,'notifications'), {
+              userId: r.uid, type: 'poc_invite',
+              title: 'Yeni PoC Daveti',
+              message: (CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email) +
+                ' sizi "' + prodName + '" ürünü için PoC\'e davet etti.' +
+                (scope ? ' Kapsam: ' + scope.substring(0,80) : ''),
+              fromUserId: CUR_USER.uid,
+              fromName: CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email,
+              productId: prodId, productName: prodName,
+              read: false, createdAt: serverTimestamp(),
+            });
+            notified++;
+          } catch(e2) {}
+        }
+
+        try {
+          sendEmail(r.email, r.name || r.email,
+            'PoC Daveti: ' + prodName + ' — PoCHub',
+            (CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email) +
+              ' sizi ' + prodName + ' icin bir PoC\'e davet etti.' +
+              (scope ? ' Kapsam: ' + scope : '') +
+              ' Sure: ' + duration + ' Lokasyon: ' + (locLabels[location]||location) +
+              (message ? ' Not: ' + message : '') +
+              ' pochub.co',
+            '');
+        } catch(e3) {}
+        sent++;
+      } catch(e) { failed++; }
+    }
+
+    modal.remove();
+    showToast(sent + ' davet gönderildi' +
+      (notified ? ', ' + notified + ' panel bildirimi' : '') +
+      (failed ? '. ' + failed + ' başarısız.' : '.'));
+    loadVendTab();
+  });
 }
+
 
 
 async function vendPortfolio(m) {
@@ -8085,7 +8192,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.22</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.23</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
