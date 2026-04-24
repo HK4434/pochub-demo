@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.26</title>
+<title>PoCHub.co — v4.27</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.26';
+const VERSION = 'v4.27';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -8797,7 +8797,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.26</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.27</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -9686,6 +9686,75 @@ function openCatModal(existing) {
   });
 }
 
+// ══════════════════════════════════════════════════════
+// TEKLİF DETAY MODAL — vendor ve müşteri için
+// ══════════════════════════════════════════════════════
+function openOfferDetailModal(o, viewerRole) {
+  var stMap = {
+    pending:            {label:'Bekliyor',        color:'#f0a429'},
+    accepted:           {label:'Kabul Edildi',    color:'#22d078'},
+    rejected:           {label:'Reddedildi',      color:'#ff7070'},
+    revision_requested: {label:'Revizyon Istendi',color:'#d97706'},
+  };
+  var st = stMap[o.status] || {label: o.status||'—', color:'#7c87a0'};
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+
+  var createdStr   = o.createdAt?.toDate  ? o.createdAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  var respondedStr = o.respondedAt?.toDate ? o.respondedAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}) : '';
+  var discHtml     = o.discount    ? '<div style="font-size:11px;color:#22d078;margin-top:4px">Iskonto: %' + o.discount + '</div>' : '';
+  var notesHtml    = o.notes       ? '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.6"><b style="font-size:10px;color:var(--text-muted)">NOTLAR</b><br>' + o.notes + '</div>' : '';
+  var revNoteHtml  = o.revisionNote ? '<div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#d97706"><b>REVIZYON NOTU</b><br>' + o.revisionNote + '</div>' : '';
+  var revBtnHtml   = (viewerRole === 'vendor' && o.status === 'revision_requested')
+    ? '<button id="od-revise" class="btn-p" style="flex:2">Revize Et ve Gonder</button>' : '';
+  var otherParty   = viewerRole === 'vendor' ? (o.customerName||o.customerEmail||'—') : (o.vendorName||'—');
+  var otherLabel   = viewerRole === 'vendor' ? 'Musteri' : 'Satici';
+
+  modal.innerHTML =
+    '<div class="modal" style="max-width:500px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<div><h3 style="font-size:15px;font-weight:700">Teklif Detayi</h3>' +
+    '<span style="font-size:12px;font-weight:700;color:' + st.color + '">' + st.label + '</span></div>' +
+    '<button id="od-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px">x</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">' +
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Urun</div><div style="font-size:13px;font-weight:700">' + (o.productName||'—') + '</div></div>' +
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Teklif Tipi</div><div style="font-size:13px;font-weight:600">' + (o.offerTypeLabel||o.offerType||'—') + '</div></div>' +
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">' + otherLabel + '</div><div style="font-size:13px;font-weight:600">' + otherParty + '</div></div>' +
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Gecerlilik</div><div style="font-size:13px;font-weight:600">' + (o.validDays ? o.validDays + ' gun' : (o.validUntil||'—')) + '</div></div>' +
+    '</div>' +
+    '<div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:14px;margin-bottom:14px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+    '<div style="font-size:12px;color:var(--text-secondary)">Birim Fiyat x Adet</div>' +
+    '<div style="font-size:12px;color:var(--text-secondary)">' + (o.unitPrice||0).toLocaleString('tr-TR') + ' x ' + (o.quantity||1) + '</div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+    '<div style="font-size:14px;font-weight:700">Toplam Tutar</div>' +
+    '<div style="font-size:20px;font-weight:800;color:var(--color-primary)">' + (o.totalAmount||0).toLocaleString('tr-TR') + ' ' + (o.currency||'TL') + '</div>' +
+    '</div>' + discHtml + '</div>' +
+    notesHtml + revNoteHtml +
+    '<div style="font-size:11px;color:var(--text-muted);text-align:right">' +
+    'Gonderilme: ' + createdStr + (respondedStr ? ' - Yanit: ' + respondedStr : '') +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:16px">' +
+    '<button id="od-close2" class="btn-g" style="flex:1">Kapat</button>' +
+    revBtnHtml + '</div></div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#od-close').onclick  = function() { modal.remove(); };
+  modal.querySelector('#od-close2').onclick = function() { modal.remove(); };
+  modal.addEventListener('click', function(e) { if (e.target===modal) modal.remove(); });
+  var revBtn = modal.querySelector('#od-revise');
+  if (revBtn) {
+    revBtn.addEventListener('click', function() {
+      modal.remove();
+      openSendOfferModal(o.pocId, o.customerId, o.customerEmail, o.customerName, o.productName);
+    });
+  }
+}
+window.openOfferDetailModal = openOfferDetailModal;
+
+
 // EmailJS public key — sonradan eklenecek
 window.addEventListener('DOMContentLoaded', () => {
   if (typeof emailjs !== 'undefined') {
@@ -9705,89 +9774,6 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 
 </body>
-</html>// ══════════════════════════════════════════════════════
-// TEKLİF DETAY MODAL — vendor ve müşteri için
-// ══════════════════════════════════════════════════════
-function openOfferDetailModal(o, viewerRole) {
-  const statusLabel = {
-    pending:            {label:'Bekliyor',            color:'#f0a429'},
-    accepted:           {label:'✓ Kabul Edildi',      color:'#22d078'},
-    rejected:           {label:'✕ Reddedildi',        color:'#ff7070'},
-    revision_requested: {label:'↩ Revizyon İstendi',  color:'#d97706'},
-  };
-  const st = statusLabel[o.status] || {label:o.status, color:'#7c87a0'};
-  const modal = document.createElement('div');
-  modal.className = 'modal-bg on';
-  modal.innerHTML = `
-    <div class="modal" style="max-width:500px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-        <div>
-          <h3 style="font-size:15px;font-weight:700">Teklif Detayı</h3>
-          <span style="font-size:12px;font-weight:700;color:${st.color}">${st.label}</span>
-        </div>
-        <button id="od-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px">×</button>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">
-          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Ürün / Hizmet</div>
-          <div style="font-size:13px;font-weight:700">${o.productName||'—'}</div>
-        </div>
-        <div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">
-          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Teklif Tipi</div>
-          <div style="font-size:13px;font-weight:600">${o.offerTypeLabel||o.offerType||'—'}</div>
-        </div>
-        <div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">
-          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">${viewerRole==='vendor'?'Müşteri':'Satıcı'}</div>
-          <div style="font-size:13px;font-weight:600">${viewerRole==='vendor'?(o.customerName||o.customerEmail||'—'):(o.vendorName||'—')}</div>
-        </div>
-        <div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">
-          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Geçerlilik</div>
-          <div style="font-size:13px;font-weight:600">${o.validDays ? o.validDays + ' gün' : (o.validUntil||'—')}</div>
-        </div>
-      </div>
-
-      <div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:14px;margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-size:12px;color:var(--text-secondary)">Birim Fiyat × Adet</div>
-          <div style="font-size:12px;color:var(--text-secondary)">${(o.unitPrice||0).toLocaleString('tr-TR')} × ${o.quantity||1}</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:14px;font-weight:700">Toplam Tutar</div>
-          <div style="font-size:20px;font-weight:800;color:var(--color-primary)">${(o.totalAmount||0).toLocaleString('tr-TR')} ${o.currency||'₺'}</div>
-        </div>
-        ${o.discount ? '<div style="font-size:11px;color:#22d078;margin-top:4px">İskonto: %' + o.discount + '</div>' : ''}
-      </div>
-
-      ${o.notes ? '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.6"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;font-weight:600">NOTLAR</div>' + o.notes + '</div>' : ''}
-
-      ${o.revisionNote ? '<div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#d97706"><div style="font-size:10px;font-weight:700;margin-bottom:4px">REVİZYON NOTU</div>' + o.revisionNote + '</div>' : ''}
-
-      <div style="font-size:11px;color:var(--text-muted);text-align:right">
-        Gönderilme: ${o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}
-        ${o.respondedAt?.toDate ? ' · Yanıt: ' + o.respondedAt.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}) : ''}
-      </div>
-
-      <div style="display:flex;gap:8px;margin-top:16px">
-        <button id="od-close2" class="btn-g" style="flex:1">Kapat</button>
-        ${viewerRole==='vendor' && o.status==='revision_requested' ? '<button id="od-revise" class="btn-p" style="flex:2">✏ Revize Et & Gönder</button>' : ''}
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.querySelector('#od-close').onclick  = () => modal.remove();
-  modal.querySelector('#od-close2').onclick = () => modal.remove();
-  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
-
-  const revBtn = modal.querySelector('#od-revise');
-  if (revBtn) {
-    revBtn.addEventListener('click', () => {
-      modal.remove();
-      openSendOfferModal(o.pocId, o.customerId, o.customerEmail, o.customerName, o.productName);
-    });
-  }
-}
-
-window.openOfferDetailModal = openOfferDetailModal;
+</html>
 
 
