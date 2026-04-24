@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.29';
+const VERSION = 'v4.29.1';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -8848,7 +8848,7 @@ function renderAdmin() {
     <div class="sbar">
       <div class="role-tag" style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.18)">
         <span style="color:${getRolePerm(CUR_PROFILE?.role).color}">${getRolePerm(CUR_PROFILE?.role).label}</span>
-        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.29</span>
+        <span style="font-family:monospace;font-size:10px;color:#5a6278">v4.29.1</span>
       </div>
       <div class="slbl">Admin Paneli</div>
       ${tabs.map(([t,l])=>`<button class="si${CUR_ADM_TAB===t?' on':''}" data-t="${t}" id="atab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
@@ -9360,21 +9360,20 @@ async function admProducts(m) {
       var rejectBtn  = '';
       var archiveBtn = '';
 
-      // Onayla butonu — sadece pending VE awaiting_admin ise
-      if (p.status === 'pending') {
+      var needsApproval = p.status === 'pending' ||
+        ((p.publishStatus||'awaiting_admin') === 'awaiting_admin' &&
+         p.status !== 'active' && p.status !== 'rejected' && p.status !== 'archived');
+      if (needsApproval) {
         if ((p.publishStatus||'awaiting_admin') === 'awaiting_integrator') {
           approveBtn = '<button class="btn-sm" data-id="'+p.id+'" data-ps="awaiting_integrator" style="background:rgba(255,112,112,.08);color:#ff7070;border:1px solid rgba(255,112,112,.2);border-radius:4px;padding:4px 8px;font-size:11px;cursor:default" title="Entegratör ataması bekleniyor">⛔ Zincir Eksik</button>';
         } else {
-          approveBtn = '<button class="btn-gr btn-sm ap-appr" data-id="'+p.id+
+          approveBtn = '<button class="ap-appr" data-id="'+p.id+
             '" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+
             '" data-pn="'+p.name+'" data-vid="'+(p.vendorId||'')+
-            '" style="margin-right:4px">✓ Onayla</button>';
-          rejectBtn  = '<button class="btn-red btn-sm ap-rej" data-id="'+p.id+
-            '" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+
-            '" data-pn="'+p.name+'" data-vid="'+(p.vendorId||'')+'">✕ Reddet</button>';
+            '" style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">✕ Reddet</button>';
         }
       } else if (p.status === 'active') {
-        archiveBtn = '<button class="btn-red btn-sm ap-arc" data-id="'+p.id+'">Arşivle</button>';
+        archiveBtn = '<button class="ap-arc" data-id="'+p.id+'" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">📦 Arşivle</button>';
       }
 
       return '<tr>'+
@@ -9390,11 +9389,11 @@ async function admProducts(m) {
         '<td style="font-size:11px;color:var(--text-muted)">'+dateStr+'</td>'+
         '<td style="white-space:nowrap">'+
           approveBtn + rejectBtn + archiveBtn +
-          '<button class="btn-g btn-sm ap-edit" data-id="'+p.id+'" data-name="'+p.name+
+          '<button class="ap-edit" data-id="'+p.id+'" data-name="'+p.name+
             '" data-cat="'+(p.category||'')+'" data-desc="'+(p.description||'')+
-            '" data-country="'+(p.country||'')+'" style="margin-left:4px;font-size:11px">✏</button>'+
-          (p.status!=='active'?'<button class="btn-red btn-sm ap-del" data-id="'+p.id+
-            '" data-name="'+p.name+'" style="margin-left:4px;font-size:11px">🗑</button>':'')+
+            '" data-country="'+(p.country||'')+'" style="background:rgba(59,124,255,.1);color:#7db4ff;border:1px solid rgba(59,124,255,.25);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px">✎ Düzenle</button>'+
+          (p.status!=='active'?'<button class="ap-del" data-id="'+p.id+
+            '" data-name="'+p.name+'" style="background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px">⊖ Sil</button>':'')+
         '</td></tr>';
     }).join('');
 
@@ -9529,7 +9528,7 @@ async function admProducts(m) {
     '</div>' +
 
     // Tablo
-    '<div style="overflow-x:auto">' +
+    '<div style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px">' +
     '<table><thead><tr>' +
     '<th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Ülke</th><th>Durum</th><th>Yayın</th><th>Tarih</th><th>İşlemler</th>' +
     '</tr></thead><tbody id="ap-tbody"></tbody></table>' +
