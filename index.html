@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.30.1';
+const VERSION = 'v4.31';
 
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
@@ -5265,18 +5265,53 @@ async function custInvites(m) {
         });
       });
 
-      // Mesaj
+      // Mesaj - vendor'a davet üzerinden geri bildirim
       m.querySelectorAll('.ci-message').forEach(function(btn) {
         btn.addEventListener('click', function() {
-          var row = btn.closest('.ci-actions');
-          if (!row) return;
-          var invData = invites.find(function(i){ return i.id===row.dataset.id; });
-          if (!invData || !invData.vendorId) {
-            showToast('Bu vendor ile henüz PoC bağlantısı yok.','err'); return;
-          }
-          // poc_invites üzerinden mesaj — poc_conversations'a bağlantı yok
-          // Uyarı ile bildir
-          showToast('Mesaj göndermek için PoC oluşturmanız gerekmektedir.','err');
+          var row=btn.closest('.ci-actions'); if(!row) return;
+          var inv=invites.find(function(i){return i.id===row.dataset.id;}); if(!inv) return;
+          var opts=['Tarih/sure muzakere etmek istiyorum','Lokasyon degisikligi oneriyorum','Kapsam hakkinda sorum var','Farkli bir mesaj yaz...'];
+          var dlg=document.createElement('div'); dlg.className='modal-bg on';
+          dlg.innerHTML='<div class="modal" style="max-width:420px">'
+            +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+            +'<h3 style="font-size:15px;font-weight:700">Vendor\u2019a Bildir</h3>'
+            +'<button id="im-x" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px">×</button></div>'
+            +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">'+(inv.vendorCompany||inv.vendorName||'Vendor')+' \u2014 '+(inv.productName||'')+'</div>'
+            +opts.map(function(o,i){return '<button class="im-o" data-i="'+i+'" style="width:100%;text-align:left;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:9px 12px;color:#e9ecf3;font:inherit;font-size:13px;cursor:pointer;margin-bottom:6px">'+o+'</button>';}).join('')
+            +'<textarea id="im-t" class="inp" rows="3" placeholder="Mesajinizi yazin..." style="display:none;margin-top:6px"></textarea>'
+            +'<div style="display:flex;gap:8px;margin-top:12px">'
+            +'<button id="im-c" class="btn-g btn-sm" style="flex:1">Vazgeç</button>'
+            +'<button id="im-s" class="btn-p btn-sm" style="flex:1;display:none">Gönder</button></div></div>';
+          document.body.appendChild(dlg);
+          var sel='';
+          dlg.querySelector('#im-x').onclick=function(){dlg.remove();};
+          dlg.querySelector('#im-c').onclick=function(){dlg.remove();};
+          dlg.addEventListener('click',function(e){if(e.target===dlg)dlg.remove();});
+          dlg.querySelectorAll('.im-o').forEach(function(b,idx){
+            b.addEventListener('click',function(){
+              dlg.querySelectorAll('.im-o').forEach(function(x){x.style.background='rgba(255,255,255,.05)';x.style.borderColor='rgba(255,255,255,.12)';});
+              b.style.background='rgba(59,124,255,.15)';b.style.borderColor='rgba(59,124,255,.35)';
+              if(idx===3){dlg.querySelector('#im-t').style.display='block';sel='';}
+              else{dlg.querySelector('#im-t').style.display='none';sel=opts[idx];}
+              dlg.querySelector('#im-s').style.display='block';
+            });
+          });
+          dlg.querySelector('#im-s').addEventListener('click',async function(){
+            var msg=sel||dlg.querySelector('#im-t').value.trim();
+            if(!msg){showToast('Mesaj bos olamaz','err');return;}
+            if(!inv.vendorId){showToast('Vendor bilgisi eksik','err');return;}
+            try{
+              await addDoc(collection(db,'notifications'),{
+                userId:inv.vendorId,type:'invite_message',
+                title:'Davet Hakkinda Mesaj',
+                message:(CUR_PROFILE?.company||CUR_USER.email)+': '+msg,
+                fromUserId:CUR_USER.uid,fromName:CUR_PROFILE?.company||CUR_USER.email,
+                inviteId:inv.id,productName:inv.productName||'',
+                read:false,createdAt:serverTimestamp(),
+              });
+              dlg.remove();showToast('Mesaj gonderildi!');
+            }catch(e2){showToast('Hata: '+e2.message,'err');}
+          });
         });
       });
 
@@ -6037,52 +6072,64 @@ async function loadCustTab() {
     return;
   }
   if (CUR_CUST_TAB === 'requests') {
-    const snap = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid)));
-    if (snap.empty) { m.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Henüz PoC talebiniz yok.<br><br><button class="btn-p btn-sm" onclick="go(\'catalog\')">Katalogdan PoC Başlat</button></div>'; return; }
-    m.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">PoC Taleplerim</h2>
-    <table><thead><tr><th>Ürün / Başlık</th><th>Vendor</th><th>Lokasyon</th><th>Durum</th><th>Tarih</th><th></th></tr></thead><tbody>
-    ${snap.docs.map(d=>{const r={...d.data(),id:d.id};
-      const locLabels={customer:'Müşteri Lok.',vendor:'Vendor Lok.',online:'Online',hybrid:'Hibrit'};
-      return `<tr>
-        <td><div style="font-weight:600">${r.productName||'—'}</div><div style="font-size:11.5px;color:#7c87a0">${r.title}</div></td>
-        <td style="color:var(--text-secondary)">${r.vendorName||'—'}</td>
-        <td style="color:var(--text-secondary)">${locLabels[r.location]||r.location||'—'}</td>
-        <td>${statusBadge(r.status)}</td>
-        <td style="color:var(--text-secondary);font-size:12px">${fmt(r.createdAt)}</td>
-        <td><div style="display:flex;gap:6px">
-          <button class="poc-tl-btn btn-g btn-sm" data-id="${d.id}" title="Süreç Detayı">📋 Detay</button>
-          ${r.status==='pending'?`<button class="edit-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-req="${(r.requirements||'')}" data-dates="${r.preferredDates||''}" data-loc="${r.location||'customer'}">Düzenle</button>`:''}
-          ${(r.status==='active'||r.status==='pending')?`<button class="chat-poc-btn btn-g btn-sm" data-id="${d.id}" data-title="${(r.title||'')}" data-vendor="${(r.vendorName||'')}">💬 Mesaj</button>`:''}
-          ${r.status==='pending'?`<button class="cancel-poc-btn btn-red btn-sm" data-id="${d.id}" data-title="${(r.title||r.productName||'')}" data-vemail="${(r.vendorEmail||'')}" data-vname="${(r.vendorName||'')}">İptal</button>`:''}
-        </div></td>
-      </tr>`;
-    }).join('')}
-    </tbody></table>`;
-    // İptal
-    m.querySelectorAll('.cancel-poc-btn').forEach(function(b) {
-      b.addEventListener('click', function() {
-        openPocCancelModal(b.dataset.id, b.dataset.title, b.dataset.vemail, b.dataset.vname, function() {
-          loadCustTab();
-        });
+    var rSnap = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid)));
+    var reqs = rSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    reqs.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+    var rStC={pending:'#f0a429',active:'#22d078',completed:'#7db4ff',rejected:'#ff7070',cancelled:'#5a6278'};
+    var rStL={pending:'Bekliyor',active:'Aktif',completed:'Tamamlandı',rejected:'Reddedildi',cancelled:'İptal'};
+    var renderReqs=function(q,fs){
+      var fil=reqs.filter(function(r){
+        if(fs&&r.status!==fs)return false;
+        if(q){var qq=q.toLowerCase();return (r.productName||'').toLowerCase().includes(qq)||(r.title||'').toLowerCase().includes(qq)||(r.vendorName||'').toLowerCase().includes(qq);}
+        return true;
       });
-    });
-
-    // Düzenle
-    m.querySelectorAll('.poc-tl-btn').forEach(function(btn) {
-      btn.addEventListener('click', async function() {
-        var pocId = btn.dataset.id;
-        var docSnap = await getDoc(doc(db,'poc_requests',pocId));
-        if (docSnap.exists()) openPocTimeline({...docSnap.data(), id:pocId});
+      var actCnt=reqs.filter(function(r){return r.status==='active';}).length;
+      m.innerHTML='';
+      var hdr=document.createElement('div');
+      hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
+      hdr.innerHTML='<div style="display:flex;align-items:center;gap:10px">'+'<h2 style="font-size:18px;font-weight:700">PoC Taleplerim</h2>'
+        +(actCnt?'<span style="background:#22d078;color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:12px">'+actCnt+' aktif</span>':'')
+        +'<span style="font-size:12px;color:var(--text-muted)">'+reqs.length+' talep</span></div>'
+        +'<button class="btn-p btn-sm" onclick="go(\'catalog\')">+ Katalogdan Basvur</button>';
+      m.appendChild(hdr);
+      var si=document.createElement('input');si.className='inp';si.placeholder='?? Urun, vendor veya baslik...';si.value=q||'';
+      si.style.cssText='margin-bottom:10px;font-size:13px';
+      si.addEventListener('input',function(){renderReqs(this.value,fs);});m.appendChild(si);
+      var fb=document.createElement('div');fb.style.cssText='display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
+      fb.innerHTML=[['','Tumu'],['pending','Bekliyor'],['active','Aktif'],['completed','Tamamlandi'],['rejected','Reddedildi']].map(function(p){
+        return '<button class="rqf btn-'+(fs===p[0]?'p':'g')+' btn-sm" data-v="'+p[0]+'" style="font-size:12px">'+p[1]+'</button>';
+      }).join('');m.appendChild(fb);
+      fb.querySelectorAll('.rqf').forEach(function(b){b.addEventListener('click',function(){renderReqs(si.value,b.dataset.v);});});
+      if(!fil.length){m.innerHTML+='<div class="empty"><div class="empty-icon">??</div>'+(q||fs?'Sonuc bulunamadi.':'Henuz PoC talebiniz yok.')+'</div>';return;}
+      var lst=document.createElement('div');lst.style.cssText='display:flex;flex-direction:column;gap:12px';
+      var locL={online:'?? Online',customer:'?? Musteri Lok.',vendor:'?? Vendor Lok.',hybrid:'?? Hibrit'};
+      fil.forEach(function(r){
+        var sc=rStC[r.status]||'#7c87a0',sl=rStL[r.status]||r.status;
+        var ds=r.createdAt?.toDate?r.createdAt.toDate().toLocaleDateString('tr-TR'):'--';
+        var card=document.createElement('div');
+        card.style.cssText='background:var(--bg-surface);border:1px solid '+(r.status==='active'?'rgba(59,124,255,.3)':'var(--border)')+';border-radius:12px;padding:16px';
+        card.innerHTML=
+          '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">'
+          +'<div><div style="font-size:14px;font-weight:700">'+(r.productName||r.title||'--')+'</div>'
+          +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px">'+(r.vendorName?r.vendorName+' - ':'')+ds+'</div></div>'
+          +'<span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;color:'+sc+';background:'+sc+'18">'+sl+'</span></div>'
+          +(r.scope?'<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px">'+r.scope+'</div>':'')
+          +'<div style="display:flex;gap:10px;font-size:11.5px;color:var(--text-muted);flex-wrap:wrap">'
+          +(r.location?'<span>'+(locL[r.location]||r.location)+'</span>':'')
+          +(r.duration?'<span>'+r.duration+'</span>':'')
+          +'</div>'
+          +(r.status==='active'?'<div style="margin-top:10px;display:flex;gap:8px">'
+            +'<button class="rq-msg btn-g btn-sm" data-id="'+r.id+'" data-title="'+(r.productName||r.title||'').replace(/"/g,"'")+'">Mesaj</button>'
+            +'<button class="rq-off btn-g btn-sm" data-id="'+r.id+'">Teklif Durumu</button>'
+            +'</div>':'')
+        ;
+        lst.appendChild(card);
       });
-    });
-    m.querySelectorAll('.edit-poc-btn').forEach(b => b.addEventListener('click', () => {
-      openEditPocModal(b.dataset.id, b.dataset.title, b.dataset.req, b.dataset.dates, b.dataset.loc);
-    }));
-
-    // Mesaj
-    m.querySelectorAll('.chat-poc-btn').forEach(b => b.addEventListener('click', () => {
-      openChatModal(b.dataset.id, b.dataset.title, b.dataset.vendor || 'Vendor');
-    }));
+      m.appendChild(lst);
+      lst.querySelectorAll('.rq-msg').forEach(function(b){b.addEventListener('click',function(){openChatModal(b.dataset.id,b.dataset.title,'Vendor');});});
+      lst.querySelectorAll('.rq-off').forEach(function(b){b.addEventListener('click',function(){CUR_CUST_TAB='offers';loadCustTab();});});
+    };
+    renderReqs('','');
   }
 
   else if (CUR_CUST_TAB === 'registrations') {
@@ -7051,6 +7098,15 @@ async function loadVendTab() {
       }
 
       modal.remove();
+      if (customerId) {
+        addDoc(collection(db,'notifications'),{
+          userId:customerId, type:'new_offer',
+          title:'Yeni Teklif Aldınız',
+          message:(CUR_PROFILE?.company||CUR_USER.email)+'"'+productName+'"icin teklif gonderdi.',
+          fromUserId:CUR_USER.uid, fromName:CUR_PROFILE?.company||CUR_USER.email,
+          read:false, createdAt:serverTimestamp(),
+        }).catch(function(){});
+      }
       showToast('Teklif gönderildi!');
       loadVendTab();
     } catch(e) {
@@ -10620,6 +10676,15 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
       }
 
       modal.remove();
+      if (customerId) {
+        addDoc(collection(db,'notifications'),{
+          userId:customerId, type:'new_offer',
+          title:'Yeni Teklif Aldınız',
+          message:(CUR_PROFILE?.company||CUR_USER.email)+'"'+productName+'"icin teklif gonderdi.',
+          fromUserId:CUR_USER.uid, fromName:CUR_PROFILE?.company||CUR_USER.email,
+          read:false, createdAt:serverTimestamp(),
+        }).catch(function(){});
+      }
       showToast('Teklif gönderildi!');
       loadVendTab();
     } catch(e) {
