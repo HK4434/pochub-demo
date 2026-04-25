@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.32</title>
+<title>PoCHub.co — v4.33</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.32';
+const VERSION = 'v4.33';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -1696,11 +1696,12 @@ async function loadMessagesTab(m, role) {
           await Promise.all(notifSnap.docs.map(function(d){ return updateDoc(d.ref, {read:true}); }));
           NOTIF_COUNT = 0;
           updateNotifBadge();
-          showToast('Tüm mesajlar ve bildirimler okundu işaretlendi (✓ ' + (convSnap.size + notifSnap.size) + ')');
+          showToast('✓ ' + (convSnap.size + notifSnap.size) + ' kayıt okundu işaretlendi.');
         } catch(e) {
           showToast('İşaretleme hatası: ' + e.message, 'err');
         }
-        render(activeTab, searchVal, filterVal);
+        // Mesaj listesini yeniden yükle — unread count sıfırlansın
+        await loadMessagesTab();
       });
 
       // Liste
@@ -5286,16 +5287,16 @@ async function custInvites(m) {
           var inv=invites.find(function(i){return i.id===row.dataset.id;}); if(!inv) return;
           var opts=['Tarih/sure muzakere etmek istiyorum','Lokasyon degisikligi oneriyorum','Kapsam hakkinda sorum var','Farkli bir mesaj yaz...'];
           var dlg=document.createElement('div'); dlg.className='modal-bg on';
-          dlg.innerHTML='<div class="modal" style="max-width:420px">'
+          dlg.innerHTML='<div class="modal" style="max-width:420px;background:#0f1623;border:1px solid rgba(59,124,255,.25)">'
             +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
             +'<h3 style="font-size:15px;font-weight:700">Vendor\u2019a Bildir</h3>'
             +'<button id="im-x" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px">×</button></div>'
             +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">'+(inv.vendorCompany||inv.vendorName||'Vendor')+' \u2014 '+(inv.productName||'')+'</div>'
-            +opts.map(function(o,i){return '<button class="im-o" data-i="'+i+'" style="width:100%;text-align:left;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:9px 12px;color:#e9ecf3;font:inherit;font-size:13px;cursor:pointer;margin-bottom:6px">'+o+'</button>';}).join('')
+            +opts.map(function(o,i){return '<button class="im-o" data-i="'+i+'" style="width:100%;text-align:left;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:10px 14px;color:#fff;font:inherit;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:6px">'+o+'</button>';}).join('')
             +'<textarea id="im-t" class="inp" rows="3" placeholder="Mesajinizi yazin..." style="display:none;margin-top:6px"></textarea>'
             +'<div style="display:flex;gap:8px;margin-top:12px">'
-            +'<button id="im-c" class="btn-g btn-sm" style="flex:1">Vazgeç</button>'
-            +'<button id="im-s" class="btn-p btn-sm" style="flex:1;display:none">Gönder</button></div></div>';
+            +'<button id="im-c" style="flex:1;background:rgba(255,255,255,.08);color:#e9ecf3;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:600;cursor:pointer">Vazgeç</button>'
+            +'<button id="im-s" style="flex:1;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:none">📨 Gönder</button></div></div>';
           document.body.appendChild(dlg);
           var sel='';
           dlg.querySelector('#im-x').onclick=function(){dlg.remove();};
@@ -6066,26 +6067,6 @@ async function loadCustTab() {
 
   if (CUR_CUST_TAB === 'invites')  { await custInvites(m); return; }
   if (CUR_CUST_TAB === 'messages') { await loadMessagesTab(m, 'customer'); return; }
-  if (CUR_CUST_TAB === 'dashboard') {
-    const [pocSnap,regSnap,offSnap] = await Promise.all([
-      getDocs(query(collection(db,'poc_requests'),where('customerId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'registrations'),where('userId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'offers'),where('customerId','==',CUR_USER.uid))),
-    ]);
-    var pocs=pocSnap.docs.map(d=>d.data()),regs=regSnap.docs.map(d=>d.data()),offs=offSnap.docs.map(d=>d.data());
-    // Bekleyen davet sayısı
-    var invSnap = await getDocs(query(collection(db,'poc_invites'),where('customerEmail','==',CUR_USER.email),where('status','==','pending')));
-    var pendingInvites = invSnap.size;
-    m.innerHTML='<h2 style="font-size:18px;font-weight:700;margin-bottom:18px">Hoş Geldiniz, '+(CUR_PROFILE?.displayName||'')+' 👋</h2>'+
-      (pendingInvites>0?'<div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#f0a429;margin-bottom:14px;cursor:pointer" id="dash-invite-alert">🔔 '+pendingInvites+' bekleyen PoC davetiniz var → <u>Görüntüle</u></div>':'')+
-      '<div class="g4" style="margin-bottom:20px">'+
-      [{v:pocs.length,l:'Toplam PoC',c:'#3b7cff'},{v:pocs.filter(p=>p.status==='active').length,l:'Aktif PoC',c:'#22d078'},
-       {v:regs.length,l:'Etkinlik Kaydı',c:'#f0a429'},{v:pendingInvites,l:'Bekleyen Davet',c:'#f0a429'}]
-      .map(s=>'<div class="stat-card"><div style="font-size:28px;font-weight:700;color:'+s.c+';font-family:monospace">'+s.v+'</div><div style="font-size:11px;color:var(--text-secondary);margin-top:3px">'+s.l+'</div></div>').join('')+
-      '</div>';
-    m.querySelector('#dash-invite-alert')?.addEventListener('click',function(){CUR_CUST_TAB='invites';loadCustTab();});
-    return;
-  }
   if (CUR_CUST_TAB === 'requests') {
     var rSnap = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid)));
     var reqs = rSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
@@ -6145,6 +6126,144 @@ async function loadCustTab() {
       lst.querySelectorAll('.rq-off').forEach(function(b){b.addEventListener('click',function(){CUR_CUST_TAB='offers';loadCustTab();});});
     };
     renderReqs('','');
+  }
+
+
+  else if (CUR_CUST_TAB === 'dashboard') {
+    m.innerHTML = '<div class="loading"><div class="spinner"></div>Dashboard yükleniyor...</div>';
+    const [pocSnap, offSnapUID, offSnapEmail, invSnap, regSnap] = await Promise.all([
+      getDocs(query(collection(db,'poc_requests'),  where('customerId','==',CUR_USER.uid))),
+      getDocs(query(collection(db,'offers'),         where('customerId','==',CUR_USER.uid))),
+      getDocs(query(collection(db,'offers'),         where('customerEmail','==',CUR_USER.email))),
+      getDocs(query(collection(db,'poc_invites'),    where('customerEmail','==',CUR_USER.email), where('status','==','pending'))),
+      getDocs(query(collection(db,'registrations'),  where('userId','==',CUR_USER.uid))),
+    ]);
+
+    // Teklif dedup
+    var seenOff = {};
+    var allOffs = [...offSnapUID.docs, ...offSnapEmail.docs]
+      .filter(function(d){ if(seenOff[d.id]) return false; seenOff[d.id]=true; return true; })
+      .map(function(d){ return {...d.data(),id:d.id}; });
+
+    var pocs  = pocSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    var regs  = regSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    var now   = new Date();
+
+    // İstatistikler
+    var activePocs    = pocs.filter(function(p){ return p.status==='active'; }).length;
+    var pendingPocs   = pocs.filter(function(p){ return p.status==='pending'; }).length;
+    var pendingOffers = allOffs.filter(function(o){ return o.status==='pending'; }).length;
+    var acceptedOffers= allOffs.filter(function(o){ return o.status==='accepted'; }).length;
+    var revisionOffers= allOffs.filter(function(o){ return o.status==='revision_requested'; }).length;
+    var pendingInvites= invSnap.size;
+    var upcomingRegs  = regs.filter(function(r){ return r.eventDate && new Date(r.eventDate) >= now; }).length;
+
+    // Son teklifler
+    var recentOffers = allOffs
+      .filter(function(o){ return o.status==='pending' || o.status==='revision_requested'; })
+      .sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); })
+      .slice(0,3);
+
+    // Aktif PoC'ler
+    var activePocList = pocs
+      .filter(function(p){ return p.status==='active'; })
+      .sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); })
+      .slice(0,3);
+
+    var stOffC = {pending:'#f0a429', accepted:'#22d078', rejected:'#ff7070', revision_requested:'#d97706'};
+    var stOffL = {pending:'Bekliyor', accepted:'Kabul', rejected:'Reddedildi', revision_requested:'Revizyon'};
+
+    m.innerHTML =
+      // Karşılama
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">' +
+      '<div>' +
+      '<h2 style="font-size:20px;font-weight:800">Hoş Geldiniz, ' + (CUR_PROFILE?.displayName||CUR_PROFILE?.company||CUR_USER.email.split('@')[0]) + ' 👋</h2>' +
+      '<div style="font-size:13px;color:var(--text-muted);margin-top:3px">' + new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + '</div>' +
+      '</div></div>' +
+
+      // İstatistik kartları
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px">' +
+
+      // Aktif PoC
+      '<div onclick="CUR_CUST_TAB=\'requests\';loadCustTab();" style="background:rgba(34,208,120,.07);border:1px solid rgba(34,208,120,.2);border-radius:12px;padding:14px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor=\'#22d078\'" onmouseout="this.style.borderColor=\'rgba(34,208,120,.2)\'">' +
+      '<div style="font-size:26px;font-weight:800;color:#22d078">' + activePocs + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">Aktif PoC</div>' +
+      (pendingPocs?'<div style="font-size:10px;color:#f0a429;margin-top:2px">+'+pendingPocs+' bekliyor</div>':'') + '</div>' +
+
+      // Teklifler
+      '<div onclick="CUR_CUST_TAB=\'offers\';loadCustTab();" style="background:rgba(59,124,255,.07);border:1px solid rgba(59,124,255,.2);border-radius:12px;padding:14px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor=\'#7db4ff\'" onmouseout="this.style.borderColor=\'rgba(59,124,255,.2)\'">' +
+      '<div style="font-size:26px;font-weight:800;color:#7db4ff">' + pendingOffers + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">Bekleyen Teklif</div>' +
+      (revisionOffers?'<div style="font-size:10px;color:#d97706;margin-top:2px">'+revisionOffers+' revizyon</div>':'') + '</div>' +
+
+      // Davetler
+      '<div onclick="CUR_CUST_TAB=\'invites\';loadCustTab();" style="background:' + (pendingInvites?'rgba(240,164,41,.1)':'rgba(255,255,255,.04)') + ';border:1px solid ' + (pendingInvites?'rgba(240,164,41,.3)':'rgba(255,255,255,.1)') + ';border-radius:12px;padding:14px;cursor:pointer;transition:border-color .2s">' +
+      '<div style="font-size:26px;font-weight:800;color:' + (pendingInvites?'#f0a429':'rgba(255,255,255,.3)') + '">' + pendingInvites + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">Yeni Davet</div>' +
+      (pendingInvites?'<div style="font-size:10px;color:#f0a429;margin-top:2px">Yanıt bekleniyor</div>':'') + '</div>' +
+
+      // Etkinlikler
+      '<div onclick="CUR_CUST_TAB=\'registrations\';loadCustTab();" style="background:rgba(196,168,255,.07);border:1px solid rgba(196,168,255,.2);border-radius:12px;padding:14px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor=\'#c4a8ff\'" onmouseout="this.style.borderColor=\'rgba(196,168,255,.2)\'">' +
+      '<div style="font-size:26px;font-weight:800;color:#c4a8ff">' + upcomingRegs + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">Yaklaşan Etkinlik</div>' + '</div>' +
+
+      '</div>' +
+
+      // Hızlı aksiyonlar
+      '<div style="margin-bottom:20px">' +
+      '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px">Hızlı İşlemler</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button onclick="go(\'catalog\')" style="background:rgba(37,99,235,.12);color:#7db4ff;border:1px solid rgba(37,99,235,.25);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer">🔍 Katalogda Ara</button>' +
+      '<button onclick="CUR_CUST_TAB=\'requests\';loadCustTab();" style="background:rgba(34,208,120,.08);color:#22d078;border:1px solid rgba(34,208,120,.2);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer">📋 PoC Taleplerim</button>' +
+      '<button onclick="CUR_CUST_TAB=\'messages\';loadCustTab();" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer">💬 Mesajlar</button>' +
+      (pendingInvites?'<button onclick="CUR_CUST_TAB=\'invites\';loadCustTab();" style="background:rgba(240,164,41,.12);color:#f0a429;border:1px solid rgba(240,164,41,.3);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">📨 '+pendingInvites+' Davet Bekliyor</button>':'') +
+      (pendingOffers?'<button onclick="CUR_CUST_TAB=\'offers\';loadCustTab();" style="background:rgba(59,124,255,.12);color:#7db4ff;border:1px solid rgba(59,124,255,.3);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">💰 '+pendingOffers+' Teklif Yanıtla</button>':'') +
+      '</div></div>' +
+
+      // Bekleyen teklifler
+      (recentOffers.length ?
+        '<div style="margin-bottom:20px">' +
+        '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px">Yanıt Bekleyen Teklifler</div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px">' +
+        recentOffers.map(function(o) {
+          var sc = stOffC[o.status]||'#7c87a0';
+          var sl = stOffL[o.status]||o.status;
+          var amt = o.totalAmount||(o.unitPrice||0)*(o.quantity||1)||0;
+          return '<div onclick="CUR_CUST_TAB=\'offers\';loadCustTab();" style="background:var(--bg-surface);border:1px solid rgba(59,124,255,.2);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s" onmouseover="this.style.borderColor=\'rgba(59,124,255,.5)\'" onmouseout="this.style.borderColor=\'rgba(59,124,255,.2)\'">' +
+            '<div>' +
+            '<div style="font-size:13px;font-weight:700">'+(o.productName||'—')+'</div>' +
+            '<div style="font-size:12px;color:var(--text-muted)">'+( o.vendorName||'—')+'</div>' +
+            '</div>' +
+            '<div style="text-align:right">' +
+            '<div style="font-size:14px;font-weight:800;color:var(--color-primary)">'+amt.toLocaleString('tr-TR')+' '+(o.currency||'₺')+'</div>' +
+            '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;color:'+sc+';background:'+sc+'18">'+sl+'</span>' +
+            '</div></div>';
+        }).join('') +
+        '</div></div>' : '') +
+
+      // Aktif PoC listesi
+      (activePocList.length ?
+        '<div>' +
+        '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px">Aktif PoC\'ler</div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px">' +
+        activePocList.map(function(p) {
+          var ds = p.createdAt?.seconds ? new Date(p.createdAt.seconds*1000).toLocaleDateString('tr-TR') : '—';
+          return '<div onclick="CUR_CUST_TAB=\'requests\';loadCustTab();" style="background:var(--bg-surface);border:1px solid rgba(34,208,120,.2);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s" onmouseover="this.style.borderColor=\'#22d078\'" onmouseout="this.style.borderColor=\'rgba(34,208,120,.2)\'">' +
+            '<div>' +
+            '<div style="font-size:13px;font-weight:700">'+(p.productName||p.title||'—')+'</div>' +
+            '<div style="font-size:12px;color:var(--text-muted)">'+(p.vendorName||'Vendor atanmadı')+'</div>' +
+            '</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,.3)">'+ds+'</div>' +
+            '</div>';
+        }).join('') +
+        '</div></div>' : '') +
+
+      (pocs.length===0 && allOffs.length===0 && pendingInvites===0 ?
+        '<div class="empty" style="margin-top:20px"><div class="empty-icon">🚀</div>' +
+        'PoCHub\'a hoş geldiniz!<br>' +
+        '<small style="color:var(--text-muted)">Başlamak için ürün kataloğuna göz atın.</small><br><br>' +
+        '<button onclick="go(\'catalog\')" class="btn-p btn-sm">🔍 Kataloğu Keşfet</button>' +
+        '</div>' : '');
   }
 
   else if (CUR_CUST_TAB === 'registrations') {
@@ -6297,7 +6416,7 @@ async function loadCustTab() {
           (regSt!=='cancelled' && !past ?
             '<button class="reg-cancel-btn btn-red btn-sm" data-id="'+r.id+'" data-title="'+(r.eventTitle||'').replace(/"/g,"")+'" style="font-size:12px">Kaydı İptal Et</button>' : '') +
           (past && regSt==='confirmed'?'<span style="font-size:12px;color:#22d078;padding:5px 10px">✓ Tamamlandı</span>':'') +
-          '<button class="reg-delete-btn btn-g btn-sm" data-id="'+r.id+'" style="font-size:11px;color:rgba(255,255,255,.4)">Listeden Kaldır</button>' +
+          '<button class="reg-delete-btn btn-g btn-sm" data-id="'+r.id+'" style="font-size:11.5px;font-weight:600;color:#e9ecf3;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:6px 10px;cursor:pointer">🗑 Listeden Kaldır</button>' +
           '</div>';
 
         lst.appendChild(card);
