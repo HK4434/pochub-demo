@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.33.2</title>
+<title>PoCHub.co — v4.34</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.33.2';
+const VERSION = 'v4.34';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -2474,6 +2474,10 @@ function go(s) {
     }
   }
   CUR_SCREEN = s;
+  // URL hash güncelle
+  if (location.hash.replace('#','').split('/')[0] !== s) {
+    history.pushState(null, '', '#' + s);
+  }
   buildNav();
   renderScreen(s);
 }
@@ -6064,6 +6068,8 @@ function renderCustomer() {
 
 async function loadCustTab() {
   LAST_SYNC_TIME = Date.now();
+  // URL hash güncelle — deep link
+  history.replaceState(null, '', '#customer/' + CUR_CUST_TAB);
   const m = el('cust-main');
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
@@ -6466,8 +6472,8 @@ async function loadCustTab() {
 
         var card = document.createElement('div');
         card.style.cssText =
-          'background:#0f1623;border:1px solid '
-          +(past?'rgba(255,255,255,.07)':evSt==='cancelled'?'rgba(220,38,38,.2)':'rgba(59,124,255,.2)')
+          'background:var(--bg-surface);border:1px solid '
+          +(past?'rgba(0,0,0,.08)':evSt==='cancelled'?'rgba(220,38,38,.2)':'rgba(59,124,255,.2)')
           +';border-radius:12px;padding:16px;'+(past?'opacity:.8':'');
 
         var topBadges =
@@ -6846,6 +6852,8 @@ function renderVendor() {
 
 async function loadVendTab() {
   LAST_SYNC_TIME = Date.now();
+  // URL hash güncelle — deep link
+  history.replaceState(null, '', '#vendor/' + CUR_VEND_TAB);
   const m = el('vend-main');
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
@@ -9623,6 +9631,7 @@ function renderAdmin() {
 }
 
 async function loadAdmTab() {
+  history.replaceState(null, '', '#admin/' + CUR_ADM_TAB);
   const m = el('adm-main');
   if (!m) return;
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
@@ -11310,6 +11319,27 @@ function openOfferDetailModal(o, viewerRole) {
 }
 window.openOfferDetailModal = openOfferDetailModal;
 
+
+// ── URL Hash Router ─────────────────────────────────────────────
+function parseAndNavigate(hash) {
+  if (!hash || hash === '#') return;
+  var parts = hash.replace('#','').split('/');
+  var screen = parts[0];
+  var tab    = parts[1] || 'dashboard';
+  if (!['home','events','catalog','customer','vendor','admin'].includes(screen)) return;
+  if (screen !== CUR_SCREEN) { CUR_SCREEN = screen; buildNav(); renderScreen(screen); }
+  setTimeout(function() {
+    if (screen === 'vendor'   && tab !== CUR_VEND_TAB) { CUR_VEND_TAB = tab; loadVendTab(); }
+    if (screen === 'customer' && tab !== CUR_CUST_TAB) { CUR_CUST_TAB = tab; loadCustTab(); }
+    if (screen === 'admin'    && tab !== CUR_ADM_TAB)  { CUR_ADM_TAB  = tab; loadAdmTab(); }
+  }, 200);
+}
+window.addEventListener('popstate', function() { parseAndNavigate(location.hash); });
+if (location.hash && location.hash.length > 1) {
+  window.addEventListener('load', function() {
+    setTimeout(function() { parseAndNavigate(location.hash); }, 1000);
+  });
+}
 
 // EmailJS public key — sonradan eklenecek
 window.addEventListener('DOMContentLoaded', () => {
