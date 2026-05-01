@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.39 | pochub.co -->
+<!-- PoCHub v4.40 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.39</title>
+<title>PoCHub.co — v4.40</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.39';
+const VERSION = 'v4.40';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -519,6 +519,67 @@ async function cleanupExpiredTrash(collectionName, ownerField, ownerId) {
 
 
 /* ══════════════════════════════════════════════════════════════
+   KDV HESAPLAMA HELPER'LARI (v4.40)
+   ─────────────────────────────────────────────────────────────
+   Türkiye standartı: Vendor net fiyat girer, sistem KDV ekler.
+   Dropdown oranlar: %0, %1, %10, %20 (varsayılan %20)
+   ═════════════════════════════════════════════════════════════ */
+
+const VAT_RATES = [0, 1, 10, 20];
+const DEFAULT_VAT = 20;
+
+// Para birimi simbolleri
+const CURRENCY_SYMBOLS = {TRY:'₺', USD:'$', EUR:'€'};
+
+// KDV hesaplama: net tutardan brüt tutar
+function calculateVat(netAmount, vatRate) {
+  var net = parseFloat(netAmount) || 0;
+  var rate = parseFloat(vatRate);
+  if (isNaN(rate)) rate = DEFAULT_VAT;
+  var vat = net * (rate / 100);
+  var gross = net + vat;
+  return {
+    net: net,
+    vatRate: rate,
+    vatAmount: vat,
+    gross: gross,
+  };
+}
+
+// Tutar formatla — TR locale
+function formatMoney(amount, currency) {
+  var sym = CURRENCY_SYMBOLS[currency] || '₺';
+  var n = parseFloat(amount) || 0;
+  return sym + n.toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// Bir teklif objesinin KDV bilgilerini geri uyumlu şekilde çek
+// Eski tekliflerde vatRate yok, o zaman KDV dahil net=brüt sayılır
+function getOfferVatInfo(offer) {
+  if (!offer) return { net:0, vatRate:0, vatAmount:0, gross:0, hasVatField:false };
+  // Yeni alanlar: netAmount, vatRate, vatAmount, grossAmount
+  if (typeof offer.vatRate === 'number') {
+    return {
+      net: offer.netAmount || 0,
+      vatRate: offer.vatRate || 0,
+      vatAmount: offer.vatAmount || 0,
+      gross: offer.grossAmount || offer.totalAmount || 0,
+      hasVatField: true,
+    };
+  }
+  // Eski tekliflerde sadece amount/totalAmount var → KDV bilinmiyor say
+  var legacyTotal = offer.totalAmount || offer.amount || 0;
+  return {
+    net: legacyTotal,
+    vatRate: 0,
+    vatAmount: 0,
+    gross: legacyTotal,
+    hasVatField: false,
+  };
+}
+
+
+/* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
    ─────────────────────────────────────────────────────────────
    Her değişiklik = Versiyon artışı. İstisna yok.
@@ -539,6 +600,7 @@ async function cleanupExpiredTrash(collectionName, ownerField, ownerId) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.40':  ['MINOR: KDV sistemi (dropdown %0/%1/%10/%20, vendor net girer otomatik hesap), Mesajlar yaşam döngüsü (arşiv/çöp/geri al), tüm silme noktaları yaşam döngüsü ile uyumlu (kayıtlar, teklifler, bildirimler, kategoriler)'],
   'v4.39':  ['MINOR: Yaşam döngüsü sistemi (Aktif → Arşiv → Çöp Kutusu → Kalıcı Silme) — Ürünler, Etkinlikler, Portföy için ortak. 30 gün otomatik temizlik, manuel hemen sil, aktif PoC/teklifi olan kayıtlar korumalı. lifecycle.js helper fonksiyonları'],
   'v4.38':  ['BUG FIX: Ürünlerim ✎ butonu çoklu modal açıyordu (pr-eb pr-dist forEach içine yanlış nest), mesaj okundu sayım sistemi tutarsızdı (readBy kullanıma alındı), Tümünü Okundu İşaretle artık gerçekten okutuyor'],
   'v4.37':  ['BUG FIX: Vendor dashboard emoji surrogate pair fix, requests tab dispatch eksikliği, openEditEventModal null guard, Tümünü Okundu role-aware reload'],
@@ -1717,6 +1779,14 @@ async function loadMessagesTab(m, role) {
       const isArchived = poc => (metaMap[poc.id]?.archivedBy||[]).includes(CUR_USER.uid);
       const isPinned   = poc => (metaMap[poc.id]?.pinnedBy||[]).includes(CUR_USER.uid);
 
+      // Sayımlar (tab label'larına ve banner'a yansıtmak için)
+      var msgCounts = { active:0, archived:0, deleted:0 };
+      pocs.forEach(function(poc){
+        if (isDeleted(poc)) msgCounts.deleted++;
+        else if (isArchived(poc)) msgCounts.archived++;
+        else msgCounts.active++;
+      });
+
       // Tab: active, archived, deleted
       let filtered = pocs.filter(poc => {
         if (activeTab === 'deleted')  return isDeleted(poc) && !isFullyDeleted(metaMap[poc.id]);
@@ -1805,9 +1875,9 @@ async function loadMessagesTab(m, role) {
       const tabs = document.createElement('div');
       tabs.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap';
       const tabList = [
-        {id:'active',   label:'Aktif'},
-        {id:'archived', label:'📦 Arşiv'},
-        {id:'deleted',  label:'🗑 Silinen (30 gün)'},
+        {id:'active',   label:'Aktif ('+msgCounts.active+')'},
+        {id:'archived', label:'📦 Arşiv ('+msgCounts.archived+')'},
+        {id:'deleted',  label:'🗑 Silinen ('+msgCounts.deleted+')'},
       ];
       tabList.forEach(t => {
         const btn = document.createElement('button');
@@ -1819,6 +1889,14 @@ async function loadMessagesTab(m, role) {
         tabs.appendChild(btn);
       });
       m.appendChild(tabs);
+
+      // Silinen tab'ında uyarı banner'ı
+      if (activeTab === 'deleted' && msgCounts.deleted > 0) {
+        var delBanner = document.createElement('div');
+        delBanner.style.cssText = 'background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#fca5a5';
+        delBanner.innerHTML = '⚠️ Silinen yazışmalar 30 gün sonra <strong>kalıcı olarak silinir</strong>. Geri almak için yazışmaya tıklayıp eski haline döndürebilirsiniz.';
+        m.appendChild(delBanner);
+      }
 
       // Filtreler
       const filters = document.createElement('div');
@@ -2037,6 +2115,44 @@ async function loadMessagesTab(m, role) {
         actions.appendChild(pinBtn);
         actions.appendChild(archBtn);
         actions.appendChild(delBtn);
+
+        // Silinen sekmede ek "Hemen Sil" butonu (kalıcı, 30 gün beklemeden)
+        if (isDel) {
+          const permBtn = document.createElement('button');
+          permBtn.className = 'msg-action-btn btn-sm';
+          permBtn.title = 'Hemen kalıcı sil';
+          permBtn.textContent = '⊗';
+          permBtn.style.cssText = 'font-size:13px;padding:3px 7px;background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.4);border-radius:4px;cursor:pointer;font-weight:700';
+          permBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm('Bu yazışma KALICI olarak silinsin mi? Tüm mesajlar silinir, geri alınamaz!')) return;
+            if (!confirm('Emin misiniz?')) return;
+            permBtn.disabled = true;
+            try {
+              // Mesajları kendi yanımızda sil; karşı tarafın görmesi gerekiyorsa karşı tarafın delete'ı ayrı.
+              // Ama "kalıcı" sadece bizim için olur — karşı taraf hâlâ görür.
+              // Kıdemli analist kararı: hemen sil = sadece kendi delete'ı kalıcılaştır,
+              // ama Firestore'dan silme yapma çünkü karşı taraf da konuşmayı kullanıyor olabilir.
+              // 30 gün sonra cleanupDeleted iki tarafın da deletedBy'da olduğunu görürse fiziksel siler.
+              // Bu davranış memory'deki eski kuralla uyumlu — kullanıcıya açıklayalım.
+              const cur2 = metaMap[poc.id]?.deletedBy || [];
+              await setConvMeta(poc.id, {
+                deletedBy: cur2.map(function(d){
+                  return d.userId === CUR_USER.uid
+                    ? {userId: d.userId, deletedAt: new Date(Date.now() - 31*24*60*60*1000).toISOString()}
+                    : d;
+                }),
+              });
+              showToast('Yazışma sizden kalıcı kaldırıldı. Karşı taraf silmediğinde yazışma onlarda kalır.');
+              render(activeTab, searchVal, filterVal);
+            } catch(err) {
+              showToast('Hata: ' + err.message, 'err');
+              permBtn.disabled = false;
+            }
+          });
+          actions.appendChild(permBtn);
+        }
+
         row.appendChild(actions);
         list.appendChild(row);
       });
@@ -6764,7 +6880,8 @@ async function loadOffersWithComparison(m) {
     var seenIds = {};
     var offers = [...snapByUid.docs, ...snapByEmail.docs]
       .filter(function(d){ if(seenIds[d.id]) return false; seenIds[d.id]=true; return true; })
-      .map(function(d){ return {...d.data(),id:d.id}; });
+      .map(function(d){ return {...d.data(),id:d.id}; })
+      .filter(function(o){ return getLifecycleState(o) !== 'trash'; });  // çöptekileri gizle
     offers.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
     var pocs = pocSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
@@ -6888,8 +7005,9 @@ async function loadOffersWithComparison(m) {
             // Tutar + detay
             '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">' +
             '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;text-align:center">' +
-            '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Tutar</div>' +
+            '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Toplam</div>' +
             '<div style="font-size:16px;font-weight:800;color:var(--color-primary)">' + (o.totalAmount||o.amount||0).toLocaleString('tr-TR') + ' ' + (o.currency||'₺') + '</div>' +
+            '<div style="font-size:9.5px;color:var(--text-muted);margin-top:2px">' + (typeof o.vatRate === 'number' ? 'KDV %' + o.vatRate + ' dahil' : 'KDV bilgisi yok') + '</div>' +
             '</div>' +
             '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;text-align:center">' +
             '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Tip</div>' +
@@ -7511,12 +7629,14 @@ async function loadVendTab() {
         });
         m.querySelectorAll('.ev-del-btn').forEach(function(b) {
           b.addEventListener('click', async function() {
-            if (!confirm('"'+b.dataset.title+'" silinsin mi? Geri alınamaz.')) return;
+            if (!confirm('"'+b.dataset.title+'" çöp kutusuna taşınsın mı? 30 gün içinde Etkinliklerim sekmesinden geri alabilirsiniz.')) return;
             b.disabled=true;
             try {
-              await deleteDoc(doc(db,'public_events',b.dataset.id));
+              var dep = await hasActiveDependencies('public_events', b.dataset.id);
+              if (!dep.ok) { showToast('Silinemedi: ' + dep.reason, 'err'); b.disabled = false; return; }
+              await softDeleteItem('public_events', b.dataset.id);
               evs = evs.filter(function(x){return x.id!==b.dataset.id;});
-              showToast('Etkinlik silindi.');
+              showToast('🗑 Etkinlik çöp kutusuna taşındı.');
               renderMain();
             } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled=false; }
           });
@@ -8129,9 +8249,18 @@ async function loadVendTab() {
 
   else if (CUR_VEND_TAB === 'offers-sent') {
     m.innerHTML = '<div class="loading"><div class="spinner"></div>Teklifler yükleniyor...</div>';
-    const snap = await getDocs(query(collection(db,'offers'), where('vendorId','==',CUR_USER.uid)));
-    var offers = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    const _allSnap = await getDocs(query(collection(db,'offers'), where('vendorId','==',CUR_USER.uid)));
+    var _allOffers = _allSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    var offers = _allOffers.filter(function(o){ return getLifecycleState(o) !== 'trash'; });
+    var trashedOffers = _allOffers.filter(function(o){ return getLifecycleState(o) === 'trash'; });
     offers.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+    trashedOffers.sort(function(a,b){
+      var ta = a.deletedAt?.seconds||0, tb = b.deletedAt?.seconds||0;
+      return tb - ta;
+    });
+
+    // Arka planda 30 gün geçmiş teklif çöpünü otomatik temizle
+    cleanupExpiredTrash('offers','vendorId',CUR_USER.uid).catch(function(){});
 
     // Müşteri listesi — filtre için
     var custList = [...new Set(offers.map(function(o){ return o.customerName||o.customerEmail||''; }).filter(Boolean))].sort();
@@ -8145,11 +8274,12 @@ async function loadVendTab() {
       archived:           {l:'Arşivlendi',         c:'#5a6278', bg:'rgba(90,98,120,.12)'},
     };
 
-    var filters = {status:'', customer:'', product:'', dateFrom:'', dateTo:'', search:''};
+    var filters = {status:'', customer:'', product:'', dateFrom:'', dateTo:'', search:'', trashMode:false};
 
     function applyFilters() {
       var f = filters;
-      return offers.filter(function(o) {
+      var src = f.trashMode ? trashedOffers : offers;
+      return src.filter(function(o) {
         if (f.status   && o.status !== f.status)                return false;
         if (f.customer && (o.customerName||o.customerEmail||'') !== f.customer) return false;
         if (f.product  && (o.productName||'') !== f.product)   return false;
@@ -8269,15 +8399,24 @@ async function loadVendTab() {
 
         // Aksiyonlar
         var actHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">';
-        if (o.status === 'revision_requested') {
-          actHtml += '<button class="ofs-revise" data-id="'+o.id+'" data-cid="'+(o.customerId||'')+ '" data-cemail="'+(o.customerEmail||'')+'" data-cname="'+(o.customerName||'').replace(/"/g,"")+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" data-pocid="'+(o.pocId||'')+'" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">✎ Revize Et & Gönder</button>';
-        }
-        if (o.status === 'accepted' || o.status === 'rejected') {
-          actHtml += '<button class="ofs-archive" data-id="'+o.id+'" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">📦 Arşivle</button>';
-        }
-        actHtml += '<button class="ofs-detail" data-id="'+o.id+'" style="background:rgba(59,124,255,.08);color:#7db4ff;border:1px solid rgba(59,124,255,.2);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">Detay</button>';
-        if (o.status !== 'accepted') {
-          actHtml += '<button class="ofs-delete" data-id="'+o.id+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" style="background:rgba(220,38,38,.06);color:#dc2626;border:1px solid rgba(220,38,38,.15);border-radius:6px;padding:7px 10px;font:inherit;font-size:12px;cursor:pointer">⊘ Sil</button>';
+        if (filters.trashMode) {
+          // Çöp modunda: kalan gün rozeti + geri al + hemen sil
+          var daysLeft = trashDaysLeft(o);
+          actHtml += '<div style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.25);border-radius:6px;padding:6px 10px;font:inherit;font-size:11.5px;font-weight:700;align-self:center">🗑 ' + (daysLeft||0) + ' gün</div>';
+          actHtml += '<button class="ofs-restore" data-id="'+o.id+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" style="background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">↩ Geri Al</button>';
+          actHtml += '<button class="ofs-detail" data-id="'+o.id+'" style="background:rgba(59,124,255,.08);color:#7db4ff;border:1px solid rgba(59,124,255,.2);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">Detay</button>';
+          actHtml += '<button class="ofs-perm" data-id="'+o.id+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" style="background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.4);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">⊗ Hemen Sil</button>';
+        } else {
+          if (o.status === 'revision_requested') {
+            actHtml += '<button class="ofs-revise" data-id="'+o.id+'" data-cid="'+(o.customerId||'')+ '" data-cemail="'+(o.customerEmail||'')+'" data-cname="'+(o.customerName||'').replace(/"/g,"")+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" data-pocid="'+(o.pocId||'')+'" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">✎ Revize Et & Gönder</button>';
+          }
+          if (o.status === 'accepted' || o.status === 'rejected') {
+            actHtml += '<button class="ofs-archive" data-id="'+o.id+'" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">📦 Arşivle</button>';
+          }
+          actHtml += '<button class="ofs-detail" data-id="'+o.id+'" style="background:rgba(59,124,255,.08);color:#7db4ff;border:1px solid rgba(59,124,255,.2);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">Detay</button>';
+          if (o.status !== 'accepted') {
+            actHtml += '<button class="ofs-delete" data-id="'+o.id+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" style="background:rgba(220,38,38,.06);color:#dc2626;border:1px solid rgba(220,38,38,.15);border-radius:6px;padding:7px 10px;font:inherit;font-size:12px;cursor:pointer">⊘ Sil</button>';
+          }
         }
         actHtml += '</div>';
 
@@ -8297,8 +8436,9 @@ async function loadVendTab() {
           '</div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">' +
           '<div style="background:rgba(59,124,255,.06);border-radius:6px;padding:8px;text-align:center">' +
-          '<div style="font-size:10px;color:var(--text-muted)">Tutar</div>' +
-          '<div style="font-size:15px;font-weight:800;color:var(--color-primary)">'+totalAmt.toLocaleString('tr-TR')+' '+(o.currency||'₺')+'</div></div>' +
+          '<div style="font-size:10px;color:var(--text-muted)">Toplam</div>' +
+          '<div style="font-size:15px;font-weight:800;color:var(--color-primary)">'+totalAmt.toLocaleString('tr-TR')+' '+(o.currency||'₺')+'</div>' +
+          '<div style="font-size:9.5px;color:var(--text-muted);margin-top:2px">' + (typeof o.vatRate === 'number' ? 'KDV %' + o.vatRate + ' dahil' : 'KDV bilgisi yok') + '</div></div>' +
           '<div style="background:rgba(255,255,255,.04);border-radius:6px;padding:8px;text-align:center">' +
           '<div style="font-size:10px;color:var(--text-muted)">Tip</div>' +
           '<div style="font-size:12px;font-weight:600">'+(o.offerTypeLabel||o.offerType||'—')+'</div></div>' +
@@ -8330,17 +8470,42 @@ async function loadVendTab() {
       });
       listEl.querySelectorAll('.ofs-delete').forEach(function(b) {
         b.addEventListener('click', async function() {
-          if (!confirm('"'+b.dataset.pname+'" teklifini kalıcı silmek istiyor musunuz?')) return;
-          await deleteDoc(doc(db,'offers',b.dataset.id));
+          if (!confirm('"'+b.dataset.pname+'" teklifi çöp kutusuna taşınsın mı? 30 gün içinde geri alabilirsiniz, sonra kalıcı silinir.')) return;
+          await softDeleteItem('offers', b.dataset.id);
           offers = offers.filter(function(o){ return o.id!==b.dataset.id; });
           renderList();
-          showToast('Teklif silindi.');
+          showToast('🗑 Teklif çöp kutusuna taşındı.');
         });
       });
       listEl.querySelectorAll('.ofs-detail').forEach(function(b) {
         b.addEventListener('click', function() {
-          var o = offers.find(function(x){ return x.id===b.dataset.id; });
+          var src = filters.trashMode ? trashedOffers : offers;
+          var o = src.find(function(x){ return x.id===b.dataset.id; });
           if (o) openOfferDetailModal(o, 'vendor');
+        });
+      });
+      // Çöp modu: geri al
+      listEl.querySelectorAll('.ofs-restore').forEach(function(b) {
+        b.addEventListener('click', async function() {
+          b.disabled = true;
+          try {
+            await restoreFromTrash('offers', b.dataset.id);
+            showToast('✓ Teklif geri alındı.');
+            CUR_VEND_TAB = 'offers-sent'; loadVendTab();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+      // Çöp modu: hemen kalıcı sil
+      listEl.querySelectorAll('.ofs-perm').forEach(function(b) {
+        b.addEventListener('click', async function() {
+          if (!confirm('"'+b.dataset.pname+'" teklifi KALICI olarak silinsin mi? Geri alınamaz!')) return;
+          if (!confirm('Emin misiniz?')) return;
+          b.disabled = true;
+          try {
+            await permanentDelete('offers', b.dataset.id);
+            showToast('Teklif kalıcı olarak silindi.');
+            CUR_VEND_TAB = 'offers-sent'; loadVendTab();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
         });
       });
     }
@@ -8348,11 +8513,15 @@ async function loadVendTab() {
     // ── UI ────────────────────────────────────────────────────────
     m.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">' +
-      '<div style="display:flex;align-items:center;gap:10px">' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
       '<h2 style="font-size:18px;font-weight:700">💰 Tekliflerim</h2>' +
       '<span id="ofs-cnt" style="font-size:12px;color:var(--text-muted)">'+offers.length+' teklif</span>' +
-      '</div></div>' +
+      '</div>' +
+      '<button id="ofs-trash-toggle" style="background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.25);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">🗑 Çöp Kutusu ('+trashedOffers.length+')</button>' +
+      '</div>' +
+      '<div id="ofs-trash-banner"></div>' +
       '<input id="ofs-search" class="inp" placeholder="🔍 Ürün, müşteri veya not ara..." style="margin-bottom:10px;font-size:13px">' +
+      '<div id="ofs-filters">' +
       '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">' +
       [['','Tümü'],['pending','Bekliyor'],['accepted','Kabul'],['rejected','Reddedildi'],['revision_requested','Revizyon'],['archived','Arşiv']].map(function(p) {
         return '<button class="ofs-sf btn-g btn-sm" data-val="'+p[0]+'" style="font-size:12px">'+p[1]+'</button>';
@@ -8371,7 +8540,30 @@ async function loadVendTab() {
       '<input id="ofs-date-to"   type="date" class="inp" style="width:auto;font-size:12px;margin-bottom:0" title="Bitiş tarihi">' +
       '<button id="ofs-reset" class="btn-g btn-sm" style="font-size:12px">✕ Sıfırla</button>' +
       '</div>' +
+      '</div>' +
       '<div id="ofs-list"></div>';
+
+    // Çöp toggle
+    m.querySelector('#ofs-trash-toggle').addEventListener('click', function(){
+      filters.trashMode = !filters.trashMode;
+      var btn = this;
+      var banner = m.querySelector('#ofs-trash-banner');
+      var filtersEl = m.querySelector('#ofs-filters');
+      if (filters.trashMode) {
+        btn.style.background = '#dc2626';
+        btn.style.color = '#fff';
+        btn.textContent = '↩ Aktif Listeye Dön';
+        banner.innerHTML = '<div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#fca5a5">⚠️ Çöp kutusundaki teklifler 30 gün sonra <strong>kalıcı olarak silinir</strong>. Geri al veya hemen sil seçeneklerinden faydalanabilirsiniz.</div>';
+        if (filtersEl) filtersEl.style.display = 'none';
+      } else {
+        btn.style.background = 'rgba(220,38,38,.08)';
+        btn.style.color = '#dc2626';
+        btn.textContent = '🗑 Çöp Kutusu (' + trashedOffers.length + ')';
+        banner.innerHTML = '';
+        if (filtersEl) filtersEl.style.display = '';
+      }
+      renderList();
+    });
 
     // Filter eventleri
     m.querySelector('#ofs-search').addEventListener('input', function() { filters.search=this.value; renderList(); });
@@ -8423,110 +8615,6 @@ async function loadVendTab() {
     });
   
   }
-
-  modal.querySelector('#of-submit').addEventListener('click', async function() {
-    var amount = parseFloat(modal.querySelector('#of-amount').value)||0;
-    var errDiv = modal.querySelector('#of-err');
-    if (amount <= 0) { errDiv.innerHTML='<div class="alert alert-err">Geçerli bir tutar girin.</div>'; return; }
-
-    var btn = modal.querySelector('#of-submit');
-    btn.disabled=true; btn.textContent='Gönderiliyor...';
-
-    var offerType = modal.querySelector('#of-type').value;
-    var billingModel = modal.querySelector('#of-billing').value;
-    var currency = modal.querySelector('#of-currency').value;
-    var validity = parseInt(modal.querySelector('#of-validity').value)||30;
-    var hasChannelFee = modal.querySelector('#of-channel').value==='yes';
-    var delivery = modal.querySelector('#of-delivery').value;
-    var cert = modal.querySelector('#of-cert').value.trim();
-    var warranty = modal.querySelector('#of-warranty').value.trim();
-    var supportLevel = modal.querySelector('#of-support').value;
-    var notes = modal.querySelector('#of-notes').value.trim();
-
-    var currencySymbols = {TRY:'₺',USD:'$',EUR:'€'};
-    var validityDate = validity > 0 ? new Date(Date.now() + validity*24*60*60*1000) : null;
-
-    var offerTypeLabels = {
-      distributor:'Distribütör Teklifi', integrator:'Entegratör Teklifi',
-      direct:'Doğrudan Üretici Teklifi', enterprise:'Enterprise Anlaşma'
-    };
-    var billingLabels = {
-      local_distributor:'Türkiye Distribütörü', local_integrator:'Entegratör',
-      direct_vendor:'Doğrudan Üretici', local_reseller:'Yetkili Bayi'
-    };
-
-    try {
-      await addDoc(collection(db,'offers'), {
-        pocId:         pocId,
-        customerId:    customerId,
-        customerEmail: customerEmail,
-        customerName:  customerName,
-        vendorId:      CUR_USER.uid,
-        vendorName:    CUR_PROFILE?.displayName||CUR_USER.email,
-        vendorEmail:   CUR_USER.email,
-        vendorType:    vtype,
-        productName:   productName,
-        // Yeni gelişmiş alanlar
-        offerType:     offerType,
-        offerTypeLabel:offerTypeLabels[offerType]||offerType,
-        billingModel:  billingModel,
-        billingLabel:  billingLabels[billingModel]||billingModel,
-        amount:        amount,
-        unitPrice:     amount,
-        quantity:      1,
-        totalAmount:   amount,
-        currency:      currency,
-        currencySymbol:currencySymbols[currency]||'₺',
-        hasChannelFee: hasChannelFee,
-        validityDays:  validity,
-        validUntil:    validityDate ? Timestamp.fromDate(validityDate) : null,
-        delivery:      delivery,
-        certification: cert,
-        warranty:      warranty,
-        supportLevel:  supportLevel,
-        notes:         notes,
-        status:        'pending',
-        createdAt:     serverTimestamp(),
-      });
-
-      // Müşteriye bildirim
-      if (customerEmail) {
-        sendEmail(customerEmail, customerName,
-          'Yeni PoC Teklifi Aldınız — PoCHub',
-          (CUR_PROFILE?.displayName||CUR_USER.email)+' size '+productName+' icin teklif gonderdi. Tutar: '+currencySymbols[currency]+amount.toLocaleString('tr-TR'),
-          'pochub.co uzerinden teklifinizi inceleyebilirsiniz.'
-        );
-      }
-
-      // PoC durumunu offer_sent yap — pocId varsa
-      if (pocId) {
-        try {
-          await updateDoc(doc(db,'poc_requests',pocId), {
-            status: 'offer_sent',
-            offerSentAt: serverTimestamp(),
-          });
-        } catch(e2) {}
-      }
-
-      modal.remove();
-      if (customerId) {
-        addDoc(collection(db,'notifications'),{
-          userId:customerId, type:'new_offer',
-          title:'Yeni Teklif Aldınız',
-          message:(CUR_PROFILE?.company||CUR_USER.email)+'"'+productName+'"icin teklif gonderdi.',
-          fromUserId:CUR_USER.uid, fromName:CUR_PROFILE?.company||CUR_USER.email,
-          read:false, createdAt:serverTimestamp(),
-        }).catch(function(){});
-      }
-      showToast('Teklif gönderildi!');
-      loadVendTab();
-    } catch(e) {
-      var msg = (e && e.message) ? e.message : String(e);
-      errDiv.textContent = 'Hata: ' + msg;
-      showToast('Teklif gönderilemedi: ' + msg, 'err');
-      btn.disabled=false; btn.textContent='Teklifi Gönder';
-    }
-  });
 }
 
 
@@ -11140,7 +11228,10 @@ async function openAdmProdEditModal(prodId, name, cat, desc, country) {
 async function admProducts(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Ürünler yükleniyor...</div>';
   const snap = await getDocs(collection(db,'products'));
-  var all = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+  var allRaw = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+  // Admin için çöptekileri filtreyle ayır — varsayılan görünümde gizli
+  var all = allRaw.filter(function(p){ return getLifecycleState(p) !== 'trash'; });
+  var trashedAdminProds = allRaw.filter(function(p){ return getLifecycleState(p) === 'trash'; });
   all.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
   // Dinamik filtre seçenekleri
@@ -11303,10 +11394,10 @@ async function admProducts(m) {
     });
     tbody.querySelectorAll('.ap-del').forEach(function(b) {
       b.addEventListener('click', async function() {
-        if (!confirm('"'+b.dataset.name+'" ürününü kalıcı olarak silmek istiyor musunuz?')) return;
+        if (!confirm('"'+b.dataset.name+'" ürününü çöp kutusuna taşıyın mı? 30 gün içinde geri alınabilir, sonra kalıcı silinir. (Vendor da çöp kutusunda görür.)')) return;
         try {
-          await deleteDoc(doc(db,'products',b.dataset.id));
-          showToast('Ürün silindi.');
+          await softDeleteItem('products', b.dataset.id);
+          showToast('🗑 Ürün çöp kutusuna taşındı.');
           all = all.filter(function(p){ return p.id!==b.dataset.id; });
           applyFilter();
         } catch(e) { showToast('Hata: '+e.message,'err'); }
@@ -11332,6 +11423,7 @@ async function admProducts(m) {
     '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(34,208,120,.12);color:#22d078">Aktif: '+activeCount+'</span>' +
     '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(240,164,41,.12);color:#f0a429">Admin Onayı: '+awaitingAdmin+'</span>' +
     '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(139,92,246,.12);color:#c4a8ff">Zincir Bekleniyor: '+awaitingInt+'</span>' +
+    (trashedAdminProds.length ? '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(220,38,38,.12);color:#dc2626">🗑 Çöp: '+trashedAdminProds.length+'</span>' : '') +
     '</div></div>' +
 
     // Arama
@@ -12129,15 +12221,32 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
     '<option value="local_reseller">Yetkili Bayi Üzerinden</option>' +
     '</select>' +
 
-    // Tutar + Para birimi
+    // Tutar + Para birimi + KDV
     '<div class="g2">' +
-    '<div><label class="lbl">Teklif Tutarı *</label><input class="inp" id="of-amount" type="number" min="0" placeholder="0"></div>' +
+    '<div><label class="lbl">Net Tutar (KDV Hariç) *</label><input class="inp" id="of-amount" type="number" min="0" step="0.01" placeholder="0,00"></div>' +
     '<div><label class="lbl">Para Birimi</label>' +
     '<select class="inp" id="of-currency">' +
     '<option value="TRY">₺ TRY</option>' +
     '<option value="USD">$ USD</option>' +
     '<option value="EUR">€ EUR</option>' +
     '</select></div>' +
+    '</div>' +
+
+    // KDV oranı + canlı hesap kutusu
+    '<div class="g2">' +
+    '<div><label class="lbl">KDV Oranı *</label>' +
+    '<select class="inp" id="of-vat">' +
+    '<option value="20" selected>%20 (Standart)</option>' +
+    '<option value="10">%10</option>' +
+    '<option value="1">%1</option>' +
+    '<option value="0">%0 (KDV\'siz)</option>' +
+    '</select></div>' +
+    '<div><label class="lbl">&nbsp;</label>' +
+    '<div id="of-vat-summary" style="background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.2);border-radius:6px;padding:8px 12px;font-size:11.5px;line-height:1.6">' +
+    '<div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Net</span><span style="font-weight:600" id="vat-net">₺0,00</span></div>' +
+    '<div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">KDV (%<span id="vat-rate">20</span>)</span><span style="font-weight:600" id="vat-amount">₺0,00</span></div>' +
+    '<div style="display:flex;justify-content:space-between;border-top:1px solid rgba(34,208,120,.25);padding-top:4px;margin-top:4px"><span style="color:#22d078;font-weight:700">TOPLAM</span><span style="font-weight:800;color:#22d078" id="vat-gross">₺0,00</span></div>' +
+    '</div></div>' +
     '</div>' +
 
     // Geçerlilik + Kanal payı
@@ -12212,10 +12321,27 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
     modal.querySelector('#of-billing').value='local_integrator';
   }
 
+  // KDV canlı hesaplama
+  function refreshVatSummary() {
+    var net = parseFloat(modal.querySelector('#of-amount').value) || 0;
+    var rate = parseFloat(modal.querySelector('#of-vat').value);
+    var cur = modal.querySelector('#of-currency').value;
+    var calc = calculateVat(net, rate);
+    modal.querySelector('#vat-net').textContent = formatMoney(calc.net, cur);
+    modal.querySelector('#vat-rate').textContent = calc.vatRate;
+    modal.querySelector('#vat-amount').textContent = formatMoney(calc.vatAmount, cur);
+    modal.querySelector('#vat-gross').textContent = formatMoney(calc.gross, cur);
+  }
+  ['of-amount','of-vat','of-currency'].forEach(function(id){
+    modal.querySelector('#'+id).addEventListener('input', refreshVatSummary);
+    modal.querySelector('#'+id).addEventListener('change', refreshVatSummary);
+  });
+  refreshVatSummary();
+
   modal.querySelector('#of-submit').addEventListener('click', async function() {
-    var amount = parseFloat(modal.querySelector('#of-amount').value)||0;
+    var netAmount = parseFloat(modal.querySelector('#of-amount').value)||0;
     var errDiv = modal.querySelector('#of-err');
-    if (amount <= 0) { errDiv.innerHTML='<div class="alert alert-err">Geçerli bir tutar girin.</div>'; return; }
+    if (netAmount <= 0) { errDiv.innerHTML='<div class="alert alert-err">Geçerli bir net tutar girin.</div>'; return; }
 
     var btn = modal.querySelector('#of-submit');
     btn.disabled=true; btn.textContent='Gönderiliyor...';
@@ -12223,6 +12349,8 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
     var offerType = modal.querySelector('#of-type').value;
     var billingModel = modal.querySelector('#of-billing').value;
     var currency = modal.querySelector('#of-currency').value;
+    var vatRate = parseFloat(modal.querySelector('#of-vat').value);
+    if (isNaN(vatRate)) vatRate = DEFAULT_VAT;
     var validity = parseInt(modal.querySelector('#of-validity').value)||30;
     var hasChannelFee = modal.querySelector('#of-channel').value==='yes';
     var delivery = modal.querySelector('#of-delivery').value;
@@ -12231,7 +12359,11 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
     var supportLevel = modal.querySelector('#of-support').value;
     var notes = modal.querySelector('#of-notes').value.trim();
 
-    var currencySymbols = {TRY:'₺',USD:'$',EUR:'€'};
+    // KDV hesapla
+    var vatCalc = calculateVat(netAmount, vatRate);
+    var grossAmount = vatCalc.gross;
+    var vatAmount = vatCalc.vatAmount;
+
     var validityDate = validity > 0 ? new Date(Date.now() + validity*24*60*60*1000) : null;
 
     var offerTypeLabels = {
@@ -12254,17 +12386,23 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
         vendorEmail:   CUR_USER.email,
         vendorType:    vtype,
         productName:   productName,
-        // Yeni gelişmiş alanlar
+        // Teklif bilgileri
         offerType:     offerType,
         offerTypeLabel:offerTypeLabels[offerType]||offerType,
         billingModel:  billingModel,
         billingLabel:  billingLabels[billingModel]||billingModel,
-        amount:        amount,
-        unitPrice:     amount,
+        // Fiyat alanları (yeni KDV destekli — v4.40+)
+        netAmount:     netAmount,
+        vatRate:       vatRate,
+        vatAmount:     vatAmount,
+        grossAmount:   grossAmount,
+        // Geri uyumluluk için eski alanlar (toplam = brüt = KDV dahil)
+        amount:        netAmount,
+        unitPrice:     netAmount,
         quantity:      1,
-        totalAmount:   amount,
+        totalAmount:   grossAmount,
         currency:      currency,
-        currencySymbol:currencySymbols[currency]||'₺',
+        currencySymbol:CURRENCY_SYMBOLS[currency]||'₺',
         hasChannelFee: hasChannelFee,
         validityDays:  validity,
         validUntil:    validityDate ? Timestamp.fromDate(validityDate) : null,
@@ -12281,7 +12419,7 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
       if (customerEmail) {
         sendEmail(customerEmail, customerName,
           'Yeni PoC Teklifi Aldınız — PoCHub',
-          (CUR_PROFILE?.displayName||CUR_USER.email)+' size '+productName+' icin teklif gonderdi. Tutar: '+currencySymbols[currency]+amount.toLocaleString('tr-TR'),
+          (CUR_PROFILE?.displayName||CUR_USER.email)+' size '+productName+' icin teklif gonderdi. Toplam: '+formatMoney(grossAmount, currency)+' (KDV %'+vatRate+' dahil)',
           'pochub.co uzerinden teklifinizi inceleyebilirsiniz.'
         );
       }
@@ -12301,12 +12439,12 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
         addDoc(collection(db,'notifications'),{
           userId:customerId, type:'new_offer',
           title:'Yeni Teklif Aldınız',
-          message:(CUR_PROFILE?.company||CUR_USER.email)+'"'+productName+'"icin teklif gonderdi.',
+          message:(CUR_PROFILE?.company||CUR_USER.email)+' "'+productName+'" için teklif gönderdi. Toplam: '+formatMoney(grossAmount, currency),
           fromUserId:CUR_USER.uid, fromName:CUR_PROFILE?.company||CUR_USER.email,
           read:false, createdAt:serverTimestamp(),
         }).catch(function(){});
       }
-      showToast('Teklif gönderildi!');
+      showToast('Teklif gönderildi! Toplam: '+formatMoney(grossAmount, currency));
       loadVendTab();
     } catch(e) {
       var msg = (e && e.message) ? e.message : String(e);
@@ -12344,6 +12482,34 @@ function openOfferDetailModal(o, viewerRole) {
   var otherParty   = viewerRole === 'vendor' ? (o.customerName||o.customerEmail||'—') : (o.vendorName||'—');
   var otherLabel   = viewerRole === 'vendor' ? 'Musteri' : 'Satici';
 
+  // KDV kırılımı (yeni teklifler) veya geri uyumlu legacy gösterim
+  var vatInfo = getOfferVatInfo(o);
+  var priceBlockHtml = '';
+  if (vatInfo.hasVatField) {
+    priceBlockHtml =
+      '<div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:14px;margin-bottom:14px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-secondary);margin-bottom:6px"><span>Net Tutar (KDV Hariç)</span><span style="font-weight:600">' + formatMoney(vatInfo.net, o.currency) + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-secondary);margin-bottom:8px"><span>KDV (%' + vatInfo.vatRate + ')</span><span style="font-weight:600">' + formatMoney(vatInfo.vatAmount, o.currency) + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(59,124,255,.25);padding-top:8px">' +
+      '<div style="font-size:14px;font-weight:700">TOPLAM (KDV Dahil)</div>' +
+      '<div style="font-size:20px;font-weight:800;color:var(--color-primary)">' + formatMoney(vatInfo.gross, o.currency) + '</div>' +
+      '</div>' + discHtml + '</div>';
+  } else {
+    // Eski tekliflerde KDV alanı yok — sadece toplam göster
+    priceBlockHtml =
+      '<div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:14px;margin-bottom:14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+      '<div style="font-size:12px;color:var(--text-secondary)">Birim Fiyat x Adet</div>' +
+      '<div style="font-size:12px;color:var(--text-secondary)">' + (o.unitPrice||0).toLocaleString('tr-TR') + ' x ' + (o.quantity||1) + '</div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<div style="font-size:14px;font-weight:700">Toplam Tutar</div>' +
+      '<div style="font-size:20px;font-weight:800;color:var(--color-primary)">' + (o.totalAmount||0).toLocaleString('tr-TR') + ' ' + (o.currency||'TL') + '</div>' +
+      '</div>' +
+      '<div style="font-size:10.5px;color:var(--text-muted);margin-top:6px;font-style:italic">Eski format: KDV bilgisi yok</div>' +
+      discHtml + '</div>';
+  }
+
   modal.innerHTML =
     '<div class="modal" style="max-width:500px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
@@ -12357,15 +12523,7 @@ function openOfferDetailModal(o, viewerRole) {
     '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">' + otherLabel + '</div><div style="font-size:13px;font-weight:600">' + otherParty + '</div></div>' +
     '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">Gecerlilik</div><div style="font-size:13px;font-weight:600">' + (o.validDays ? o.validDays + ' gun' : formatTS(o.validUntil)) + '</div></div>' +
     '</div>' +
-    '<div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:14px;margin-bottom:14px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
-    '<div style="font-size:12px;color:var(--text-secondary)">Birim Fiyat x Adet</div>' +
-    '<div style="font-size:12px;color:var(--text-secondary)">' + (o.unitPrice||0).toLocaleString('tr-TR') + ' x ' + (o.quantity||1) + '</div>' +
-    '</div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center">' +
-    '<div style="font-size:14px;font-weight:700">Toplam Tutar</div>' +
-    '<div style="font-size:20px;font-weight:800;color:var(--color-primary)">' + (o.totalAmount||0).toLocaleString('tr-TR') + ' ' + (o.currency||'TL') + '</div>' +
-    '</div>' + discHtml + '</div>' +
+    priceBlockHtml +
     notesHtml + revNoteHtml +
     '<div style="font-size:11px;color:var(--text-muted);text-align:right">' +
     'Gonderilme: ' + createdStr + (respondedStr ? ' - Yanit: ' + respondedStr : '') +
