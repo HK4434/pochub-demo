@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.37 | pochub.co -->
+<!-- PoCHub v4.38 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.37</title>
+<title>PoCHub.co — v4.38</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.37';
+const VERSION = 'v4.38';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -399,6 +399,7 @@ function formatTSShort(val) { return formatTS(val, {day:'2-digit', month:'2-digi
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.38':  ['BUG FIX: Ürünlerim ✎ butonu çoklu modal açıyordu (pr-eb pr-dist forEach içine yanlış nest), mesaj okundu sayım sistemi tutarsızdı (readBy kullanıma alındı), Tümünü Okundu İşaretle artık gerçekten okutuyor'],
   'v4.37':  ['BUG FIX: Vendor dashboard emoji surrogate pair fix, requests tab dispatch eksikliği, openEditEventModal null guard, Tümünü Okundu role-aware reload'],
   'v4.36':  ['PATCH: CHANGELOG toparlama — v4.14 → v4.35 arası eksik girişler tamamlandı, HTML yorum güncel'],
   'v4.35':  ['MINOR: Vendor dashboard zenginleştirme (satış hunisi, gelir pipeline, top products), ürünlerim CRUD, takvim etkinlik yönetimi, URL hash routing'],
@@ -1599,14 +1600,18 @@ async function loadMessagesTab(m, role) {
       const now2 = new Date();
       const monthStart = new Date(now2.getFullYear(), now2.getMonth(), 1);
 
-      // Her PoC için son mesaj ve okunmamış sayısı
+      // Her PoC için son mesaj ve okunmamış sayısı (readBy bazlı)
       const msgMap = {};
       await Promise.all(filtered.map(async poc => {
         try {
           const ms = await getDocs(query(collection(db,'poc_messages'), where('pocId','==',poc.id)));
           const msgs = ms.docs.map(d=>({...d.data(),id:d.id}))
             .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-          const unread = msgs.filter(msg => msg.senderId !== CUR_USER?.uid).length;
+          // Okunmamış = bana ait olmayan VE readBy'da olmadığım mesajlar
+          const unread = msgs.filter(function(msg){
+            if (msg.senderId === CUR_USER?.uid) return false;
+            return !(msg.readBy||[]).includes(CUR_USER?.uid);
+          }).length;
           msgMap[poc.id] = { last: msgs[0]||null, unread, total: msgs.length };
         } catch(e) { msgMap[poc.id] = {last:null, unread:0, total:0}; }
       }));
@@ -1700,21 +1705,35 @@ async function loadMessagesTab(m, role) {
 
       // Tümünü okundu
       m.querySelector('#msg-mark-all-read').addEventListener('click', async () => {
-        // Okunmamış bildirimleri Firestore'da okundu yap
         try {
-          // poc_conversations'daki unreadBy alanından kullanıcıyı kaldır
-          const convSnap = await getDocs(query(
-            collection(db,'poc_conversations'),
-            where('unreadBy','array-contains',CUR_USER.uid)
-          ));
-          const convUpdates = convSnap.docs.map(function(d) {
-            var current = d.data().unreadBy || [];
-            return updateDoc(d.ref, {
-              unreadBy: current.filter(function(uid){ return uid !== CUR_USER.uid; })
+          // Kullanıcının PoC'lerini al (rol bazlı)
+          var rolePocQuery = role === 'customer'
+            ? query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid))
+            : query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid));
+          var pocSnap = await getDocs(rolePocQuery);
+          var pocIds = pocSnap.docs.map(function(d){ return d.id; });
+
+          // Tüm okunmamış mesajları bul ve readBy'a ekle
+          var totalMarked = 0;
+          for (var i = 0; i < pocIds.length; i++) {
+            var msgSnap = await getDocs(query(
+              collection(db,'poc_messages'),
+              where('pocId','==',pocIds[i])
+            ));
+            var ups = [];
+            msgSnap.docs.forEach(function(md){
+              var msg = md.data();
+              if (msg.senderId === CUR_USER.uid) return;  // kendi mesajım
+              var rb = msg.readBy || [];
+              if (!rb.includes(CUR_USER.uid)) {
+                ups.push(updateDoc(md.ref, { readBy: [...rb, CUR_USER.uid] }));
+                totalMarked++;
+              }
             });
-          });
-          await Promise.all(convUpdates);
-          // notifications da okundu yap
+            await Promise.all(ups);
+          }
+
+          // Bildirimler de okundu yapılır
           const notifSnap = await getDocs(query(
             collection(db,'notifications'),
             where('userId','==',CUR_USER.uid),
@@ -1723,7 +1742,8 @@ async function loadMessagesTab(m, role) {
           await Promise.all(notifSnap.docs.map(function(d){ return updateDoc(d.ref, {read:true}); }));
           NOTIF_COUNT = 0;
           updateNotifBadge();
-          showToast('✓ ' + (convSnap.size + notifSnap.size) + ' kayıt okundu işaretlendi.');
+
+          showToast('✓ ' + totalMarked + ' mesaj, ' + notifSnap.size + ' bildirim okundu işaretlendi.');
         } catch(e) {
           showToast('İşaretleme hatası: ' + e.message, 'err');
         }
@@ -1969,6 +1989,14 @@ function openChatModal(pocId, pocTitle, otherName) {
       msgsEl.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,.35);font-size:13px">💬 Henüz mesaj yok.<br>İlk mesajı gönderin.</div>';
       return;
     }
+    // Okunmamış mesajları arka planda okundu işaretle (kullanıcıyı readBy'a ekle)
+    snap.docs.forEach(function(d){
+      var msg = d.data();
+      var rb = msg.readBy || [];
+      if (msg.senderId !== CUR_USER?.uid && !rb.includes(CUR_USER.uid)) {
+        updateDoc(d.ref, { readBy: [...rb, CUR_USER.uid] }).catch(function(){});
+      }
+    });
     msgsEl.innerHTML = snap.docs.map(d => {
       const msg = d.data();
       const isMine = msg.senderId === CUR_USER?.uid;
@@ -1997,6 +2025,7 @@ function openChatModal(pocId, pocTitle, otherName) {
         senderName: CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email,
         senderRole: CUR_PROFILE?.role || '',
         text,
+        readBy: [CUR_USER.uid],
         createdAt: serverTimestamp()
       });
       // Karşı tarafa Firestore bildirimi
@@ -5577,6 +5606,7 @@ function openPocCancelModal(pocId, pocTitle, vendorEmail, vendorName, onSuccess)
         senderRole: 'customer',
         text:     '[İPTAL BİLDİRİMİ] Neden: '+reason+' | Kategori: '+(catLabels[cat]||cat)+' | Yeniden görüşme: '+(reopenLabels[reopen]||reopen),
         type:     'cancellation',
+        readBy:   [CUR_USER.uid],
         createdAt: serverTimestamp(),
       });
 
@@ -7524,10 +7554,9 @@ async function loadVendTab() {
       m.querySelectorAll('.pr-cf').forEach(function(btn){ btn.addEventListener('click', function(){ renderProducts(searchVal, filterStatus, btn.dataset.val); }); });
       m.querySelectorAll('.pr-dist-btn').forEach(function(b){
         b.addEventListener('click', function(){ openProductDistModal(b.dataset.id, b.dataset.name, b.dataset.origin); });
+      });
       m.querySelectorAll('.pr-eb').forEach(function(b){b.addEventListener('click',function(){var p=products.find(function(x){return x.id===b.dataset.id;});if(p)openEditProd(p.id,p.name||'',p.category||'',p.country||'',p.description||'','',null);});});
       m.querySelectorAll('.pr-db').forEach(function(b){b.addEventListener('click',async function(){var p=products.find(function(x){return x.id===b.dataset.id;});if(!p||!confirm((p.name||'')+' silinsin mi?'))return;b.disabled=true;try{await deleteDoc(doc(db,'products',b.dataset.id));showToast('Silindi.');CUR_VEND_TAB='products';loadVendTab();}catch(e){showToast(e.message,'err');b.disabled=false;}});});
-
-      });
     };
     renderProducts('', '', '');
   }
