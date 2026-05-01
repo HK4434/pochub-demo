@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.41 | pochub.co -->
+<!-- PoCHub v4.42 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.41</title>
+<title>PoCHub.co — v4.42</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.41';
+const VERSION = 'v4.42';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -600,6 +600,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.42':  ['BUG FIX: Vendor dashboard hızlı erişim butonları (PoC Davet, Ürün Ekle, Etkinlik, Mesajlar) çalışmıyordu — new Function module scope dışındaydı, direkt fonksiyon referansına çevrildi. YENİ: Süresi dolmuş davetler otomatik Arşiv sekmesinde'],
   'v4.41':  ['MINOR: Davetlerim profesyonel yenileme — istatistik kartları, kabul oranı, yaşam döngüsü (arşiv/çöp), detay modal, düzenle (pending), hatırlat, yeniden gönder, iptal et, süre takibi, geçen zaman etiketi'],
   'v4.40':  ['MINOR: KDV sistemi (dropdown %0/%1/%10/%20, vendor net girer otomatik hesap), Mesajlar yaşam döngüsü (arşiv/çöp/geri al), tüm silme noktaları yaşam döngüsü ile uyumlu (kayıtlar, teklifler, bildirimler, kategoriler)'],
   'v4.39':  ['MINOR: Yaşam döngüsü sistemi (Aktif → Arşiv → Çöp Kutusu → Kalıcı Silme) — Ürünler, Etkinlikler, Portföy için ortak. 30 gün otomatik temizlik, manuel hemen sil, aktif PoC/teklifi olan kayıtlar korumalı. lifecycle.js helper fonksiyonları'],
@@ -7421,15 +7422,15 @@ async function loadVendTab() {
     var qaRow = document.createElement('div');
     qaRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
     [
-      ['\ud83d\udce8 PoC Davet Gönder',  'openSendInviteModal()',         'rgba(59,124,255,.12)','#7db4ff','rgba(59,124,255,.25)'],
-      ['\ud83d\udce6 Ürün Ekle',         "CUR_VEND_TAB='products';loadVendTab();el('v-add-product')?.click()", 'rgba(34,208,120,.08)','#22d078','rgba(34,208,120,.2)'],
-      ['\ud83d\udcc5 Etkinlik Oluştur',  "CUR_VEND_TAB='calendar';loadVendTab();setTimeout(function(){el('vd-add-event')?.click();},400)", 'rgba(196,168,255,.08)','#c4a8ff','rgba(196,168,255,.2)'],
-      ['\ud83d\udcac Mesajlar',          "CUR_VEND_TAB='messages';loadVendTab()", 'rgba(255,255,255,.06)','var(--text-secondary)','var(--border)'],
+      ['\ud83d\udce8 PoC Davet Gönder', function(){ openSendInviteModal(); },                                                  'rgba(59,124,255,.12)','#7db4ff','rgba(59,124,255,.25)'],
+      ['\ud83d\udce6 Ürün Ekle',        function(){ CUR_VEND_TAB='products'; loadVendTab(); setTimeout(function(){ el('v-add-product')?.click(); }, 400); }, 'rgba(34,208,120,.08)','#22d078','rgba(34,208,120,.2)'],
+      ['\ud83d\udcc5 Etkinlik Oluştur', function(){ CUR_VEND_TAB='calendar'; loadVendTab(); setTimeout(function(){ el('vd-add-event')?.click(); }, 400); }, 'rgba(196,168,255,.08)','#c4a8ff','rgba(196,168,255,.2)'],
+      ['\ud83d\udcac Mesajlar',         function(){ CUR_VEND_TAB='messages'; loadVendTab(); },                                  'rgba(255,255,255,.06)','var(--text-secondary)','var(--border)'],
     ].forEach(function(qa){
       var b = document.createElement('button');
       b.innerHTML = qa[0];
       b.style.cssText = 'background:'+qa[2]+';color:'+qa[3]+';border:1px solid '+qa[4]+';border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer';
-      b.addEventListener('click', function(){ new Function(qa[1])(); });
+      b.addEventListener('click', qa[1]);
       qaRow.appendChild(b);
     });
     m.appendChild(qaRow);
@@ -8947,16 +8948,37 @@ async function vendInvites(m) {
   // Arka planda 30 gün geçmiş çöp kayıtlarını otomatik temizle
   cleanupExpiredTrash('poc_invites','vendorId',CUR_USER.uid).catch(function(){});
 
-  // Süresi dolmuş pending'leri otomatik expired'a çevir (sadece local view; db de dirty olabilir ama dert değil)
+  // Süresi dolmuş pending'leri otomatik expired'a çevir + arşive taşı (kıdemli analist kararı)
+  // Vendor'ın "Bekliyor" listesini eski ölü davetler kirletmesin, ama Arşiv'den hâlâ ulaşılabilir
   var nowMs = Date.now();
+  var autoExpireBatch = [];
   allInvites.forEach(function(inv){
     if (inv.status === 'pending' && inv.createdAt?.seconds) {
       var ageMs = nowMs - (inv.createdAt.seconds * 1000);
       if (ageMs > INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000) {
-        inv.status = 'expired'; // local
+        inv.status = 'expired';   // local güncelle
+        inv.archived = true;       // local: Arşiv sekmesinde gözüksün
+        inv.archivedAt = inv.archivedAt || { seconds: Math.floor(nowMs/1000), nanoseconds: 0 };
+        // Firestore'da kalıcı yaz — bir kez, sonra okuma yeter
+        if (!inv._autoArchived) {
+          autoExpireBatch.push(
+            updateDoc(doc(db,'poc_invites',inv.id), {
+              status:     'expired',
+              archived:   true,
+              archivedAt: serverTimestamp(),
+              autoExpiredAt: serverTimestamp(),
+            }).catch(function(){})
+          );
+        }
       }
     }
   });
+  // Arka planda yaz, render'ı bekletmesin
+  if (autoExpireBatch.length) {
+    Promise.all(autoExpireBatch).then(function(){
+      console.log('[invites] ' + autoExpireBatch.length + ' süresi dolmuş davet otomatik arşive taşındı.');
+    }).catch(function(){});
+  }
 
   var statusLabels = {pending:'Bekliyor', accepted:'Kabul Edildi', declined:'Reddedildi', expired:'Süresi Doldu', cancelled:'İptal Edildi'};
   var statusColors = {pending:'#f0a429', accepted:'#22d078', declined:'#ff7070', expired:'#5a6278', cancelled:'#7c87a0'};
@@ -9079,6 +9101,19 @@ async function vendInvites(m) {
       warn.style.cssText = 'background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#fca5a5';
       warn.innerHTML = '⚠️ Çöp kutusundaki davetler 30 gün sonra <strong>kalıcı olarak silinir</strong>.';
       m.appendChild(warn);
+    }
+
+    // Arşiv bilgilendirme banner'ı — otomatik arşivlenen davet varsa
+    if (filterLifecycle === 'archived' && counts.archived > 0) {
+      var autoExpiredCount = bucket.filter(function(inv){
+        return inv.status === 'expired' && inv.autoExpiredAt;
+      }).length;
+      if (autoExpiredCount > 0) {
+        var info = document.createElement('div');
+        info.style.cssText = 'background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#7db4ff';
+        info.innerHTML = 'ℹ️ Süresi dolan ('+INVITE_EXPIRY_DAYS+'+ gün cevap alınamayan) davetler buraya otomatik taşınır. <strong>Yeniden Gönder</strong> ile aynı müşteriye yeni davet oluşturabilirsiniz.';
+        m.appendChild(info);
+      }
     }
 
     // Arama
