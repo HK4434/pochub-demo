@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.40 | pochub.co -->
+<!-- PoCHub v4.41 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.40</title>
+<title>PoCHub.co — v4.41</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.40';
+const VERSION = 'v4.41';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -600,6 +600,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.41':  ['MINOR: Davetlerim profesyonel yenileme — istatistik kartları, kabul oranı, yaşam döngüsü (arşiv/çöp), detay modal, düzenle (pending), hatırlat, yeniden gönder, iptal et, süre takibi, geçen zaman etiketi'],
   'v4.40':  ['MINOR: KDV sistemi (dropdown %0/%1/%10/%20, vendor net girer otomatik hesap), Mesajlar yaşam döngüsü (arşiv/çöp/geri al), tüm silme noktaları yaşam döngüsü ile uyumlu (kayıtlar, teklifler, bildirimler, kategoriler)'],
   'v4.39':  ['MINOR: Yaşam döngüsü sistemi (Aktif → Arşiv → Çöp Kutusu → Kalıcı Silme) — Ürünler, Etkinlikler, Portföy için ortak. 30 gün otomatik temizlik, manuel hemen sil, aktif PoC/teklifi olan kayıtlar korumalı. lifecycle.js helper fonksiyonları'],
   'v4.38':  ['BUG FIX: Ürünlerim ✎ butonu çoklu modal açıyordu (pr-eb pr-dist forEach içine yanlış nest), mesaj okundu sayım sistemi tutarsızdı (readBy kullanıma alındı), Tümünü Okundu İşaretle artık gerçekten okutuyor'],
@@ -5443,7 +5444,11 @@ async function custInvites(m) {
     var invites = [
       ...pendSnap.docs.map(function(d){ return {...d.data(),id:d.id}; }),
       ...histSnap.docs.map(function(d){ return {...d.data(),id:d.id}; }),
-    ];
+    ]
+      // Vendor'un çöp/arşive attığı davetler müşteride görünmesin
+      .filter(function(inv){ return getLifecycleState(inv) === 'active'; })
+      // İptal edilmiş davetler de müşteri için görünmesin
+      .filter(function(inv){ return inv.status !== 'cancelled'; });
     invites.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
     var stColors = {pending:'#f0a429', accepted:'#22d078', declined:'#ff7070', expired:'#5a6278'};
@@ -6485,7 +6490,10 @@ async function loadCustTab() {
     var pendingPocs    = pocs.filter(function(p){ return p.status==='pending'; }).length;
     var pendingOffers  = allOffs.filter(function(o){ return o.status==='pending'; }).length;
     var revisionOffers = allOffs.filter(function(o){ return o.status==='revision_requested'; }).length;
-    var pendingInvites = invSnap.size;
+    var pendingInvites = invSnap.docs.filter(function(d){
+      var inv = d.data();
+      return getLifecycleState(inv) === 'active' && inv.status !== 'cancelled';
+    }).length;
     var upcomingRegs   = regsD.filter(function(r){ return r.eventDate && new Date(r.eventDate) >= now; }).length;
 
     var recentOffers = allOffs
@@ -7202,7 +7210,8 @@ async function loadVendTab() {
     var evs   = evSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var offs  = offSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var prods = prodSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
-    var invs  = invSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    var invs  = invSnap.docs.map(function(d){ return {...d.data(),id:d.id}; })
+      .filter(function(i){ return getLifecycleState(i) === 'active'; });  // çöp/arşiv hariç
     var now   = new Date();
 
     // İstatistikler
@@ -8927,87 +8936,630 @@ async function vendRequests(m) {
 
 
 async function vendInvites(m) {
+  if (!m) return;
+
+  const INVITE_EXPIRY_DAYS = 30;
+
   const snap = await getDocs(query(collection(db,'poc_invites'), where('vendorId','==',CUR_USER.uid)));
-  var invites = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
-  invites.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+  var allInvites = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+  allInvites.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
-  var statusLabels = {pending:'Bekliyor', accepted:'Kabul Edildi', declined:'Reddedildi', expired:'Süresi Doldu'};
-  var statusColors = {pending:'#f0a429', accepted:'#22d078', declined:'#ff7070', expired:'#5a6278'};
+  // Arka planda 30 gün geçmiş çöp kayıtlarını otomatik temizle
+  cleanupExpiredTrash('poc_invites','vendorId',CUR_USER.uid).catch(function(){});
 
-  var render = function(searchVal, filterStatus) {
-    m.innerHTML = '';
-    var filtered = invites.filter(function(inv) {
-      if (filterStatus && inv.status !== filterStatus) return false;
+  // Süresi dolmuş pending'leri otomatik expired'a çevir (sadece local view; db de dirty olabilir ama dert değil)
+  var nowMs = Date.now();
+  allInvites.forEach(function(inv){
+    if (inv.status === 'pending' && inv.createdAt?.seconds) {
+      var ageMs = nowMs - (inv.createdAt.seconds * 1000);
+      if (ageMs > INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000) {
+        inv.status = 'expired'; // local
+      }
+    }
+  });
+
+  var statusLabels = {pending:'Bekliyor', accepted:'Kabul Edildi', declined:'Reddedildi', expired:'Süresi Doldu', cancelled:'İptal Edildi'};
+  var statusColors = {pending:'#f0a429', accepted:'#22d078', declined:'#ff7070', expired:'#5a6278', cancelled:'#7c87a0'};
+  var statusIcons  = {pending:'⏳', accepted:'✓', declined:'✕', expired:'⏰', cancelled:'⊘'};
+
+  // Geçen zaman etiketi ("3 gün önce")
+  function timeAgo(ts) {
+    if (!ts) return '—';
+    var t = ts.toDate ? ts.toDate() : new Date(ts);
+    var diffMs = Date.now() - t.getTime();
+    var diffMin = Math.floor(diffMs / (60*1000));
+    if (diffMin < 1) return 'az önce';
+    if (diffMin < 60) return diffMin + ' dakika önce';
+    var diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return diffHr + ' saat önce';
+    var diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 30) return diffDay + ' gün önce';
+    var diffMo = Math.floor(diffDay / 30);
+    if (diffMo < 12) return diffMo + ' ay önce';
+    return Math.floor(diffMo / 12) + ' yıl önce';
+  }
+
+  // Davet için kalan gün sayısı (pending'ler için)
+  function daysUntilExpiry(inv) {
+    if (!inv.createdAt?.seconds) return null;
+    var ageMs = Date.now() - (inv.createdAt.seconds * 1000);
+    var leftMs = (INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000) - ageMs;
+    return Math.ceil(leftMs / (24*60*60*1000));
+  }
+
+  var render = function(searchVal, filterStatus, filterLifecycle) {
+    filterLifecycle = filterLifecycle || 'active';
+
+    // Yaşam döngüsü sayımları
+    var counts = { active:0, archived:0, trash:0 };
+    allInvites.forEach(function(inv){ counts[getLifecycleState(inv)] = (counts[getLifecycleState(inv)]||0) + 1; });
+
+    // Sadece bu yaşam döngüsündeki davetler
+    var bucket = allInvites.filter(function(inv){ return getLifecycleState(inv) === filterLifecycle; });
+
+    // Status istatistikleri (sadece active bucket için anlamlı)
+    var stats = {
+      total:    bucket.length,
+      pending:  bucket.filter(function(i){return i.status==='pending';}).length,
+      accepted: bucket.filter(function(i){return i.status==='accepted';}).length,
+      declined: bucket.filter(function(i){return i.status==='declined';}).length,
+      expired:  bucket.filter(function(i){return i.status==='expired';}).length,
+      cancelled:bucket.filter(function(i){return i.status==='cancelled';}).length,
+    };
+    var responded = stats.accepted + stats.declined;
+    var acceptRate = responded > 0 ? Math.round((stats.accepted / responded) * 100) : 0;
+
+    // Filtre uygulanmış liste
+    var filtered = bucket.filter(function(inv) {
+      if (filterLifecycle === 'active' && filterStatus && inv.status !== filterStatus) return false;
       if (searchVal) {
-        var q = searchVal.toLowerCase();
-        return (inv.customerName||'').toLowerCase().includes(q) ||
-               (inv.customerEmail||'').toLowerCase().includes(q) ||
-               (inv.productName||'').toLowerCase().includes(q);
+        var q2 = searchVal.toLowerCase();
+        return (inv.customerName||'').toLowerCase().includes(q2) ||
+               (inv.customerEmail||'').toLowerCase().includes(q2) ||
+               (inv.productName||'').toLowerCase().includes(q2) ||
+               (inv.pocScope||'').toLowerCase().includes(q2);
       }
       return true;
     });
 
-    // Başlık
-    m.innerHTML =
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">' +
-      '<div style="display:flex;align-items:center;gap:10px">' +
-      '<h2 style="font-size:18px;font-weight:700">Gönderilen Davetler</h2>' +
-      '<span style="font-size:12px;color:var(--text-muted)">' + invites.length + ' davet</span>' +
-      '</div>' +
-      '<button class="btn-p btn-sm" id="vend-new-invite-btn">+ Yeni Davet</button>' +
-      '</div>' +
+    m.innerHTML = '';
 
-      // Arama
-      '<input id="vi-search" class="inp" placeholder="🔍 Müşteri adı, email veya ürün ara..." value="' + (searchVal||'') + '" style="margin-bottom:10px;font-size:13px">' +
+    // Header
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
+    hdr.innerHTML = '<div style="display:flex;align-items:center;gap:10px">'
+      + '<h2 style="font-size:18px;font-weight:700">📨 Davetlerim</h2>'
+      + '<span style="font-size:12px;color:var(--text-muted)">' + counts.active + ' aktif · ' + counts.archived + ' arşiv · ' + counts.trash + ' çöp</span>'
+      + '</div>'
+      + '<button class="btn-p btn-sm" id="vend-new-invite-btn">+ Yeni Davet</button>';
+    m.appendChild(hdr);
 
-      // Filtreler
-      '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
-      ['','pending','accepted','declined','expired'].map(function(s) {
-        var lbl = s ? statusLabels[s] : 'Tümü';
-        var active = filterStatus === s;
-        return '<button class="vi-filter btn-' + (active?'p':'g') + ' btn-sm" data-val="' + s + '" style="font-size:12px">' + lbl + '</button>';
-      }).join('') +
-      '</div>';
-
-    if (!filtered.length) {
-      m.innerHTML += '<div class="empty"><div class="empty-icon">📨</div>' +
-        (searchVal || filterStatus ? 'Arama sonucu bulunamadı.' : 'Henüz davet göndermediniz.') + '</div>';
-    } else {
-      var list = '<div style="display:flex;flex-direction:column;gap:8px">';
-      filtered.forEach(function(inv) {
-        var stColor = statusColors[inv.status] || '#7c87a0';
-        var stLabel = statusLabels[inv.status] || inv.status;
-        list +=
-          '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">' +
-          '<div>' +
-          '<div style="font-size:13.5px;font-weight:700">' + (inv.customerName||inv.customerEmail||'—') + '</div>' +
-          '<div style="font-size:12px;color:var(--text-secondary);margin-top:1px">' + (inv.customerEmail||'') + '</div>' +
-          '</div>' +
-          '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;color:' + stColor + ';background:' + stColor + '18">' + stLabel + '</span>' +
-          '</div>' +
-          '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">📦 ' + (inv.productName||'—') + (inv.productCategory?' · '+inv.productCategory:'') + '</div>' +
-          (inv.pocScope ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">🎯 Kapsam: ' + inv.pocScope + '</div>' : '') +
-          '<div style="display:flex;gap:8px;font-size:11px;color:var(--text-muted);flex-wrap:wrap">' +
-          (inv.pocDuration ? '<span>⏱ ' + inv.pocDuration + '</span>' : '') +
-          (inv.pocLocation ? '<span>📍 ' + inv.pocLocation + '</span>' : '') +
-          '<span>📅 ' + (inv.createdAt?.toDate ? inv.createdAt.toDate().toLocaleDateString('tr-TR') : '—') + '</span>' +
-          '</div>' +
-          '</div>';
+    // İstatistik kartları (sadece active sekmesinde)
+    if (filterLifecycle === 'active') {
+      var statsRow = document.createElement('div');
+      statsRow.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px';
+      var statCards = [
+        ['Toplam',     stats.total,     '#7db4ff', 'rgba(125,180,255,.08)', 'rgba(125,180,255,.2)'],
+        ['Bekliyor',   stats.pending,   '#f0a429', 'rgba(240,164,41,.08)',  'rgba(240,164,41,.2)'],
+        ['Kabul',      stats.accepted,  '#22d078', 'rgba(34,208,120,.08)',  'rgba(34,208,120,.2)'],
+        ['Red',        stats.declined,  '#ff7070', 'rgba(255,112,112,.08)', 'rgba(255,112,112,.2)'],
+        ['Süresi Doldu', stats.expired, '#5a6278', 'rgba(90,98,120,.08)',   'rgba(90,98,120,.2)'],
+        ['Kabul Oranı', acceptRate + '%', '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+      ];
+      statCards.forEach(function(s){
+        var card = document.createElement('div');
+        card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4]+';border-radius:8px;padding:10px 12px;text-align:center';
+        card.innerHTML = '<div style="font-size:18px;font-weight:800;color:'+s[2]+'">'+s[1]+'</div>'
+                       + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">'+s[0]+'</div>';
+        statsRow.appendChild(card);
       });
-      list += '</div>';
-      m.innerHTML += list;
+      m.appendChild(statsRow);
     }
 
-    // Eventler
-    m.querySelector('#vend-new-invite-btn')?.addEventListener('click', function() { openSendInviteModal(); });
-    m.querySelector('#vi-search')?.addEventListener('input', function() { render(this.value, filterStatus); });
-    m.querySelectorAll('.vi-filter').forEach(function(btn) {
-      btn.addEventListener('click', function() { render(searchVal, btn.dataset.val); });
+    // Yaşam döngüsü sekmeleri
+    var lcRow = document.createElement('div');
+    lcRow.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px';
+    [
+      ['active',   'Aktif ('+counts.active+')',     '#22d078'],
+      ['archived', '📦 Arşiv ('+counts.archived+')','#7db4ff'],
+      ['trash',    '🗑 Çöp Kutusu ('+counts.trash+')','#dc2626'],
+    ].forEach(function(t){
+      var b = document.createElement('button');
+      var isOn = filterLifecycle === t[0];
+      b.style.cssText = 'background:'+(isOn?t[2]:'transparent')+';color:'+(isOn?'#fff':t[2])+';border:1px solid '+t[2]+';padding:5px 14px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer';
+      b.textContent = t[1];
+      b.addEventListener('click', function(){ render(searchVal, '', t[0]); });
+      lcRow.appendChild(b);
+    });
+    m.appendChild(lcRow);
+
+    // Çöp uyarı banner'ı
+    if (filterLifecycle === 'trash' && counts.trash > 0) {
+      var warn = document.createElement('div');
+      warn.style.cssText = 'background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#fca5a5';
+      warn.innerHTML = '⚠️ Çöp kutusundaki davetler 30 gün sonra <strong>kalıcı olarak silinir</strong>.';
+      m.appendChild(warn);
+    }
+
+    // Arama
+    var sInp = document.createElement('input');
+    sInp.id = 'vi-search';
+    sInp.className = 'inp';
+    sInp.placeholder = '🔍 Müşteri, email, ürün veya kapsam ara...';
+    sInp.value = searchVal || '';
+    sInp.style.cssText = 'margin-bottom:10px;font-size:13px';
+    sInp.addEventListener('input', function(){ render(this.value, filterStatus, filterLifecycle); });
+    m.appendChild(sInp);
+
+    // Status filtreleri (sadece active'da)
+    if (filterLifecycle === 'active') {
+      var sfRow = document.createElement('div');
+      sfRow.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
+      ['','pending','accepted','declined','expired','cancelled'].forEach(function(s){
+        var lbl = s ? statusLabels[s] : 'Tümü';
+        var b = document.createElement('button');
+        b.className = 'btn-' + (filterStatus===s?'p':'g') + ' btn-sm';
+        b.style.cssText = 'font-size:12px';
+        b.textContent = lbl;
+        b.addEventListener('click', function(){ render(searchVal, s, filterLifecycle); });
+        sfRow.appendChild(b);
+      });
+      m.appendChild(sfRow);
+    }
+
+    // Liste
+    if (!filtered.length) {
+      var emp = document.createElement('div');
+      emp.className = 'empty';
+      var icon = filterLifecycle==='trash' ? '🗑' : filterLifecycle==='archived' ? '📦' : '📨';
+      var msg2 = filterLifecycle==='trash' ? 'Çöp kutusu boş.'
+               : filterLifecycle==='archived' ? 'Arşivde davet yok.'
+               : (searchVal||filterStatus ? 'Arama sonucu bulunamadı.' : 'Henüz davet göndermediniz.');
+      emp.innerHTML = '<div class="empty-icon">'+icon+'</div>' + msg2;
+      m.appendChild(emp);
+    } else {
+      var listWrap = document.createElement('div');
+      listWrap.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+
+      filtered.forEach(function(inv){
+        var lcState = getLifecycleState(inv);
+        var stColor = statusColors[inv.status] || '#7c87a0';
+        var stLabel = statusLabels[inv.status] || inv.status;
+        var stIcon  = statusIcons[inv.status] || '';
+        var daysLeft = inv.status === 'pending' ? daysUntilExpiry(inv) : null;
+        var sentAgo = timeAgo(inv.createdAt);
+
+        var card = document.createElement('div');
+        var borderColor = inv.status==='pending'  ? 'rgba(240,164,41,.3)'
+                        : inv.status==='accepted' ? 'rgba(34,208,120,.3)'
+                        : 'var(--border)';
+        card.style.cssText = 'background:var(--bg-surface);border:1px solid '+borderColor+';border-radius:10px;padding:14px 16px';
+
+        // Üst satır: müşteri + status badge
+        var topRow = '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;gap:10px">'
+          + '<div style="flex:1;min-width:0">'
+          +   '<div style="font-size:13.5px;font-weight:700">' + (inv.customerName||inv.customerEmail||'—') + '</div>'
+          +   '<div style="font-size:12px;color:var(--text-secondary);margin-top:1px">' + (inv.customerEmail||'') + '</div>'
+          + '</div>'
+          + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
+          +   '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;color:' + stColor + ';background:' + stColor + '18">' + stIcon + ' ' + stLabel + '</span>'
+          +   (lcState==='trash' ? '<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;color:#dc2626;background:rgba(220,38,38,.12)">🗑 ' + (trashDaysLeft(inv)||0) + ' gün</span>' : '')
+          +   (daysLeft !== null && daysLeft > 0 && daysLeft <= 7 ? '<span style="font-size:10.5px;color:#f0a429;font-weight:600">⏰ ' + daysLeft + ' gün kaldı</span>' : '')
+          + '</div>'
+          + '</div>';
+
+        // Ürün satırı
+        var prodRow = '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:6px">📦 <strong>' + (inv.productName||'—') + '</strong>' + (inv.productCategory?' · '+inv.productCategory:'') + '</div>';
+
+        // Kapsam
+        var scopeRow = inv.pocScope
+          ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;line-height:1.5">🎯 ' + (inv.pocScope.length > 140 ? inv.pocScope.substring(0,140)+'…' : inv.pocScope) + '</div>'
+          : '';
+
+        // Meta
+        var locLabels = {online:'🌐 Online', customer:'📍 Müşteri Lok.', vendor:'🏢 Vendor Lok.', hybrid:'🔄 Hibrit'};
+        var metaRow = '<div style="display:flex;gap:10px;font-size:11px;color:var(--text-muted);flex-wrap:wrap;margin-bottom:'+(lcState==='active'?'10px':'0')+'">'
+          + (inv.pocDuration ? '<span>⏱ ' + inv.pocDuration + '</span>' : '')
+          + (inv.pocLocation ? '<span>' + (locLabels[inv.pocLocation]||inv.pocLocation) + '</span>' : '')
+          + '<span>📅 ' + sentAgo + '</span>'
+          + '</div>';
+
+        // Aksiyonlar — duruma ve yaşam döngüsüne göre
+        var actHtml = '';
+        if (lcState === 'active') {
+          actHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px">';
+          actHtml += '<button class="vi-detail" data-id="'+inv.id+'" style="background:rgba(59,124,255,.08);color:#7db4ff;border:1px solid rgba(59,124,255,.2);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">👁 Detay</button>';
+
+          if (inv.status === 'pending') {
+            actHtml += '<button class="vi-edit" data-id="'+inv.id+'" style="background:rgba(125,180,255,.08);color:#7db4ff;border:1px solid rgba(125,180,255,.2);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">✏️ Düzenle</button>';
+            actHtml += '<button class="vi-remind" data-id="'+inv.id+'" data-cn="'+(inv.customerName||'').replace(/"/g,"&quot;")+'" data-ce="'+(inv.customerEmail||'').replace(/"/g,"&quot;")+'" data-pn="'+(inv.productName||'').replace(/"/g,"&quot;")+'" style="background:rgba(240,164,41,.08);color:#f0a429;border:1px solid rgba(240,164,41,.2);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">🔔 Hatırlat</button>';
+            actHtml += '<button class="vi-cancel" data-id="'+inv.id+'" data-cn="'+(inv.customerName||'').replace(/"/g,"&quot;")+'" style="background:rgba(220,38,38,.06);color:#dc2626;border:1px solid rgba(220,38,38,.15);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">⊘ İptal Et</button>';
+          }
+
+          if (inv.status === 'declined' || inv.status === 'expired' || inv.status === 'cancelled') {
+            actHtml += '<button class="vi-resend" data-id="'+inv.id+'" style="background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">↻ Yeniden Gönder</button>';
+          }
+
+          if (inv.status !== 'accepted') {
+            actHtml += '<button class="vi-arch" data-id="'+inv.id+'" style="background:rgba(125,180,255,.06);color:#7db4ff;border:1px solid rgba(125,180,255,.18);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer" title="Arşive al">📦</button>';
+            actHtml += '<button class="vi-trash" data-id="'+inv.id+'" data-cn="'+(inv.customerName||'').replace(/"/g,"&quot;")+'" style="background:rgba(220,38,38,.06);color:#dc2626;border:1px solid rgba(220,38,38,.15);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer" title="Çöpe at">🗑</button>';
+          } else {
+            actHtml += '<span style="font-size:11px;color:var(--text-muted);align-self:center;font-style:italic">Kabul edilen davet silinemez (PoC oluşmuş olabilir)</span>';
+          }
+
+          actHtml += '</div>';
+        } else if (lcState === 'archived') {
+          actHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px">';
+          actHtml += '<button class="vi-detail" data-id="'+inv.id+'" style="background:rgba(59,124,255,.08);color:#7db4ff;border:1px solid rgba(59,124,255,.2);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">👁 Detay</button>';
+          actHtml += '<button class="vi-unarch" data-id="'+inv.id+'" style="background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">↩ Aktife Al</button>';
+          actHtml += '<button class="vi-trash" data-id="'+inv.id+'" data-cn="'+(inv.customerName||'').replace(/"/g,"&quot;")+'" style="background:rgba(220,38,38,.06);color:#dc2626;border:1px solid rgba(220,38,38,.15);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">🗑</button>';
+          actHtml += '</div>';
+        } else if (lcState === 'trash') {
+          actHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px">';
+          actHtml += '<button class="vi-detail" data-id="'+inv.id+'" style="background:rgba(59,124,255,.08);color:#7db4ff;border:1px solid rgba(59,124,255,.2);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">👁 Detay</button>';
+          actHtml += '<button class="vi-restore" data-id="'+inv.id+'" style="background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer">↩ Geri Al</button>';
+          actHtml += '<button class="vi-perm" data-id="'+inv.id+'" data-cn="'+(inv.customerName||'').replace(/"/g,"&quot;")+'" style="background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.4);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">⊗ Hemen Sil</button>';
+          actHtml += '</div>';
+        }
+
+        card.innerHTML = topRow + prodRow + scopeRow + metaRow + actHtml;
+        listWrap.appendChild(card);
+      });
+
+      m.appendChild(listWrap);
+    }
+
+    // ── EVENT LISTENERLAR ────────────────────────────────────────
+    m.querySelector('#vend-new-invite-btn')?.addEventListener('click', function(){ openSendInviteModal(); });
+
+    var refresh = function(){ vendInvites(m); };
+
+    // Detay
+    m.querySelectorAll('.vi-detail').forEach(function(b){
+      b.addEventListener('click', function(){
+        var inv = allInvites.find(function(x){ return x.id===b.dataset.id; });
+        if (inv) openInviteDetailModal(inv);
+      });
+    });
+
+    // Düzenle (sadece pending)
+    m.querySelectorAll('.vi-edit').forEach(function(b){
+      b.addEventListener('click', function(){
+        var inv = allInvites.find(function(x){ return x.id===b.dataset.id; });
+        if (inv) openEditInviteModal(inv, refresh);
+      });
+    });
+
+    // Hatırlat
+    m.querySelectorAll('.vi-remind').forEach(function(b){
+      b.addEventListener('click', async function(){
+        if (!confirm((b.dataset.cn||'Müşteri') + ' kişisine "' + b.dataset.pn + '" daveti için hatırlatma e-postası gönderilsin mi?')) return;
+        b.disabled = true;
+        try {
+          // Hatırlatma kaydı (audit) — opsiyonel ama iyi olur
+          await updateDoc(doc(db,'poc_invites',b.dataset.id), {
+            lastReminderAt: serverTimestamp(),
+            reminderCount: (allInvites.find(function(x){return x.id===b.dataset.id;})?.reminderCount || 0) + 1,
+          });
+          // E-posta + bildirim
+          if (b.dataset.ce && typeof sendEmail === 'function') {
+            sendEmail(b.dataset.ce, b.dataset.cn,
+              'PoC Daveti Hatırlatması — PoCHub',
+              (CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email) + ' size daha önce "' + b.dataset.pn + '" ürünü için PoC daveti göndermişti. Cevap bekliyoruz.',
+              'pochub.co üzerinden davete cevap verebilirsiniz.'
+            );
+          }
+          var inv = allInvites.find(function(x){return x.id===b.dataset.id;});
+          if (inv && inv.customerId) {
+            await addDoc(collection(db,'notifications'), {
+              userId: inv.customerId,
+              type: 'invite_reminder',
+              title: 'PoC Daveti Hatırlatma',
+              message: (CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) + ' "' + b.dataset.pn + '" daveti için hatırlatma gönderdi.',
+              fromUserId: CUR_USER.uid,
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+          }
+          showToast('🔔 Hatırlatma gönderildi.');
+          refresh();
+        } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+      });
+    });
+
+    // İptal et (pending)
+    m.querySelectorAll('.vi-cancel').forEach(function(b){
+      b.addEventListener('click', async function(){
+        if (!confirm((b.dataset.cn||'Müşteri') + ' kişisine gönderilen davet iptal edilsin mi? Davet "İptal Edildi" olarak işaretlenir, müşteri tarafında pasif olur.')) return;
+        b.disabled = true;
+        try {
+          await updateDoc(doc(db,'poc_invites',b.dataset.id), {
+            status: 'cancelled',
+            cancelledAt: serverTimestamp(),
+          });
+          showToast('Davet iptal edildi.');
+          refresh();
+        } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+      });
+    });
+
+    // Yeniden gönder
+    m.querySelectorAll('.vi-resend').forEach(function(b){
+      b.addEventListener('click', async function(){
+        var inv = allInvites.find(function(x){ return x.id===b.dataset.id; });
+        if (!inv) return;
+        if (!confirm((inv.customerName||inv.customerEmail||'Müşteri') + ' kişisine "' + (inv.productName||'') + '" daveti yeniden gönderilsin mi? Yeni bir davet kaydı oluşturulacak ve süre baştan başlayacak.')) return;
+        b.disabled = true;
+        try {
+          // Yeni kayıt
+          await addDoc(collection(db,'poc_invites'), {
+            vendorId:        inv.vendorId,
+            vendorName:      inv.vendorName || (CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email),
+            vendorEmail:     inv.vendorEmail || CUR_USER.email,
+            vendorType:      inv.vendorType || (CUR_PROFILE?.vendorType || ''),
+            vendorCompany:   inv.vendorCompany || (CUR_PROFILE?.company || ''),
+            customerEmail:   inv.customerEmail,
+            customerName:    inv.customerName,
+            customerId:      inv.customerId || '',
+            productId:       inv.productId,
+            productName:     inv.productName,
+            productCategory: inv.productCategory,
+            pocScope:        inv.pocScope || '',
+            pocDuration:     inv.pocDuration || '',
+            pocLocation:     inv.pocLocation || '',
+            message:         inv.message || '',
+            status:          'pending',
+            resendOf:        inv.id,
+            createdAt:       serverTimestamp(),
+          });
+          // Bildirim
+          if (inv.customerId) {
+            await addDoc(collection(db,'notifications'), {
+              userId: inv.customerId,
+              type: 'poc_invite',
+              title: 'PoC Daveti Yenilendi',
+              message: (CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) + ' "' + (inv.productName||'') + '" daveti yeniden gönderdi.',
+              fromUserId: CUR_USER.uid,
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+          }
+          showToast('↻ Davet yeniden gönderildi.');
+          refresh();
+        } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+      });
+    });
+
+    // Yaşam döngüsü
+    m.querySelectorAll('.vi-arch').forEach(function(b){
+      b.addEventListener('click', async function(){
+        b.disabled = true;
+        try { await archiveItem('poc_invites', b.dataset.id); showToast('📦 Davet arşive alındı.'); refresh(); }
+        catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+      });
+    });
+    m.querySelectorAll('.vi-unarch').forEach(function(b){
+      b.addEventListener('click', async function(){
+        b.disabled = true;
+        try { await restoreFromArchive('poc_invites', b.dataset.id); showToast('✓ Aktife alındı.'); refresh(); }
+        catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+      });
+    });
+    m.querySelectorAll('.vi-trash').forEach(function(b){
+      b.addEventListener('click', async function(){
+        if (!confirm('"'+(b.dataset.cn||'Müşteri')+'" daveti çöp kutusuna taşınsın mı? 30 gün içinde geri alabilirsiniz, sonra kalıcı silinir.')) return;
+        b.disabled = true;
+        try { await softDeleteItem('poc_invites', b.dataset.id); showToast('🗑 Davet çöp kutusuna taşındı.'); refresh(); }
+        catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+      });
+    });
+    m.querySelectorAll('.vi-restore').forEach(function(b){
+      b.addEventListener('click', async function(){
+        b.disabled = true;
+        try { await restoreFromTrash('poc_invites', b.dataset.id); showToast('✓ Geri alındı.'); refresh(); }
+        catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+      });
+    });
+    m.querySelectorAll('.vi-perm').forEach(function(b){
+      b.addEventListener('click', async function(){
+        if (!confirm('"'+(b.dataset.cn||'Müşteri')+'" daveti KALICI olarak silinsin mi? Geri alınamaz!')) return;
+        if (!confirm('Emin misiniz?')) return;
+        b.disabled = true;
+        try { await permanentDelete('poc_invites', b.dataset.id); showToast('Kalıcı silindi.'); refresh(); }
+        catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+      });
     });
   };
 
-  render('', '');
+  render('', '', 'active');
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// Davet Detay Modal — vendor için (v4.41)
+// ════════════════════════════════════════════════════════════════
+function openInviteDetailModal(inv) {
+  var statusLabels = {pending:'Bekliyor', accepted:'Kabul Edildi', declined:'Reddedildi', expired:'Süresi Doldu', cancelled:'İptal Edildi'};
+  var statusColors = {pending:'#f0a429', accepted:'#22d078', declined:'#ff7070', expired:'#5a6278', cancelled:'#7c87a0'};
+  var locLabels = {online:'🌐 Online', customer:'📍 Müşteri Lokasyonu', vendor:'🏢 Vendor Lokasyonu', hybrid:'🔄 Hibrit'};
+
+  var sentDate = inv.createdAt?.toDate ? inv.createdAt.toDate() : null;
+  var sentStr  = sentDate ? sentDate.toLocaleString('tr-TR') : '—';
+  var respDate = inv.respondedAt?.toDate ? inv.respondedAt.toDate() : null;
+  var respStr  = respDate ? respDate.toLocaleString('tr-TR') : '';
+  var lastRem  = inv.lastReminderAt?.toDate ? inv.lastReminderAt.toDate() : null;
+  var lastRemStr = lastRem ? lastRem.toLocaleString('tr-TR') : '';
+
+  var stColor = statusColors[inv.status] || '#7c87a0';
+  var stLabel = statusLabels[inv.status] || inv.status;
+
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:560px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<div><h3 style="font-size:16px;font-weight:700">📨 Davet Detayı</h3>' +
+    '<span style="font-size:12px;font-weight:700;color:'+stColor+'">'+stLabel+'</span></div>' +
+    '<button id="id-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px">×</button>' +
+    '</div>' +
+
+    // Müşteri
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px 14px;margin-bottom:12px">' +
+    '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">MÜŞTERİ</div>' +
+    '<div style="font-size:14px;font-weight:700">'+(inv.customerName||inv.customerEmail||'—')+'</div>' +
+    '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">'+(inv.customerEmail||'—')+'</div>' +
+    '</div>' +
+
+    // Ürün
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px 14px;margin-bottom:12px">' +
+    '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">ÜRÜN</div>' +
+    '<div style="font-size:14px;font-weight:700">'+(inv.productName||'—')+'</div>' +
+    (inv.productCategory ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">'+inv.productCategory+'</div>' : '') +
+    '</div>' +
+
+    // PoC bilgileri
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">' +
+    '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">SÜRE</div>' +
+    '<div style="font-size:13px;font-weight:600">'+(inv.pocDuration||'—')+'</div></div>' +
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px">' +
+    '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">LOKASYON</div>' +
+    '<div style="font-size:13px;font-weight:600">'+(locLabels[inv.pocLocation]||inv.pocLocation||'—')+'</div></div>' +
+    '</div>' +
+
+    (inv.pocScope ? '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">PoC KAPSAMI</div>'
+      + '<div style="font-size:13px;line-height:1.6">'+inv.pocScope+'</div>'
+      + '</div>' : '') +
+
+    (inv.message ? '<div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.2);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
+      + '<div style="font-size:10px;color:#7db4ff;font-weight:700;margin-bottom:4px">MÜŞTERİYE MESAJ</div>'
+      + '<div style="font-size:13px;line-height:1.6">'+inv.message+'</div>'
+      + '</div>' : '') +
+
+    (inv.declineReason ? '<div style="background:rgba(255,112,112,.06);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
+      + '<div style="font-size:10px;color:#ff7070;font-weight:700;margin-bottom:4px">RED GEREKÇESİ</div>'
+      + '<div style="font-size:13px;line-height:1.6">'+inv.declineReason+'</div>'
+      + '</div>' : '') +
+
+    // Zaman çizelgesi
+    '<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;font-size:11.5px;color:var(--text-muted);line-height:1.8">' +
+    '<div>📅 <strong>Gönderildi:</strong> '+sentStr+'</div>' +
+    (respStr ? '<div>'+(inv.status==='accepted'?'✓':inv.status==='declined'?'✕':'•')+' <strong>Yanıt:</strong> '+respStr+'</div>' : '') +
+    (lastRemStr ? '<div>🔔 <strong>Son Hatırlatma:</strong> '+lastRemStr+(inv.reminderCount?' ('+inv.reminderCount+' kez)':'')+'</div>' : '') +
+    (inv.resendOf ? '<div style="color:#7db4ff">↻ Bu davet bir yeniden gönderim</div>' : '') +
+    '</div>' +
+
+    '<button class="btn-g" id="id-close2" style="width:100%;margin-top:14px">Kapat</button>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#id-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#id-close2').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// Davet Düzenle Modal — sadece pending davetler için (v4.41)
+// ════════════════════════════════════════════════════════════════
+function openEditInviteModal(inv, onSaved) {
+  if (inv.status !== 'pending') {
+    showToast('Sadece "Bekliyor" durumdaki davetler düzenlenebilir.','err');
+    return;
+  }
+
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:520px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+    '<h3 style="font-size:15px;font-weight:700">✏️ Daveti Düzenle</h3>' +
+    '<button id="ei-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px">×</button>' +
+    '</div>' +
+
+    // Müşteri (read-only)
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px;margin-bottom:12px">' +
+    '<div style="font-size:10px;color:var(--text-muted)">MÜŞTERİ (değiştirilemez)</div>' +
+    '<div style="font-size:13px;font-weight:600">'+(inv.customerName||inv.customerEmail||'—')+'</div>' +
+    '<div style="font-size:11.5px;color:var(--text-secondary)">'+(inv.customerEmail||'—')+'</div>' +
+    '</div>' +
+
+    // Ürün (read-only)
+    '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px 12px;margin-bottom:14px">' +
+    '<div style="font-size:10px;color:var(--text-muted)">ÜRÜN (değiştirilemez)</div>' +
+    '<div style="font-size:13px;font-weight:600">'+(inv.productName||'—')+'</div>' +
+    '</div>' +
+
+    '<label class="lbl">PoC Kapsamı</label>' +
+    '<textarea class="inp" id="ei-scope" rows="3" style="resize:vertical">'+(inv.pocScope||'').replace(/</g,'&lt;')+'</textarea>' +
+
+    '<div class="g2">' +
+    '<div><label class="lbl">Süre</label>' +
+    '<input class="inp" id="ei-duration" placeholder="Örn: 2 hafta" value="'+(inv.pocDuration||'').replace(/"/g,'&quot;')+'"></div>' +
+    '<div><label class="lbl">Lokasyon</label>' +
+    '<select class="inp" id="ei-location">' +
+    '<option value="">—</option>' +
+    '<option value="online"'+(inv.pocLocation==='online'?' selected':'')+'>🌐 Online</option>' +
+    '<option value="customer"'+(inv.pocLocation==='customer'?' selected':'')+'>📍 Müşteri Lokasyonu</option>' +
+    '<option value="vendor"'+(inv.pocLocation==='vendor'?' selected':'')+'>🏢 Vendor Lokasyonu</option>' +
+    '<option value="hybrid"'+(inv.pocLocation==='hybrid'?' selected':'')+'>🔄 Hibrit</option>' +
+    '</select></div>' +
+    '</div>' +
+
+    '<label class="lbl">Müşteriye Mesaj</label>' +
+    '<textarea class="inp" id="ei-message" rows="3" style="resize:vertical">'+(inv.message||'').replace(/</g,'&lt;')+'</textarea>' +
+
+    '<div id="ei-err" style="margin-top:8px;font-size:12.5px;color:#ff7070;min-height:18px"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:10px">' +
+    '<button class="btn-g" id="ei-cancel" style="flex:1">Vazgeç</button>' +
+    '<button class="btn-p" id="ei-save" style="flex:2">💾 Kaydet</button>' +
+    '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#ei-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ei-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+
+  modal.querySelector('#ei-save').addEventListener('click', async function(){
+    var scope = modal.querySelector('#ei-scope').value.trim();
+    var duration = modal.querySelector('#ei-duration').value.trim();
+    var location = modal.querySelector('#ei-location').value;
+    var message = modal.querySelector('#ei-message').value.trim();
+
+    var btn = this;
+    btn.disabled = true;
+    var orig = btn.textContent;
+    btn.textContent = 'Kaydediliyor...';
+    try {
+      await updateDoc(doc(db,'poc_invites',inv.id), {
+        pocScope:    scope,
+        pocDuration: duration,
+        pocLocation: location,
+        message:     message,
+        editedAt:    serverTimestamp(),
+      });
+      // Müşteriye bildirim — davet güncellendi
+      if (inv.customerId) {
+        await addDoc(collection(db,'notifications'), {
+          userId: inv.customerId,
+          type: 'invite_updated',
+          title: 'PoC Daveti Güncellendi',
+          message: (CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) + ' "' + (inv.productName||'') + '" davetinde değişiklik yaptı.',
+          fromUserId: CUR_USER.uid,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+      showToast('✓ Davet güncellendi.');
+      modal.remove();
+      if (typeof onSaved === 'function') onSaved();
+    } catch(e){
+      modal.querySelector('#ei-err').textContent = 'Hata: '+e.message;
+      btn.disabled = false; btn.textContent = orig;
+    }
+  });
 }
 
 
