@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.38 | pochub.co -->
+<!-- PoCHub v4.39 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.38</title>
+<title>PoCHub.co — v4.39</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -362,7 +362,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.38';
+const VERSION = 'v4.39';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -376,6 +376,146 @@ function formatTS(val, opts) {
   return d.toLocaleDateString('tr-TR', opts || {day:'numeric', month:'long', year:'numeric'});
 }
 function formatTSShort(val) { return formatTS(val, {day:'2-digit', month:'2-digit', year:'numeric'}); }
+
+
+/* ══════════════════════════════════════════════════════════════
+   YAŞAM DÖNGÜSÜ HELPER'LARI (v4.39)
+   ─────────────────────────────────────────────────────────────
+   Aktif → Arşiv → Çöp Kutusu → Kalıcı Silme
+   
+   Veri modeli (her koleksiyona aynı şekilde):
+     archived:    boolean        — arşivde mi?
+     archivedAt:  Timestamp      — ne zaman arşivlendi
+     deletedAt:   Timestamp      — set edilince çöpte; 30 gün sonra otomatik silinir
+   
+   Geri uyumluluk:
+     Ürünlerde eski status:'archived' değeri archived:true olarak okunur.
+     Bunlar henüz migrate edilmiyor ama görüntüde tutarlı davranıyor.
+   ═════════════════════════════════════════════════════════════ */
+
+const TRASH_DAYS = 30;
+const TRASH_MS = TRASH_DAYS * 24 * 60 * 60 * 1000;
+
+// Bir kaydın yaşam döngüsü durumunu belirler
+function getLifecycleState(item) {
+  if (!item) return 'active';
+  if (item.deletedAt) return 'trash';
+  if (item.archived === true) return 'archived';
+  // Geri uyumluluk: eski status:'archived' ürünleri arşivde say
+  if (item.status === 'archived') return 'archived';
+  return 'active';
+}
+
+// Çöpte kalan günleri hesapla (negatif → süresi dolmuş)
+function trashDaysLeft(item) {
+  if (!item || !item.deletedAt) return null;
+  var d = item.deletedAt.toDate ? item.deletedAt.toDate() : new Date(item.deletedAt);
+  var elapsed = Date.now() - d.getTime();
+  return Math.ceil((TRASH_MS - elapsed) / (24*60*60*1000));
+}
+
+// Bir kaydın aktif PoC/teklifi var mı? — silme/arşivleme öncesi koruma kontrolü
+async function hasActiveDependencies(collectionName, itemId) {
+  try {
+    var fieldName = collectionName === 'products' ? 'productId'
+                  : collectionName === 'public_events' ? 'eventId'
+                  : null;
+    if (!fieldName) return { ok: false, reason: '' };
+
+    // Aktif PoC kontrolü
+    var pocSnap = await getDocs(query(
+      collection(db,'poc_requests'),
+      where(fieldName,'==',itemId)
+    ));
+    var activePocs = pocSnap.docs.filter(function(d){
+      var st = d.data().status;
+      return st === 'active' || st === 'pending';
+    });
+    if (activePocs.length > 0) {
+      return { ok: false, reason: activePocs.length + ' aktif/bekleyen PoC bağlı' };
+    }
+
+    // Aktif teklif kontrolü (sadece ürünler)
+    if (collectionName === 'products') {
+      var offSnap = await getDocs(query(
+        collection(db,'offers'),
+        where('productId','==',itemId)
+      ));
+      var activeOffers = offSnap.docs.filter(function(d){
+        var st = d.data().status;
+        return st === 'pending' || st === 'revised';
+      });
+      if (activeOffers.length > 0) {
+        return { ok: false, reason: activeOffers.length + ' bekleyen teklif bağlı' };
+      }
+    }
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, reason: 'Bağıntı kontrolü hatası: ' + e.message };
+  }
+}
+
+// Arşive al
+async function archiveItem(collectionName, itemId) {
+  await updateDoc(doc(db, collectionName, itemId), {
+    archived: true,
+    archivedAt: serverTimestamp(),
+    deletedAt: null,
+  });
+}
+
+// Arşivden çıkar (aktife al)
+async function restoreFromArchive(collectionName, itemId) {
+  await updateDoc(doc(db, collectionName, itemId), {
+    archived: false,
+    archivedAt: null,
+  });
+}
+
+// Çöpe at (soft delete)
+async function softDeleteItem(collectionName, itemId) {
+  await updateDoc(doc(db, collectionName, itemId), {
+    deletedAt: serverTimestamp(),
+  });
+}
+
+// Çöpten geri al
+async function restoreFromTrash(collectionName, itemId) {
+  await updateDoc(doc(db, collectionName, itemId), {
+    deletedAt: null,
+  });
+}
+
+// Kalıcı sil (gerçekten Firestore'dan kaldır)
+async function permanentDelete(collectionName, itemId) {
+  await deleteDoc(doc(db, collectionName, itemId));
+}
+
+// 30 gün geçmiş çöp kayıtlarını otomatik temizle (arka planda)
+async function cleanupExpiredTrash(collectionName, ownerField, ownerId) {
+  try {
+    var snap = await getDocs(query(
+      collection(db, collectionName),
+      where(ownerField, '==', ownerId)
+    ));
+    var now = Date.now();
+    var deletions = [];
+    snap.docs.forEach(function(d){
+      var data = d.data();
+      if (!data.deletedAt) return;
+      var del = data.deletedAt.toDate ? data.deletedAt.toDate() : new Date(data.deletedAt);
+      if (now - del.getTime() > TRASH_MS) {
+        deletions.push(deleteDoc(d.ref));
+      }
+    });
+    if (deletions.length) {
+      await Promise.all(deletions);
+      console.log('[lifecycle] ' + deletions.length + ' süresi dolan çöp kaydı kalıcı silindi (' + collectionName + ')');
+    }
+  } catch(e) {
+    console.warn('[lifecycle] cleanup hata:', e);
+  }
+}
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -399,6 +539,7 @@ function formatTSShort(val) { return formatTS(val, {day:'2-digit', month:'2-digi
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.39':  ['MINOR: Yaşam döngüsü sistemi (Aktif → Arşiv → Çöp Kutusu → Kalıcı Silme) — Ürünler, Etkinlikler, Portföy için ortak. 30 gün otomatik temizlik, manuel hemen sil, aktif PoC/teklifi olan kayıtlar korumalı. lifecycle.js helper fonksiyonları'],
   'v4.38':  ['BUG FIX: Ürünlerim ✎ butonu çoklu modal açıyordu (pr-eb pr-dist forEach içine yanlış nest), mesaj okundu sayım sistemi tutarsızdı (readBy kullanıma alındı), Tümünü Okundu İşaretle artık gerçekten okutuyor'],
   'v4.37':  ['BUG FIX: Vendor dashboard emoji surrogate pair fix, requests tab dispatch eksikliği, openEditEventModal null guard, Tümünü Okundu role-aware reload'],
   'v4.36':  ['PATCH: CHANGELOG toparlama — v4.14 → v4.35 arası eksik girişler tamamlandı, HTML yorum güncel'],
@@ -2977,6 +3118,7 @@ async function renderHome() {
     const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published')));
     var _now = new Date();
     allEvents = snap.docs.map(d => ({...d.data(), id:d.id}))
+      .filter(e => getLifecycleState(e) === 'active')
       .filter(e => {
         if (!e.eventDate) return true;
         var ed = e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate);
@@ -4209,7 +4351,8 @@ async function loadEventsList() {
   try {
     let q = query(collection(db,'public_events'), where('status','==','published'));
     const snap = await getDocs(q);
-    let allDocs = snap.docs.map(d => ({...d.data(), id:d.id}));
+    let allDocs = snap.docs.map(d => ({...d.data(), id:d.id}))
+      .filter(e => getLifecycleState(e) === 'active');
     // Dönem filtresi
     var evPeriod = CUR_EV_PERIOD || 'upcoming';
     var now2 = new Date();
@@ -4387,7 +4530,9 @@ async function loadCatalog() {
     const snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
     let prods = snap.docs.map(d => ({...d.data(), id:d.id}))
       // publishStatus kontrolü: ready veya publishStatus alanı olmayan eski ürünler göster
-      .filter(p => !p.publishStatus || p.publishStatus === 'ready' || p.publishStatus === 'awaiting_admin');
+      .filter(p => !p.publishStatus || p.publishStatus === 'ready' || p.publishStatus === 'awaiting_admin')
+      // Arşiv ve çöp ürünleri katalogda gösterme
+      .filter(p => getLifecycleState(p) === 'active');
 
     const search = el('cat-search')?.value?.toLowerCase()||'';
     const cat = el('cat-category')?.value||'';
@@ -7477,170 +7622,439 @@ async function loadVendTab() {
     const products = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     products.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
+    // Arka planda 30 gün geçmiş çöp temizle (no-await)
+    cleanupExpiredTrash('products','vendorId',CUR_USER.uid).catch(function(){});
+
     var allCats = [...new Set(products.map(function(p){ return p.category; }).filter(Boolean))].sort();
     var stColors = {active:'#22d078', pending:'#f0a429', rejected:'#ff7070', archived:'#5a6278'};
     var stLabels = {active:'Aktif', pending:'Bekliyor', rejected:'Reddedildi', archived:'Arşiv'};
     var psColors = {ready:'#22d078', awaiting_admin:'#7db4ff', awaiting_integrator:'#f0a429'};
     var psLabels = {ready:'Yayında', awaiting_admin:'Admin Onayı', awaiting_integrator:'Entegratör Bekleniyor'};
 
-    var renderProducts = function(searchVal, filterStatus, filterCat) {
+    var renderProducts = function(searchVal, filterStatus, filterCat, filterLifecycle) {
+      filterLifecycle = filterLifecycle || 'active';
+      var counts = { active:0, archived:0, trash:0 };
+      products.forEach(function(p){ counts[getLifecycleState(p)] = (counts[getLifecycleState(p)]||0) + 1; });
+
       var filtered = products.filter(function(p) {
-        if (filterStatus && p.status !== filterStatus) return false;
+        if (getLifecycleState(p) !== filterLifecycle) return false;
+        // Status filtresi sadece "active" yaşam döngüsünde anlamlı
+        if (filterLifecycle === 'active' && filterStatus && p.status !== filterStatus) return false;
         if (filterCat    && p.category !== filterCat) return false;
         if (searchVal) {
-          var q = searchVal.toLowerCase();
-          return (p.name||'').toLowerCase().includes(q) ||
-                 (p.category||'').toLowerCase().includes(q) ||
-                 (p.description||'').toLowerCase().includes(q);
+          var qq = searchVal.toLowerCase();
+          return (p.name||'').toLowerCase().includes(qq) ||
+                 (p.category||'').toLowerCase().includes(qq) ||
+                 (p.description||'').toLowerCase().includes(qq);
         }
         return true;
       });
 
-      m.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">' +
-        '<div style="display:flex;align-items:center;gap:10px">' +
-        '<h2 style="font-size:18px;font-weight:700">Ürünlerim</h2>' +
-        '<span style="font-size:12px;color:var(--text-muted)">' + products.length + ' ürün</span>' +
-        '</div>' +
-        '<button class="btn-p btn-sm" id="v-add-prod2">+ Ürün Ekle</button>' +
-        '</div>' +
+      m.innerHTML = '';
 
-        '<input id="prod-search" class="inp" placeholder="🔍 Ürün adı veya kategori ara..." value="' + (searchVal||'') + '" style="margin-bottom:10px;font-size:13px">' +
+      // Header
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
+      hdr.innerHTML = '<div style="display:flex;align-items:center;gap:10px">'
+        + '<h2 style="font-size:18px;font-weight:700">Ürünlerim</h2>'
+        + '<span style="font-size:12px;color:var(--text-muted)">' + counts.active + ' aktif · ' + counts.archived + ' arşiv · ' + counts.trash + ' çöp</span>'
+        + '</div>'
+        + '<button class="btn-p btn-sm" id="v-add-prod2">+ Ürün Ekle</button>';
+      m.appendChild(hdr);
 
-        '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">' +
-        ['','active','pending','rejected','archived'].map(function(s) {
-          var lbl = s ? (stLabels[s]||s) : 'Tümü';
-          return '<button class="pr-sf btn-' + (filterStatus===s?'p':'g') + ' btn-sm" data-val="' + s + '" style="font-size:12px">' + lbl + '</button>';
-        }).join('') +
-        '</div>' +
+      // Yaşam döngüsü sekmeleri
+      var lcRow = document.createElement('div');
+      lcRow.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px';
+      var lcTabs = [
+        ['active',  'Aktif ('+counts.active+')',     '#22d078'],
+        ['archived','📦 Arşiv ('+counts.archived+')','#7db4ff'],
+        ['trash',   '🗑 Çöp Kutusu ('+counts.trash+')','#dc2626'],
+      ];
+      lcTabs.forEach(function(t){
+        var b = document.createElement('button');
+        var isOn = filterLifecycle === t[0];
+        b.style.cssText = 'background:'+(isOn?t[2]:'transparent')+';color:'+(isOn?'#fff':t[2])+';border:1px solid '+t[2]+';padding:5px 14px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer';
+        b.textContent = t[1];
+        b.addEventListener('click', function(){ renderProducts(searchVal, '', filterCat, t[0]); });
+        lcRow.appendChild(b);
+      });
+      m.appendChild(lcRow);
 
-        '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
-        '<button class="pr-cf btn-' + (!filterCat?'p':'g') + ' btn-sm" data-val="" style="font-size:11px">Tüm Kategoriler</button>' +
-        allCats.map(function(cat) {
-          return '<button class="pr-cf btn-' + (filterCat===cat?'p':'g') + ' btn-sm" data-val="' + cat + '" style="font-size:11px">' + cat + '</button>';
-        }).join('') +
-        '</div>';
-
-      if (!filtered.length) {
-        m.innerHTML += '<div class="empty"><div class="empty-icon">📦</div>' +
-          (searchVal||filterStatus||filterCat ? 'Arama sonucu bulunamadı.' : 'Henüz ürün eklemediniz.') + '</div>';
-      } else {
-        m.innerHTML +=
-          '<table><thead><tr>' +
-          '<th>Ürün</th><th>Kategori</th><th>Menşei</th><th>Yayın</th><th>Durum</th><th></th>' +
-          '</tr></thead><tbody>' +
-          filtered.map(function(p) {
-            var stColor = stColors[p.status] || '#7c87a0';
-            var stLabel = stLabels[p.status] || p.status;
-            var psColor = psColors[p.publishStatus] || '#7c87a0';
-            var psLabel = psLabels[p.publishStatus] || '';
-            return '<tr>' +
-              '<td style="font-weight:600">' + (p.name||'—') + '</td>' +
-              '<td style="font-size:12px">' + (p.category||'—') + '</td>' +
-              '<td style="font-size:12px">' + (p.country||'TR') + (p.origin==='domestic'?' 🇹🇷':' 🌍') + '</td>' +
-              '<td>' + (psLabel ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;color:' + psColor + ';background:' + psColor + '18">' + psLabel + '</span>' : '—') + '</td>' +
-              '<td><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:' + stColor + ';background:' + stColor + '18">' + stLabel + '</span></td>' +
-              '<td style="white-space:nowrap">' +
-              '<button class="btn-g btn-sm pr-dist-btn" data-id="' + p.id + '" data-name="' + (p.name||'').replace(/"/g,'') + '" data-origin="' + (p.origin||'domestic') + '" style="font-size:11px;margin-right:4px">🔗 Dağıtım</button>' + '<button class="pr-eb" data-id="'+p.id+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(59,124,255,.1);color:#7db4ff;border:1px solid rgba(59,124,255,.25);border-radius:5px;cursor:pointer">✎</button>' + (p.status!=='active'?'<button class="pr-db" data-id="'+p.id+'" style="padding:4px 9px;font-size:11px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:5px;cursor:pointer">⊖</button>':'') + 
-              '</td></tr>';
-          }).join('') +
-          '</tbody></table>';
+      // Çöp kutusu uyarı banner'ı
+      if (filterLifecycle === 'trash' && counts.trash > 0) {
+        var warn = document.createElement('div');
+        warn.style.cssText = 'background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#fca5a5';
+        warn.innerHTML = '⚠️ Çöp kutusundaki kayıtlar 30 gün sonra <strong>kalıcı olarak silinir</strong>. İstediğiniz zaman geri alabilir veya hemen silebilirsiniz.';
+        m.appendChild(warn);
       }
 
-      // Eventler
+      // Arama
+      var sInp = document.createElement('input');
+      sInp.id = 'prod-search';
+      sInp.className = 'inp';
+      sInp.placeholder = '🔍 Ürün adı veya kategori ara...';
+      sInp.value = searchVal || '';
+      sInp.style.cssText = 'margin-bottom:10px;font-size:13px';
+      sInp.addEventListener('input', function(){ renderProducts(this.value, filterStatus, filterCat, filterLifecycle); });
+      m.appendChild(sInp);
+
+      // Status filtresi (sadece aktif sekmesinde)
+      if (filterLifecycle === 'active') {
+        var sfRow = document.createElement('div');
+        sfRow.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap';
+        ['','active','pending','rejected'].forEach(function(s){
+          var lbl = s ? (stLabels[s]||s) : 'Tümü';
+          var bb = document.createElement('button');
+          bb.className = 'btn-' + (filterStatus===s?'p':'g') + ' btn-sm';
+          bb.style.cssText = 'font-size:12px';
+          bb.textContent = lbl;
+          bb.addEventListener('click', function(){ renderProducts(searchVal, s, filterCat, filterLifecycle); });
+          sfRow.appendChild(bb);
+        });
+        m.appendChild(sfRow);
+      }
+
+      // Kategori filtresi
+      var cfRow = document.createElement('div');
+      cfRow.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
+      var allBtn = document.createElement('button');
+      allBtn.className = 'btn-' + (!filterCat?'p':'g') + ' btn-sm';
+      allBtn.style.cssText = 'font-size:11px';
+      allBtn.textContent = 'Tüm Kategoriler';
+      allBtn.addEventListener('click', function(){ renderProducts(searchVal, filterStatus, '', filterLifecycle); });
+      cfRow.appendChild(allBtn);
+      allCats.forEach(function(cat){
+        var cb = document.createElement('button');
+        cb.className = 'btn-' + (filterCat===cat?'p':'g') + ' btn-sm';
+        cb.style.cssText = 'font-size:11px';
+        cb.textContent = cat;
+        cb.addEventListener('click', function(){ renderProducts(searchVal, filterStatus, cat, filterLifecycle); });
+        cfRow.appendChild(cb);
+      });
+      m.appendChild(cfRow);
+
+      // Liste
+      if (!filtered.length) {
+        var emp = document.createElement('div');
+        emp.className = 'empty';
+        var icon = filterLifecycle==='trash' ? '🗑' : filterLifecycle==='archived' ? '📦' : '📦';
+        var msg2 = filterLifecycle==='trash' ? 'Çöp kutusu boş.'
+                 : filterLifecycle==='archived' ? 'Arşivde ürün yok.'
+                 : (searchVal||filterStatus||filterCat ? 'Arama sonucu bulunamadı.' : 'Henüz ürün eklemediniz.');
+        emp.innerHTML = '<div class="empty-icon">'+icon+'</div>' + msg2;
+        m.appendChild(emp);
+      } else {
+        var tbl = document.createElement('table');
+        var thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Ürün</th><th>Kategori</th><th>Menşei</th><th>Yayın</th><th>Durum</th><th></th></tr>';
+        tbl.appendChild(thead);
+        var tbody = document.createElement('tbody');
+
+        filtered.forEach(function(p){
+          var tr = document.createElement('tr');
+          var lcState = getLifecycleState(p);
+          var stColor = stColors[p.status] || '#7c87a0';
+          var stLabel = stLabels[p.status] || p.status;
+          var psColor = psColors[p.publishStatus] || '#7c87a0';
+          var psLabel = psLabels[p.publishStatus] || '';
+
+          // Cells
+          tr.innerHTML =
+            '<td style="font-weight:600">' + (p.name||'—') + '</td>' +
+            '<td style="font-size:12px">' + (p.category||'—') + '</td>' +
+            '<td style="font-size:12px">' + (p.country||'TR') + (p.origin==='domestic'?' 🇹🇷':' 🌍') + '</td>' +
+            '<td>' + (psLabel ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;color:' + psColor + ';background:' + psColor + '18">' + psLabel + '</span>' : '—') + '</td>' +
+            '<td>' + (lcState==='trash'
+                ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:#dc2626;background:rgba(220,38,38,.12)">🗑 ' + (trashDaysLeft(p)||0) + ' gün</span>'
+                : lcState==='archived'
+                ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:#7db4ff;background:rgba(125,180,255,.12)">📦 Arşiv</span>'
+                : '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:' + stColor + ';background:' + stColor + '18">' + stLabel + '</span>'
+              ) + '</td>';
+
+          // Action cell — yaşam döngüsüne göre değişen butonlar
+          var td = document.createElement('td');
+          td.style.cssText = 'white-space:nowrap';
+          if (lcState === 'active') {
+            td.innerHTML =
+              '<button class="btn-g btn-sm pr-dist-btn" data-id="' + p.id + '" data-name="' + (p.name||'').replace(/"/g,'') + '" data-origin="' + (p.origin||'domestic') + '" style="font-size:11px;margin-right:4px">🔗 Dağıtım</button>'
+              + '<button class="pr-eb" data-id="'+p.id+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(59,124,255,.1);color:#7db4ff;border:1px solid rgba(59,124,255,.25);border-radius:5px;cursor:pointer" title="Düzenle">✎</button>'
+              + '<button class="pr-arch" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(125,180,255,.1);color:#7db4ff;border:1px solid rgba(125,180,255,.25);border-radius:5px;cursor:pointer" title="Arşive al">📦</button>'
+              + '<button class="pr-trash" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:5px;cursor:pointer" title="Çöpe at">🗑</button>';
+          } else if (lcState === 'archived') {
+            td.innerHTML =
+              '<button class="pr-eb" data-id="'+p.id+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(59,124,255,.1);color:#7db4ff;border:1px solid rgba(59,124,255,.25);border-radius:5px;cursor:pointer" title="Düzenle">✎</button>'
+              + '<button class="pr-unarch" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:5px;cursor:pointer" title="Aktife al">↩ Aktif</button>'
+              + '<button class="pr-trash" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:5px;cursor:pointer" title="Çöpe at">🗑</button>';
+          } else if (lcState === 'trash') {
+            td.innerHTML =
+              '<button class="pr-restore" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:5px;cursor:pointer" title="Geri al">↩ Geri Al</button>'
+              + '<button class="pr-perm" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.4);border-radius:5px;cursor:pointer;font-weight:700" title="Hemen kalıcı sil">⊗ Hemen Sil</button>';
+          }
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+        });
+        tbl.appendChild(tbody);
+        m.appendChild(tbl);
+      }
+
+      // Eventler — temel
       m.querySelector('#v-add-prod2')?.addEventListener('click', function(){ openAddProductModal(); });
-      m.querySelector('#prod-search')?.addEventListener('input', function(){ renderProducts(this.value, filterStatus, filterCat); });
-      m.querySelectorAll('.pr-sf').forEach(function(btn){ btn.addEventListener('click', function(){ renderProducts(searchVal, btn.dataset.val, filterCat); }); });
-      m.querySelectorAll('.pr-cf').forEach(function(btn){ btn.addEventListener('click', function(){ renderProducts(searchVal, filterStatus, btn.dataset.val); }); });
       m.querySelectorAll('.pr-dist-btn').forEach(function(b){
         b.addEventListener('click', function(){ openProductDistModal(b.dataset.id, b.dataset.name, b.dataset.origin); });
       });
-      m.querySelectorAll('.pr-eb').forEach(function(b){b.addEventListener('click',function(){var p=products.find(function(x){return x.id===b.dataset.id;});if(p)openEditProd(p.id,p.name||'',p.category||'',p.country||'',p.description||'','',null);});});
-      m.querySelectorAll('.pr-db').forEach(function(b){b.addEventListener('click',async function(){var p=products.find(function(x){return x.id===b.dataset.id;});if(!p||!confirm((p.name||'')+' silinsin mi?'))return;b.disabled=true;try{await deleteDoc(doc(db,'products',b.dataset.id));showToast('Silindi.');CUR_VEND_TAB='products';loadVendTab();}catch(e){showToast(e.message,'err');b.disabled=false;}});});
+      m.querySelectorAll('.pr-eb').forEach(function(b){
+        b.addEventListener('click', function(){
+          var p = products.find(function(x){ return x.id===b.dataset.id; });
+          if (p) openEditProd(p.id, p.name||'', p.category||'', p.country||'', p.description||'', '', null);
+        });
+      });
+
+      // Yaşam döngüsü butonları
+      var refresh = function(){ CUR_VEND_TAB='products'; loadVendTab(); };
+
+      m.querySelectorAll('.pr-arch').forEach(function(b){
+        b.addEventListener('click', async function(){
+          if (!confirm('"'+b.dataset.name+'" arşive alınsın mı? Müşterilerin gördüğü katalogdan kalkar ama veriler korunur.')) return;
+          b.disabled = true;
+          try {
+            var dep = await hasActiveDependencies('products', b.dataset.id);
+            if (!dep.ok) {
+              showToast('Arşivlenemedi: ' + dep.reason, 'err');
+              b.disabled = false;
+              return;
+            }
+            await archiveItem('products', b.dataset.id);
+            showToast('📦 Ürün arşive alındı.');
+            refresh();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+
+      m.querySelectorAll('.pr-unarch').forEach(function(b){
+        b.addEventListener('click', async function(){
+          b.disabled = true;
+          try {
+            await restoreFromArchive('products', b.dataset.id);
+            showToast('✓ Ürün aktife alındı.');
+            refresh();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+
+      m.querySelectorAll('.pr-trash').forEach(function(b){
+        b.addEventListener('click', async function(){
+          if (!confirm('"'+b.dataset.name+'" çöpe atılsın mı? 30 gün içinde geri alabilirsiniz, sonra kalıcı silinir.')) return;
+          b.disabled = true;
+          try {
+            var dep = await hasActiveDependencies('products', b.dataset.id);
+            if (!dep.ok) {
+              showToast('Silinemedi: ' + dep.reason, 'err');
+              b.disabled = false;
+              return;
+            }
+            await softDeleteItem('products', b.dataset.id);
+            showToast('🗑 Ürün çöp kutusuna taşındı.');
+            refresh();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+
+      m.querySelectorAll('.pr-restore').forEach(function(b){
+        b.addEventListener('click', async function(){
+          b.disabled = true;
+          try {
+            await restoreFromTrash('products', b.dataset.id);
+            showToast('✓ Ürün geri alındı.');
+            refresh();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+
+      m.querySelectorAll('.pr-perm').forEach(function(b){
+        b.addEventListener('click', async function(){
+          if (!confirm('"'+b.dataset.name+'" KALICI olarak silinsin mi? Bu işlem geri alınamaz!')) return;
+          if (!confirm('Emin misiniz? Tüm ürün verileri silinecek.')) return;
+          b.disabled = true;
+          try {
+            await permanentDelete('products', b.dataset.id);
+            showToast('Ürün kalıcı olarak silindi.');
+            refresh();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
     };
-    renderProducts('', '', '');
+    renderProducts('', '', '', 'active');
   }
 
   else if (CUR_VEND_TAB === 'events') {
     const snap = await getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid)));
     const events = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     events.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+
+    // Arka planda 30 gün geçmiş çöp temizle
+    cleanupExpiredTrash('public_events','vendorId',CUR_USER.uid).catch(function(){});
+
     var evStatusLabels = {active:'Aktif', draft:'Taslak', cancelled:'İptal', completed:'Tamamlandı'};
     var evStatusColors = {active:'#22d078', draft:'#f0a429', cancelled:'#ff7070', completed:'#7db4ff'};
 
-    var renderEvents = function(searchVal, filterStatus, filterFormat) {
+    var renderEvents = function(searchVal, filterStatus, filterFormat, filterLifecycle) {
+      filterLifecycle = filterLifecycle || 'active';
+      var counts = { active:0, archived:0, trash:0 };
+      events.forEach(function(e){ counts[getLifecycleState(e)] = (counts[getLifecycleState(e)]||0) + 1; });
+
       var filtered = events.filter(function(e) {
-        if (filterStatus && e.status !== filterStatus) return false;
+        if (getLifecycleState(e) !== filterLifecycle) return false;
+        if (filterLifecycle === 'active' && filterStatus && e.status !== filterStatus) return false;
         if (filterFormat && e.format !== filterFormat) return false;
         if (searchVal) {
-          var q = searchVal.toLowerCase();
-          return (e.title||'').toLowerCase().includes(q) ||
-                 (e.category||'').toLowerCase().includes(q) ||
-                 (e.format||'').toLowerCase().includes(q);
+          var qq = searchVal.toLowerCase();
+          return (e.title||'').toLowerCase().includes(qq) ||
+                 (e.category||'').toLowerCase().includes(qq) ||
+                 (e.format||'').toLowerCase().includes(qq);
         }
         return true;
       });
 
-      m.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">' +
-        '<div style="display:flex;align-items:center;gap:10px">' +
-        '<h2 style="font-size:18px;font-weight:700">Etkinliklerim</h2>' +
-        '<span style="font-size:12px;color:var(--text-muted)">' + events.length + ' etkinlik</span>' +
-        '</div>' +
-        '<button class="btn-p btn-sm" id="v-add-ev2">+ Etkinlik Oluştur</button>' +
-        '</div>' +
-        '<input id="ev-search" class="inp" placeholder="🔍 Etkinlik adı veya kategori ara..." value="' + (searchVal||'') + '" style="margin-bottom:10px;font-size:13px">' +
-        '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' +
-        ['','active','draft','completed','cancelled'].map(function(s) {
-          var lbl = s ? (evStatusLabels[s]||s) : 'Tümü';
-          return '<button class="ev-sf btn-' + (filterStatus===s?'p':'g') + ' btn-sm" data-val="' + s + '" style="font-size:12px">' + lbl + '</button>';
-        }).join('') +
-        '</div>' +
-        '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
-        ['','online','in-person','hybrid'].map(function(f) {
-          var lbl = {''  :'Tüm Formatlar','online':'Online','in-person':'Yüz Yüze','hybrid':'Hibrit'}[f] || f;
-          return '<button class="ev-ff btn-' + (filterFormat===f?'p':'g') + ' btn-sm" data-val="' + f + '" style="font-size:11px">' + lbl + '</button>';
-        }).join('') +
-        '</div>';
+      m.innerHTML = '';
 
+      // Header
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
+      hdr.innerHTML = '<div style="display:flex;align-items:center;gap:10px">'
+        + '<h2 style="font-size:18px;font-weight:700">Etkinliklerim</h2>'
+        + '<span style="font-size:12px;color:var(--text-muted)">' + counts.active + ' aktif · ' + counts.archived + ' arşiv · ' + counts.trash + ' çöp</span>'
+        + '</div>'
+        + '<button class="btn-p btn-sm" id="v-add-ev2">+ Etkinlik Oluştur</button>';
+      m.appendChild(hdr);
+
+      // Yaşam döngüsü sekmeleri
+      var lcRow = document.createElement('div');
+      lcRow.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px';
+      [
+        ['active',  'Aktif ('+counts.active+')',     '#22d078'],
+        ['archived','📦 Arşiv ('+counts.archived+')','#7db4ff'],
+        ['trash',   '🗑 Çöp Kutusu ('+counts.trash+')','#dc2626'],
+      ].forEach(function(t){
+        var b = document.createElement('button');
+        var isOn = filterLifecycle === t[0];
+        b.style.cssText = 'background:'+(isOn?t[2]:'transparent')+';color:'+(isOn?'#fff':t[2])+';border:1px solid '+t[2]+';padding:5px 14px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer';
+        b.textContent = t[1];
+        b.addEventListener('click', function(){ renderEvents(searchVal, '', filterFormat, t[0]); });
+        lcRow.appendChild(b);
+      });
+      m.appendChild(lcRow);
+
+      if (filterLifecycle === 'trash' && counts.trash > 0) {
+        var warn = document.createElement('div');
+        warn.style.cssText = 'background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#fca5a5';
+        warn.innerHTML = '⚠️ Çöp kutusundaki etkinlikler 30 gün sonra <strong>kalıcı olarak silinir</strong>.';
+        m.appendChild(warn);
+      }
+
+      // Arama
+      var sInp = document.createElement('input');
+      sInp.id = 'ev-search';
+      sInp.className = 'inp';
+      sInp.placeholder = '🔍 Etkinlik adı veya kategori ara...';
+      sInp.value = searchVal || '';
+      sInp.style.cssText = 'margin-bottom:10px;font-size:13px';
+      sInp.addEventListener('input', function(){ renderEvents(this.value, filterStatus, filterFormat, filterLifecycle); });
+      m.appendChild(sInp);
+
+      // Status filtresi (sadece aktif)
+      if (filterLifecycle === 'active') {
+        var sfRow = document.createElement('div');
+        sfRow.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap';
+        ['','active','draft','completed','cancelled'].forEach(function(s){
+          var lbl = s ? (evStatusLabels[s]||s) : 'Tümü';
+          var bb = document.createElement('button');
+          bb.className = 'btn-' + (filterStatus===s?'p':'g') + ' btn-sm';
+          bb.style.cssText = 'font-size:12px';
+          bb.textContent = lbl;
+          bb.addEventListener('click', function(){ renderEvents(searchVal, s, filterFormat, filterLifecycle); });
+          sfRow.appendChild(bb);
+        });
+        m.appendChild(sfRow);
+      }
+
+      // Format filtresi
+      var ffRow = document.createElement('div');
+      ffRow.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
+      [['','Tüm Formatlar'],['online','Online'],['in-person','Yüz Yüze'],['hybrid','Hibrit']].forEach(function(f){
+        var fb = document.createElement('button');
+        fb.className = 'btn-' + (filterFormat===f[0]?'p':'g') + ' btn-sm';
+        fb.style.cssText = 'font-size:11px';
+        fb.textContent = f[1];
+        fb.addEventListener('click', function(){ renderEvents(searchVal, filterStatus, f[0], filterLifecycle); });
+        ffRow.appendChild(fb);
+      });
+      m.appendChild(ffRow);
+
+      // Liste
       if (!filtered.length) {
-        m.innerHTML += '<div class="empty"><div class="empty-icon">🎯</div>' +
-          (searchVal||filterStatus||filterFormat ? 'Arama sonucu bulunamadı.' : 'Henüz etkinlik oluşturmadınız.') + '</div>';
+        var emp = document.createElement('div');
+        emp.className = 'empty';
+        var icon = filterLifecycle==='trash' ? '🗑' : filterLifecycle==='archived' ? '📦' : '🎯';
+        var msg2 = filterLifecycle==='trash' ? 'Çöp kutusu boş.'
+                 : filterLifecycle==='archived' ? 'Arşivde etkinlik yok.'
+                 : (searchVal||filterStatus||filterFormat ? 'Arama sonucu bulunamadı.' : 'Henüz etkinlik oluşturmadınız.');
+        emp.innerHTML = '<div class="empty-icon">'+icon+'</div>' + msg2;
+        m.appendChild(emp);
       } else {
-        m.innerHTML +=
-          '<table><thead><tr>' +
-          '<th>Başlık</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th></th>' +
-          '</tr></thead><tbody>' +
-          filtered.map(function(e) {
-            var stColor = evStatusColors[e.status] || '#7c87a0';
-            var stLabel = evStatusLabels[e.status] || e.status;
-            var canEdit = e.status !== 'cancelled' && e.status !== 'completed';
-            return '<tr>' +
-              '<td style="font-weight:600">' + (e.title||'—') + '</td>' +
-              '<td style="font-size:12px">' + (e.date||'—') + '</td>' +
-              '<td style="font-size:12px">' + (e.format||'—') + '</td>' +
-              '<td style="text-align:center">' + (e.registeredCount||0) + (e.maxAttendees ? '/' + e.maxAttendees : '') + '</td>' +
-              '<td><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:' + stColor + ';background:' + stColor + '18">' + stLabel + '</span></td>' +
-              '<td style="white-space:nowrap">' +
-              (canEdit ? '<button class="btn-g btn-sm vev-edit" data-id="' + e.id + '" style="font-size:11.5px;margin-right:4px">✏️ Düzenle</button>' : '') +
-              (canEdit ? '<button class="btn-red btn-sm vev-cancel" data-id="' + e.id + '" data-title="' + (e.title||'').replace(/"/g,'') + '" data-count="' + (e.registeredCount||0) + '" style="font-size:11.5px">✕ İptal</button>' : '') +
-              '</td>' +
-              '</tr>';
-          }).join('') +
-          '</tbody></table>';
+        var tbl = document.createElement('table');
+        tbl.innerHTML = '<thead><tr><th>Başlık</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th></th></tr></thead>';
+        var tbody = document.createElement('tbody');
+
+        filtered.forEach(function(e){
+          var lcState = getLifecycleState(e);
+          var stColor = evStatusColors[e.status] || '#7c87a0';
+          var stLabel = evStatusLabels[e.status] || e.status;
+          var canEdit = e.status !== 'cancelled' && e.status !== 'completed';
+
+          var tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td style="font-weight:600">' + (e.title||'—') + '</td>' +
+            '<td style="font-size:12px">' + (e.date||'—') + '</td>' +
+            '<td style="font-size:12px">' + (e.format||'—') + '</td>' +
+            '<td style="text-align:center">' + (e.registeredCount||0) + (e.maxAttendees ? '/' + e.maxAttendees : '') + '</td>' +
+            '<td>' + (lcState==='trash'
+                ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:#dc2626;background:rgba(220,38,38,.12)">🗑 ' + (trashDaysLeft(e)||0) + ' gün</span>'
+                : lcState==='archived'
+                ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:#7db4ff;background:rgba(125,180,255,.12)">📦 Arşiv</span>'
+                : '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:' + stColor + ';background:' + stColor + '18">' + stLabel + '</span>'
+              ) + '</td>';
+
+          var td = document.createElement('td');
+          td.style.cssText = 'white-space:nowrap';
+          if (lcState === 'active') {
+            var html = '';
+            if (canEdit) {
+              html += '<button class="btn-g btn-sm vev-edit" data-id="' + e.id + '" style="font-size:11.5px;margin-right:4px">✏️ Düzenle</button>';
+              html += '<button class="btn-red btn-sm vev-cancel" data-id="' + e.id + '" data-title="' + (e.title||'').replace(/"/g,'') + '" data-count="' + (e.registeredCount||0) + '" style="font-size:11.5px;margin-right:4px">✕ İptal</button>';
+            }
+            html += '<button class="ev-arch" data-id="'+e.id+'" data-title="'+(e.title||'').replace(/"/g,"&quot;")+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(125,180,255,.1);color:#7db4ff;border:1px solid rgba(125,180,255,.25);border-radius:5px;cursor:pointer" title="Arşive al">📦</button>';
+            html += '<button class="ev-trash" data-id="'+e.id+'" data-title="'+(e.title||'').replace(/"/g,"&quot;")+'" data-count="'+(e.registeredCount||0)+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:5px;cursor:pointer" title="Çöpe at">🗑</button>';
+            td.innerHTML = html;
+          } else if (lcState === 'archived') {
+            td.innerHTML =
+              '<button class="ev-unarch" data-id="'+e.id+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:5px;cursor:pointer" title="Aktife al">↩ Aktif</button>'
+              + '<button class="ev-trash" data-id="'+e.id+'" data-title="'+(e.title||'').replace(/"/g,"&quot;")+'" data-count="'+(e.registeredCount||0)+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:5px;cursor:pointer" title="Çöpe at">🗑</button>';
+          } else if (lcState === 'trash') {
+            td.innerHTML =
+              '<button class="ev-restore" data-id="'+e.id+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(34,208,120,.1);color:#22d078;border:1px solid rgba(34,208,120,.25);border-radius:5px;cursor:pointer" title="Geri al">↩ Geri Al</button>'
+              + '<button class="ev-perm" data-id="'+e.id+'" data-title="'+(e.title||'').replace(/"/g,"&quot;")+'" style="margin:0 2px;padding:4px 9px;font-size:11px;background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.4);border-radius:5px;cursor:pointer;font-weight:700" title="Hemen kalıcı sil">⊗ Hemen Sil</button>';
+          }
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+        });
+        tbl.appendChild(tbody);
+        m.appendChild(tbl);
       }
 
       // Eventler
       m.querySelector('#v-add-ev2')?.addEventListener('click', function() {
-        var m2 = el('vend-main'); if (CUR_VEND_TAB !== 'events') return;
+        if (CUR_VEND_TAB !== 'events') return;
         openAddEventModal();
-      });
-      m.querySelector('#ev-search')?.addEventListener('input', function() { renderEvents(this.value, filterStatus, filterFormat); });
-      m.querySelectorAll('.ev-sf').forEach(function(btn) {
-        btn.addEventListener('click', function() { renderEvents(searchVal, btn.dataset.val, filterFormat); });
-      });
-      m.querySelectorAll('.ev-ff').forEach(function(btn) {
-        btn.addEventListener('click', function() { renderEvents(searchVal, filterStatus, btn.dataset.val); });
       });
       m.querySelectorAll('.vev-edit').forEach(function(b) {
         b.addEventListener('click', function() { openAdmProdEditModal(b.dataset.id, 'event'); });
@@ -7654,8 +8068,63 @@ async function loadVendTab() {
           loadVendTab();
         });
       });
+
+      // Yaşam döngüsü butonları
+      var refresh = function(){ CUR_VEND_TAB='events'; loadVendTab(); };
+
+      m.querySelectorAll('.ev-arch').forEach(function(b){
+        b.addEventListener('click', async function(){
+          if (!confirm('"'+b.dataset.title+'" arşive alınsın mı?')) return;
+          b.disabled = true;
+          try {
+            var dep = await hasActiveDependencies('public_events', b.dataset.id);
+            if (!dep.ok) { showToast('Arşivlenemedi: '+dep.reason,'err'); b.disabled = false; return; }
+            await archiveItem('public_events', b.dataset.id);
+            showToast('📦 Etkinlik arşive alındı.');
+            refresh();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+      m.querySelectorAll('.ev-unarch').forEach(function(b){
+        b.addEventListener('click', async function(){
+          b.disabled = true;
+          try { await restoreFromArchive('public_events', b.dataset.id); showToast('✓ Aktife alındı.'); refresh(); }
+          catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+      m.querySelectorAll('.ev-trash').forEach(function(b){
+        b.addEventListener('click', async function(){
+          var msg2 = '"'+b.dataset.title+'" çöpe atılsın mı? 30 gün içinde geri alabilirsiniz, sonra kalıcı silinir.';
+          if (parseInt(b.dataset.count||'0') > 0) msg2 += '\n\n⚠️ ' + b.dataset.count + ' kayıtlı katılımcı var!';
+          if (!confirm(msg2)) return;
+          b.disabled = true;
+          try {
+            var dep = await hasActiveDependencies('public_events', b.dataset.id);
+            if (!dep.ok) { showToast('Silinemedi: '+dep.reason,'err'); b.disabled = false; return; }
+            await softDeleteItem('public_events', b.dataset.id);
+            showToast('🗑 Etkinlik çöp kutusuna taşındı.');
+            refresh();
+          } catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+      m.querySelectorAll('.ev-restore').forEach(function(b){
+        b.addEventListener('click', async function(){
+          b.disabled = true;
+          try { await restoreFromTrash('public_events', b.dataset.id); showToast('✓ Geri alındı.'); refresh(); }
+          catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
+      m.querySelectorAll('.ev-perm').forEach(function(b){
+        b.addEventListener('click', async function(){
+          if (!confirm('"'+b.dataset.title+'" KALICI olarak silinsin mi? Geri alınamaz!')) return;
+          if (!confirm('Emin misiniz?')) return;
+          b.disabled = true;
+          try { await permanentDelete('public_events', b.dataset.id); showToast('Kalıcı silindi.'); refresh(); }
+          catch(e){ showToast('Hata: '+e.message,'err'); b.disabled = false; }
+        });
+      });
     };
-    renderEvents('', '', '');
+    renderEvents('', '', '', 'active');
   }
 
   else if (CUR_VEND_TAB === 'offers-sent') {
@@ -8836,6 +9305,20 @@ async function vendPortfolio(m) {
             _type: 'int_product',
           };
         });
+    }
+
+    // ── Yaşam döngüsü filtresi: arşivde veya çöpte olan ürünleri portföyde gösterme ──
+    // Portföy = sadece aktif ürünler. Yaşam döngüsü yönetimi Ürünlerim sekmesinde.
+    if (vtype === 'ureticid') {
+      // Üretici: kendi ürünleri — yaşam döngüsünü items üzerinden okuyalım, ham veriyi yeniden çek
+      const _ownSnap = await getDocs(query(collection(db,'products'), where('vendorId','==',CUR_USER.uid)));
+      var _activeIds = _ownSnap.docs.filter(function(d){ return getLifecycleState(d.data())==='active'; }).map(function(d){ return d.id; });
+      items = items.filter(function(it){ return _activeIds.indexOf(it.id) !== -1; });
+    } else {
+      // Distribütör/Entegratör: ürünlerin orijinal datasında archived/deletedAt varsa filtrele
+      const _allSnap = await getDocs(collection(db,'products'));
+      var _activeIds2 = _allSnap.docs.filter(function(d){ return getLifecycleState(d.data())==='active'; }).map(function(d){ return d.id; });
+      items = items.filter(function(it){ return _activeIds2.indexOf(it.id) !== -1; });
     }
 
     // ── Kategoriler ve ülkeler ──────────────────────────────────
