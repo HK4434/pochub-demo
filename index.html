@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.49 | pochub.co -->
+<!-- PoCHub v4.50 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.49</title>
+<title>PoCHub.co — v4.50</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -431,7 +431,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.49';
+const VERSION = 'v4.50';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -669,6 +669,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.50':  ['MINOR: PoC Talepleri profesyonel yenileme — vendor operasyonel kalbi 8 stat kart, acil bakman lazım banner, en hızlı yanıt banner, içgörüler, preset filtreler, kart zenginleştirme (bekleme süresi, performans rozeti, geçen süre)'],
   'v4.49':  ['MINOR: Tekliflerim profesyonel yenileme — 8 istatistik kartı, en yüksek tutarlı kazanım banner, aksiyon bekleyenler (revize+süre dolan), teklif içgörüleri (kabul süresi, en verimli tip), hızlı filtre presetleri, kart zenginleştirme (süre kalan, performans rozeti, son aktivite)'],
   'v4.48':  ['MINOR: Ürünlerim profesyonel yenileme — 8 istatistik kartı, en performanslı ürün banner, aksiyon bekleyenler uyarısı, ürün içgörüleri paneli, hızlı filtre preset\'leri, tabloya PoC/teklif/pipeline/performans/son aktivite sütunları'],
   'v4.47':  ['MINOR: Portföyüm profesyonel yenileme — 8 istatistik kartı, performans lideri banner, aksiyon bekleyenler uyarısı, kategori/menşei içgörü paneli, kart zenginleştirme (PoC/teklif sayısı, son aktivite, performans rozeti)'],
@@ -9976,8 +9977,115 @@ async function vendRequests(m) {
   var stL = {pending:'Bekliyor',active:'Aktif',completed:'Tamamlandı',rejected:'Reddedildi',cancelled:'İptal'};
   var locL = {online:'🌐 Online',customer:'📍 Müşteri Lok.',vendor:'🏢 Vendor Lok.',hybrid:'🔄 Hibrit'};
 
-  var render = function(searchVal, filterStatus) {
+  var nowMs = Date.now();
+  var thisMonthStart = new Date();
+  thisMonthStart.setDate(1); thisMonthStart.setHours(0,0,0,0);
+  var thisWeekStart = new Date();
+  thisWeekStart.setDate(thisWeekStart.getDate() - 7); thisWeekStart.setHours(0,0,0,0);
+
+  // ── İstatistik hesaplamaları ──
+  var stats = {
+    total:        reqs.length,
+    pending:      reqs.filter(function(r){return r.status==='pending';}).length,
+    active:       reqs.filter(function(r){return r.status==='active';}).length,
+    completed:    reqs.filter(function(r){return r.status==='completed';}).length,
+    rejected:     reqs.filter(function(r){return r.status==='rejected';}).length,
+    thisMonth:    reqs.filter(function(r){
+      if (!r.createdAt?.seconds) return false;
+      return r.createdAt.seconds*1000 >= thisMonthStart.getTime();
+    }).length,
+  };
+
+  // Ortalama yanıt süresi (pending → active geçişi: acceptedAt - createdAt)
+  var responseTimes = reqs
+    .filter(function(r){ return r.acceptedAt?.seconds && r.createdAt?.seconds; })
+    .map(function(r){ return (r.acceptedAt.seconds - r.createdAt.seconds) / 3600; }); // saat
+  var avgResponseHr = responseTimes.length > 0
+    ? Math.round(responseTimes.reduce(function(s,d){return s+d;},0) / responseTimes.length)
+    : null;
+  var avgResponseLabel = avgResponseHr !== null
+    ? (avgResponseHr < 24 ? avgResponseHr+'sa' : Math.round(avgResponseHr/24)+'gün')
+    : '—';
+
+  // Dönüşüm oranı: tamamlanan / (tamamlanan + aktif + reddedilen)
+  var conversionDenom = stats.completed + stats.active + stats.rejected;
+  var conversionPct = conversionDenom > 0 ? Math.round((stats.completed / conversionDenom) * 100) : 0;
+
+  // En hızlı yanıtlanan PoC
+  var fastestPoC = null;
+  reqs.filter(function(r){ return r.acceptedAt?.seconds && r.createdAt?.seconds; })
+    .forEach(function(r){
+      var hours = (r.acceptedAt.seconds - r.createdAt.seconds) / 3600;
+      if (!fastestPoC || fastestPoC._respHr > hours) {
+        fastestPoC = {...r, _respHr: hours};
+      }
+    });
+
+  // Aksiyon bekleyen PoC'ler — birleşik öncelikli liste
+  var actionPoCs = [];
+  reqs.forEach(function(r){
+    if (r.status === 'pending') {
+      var ageHr = r.createdAt?.seconds ? (nowMs - r.createdAt.seconds*1000)/3600000 : 0;
+      if (ageHr >= 72) {
+        actionPoCs.push({r:r, reason:'3+ gündür yanıt yok — fırsat soğuyor!', priority:1, ageHr:ageHr});
+      } else if (ageHr >= 24) {
+        actionPoCs.push({r:r, reason:Math.round(ageHr)+' saattir bekliyor', priority:2, ageHr:ageHr});
+      }
+    } else if (r.status === 'active') {
+      // Tarihi geçmiş aktif PoC'ler
+      if (r.preferredDateTime1) {
+        var p1 = r.preferredDateTime1.toDate ? r.preferredDateTime1.toDate() : new Date(r.preferredDateTime1);
+        if (!isNaN(p1.getTime()) && p1.getTime() < nowMs) {
+          var pastDays = Math.floor((nowMs - p1.getTime())/86400000);
+          actionPoCs.push({r:r, reason:'Tercih tarihi '+pastDays+' gün önce geçti', priority:3});
+        }
+      }
+    }
+  });
+  actionPoCs.sort(function(a,b){ return a.priority - b.priority; });
+
+  // En çok talep gelen ürün
+  var prodCount = {};
+  reqs.forEach(function(r){
+    var pn = r.productName || r.title || 'Diğer';
+    if (!prodCount[pn]) prodCount[pn] = {cnt:0, completed:0};
+    prodCount[pn].cnt++;
+    if (r.status==='completed') prodCount[pn].completed++;
+  });
+  var topProd = Object.entries(prodCount).sort(function(a,b){return b[1].cnt-a[1].cnt;})[0];
+
+  // Saat dilimine göre yoğunluk
+  var hourDist = {morning:0, noon:0, evening:0};  // 6-12, 12-18, 18-24
+  reqs.forEach(function(r){
+    if (!r.createdAt?.seconds) return;
+    var hr = new Date(r.createdAt.seconds*1000).getHours();
+    if (hr >= 6 && hr < 12) hourDist.morning++;
+    else if (hr >= 12 && hr < 18) hourDist.noon++;
+    else hourDist.evening++;
+  });
+  var topHourLabel = '—';
+  if (reqs.length > 0) {
+    var maxH = Math.max(hourDist.morning, hourDist.noon, hourDist.evening);
+    if (hourDist.morning === maxH) topHourLabel = '☀️ Sabah ('+hourDist.morning+')';
+    else if (hourDist.noon === maxH) topHourLabel = '🌤 Öğlen ('+hourDist.noon+')';
+    else topHourLabel = '🌙 Akşam ('+hourDist.evening+')';
+  }
+
+  var render = function(searchVal, filterStatus, filterPreset) {
     var filtered = reqs.filter(function(r){
+      // Preset filtresi
+      if (filterPreset === 'urgent') {
+        if (r.status !== 'pending') return false;
+        var ageHr2 = r.createdAt?.seconds ? (nowMs - r.createdAt.seconds*1000)/3600000 : 0;
+        return ageHr2 >= 24;
+      }
+      if (filterPreset === 'active_only') {
+        return r.status === 'active';
+      }
+      if (filterPreset === 'this_week') {
+        if (!r.createdAt?.seconds) return false;
+        return r.createdAt.seconds*1000 >= thisWeekStart.getTime();
+      }
       if (filterStatus && r.status !== filterStatus) return false;
       if (searchVal) {
         var qq = searchVal.toLowerCase();
@@ -9988,28 +10096,176 @@ async function vendRequests(m) {
       }
       return true;
     });
-    var pendCnt = reqs.filter(function(r){return r.status==='pending';}).length;
-    var actCnt  = reqs.filter(function(r){return r.status==='active';}).length;
 
     m.innerHTML = '';
+
+    // Header
     var hdr = document.createElement('div');
     hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
     hdr.innerHTML = '<div class="flx-c-g10">'
-      + '<h2 style="font-size:18px;font-weight:700">PoC Talepleri</h2>'
-      + (pendCnt?'<span style="background:#f0a429;color:#000;font-size:11px;font-weight:700;padding:2px 10px;border-radius:12px">'+pendCnt+' bekliyor</span>':'')
-      + (actCnt?'<span style="background:#22d078;color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:12px">'+actCnt+' aktif</span>':'')
-      + '<span class="txt-muted-12">'+reqs.length+' toplam</span>'
+      + '<h2 style="font-size:18px;font-weight:700">📋 PoC Talepleri</h2>'
+      + '<span class="txt-muted-12">'+stats.total+' toplam · '+stats.pending+' bekleyen · '+stats.active+' aktif</span>'
       + '</div>';
     m.appendChild(hdr);
 
+    // ── 8 İSTATİSTİK KARTI ──
+    var statsRow = document.createElement('div');
+    statsRow.className = 'stat-grid';
+    var statCards = [
+      ['Toplam',         stats.total,        '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+      ['Bekleyen',       stats.pending,      '#f0a429', 'rgba(240,164,41,.08)', 'rgba(240,164,41,.2)'],
+      ['Aktif',          stats.active,       '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+      ['Tamamlanan',     stats.completed,    '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+      ['Reddedilen',     stats.rejected,     '#ff7070', 'rgba(255,112,112,.08)','rgba(255,112,112,.2)'],
+      ['Bu Ay Yeni',     stats.thisMonth,    '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+      ['Ort. Yanıt',     avgResponseLabel,   '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+      ['Dönüşüm',        conversionDenom > 0 ? conversionPct+'%' : '—', '#22d078', 'rgba(34,208,120,.08)','rgba(34,208,120,.2)'],
+    ];
+    statCards.forEach(function(s){
+      var card = document.createElement('div');
+      card.className = 'stat-card';
+      card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4];
+      card.innerHTML = '<div style="font-size:'+(typeof s[1]==='string' && s[1].length>5 ? '14px':'18px')+';font-weight:800;color:'+s[2]+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s[1]+'</div>'
+                     + '<div class="stat-card-lbl">'+s[0]+'</div>';
+      statsRow.appendChild(card);
+    });
+    m.appendChild(statsRow);
+
+    // ── 🔥 EN HIZLI YANIT BANNER ──
+    if (fastestPoC) {
+      var fastBanner = document.createElement('div');
+      fastBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+      var hrLabel = fastestPoC._respHr < 1
+        ? Math.round(fastestPoC._respHr*60)+' dakika'
+        : fastestPoC._respHr < 24
+        ? Math.round(fastestPoC._respHr)+' saat'
+        : Math.round(fastestPoC._respHr/24)+' gün';
+      fastBanner.innerHTML = '<div style="flex:1;min-width:200px">'
+        + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">🔥 EN HIZLI YANITLANAN PoC</div>'
+        + '<div style="font-size:13.5px;font-weight:700">'+(fastestPoC.productName||fastestPoC.title||'—')+'</div>'
+        + '<div class="txt-muted-12-mt2">'+(fastestPoC.customerName||fastestPoC.customerEmail||'Müşteri')+'</div>'
+        + '</div>'
+        + '<div style="text-align:right">'
+        + '<div style="font-size:20px;font-weight:800;color:#22d078">'+hrLabel+'</div>'
+        + '<div style="font-size:10.5px;color:var(--text-muted)">yanıt süresi</div>'
+        + '</div>';
+      m.appendChild(fastBanner);
+    }
+
+    // ── 🚨 ACİL BAKMAN LAZIM BANNER ──
+    if (actionPoCs.length > 0) {
+      var urgBan = document.createElement('div');
+      urgBan.style.cssText = 'background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+      urgBan.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+        + '<div style="flex:1;min-width:200px">'
+        + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">🚨 Acil Bakman Lazım</div>'
+        + '<div class="txt-muted-12">'+actionPoCs.length+' PoC için aksiyon gerekli — uzun süredir bekleyenler veya tarihi geçmiş aktif PoC\'ler. Müşteri kaybı riski!</div>'
+        + '</div>'
+        + '<button id="rq-urg-toggle" style="background:#ff7070;color:#fff;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+        + '</div>';
+      m.appendChild(urgBan);
+
+      urgBan.querySelector('#rq-urg-toggle').addEventListener('click', function(){
+        var det = document.getElementById('rq-urg-list');
+        if (det) { det.remove(); return; }
+        var listDiv = document.createElement('div');
+        listDiv.id = 'rq-urg-list';
+        listDiv.style.cssText = 'background:rgba(255,112,112,.04);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+        listDiv.innerHTML = actionPoCs.slice(0,5).map(function(a){
+          return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(255,112,112,.1);font-size:12px">'
+            + '<div><strong>'+(a.r.productName||a.r.title||'—')+'</strong> <span class="txt-muted-12">· '+(a.r.customerName||a.r.customerEmail||'—')+'</span></div>'
+            + '<div class="txt-muted-12">'+a.reason+'</div>'
+            + '</div>';
+        }).join('') + (actionPoCs.length > 5
+          ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(actionPoCs.length-5)+' diğer PoC</div>'
+          : '');
+        urgBan.parentNode.insertBefore(listDiv, urgBan.nextSibling);
+      });
+    }
+
+    // ── 💡 İÇGÖRÜ PANELİ ──
+    if (reqs.length >= 2) {
+      var insR = document.createElement('div');
+      insR.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
+      var insHtml = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 PoC İçgörüleri</div>'
+        + '<div class="g2">';
+      // Sol: Performans
+      insHtml += '<div>'
+        + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 Performans</div>';
+      if (avgResponseHr !== null) {
+        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+          + '<span>Ort. yanıt süresi</span>'
+          + '<span style="font-weight:700;color:'+(avgResponseHr<24?'#22d078':avgResponseHr<72?'#f0a429':'#ff7070')+'">'+avgResponseLabel+'</span>'
+          + '</div>';
+      }
+      var avgPocDays = null;
+      var pocDurations = reqs
+        .filter(function(r){ return r.completedAt?.seconds && r.acceptedAt?.seconds; })
+        .map(function(r){ return (r.completedAt.seconds - r.acceptedAt.seconds) / 86400; });
+      if (pocDurations.length > 0) {
+        avgPocDays = Math.round(pocDurations.reduce(function(s,d){return s+d;},0) / pocDurations.length);
+        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+          + '<span>Ort. PoC süresi</span>'
+          + '<span style="font-weight:700;color:#7db4ff">'+avgPocDays+' gün</span>'
+          + '</div>';
+      }
+      insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+        + '<span>Dönüşüm oranı</span>'
+        + '<span style="font-weight:700;color:#22d078">'+(conversionDenom>0?conversionPct+'%':'—')+'</span>'
+        + '</div>';
+      insHtml += '</div>';
+      // Sağ: Talep paterni
+      insHtml += '<div>'
+        + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🎯 Talep Paterni</div>';
+      if (topProd) {
+        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+          + '<span>En çok talep gelen ürün</span>'
+          + '<span style="font-weight:700;color:#c4a8ff">'+topProd[0]+' <span class="txt-muted-12">('+topProd[1].cnt+')</span></span>'
+          + '</div>';
+      }
+      insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        + '<span>Yoğun saat dilimi</span>'
+        + '<span style="font-weight:700;color:#7db4ff">'+topHourLabel+'</span>'
+        + '</div>';
+      insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+        + '<span>Bu hafta yeni</span>'
+        + '<span style="font-weight:700;color:#f0a429">'+reqs.filter(function(r){return r.createdAt?.seconds && r.createdAt.seconds*1000>=thisWeekStart.getTime();}).length+'</span>'
+        + '</div>';
+      insHtml += '</div>';
+      insHtml += '</div>';
+      insR.innerHTML = insHtml;
+      m.appendChild(insR);
+    }
+
+    // Search
     var si = document.createElement('input');
     si.className = 'inp';
     si.placeholder = '🔍 Müşteri, ürün veya başlık...';
     si.value = searchVal||'';
     si.style.cssText = 'margin-bottom:10px;font-size:13px';
-    si.addEventListener('input', function(){ render(this.value, filterStatus); });
+    si.addEventListener('input', function(){ render(this.value, filterStatus, ''); });
     m.appendChild(si);
 
+    // ── 🚀 PRESET FİLTRELER ──
+    var presetRow = document.createElement('div');
+    presetRow.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap';
+    var presets = [
+      ['', 'Tümü', 0, 'rgba(255,255,255,.06)', 'var(--text-secondary)', 'rgba(255,255,255,.12)'],
+      ['urgent', '🚨 Acil', actionPoCs.filter(function(a){return a.r.status==='pending';}).length, 'rgba(255,112,112,.08)', '#ff7070', 'rgba(255,112,112,.25)'],
+      ['active_only', '🔥 Aktif', stats.active, 'rgba(34,208,120,.08)', '#22d078', 'rgba(34,208,120,.25)'],
+      ['this_week', '📅 Bu Hafta', reqs.filter(function(r){return r.createdAt?.seconds && r.createdAt.seconds*1000>=thisWeekStart.getTime();}).length, 'rgba(125,180,255,.08)', '#7db4ff', 'rgba(125,180,255,.25)'],
+    ];
+    presets.forEach(function(pr){
+      var b = document.createElement('button');
+      var isOn = (filterPreset||'') === pr[0];
+      b.style.cssText = 'padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid '+pr[5]+';background:'+(isOn?pr[4]:pr[3])+';color:'+(isOn?'#fff':pr[4]);
+      b.innerHTML = pr[1] + (pr[2] > 0 ? ' <span style="opacity:.7">('+pr[2]+')</span>' : '');
+      b.addEventListener('click', function(){ render(searchVal, '', pr[0]); });
+      presetRow.appendChild(b);
+    });
+    m.appendChild(presetRow);
+
+    // Status filtre butonları
     var fb = document.createElement('div');
     fb.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
     fb.innerHTML = [['','Tümü'],['pending','Bekliyor'],['active','Aktif'],['completed','Tamamlandı'],['rejected','Reddedildi'],['cancelled','İptal']].map(function(p){
@@ -10017,13 +10273,13 @@ async function vendRequests(m) {
     }).join('');
     m.appendChild(fb);
     fb.querySelectorAll('.rqf').forEach(function(b){
-      b.addEventListener('click', function(){ render(si.value, b.dataset.v); });
+      b.addEventListener('click', function(){ render(si.value, b.dataset.v, ''); });
     });
 
     if (!filtered.length) {
       var emp = document.createElement('div');
       emp.className = 'empty';
-      emp.innerHTML = '<div class="empty-icon">📭</div>' + (searchVal||filterStatus?'Sonuç bulunamadı.':'Henüz size gelmiş PoC talebi yok.');
+      emp.innerHTML = '<div class="empty-icon">📭</div>' + (searchVal||filterStatus||filterPreset?'Sonuç bulunamadı.':'Henüz size gelmiş PoC talebi yok.');
       m.appendChild(emp);
       return;
     }
@@ -10038,15 +10294,72 @@ async function vendRequests(m) {
         var p1 = r.preferredDateTime1.toDate ? r.preferredDateTime1.toDate() : new Date(r.preferredDateTime1);
         if (!isNaN(p1.getTime())) pref = p1.toLocaleDateString('tr-TR') + ' ' + p1.toTimeString().slice(0,5);
       }
+
+      // ── Performans rozeti + bekleme süresi badge'i ──
+      var perfBadge = '';
+      var waitBadge = '';
+
+      // Pending'lerde bekleme süresi
+      if (r.status === 'pending' && r.createdAt?.seconds) {
+        var ageHr3 = (nowMs - r.createdAt.seconds*1000)/3600000;
+        if (ageHr3 >= 72) {
+          waitBadge = '<div style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,112,112,.15);color:#ff7070;margin-top:4px">⏰ '+Math.round(ageHr3/24)+' gün bekliyor</div>';
+        } else if (ageHr3 >= 24) {
+          waitBadge = '<div style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(240,164,41,.15);color:#f0a429;margin-top:4px">⏰ '+Math.round(ageHr3)+' saattir bekliyor</div>';
+        } else if (ageHr3 < 1) {
+          perfBadge = ' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(34,208,120,.15);color:#22d078">🆕 Yeni</span>';
+        }
+      }
+
+      // Active'lerde tarih kontrolü
+      if (r.status === 'active' && r.preferredDateTime1) {
+        var p2 = r.preferredDateTime1.toDate ? r.preferredDateTime1.toDate() : new Date(r.preferredDateTime1);
+        if (!isNaN(p2.getTime())) {
+          var diffMs = p2.getTime() - nowMs;
+          var diffDays = Math.ceil(diffMs/86400000);
+          if (diffMs < 0) {
+            waitBadge = '<div style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,112,112,.15);color:#ff7070;margin-top:4px">⏰ Tarih '+Math.abs(diffDays)+' gün önce geçti</div>';
+          } else if (diffDays <= 3) {
+            waitBadge = '<div style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(240,164,41,.15);color:#f0a429;margin-top:4px">📅 '+diffDays+' gün sonra</div>';
+          } else if (diffDays <= 7) {
+            waitBadge = '<div style="display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(125,180,255,.1);color:#7db4ff;margin-top:4px">📅 '+diffDays+' gün sonra</div>';
+          }
+        }
+      }
+
+      // Yanıt hızı performans rozeti (kabul edildi olanlar)
+      if (r.status !== 'pending' && r.acceptedAt?.seconds && r.createdAt?.seconds) {
+        var respHr2 = (r.acceptedAt.seconds - r.createdAt.seconds)/3600;
+        if (respHr2 < 24) {
+          perfBadge = ' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(34,208,120,.15);color:#22d078" title="24 saat içinde yanıtladım">🔥 Hızlı</span>';
+        }
+      }
+
+      // Geçen süre etiketi
+      var sentAgoTxt = '';
+      if (r.createdAt?.seconds) {
+        var diffMin = Math.floor((nowMs - r.createdAt.seconds*1000)/60000);
+        var ago2;
+        if (diffMin < 60) ago2 = diffMin + ' dakika önce';
+        else if (diffMin < 1440) ago2 = Math.floor(diffMin/60) + ' saat önce';
+        else if (diffMin < 43200) ago2 = Math.floor(diffMin/1440) + ' gün önce';
+        else ago2 = Math.floor(diffMin/43200) + ' ay önce';
+        sentAgoTxt = '📅 '+ago2;
+      }
+
+      // Müşteri firma bilgisi
+      var custLine = '<strong>'+(r.customerName||r.customerEmail||'Müşteri')+'</strong>';
+      if (r.customerCompany) custLine += ' <span class="txt-muted-12">· 🏢 '+r.customerCompany+'</span>';
+      if (sentAgoTxt) custLine += ' <span class="txt-muted-12">· '+sentAgoTxt+'</span>';
+
       var card = document.createElement('div');
       card.style.cssText = 'background:var(--bg-surface);border:1px solid '+(r.status==='pending'?'rgba(240,164,41,.35)':r.status==='active'?'rgba(59,124,255,.3)':'var(--border)')+';border-radius:12px;padding:16px';
       card.innerHTML =
         '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">'
         + '<div style="flex:1">'
-        +   '<div style="font-size:14px;font-weight:700">'+(r.productName||r.title||'--')+'</div>'
-        +   '<div class="txt-muted-12-mt2">'
-        +     '<strong>'+(r.customerName||r.customerEmail||'Müşteri')+'</strong> · ' + ds
-        +   '</div>'
+        +   '<div style="font-size:14px;font-weight:700">'+(r.productName||r.title||'--')+perfBadge+'</div>'
+        +   '<div class="txt-muted-12-mt2">'+custLine+'</div>'
+        +   waitBadge
         + '</div>'
         + '<span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;color:'+sc+';background:'+sc+'18">'+sl+'</span>'
         + '</div>'
@@ -10153,7 +10466,7 @@ async function vendRequests(m) {
       });
     });
   };
-  render('','');
+  render('','','');
 }
 
 
