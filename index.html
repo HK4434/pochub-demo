@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.47 | pochub.co -->
+<!-- PoCHub v4.48 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.47</title>
+<title>PoCHub.co — v4.48</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -431,7 +431,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.47';
+const VERSION = 'v4.48';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -669,6 +669,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.48':  ['MINOR: Ürünlerim profesyonel yenileme — 8 istatistik kartı, en performanslı ürün banner, aksiyon bekleyenler uyarısı, ürün içgörüleri paneli, hızlı filtre preset\'leri, tabloya PoC/teklif/pipeline/performans/son aktivite sütunları'],
   'v4.47':  ['MINOR: Portföyüm profesyonel yenileme — 8 istatistik kartı, performans lideri banner, aksiyon bekleyenler uyarısı, kategori/menşei içgörü paneli, kart zenginleştirme (PoC/teklif sayısı, son aktivite, performans rozeti)'],
   'v4.46':  ['MINOR: Etkinlik şablonları (klonla), zaman dilimi heatmap (gün/saat performansı), etkinlik içgörüleri paneli (en iyi format/kategori), otomatik etkinlik önerisi'],
   'v4.45':  ['MINOR: Vendor Dashboard\'a Lead Conversion paneli — etkinlik kayıt → PoC talep → teklif → kabul dönüşüm hunisi, müşteri segmenti analizi (sektör/şirket büyüklüğü)'],
@@ -7980,19 +7981,83 @@ async function loadVendTab() {
     // Arka planda 30 gün geçmiş çöp temizle (no-await)
     cleanupExpiredTrash('products','vendorId',CUR_USER.uid).catch(function(){});
 
+    // ── v4.48: PoC + Teklif performans verisi (her ürüne) ──
+    try {
+      var _r48 = await Promise.all([
+        getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
+        getDocs(query(collection(db,'offers'),       where('vendorId','==',CUR_USER.uid))),
+      ]);
+      var _allPocs48 = _r48[0].docs.map(function(d){ return d.data(); });
+      var _allOffs48 = _r48[1].docs.map(function(d){ return d.data(); });
+
+      products.forEach(function(p){
+        var pocsForP = _allPocs48.filter(function(pp){
+          return pp.productId === p.id || pp.productName === p.name;
+        });
+        var offsForP = _allOffs48.filter(function(oo){
+          return oo.productId === p.id || oo.productName === p.name;
+        });
+        p._pocTotal     = pocsForP.length;
+        p._pocActive    = pocsForP.filter(function(x){ return x.status==='active'; }).length;
+        p._pocCompleted = pocsForP.filter(function(x){ return x.status==='completed'; }).length;
+        p._offTotal     = offsForP.length;
+        p._offAccepted  = offsForP.filter(function(x){ return x.status==='accepted'; }).length;
+        p._offPending   = offsForP.filter(function(x){ return x.status==='pending'; }).length;
+        p._totalRevenue = offsForP
+          .filter(function(x){ return x.status==='accepted'; })
+          .reduce(function(s,x){ return s + (x.grossAmount || x.totalAmount || 0); }, 0);
+        p._acceptRate   = p._offTotal > 0 ? Math.round((p._offAccepted/p._offTotal)*100) : 0;
+        // Son aktivite
+        var lastE = null;
+        pocsForP.concat(offsForP).forEach(function(rec){
+          var ts = rec.createdAt?.seconds || 0;
+          if (ts > (lastE?.ts || 0)) {
+            lastE = { ts: ts, type: rec.totalAmount ? 'offer' : 'poc' };
+          }
+        });
+        p._lastActivity = lastE;
+        // Performans skoru — ne kadar aktif?
+        p._perfScore = (p._pocTotal||0) * 2 + (p._offAccepted||0) * 5;
+      });
+    } catch(e) { console.warn('[products] performans verisi yüklenemedi:', e); }
+
     var allCats = [...new Set(products.map(function(p){ return p.category; }).filter(Boolean))].sort();
     var stColors = {active:'#22d078', pending:'#f0a429', rejected:'#ff7070', archived:'#5a6278'};
     var stLabels = {active:'Aktif', pending:'Bekliyor', rejected:'Reddedildi', archived:'Arşiv'};
     var psColors = {ready:'#22d078', awaiting_admin:'#7db4ff', awaiting_integrator:'#f0a429'};
     var psLabels = {ready:'Yayında', awaiting_admin:'Admin Onayı', awaiting_integrator:'Entegratör Bekleniyor'};
 
-    var renderProducts = function(searchVal, filterStatus, filterCat, filterLifecycle) {
+    var renderProducts = function(searchVal, filterStatus, filterCat, filterLifecycle, filterPreset) {
       filterLifecycle = filterLifecycle || 'active';
       var counts = { active:0, archived:0, trash:0 };
       products.forEach(function(p){ counts[getLifecycleState(p)] = (counts[getLifecycleState(p)]||0) + 1; });
 
       var filtered = products.filter(function(p) {
         if (getLifecycleState(p) !== filterLifecycle) return false;
+        // Hızlı preset filtreleri (sadece aktifte)
+        if (filterLifecycle === 'active' && filterPreset) {
+          if (filterPreset === 'action') {
+            // Aksiyon gereken: reddedilmiş, admin onayı bekleyen 7+ gün, entegratör atanmamış, distribütör yok
+            var ageDays = p.createdAt?.seconds ? Math.floor((Date.now()-p.createdAt.seconds*1000)/86400000) : 0;
+            return p.status === 'rejected'
+                || (p.publishStatus === 'awaiting_admin' && ageDays > 7)
+                || (p.publishStatus === 'awaiting_integrator' && (p.integrators||[]).length === 0)
+                || (p.status === 'active' && (p.distributors||[]).length === 0);
+          }
+          if (filterPreset === 'top') {
+            // En performanslılar: son 14 gün PoC veya teklif
+            if (!p._lastActivity || !p._lastActivity.ts) return false;
+            var actDays = (Date.now() - p._lastActivity.ts*1000) / 86400000;
+            return actDays < 14 && (p._pocTotal||0) >= 1;
+          }
+          if (filterPreset === 'idle') {
+            // Hareketsiz: 60+ gün hiç aktivite yok ama yayında
+            if (p.publishStatus !== 'ready') return false;
+            if (!p._lastActivity || !p._lastActivity.ts) return true;
+            var actDays2 = (Date.now() - p._lastActivity.ts*1000) / 86400000;
+            return actDays2 > 60;
+          }
+        }
         // Status filtresi sadece "active" yaşam döngüsünde anlamlı
         if (filterLifecycle === 'active' && filterStatus && p.status !== filterStatus) return false;
         if (filterCat    && p.category !== filterCat) return false;
@@ -8011,11 +8076,230 @@ async function loadVendTab() {
       var hdr = document.createElement('div');
       hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
       hdr.innerHTML = '<div class="flx-c-g10">'
-        + '<h2 style="font-size:18px;font-weight:700">Ürünlerim</h2>'
+        + '<h2 style="font-size:18px;font-weight:700">📦 Ürünlerim</h2>'
         + '<span class="txt-muted-12">' + counts.active + ' aktif · ' + counts.archived + ' arşiv · ' + counts.trash + ' çöp</span>'
         + '</div>'
         + '<button class="btn-p btn-sm" id="v-add-prod2">+ Ürün Ekle</button>';
       m.appendChild(hdr);
+
+      // ─── v4.48: 8 İSTATİSTİK KARTI (sadece Aktif sekmesinde) ─────
+      if (filterLifecycle === 'active') {
+        var nowD = new Date();
+        var activeBucket = products.filter(function(p){ return getLifecycleState(p) === 'active'; });
+
+        var pStats = {
+          total:        activeBucket.length,
+          published:    activeBucket.filter(function(p){ return p.publishStatus === 'ready'; }).length,
+          awaitAdmin:   activeBucket.filter(function(p){ return p.publishStatus === 'awaiting_admin' || p.status === 'pending'; }).length,
+          awaitInt:     activeBucket.filter(function(p){ return p.publishStatus === 'awaiting_integrator'; }).length,
+          rejected:     activeBucket.filter(function(p){ return p.status === 'rejected'; }).length,
+          totalPocs:    activeBucket.reduce(function(s,p){ return s + (p._pocTotal||0); }, 0),
+          totalOffers:  activeBucket.reduce(function(s,p){ return s + (p._offTotal||0); }, 0),
+          totalAccepted:activeBucket.reduce(function(s,p){ return s + (p._offAccepted||0); }, 0),
+          totalRevenue: activeBucket.reduce(function(s,p){ return s + (p._totalRevenue||0); }, 0),
+        };
+        var pAcceptRate = pStats.totalOffers > 0 ? Math.round((pStats.totalAccepted/pStats.totalOffers)*100) : 0;
+
+        // Performans lideri (en yüksek perfScore)
+        var perfLeader = null;
+        activeBucket.forEach(function(p){
+          if ((p._perfScore||0) > 0 && (!perfLeader || perfLeader._perfScore < p._perfScore)) {
+            perfLeader = p;
+          }
+        });
+
+        // Aksiyon bekleyenler — birleşik liste
+        var actionList = [];
+        activeBucket.forEach(function(p){
+          var ageDays = p.createdAt?.seconds ? Math.floor((Date.now()-p.createdAt.seconds*1000)/86400000) : 0;
+          if (p.status === 'rejected') {
+            actionList.push({p:p, reason:'Reddedildi — düzeltme gerekli', priority:1});
+          } else if (p.publishStatus === 'awaiting_admin' && ageDays > 7) {
+            actionList.push({p:p, reason:'Admin onayı '+ageDays+' gündür bekliyor', priority:2});
+          } else if (p.publishStatus === 'awaiting_integrator' && (p.integrators||[]).length === 0) {
+            actionList.push({p:p, reason:'Entegratör atanmamış', priority:3});
+          } else if (p.status === 'active' && (p.distributors||[]).length === 0) {
+            actionList.push({p:p, reason:'Dağıtım kanalı yok', priority:4});
+          }
+        });
+        actionList.sort(function(a,b){ return a.priority - b.priority; });
+
+        // 8 stat kartı
+        var statsRow = document.createElement('div');
+        statsRow.className = 'stat-grid';
+        var statCards = [
+          ['Toplam Ürün',     pStats.total,                                              '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+          ['Yayında',         pStats.published,                                          '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+          ['Admin Onayı',     pStats.awaitAdmin,                                         '#f0a429', 'rgba(240,164,41,.08)', 'rgba(240,164,41,.2)'],
+          ['Entegratör Bek.', pStats.awaitInt,                                           '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+          ['Reddedilen',      pStats.rejected,                                           '#ff7070', 'rgba(255,112,112,.08)','rgba(255,112,112,.2)'],
+          ['Toplam PoC',      pStats.totalPocs,                                          '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+          ['Kabul Oranı',     pStats.totalOffers ? pAcceptRate+'%' : '—',                '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+          ['Pipeline',        pStats.totalRevenue ? formatMoney(pStats.totalRevenue,'TRY') : '—', '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ];
+        statCards.forEach(function(s){
+          var card = document.createElement('div');
+          card.className = 'stat-card';
+          card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4];
+          card.innerHTML = '<div style="font-size:'+(typeof s[1]==='string' && s[1].length>5 ? '14px':'18px')+';font-weight:800;color:'+s[2]+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s[1]+'</div>'
+                         + '<div class="stat-card-lbl">'+s[0]+'</div>';
+          statsRow.appendChild(card);
+        });
+        m.appendChild(statsRow);
+
+        // ─── PERFORMANS LİDERİ BANNER ─────
+        if (perfLeader && perfLeader._perfScore > 0) {
+          var leadBanner = document.createElement('div');
+          leadBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+          leadBanner.innerHTML = '<div style="flex:1;min-width:200px">'
+            + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">⭐ EN PERFORMANSLI ÜRÜN</div>'
+            + '<div style="font-size:13.5px;font-weight:700">'+perfLeader.name+'</div>'
+            + '<div class="txt-muted-12-mt2">'+(perfLeader.category||'—')
+            + (perfLeader._offAccepted>0 ? ' · '+perfLeader._offAccepted+' kabul' : '')
+            + (perfLeader._totalRevenue>0 ? ' · '+formatMoney(perfLeader._totalRevenue,'TRY') : '')
+            + '</div>'
+            + '</div>'
+            + '<div style="text-align:right">'
+            + '<div style="font-size:24px;font-weight:800;color:#22d078">'+(perfLeader._pocTotal||0)+'</div>'
+            + '<div style="font-size:10.5px;color:var(--text-muted)">PoC Talebi</div>'
+            + '</div>';
+          m.appendChild(leadBanner);
+        }
+
+        // ─── AKSİYON BEKLEYENLER BANNER ─────
+        if (actionList.length > 0) {
+          var actBanner = document.createElement('div');
+          actBanner.className = 'banner-warn';
+          actBanner.style.cssText = 'background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+          actBanner.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+            + '<div style="flex:1;min-width:200px">'
+            + '<div style="font-size:12.5px;color:#f0a429;font-weight:700;margin-bottom:4px">⚠️ Bu Ürünlere Bakman Lazım</div>'
+            + '<div class="txt-muted-12">'+actionList.length+' ürün için aksiyon gerekli — reddedilen, geç onay, entegratör/distribütör eksik.</div>'
+            + '</div>'
+            + '<button id="pr-act-toggle" style="background:#f0a429;color:#000;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+            + '</div>';
+          m.appendChild(actBanner);
+
+          actBanner.querySelector('#pr-act-toggle').addEventListener('click', function(){
+            var det = document.getElementById('pr-act-list');
+            if (det) { det.remove(); return; }
+            var listDiv = document.createElement('div');
+            listDiv.id = 'pr-act-list';
+            listDiv.style.cssText = 'background:rgba(240,164,41,.04);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+            listDiv.innerHTML = actionList.slice(0,5).map(function(a){
+              return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(240,164,41,.1);font-size:12px">'
+                + '<div><strong>'+a.p.name+'</strong> <span class="txt-muted-12">· '+(a.p.category||'')+'</span></div>'
+                + '<div class="txt-muted-12">'+a.reason+'</div>'
+                + '</div>';
+            }).join('') + (actionList.length > 5
+              ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(actionList.length-5)+' diğer ürün</div>'
+              : '');
+            actBanner.parentNode.insertBefore(listDiv, actBanner.nextSibling);
+          });
+        }
+
+        // ─── ÜRÜN İÇGÖRÜLERİ ─────
+        if (pStats.total >= 2) {
+          // En çok PoC çeken kategori
+          var catPocs = {};
+          var originPocs = {domestic:{cnt:0,poc:0,off:0,acc:0}, foreign:{cnt:0,poc:0,off:0,acc:0}};
+          activeBucket.forEach(function(p){
+            var cat = p.category || 'Diğer';
+            if (!catPocs[cat]) catPocs[cat] = {cnt:0, poc:0, off:0, acc:0};
+            catPocs[cat].cnt++;
+            catPocs[cat].poc += (p._pocTotal||0);
+            catPocs[cat].off += (p._offTotal||0);
+            catPocs[cat].acc += (p._offAccepted||0);
+            var orig = p.origin === 'domestic' ? 'domestic' : 'foreign';
+            originPocs[orig].cnt++;
+            originPocs[orig].poc += (p._pocTotal||0);
+            originPocs[orig].off += (p._offTotal||0);
+            originPocs[orig].acc += (p._offAccepted||0);
+          });
+          var topCatByPoc = Object.entries(catPocs).sort(function(a,b){return b[1].poc-a[1].poc;}).slice(0,3);
+
+          // Onay süresi ortalaması — approvedAt varsa
+          var approvalDays = activeBucket
+            .filter(function(p){ return p.approvedAt?.seconds && p.createdAt?.seconds; })
+            .map(function(p){ return (p.approvedAt.seconds - p.createdAt.seconds) / 86400; });
+          var avgApproval = approvalDays.length > 0 ? Math.round(approvalDays.reduce(function(s,d){return s+d;},0) / approvalDays.length) : null;
+
+          // Verimli menşei
+          var domAcceptRate = originPocs.domestic.off > 0 ? Math.round((originPocs.domestic.acc/originPocs.domestic.off)*100) : 0;
+          var forAcceptRate = originPocs.foreign.off > 0 ? Math.round((originPocs.foreign.acc/originPocs.foreign.off)*100) : 0;
+          var bestOriginLbl = '—';
+          if (originPocs.domestic.cnt > 0 && originPocs.foreign.cnt > 0) {
+            bestOriginLbl = domAcceptRate >= forAcceptRate
+              ? '🇹🇷 Yerli (%'+domAcceptRate+' kabul)'
+              : '🌍 Yabancı (%'+forAcceptRate+' kabul)';
+          } else if (originPocs.domestic.cnt > 0) bestOriginLbl = '🇹🇷 Yerli (%'+domAcceptRate+')';
+          else if (originPocs.foreign.cnt > 0) bestOriginLbl = '🌍 Yabancı (%'+forAcceptRate+')';
+
+          var insWrap = document.createElement('div');
+          insWrap.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
+          var insHtml = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 Ürün İçgörüleri</div>'
+            + '<div class="g2">';
+          // Sol: en çok PoC çeken kategoriler
+          insHtml += '<div>'
+            + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 En Çok PoC Çeken Kategori</div>';
+          if (topCatByPoc.length === 0 || topCatByPoc[0][1].poc === 0) {
+            insHtml += '<div class="txt-muted-12" style="padding:8px 0">Henüz PoC verisi yok</div>';
+          } else {
+            topCatByPoc.forEach(function(p){
+              if (p[1].poc === 0) return;
+              insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+                + '<span>'+p[0]+'</span>'
+                + '<span style="font-weight:700;color:#c4a8ff">'+p[1].poc+' PoC <span class="txt-muted-12">('+p[1].cnt+' ürün)</span></span>'
+                + '</div>';
+            });
+          }
+          insHtml += '</div>';
+          // Sağ: özet metrikler
+          insHtml += '<div>'
+            + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📈 Performans Özeti</div>'
+            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            +   '<span>Verimli menşei</span>'
+            +   '<span style="font-weight:700;color:#22d078">'+bestOriginLbl+'</span>'
+            + '</div>'
+            + (avgApproval !== null
+              ? '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span>Ort. onay süresi</span><span style="font-weight:700;color:#7db4ff">'+avgApproval+' gün</span></div>'
+              : '')
+            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+            +   '<span>Ortalama kabul oranı</span>'
+            +   '<span style="font-weight:700;color:#22d078">'+(pStats.totalOffers?pAcceptRate:0)+'%</span>'
+            + '</div>'
+            + '</div>';
+          insHtml += '</div>';
+          insWrap.innerHTML = insHtml;
+          m.appendChild(insWrap);
+        }
+
+        // ─── HIZLI FİLTRE PRESET'LERİ ─────
+        var presetRow = document.createElement('div');
+        presetRow.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap';
+        var presets = [
+          ['', 'Tümü', actionList.length, 'rgba(255,255,255,.06)', 'var(--text-secondary)', 'rgba(255,255,255,.12)'],
+          ['action', '🚨 Aksiyon Gerekenler', actionList.length, 'rgba(240,164,41,.08)', '#f0a429', 'rgba(240,164,41,.25)'],
+          ['top', '🔥 En Performanslılar', activeBucket.filter(function(p){
+              if (!p._lastActivity || !p._lastActivity.ts) return false;
+              return (Date.now() - p._lastActivity.ts*1000) < 14*86400000 && (p._pocTotal||0) >= 1;
+            }).length, 'rgba(34,208,120,.08)', '#22d078', 'rgba(34,208,120,.25)'],
+          ['idle', '💤 Hareketsiz', activeBucket.filter(function(p){
+              if (p.publishStatus !== 'ready') return false;
+              if (!p._lastActivity || !p._lastActivity.ts) return true;
+              return (Date.now() - p._lastActivity.ts*1000) > 60*86400000;
+            }).length, 'rgba(125,180,255,.06)', '#7db4ff', 'rgba(125,180,255,.18)'],
+        ];
+        presets.forEach(function(pr){
+          var b = document.createElement('button');
+          var isOn = (filterPreset||'') === pr[0];
+          b.style.cssText = 'padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid '+pr[5]+';background:'+(isOn?pr[4]:pr[3])+';color:'+(isOn?'#000':pr[4]);
+          b.innerHTML = pr[1] + (pr[2] > 0 ? ' <span style="opacity:.7">('+pr[2]+')</span>' : '');
+          b.addEventListener('click', function(){ renderProducts(searchVal, '', filterCat, filterLifecycle, pr[0]); });
+          presetRow.appendChild(b);
+        });
+        m.appendChild(presetRow);
+      }
 
       // Yaşam döngüsü sekmeleri
       var lcRow = document.createElement('div');
@@ -8030,7 +8314,7 @@ async function loadVendTab() {
         var isOn = filterLifecycle === t[0];
         b.className = 'lc-tab' + (isOn?' on':''); b.style.cssText = 'color:'+(isOn?'#fff':t[2])+';border-color:'+t[2]+';background:'+(isOn?t[2]:'transparent');
         b.textContent = t[1];
-        b.addEventListener('click', function(){ renderProducts(searchVal, '', filterCat, t[0]); });
+        b.addEventListener('click', function(){ renderProducts(searchVal, '', filterCat, t[0], null); });
         lcRow.appendChild(b);
       });
       m.appendChild(lcRow);
@@ -8101,7 +8385,7 @@ async function loadVendTab() {
       } else {
         var tbl = document.createElement('table');
         var thead = document.createElement('thead');
-        thead.innerHTML = '<tr><th>Ürün</th><th>Kategori</th><th>Menşei</th><th>Yayın</th><th>Durum</th><th></th></tr>';
+        thead.innerHTML = '<tr><th>Ürün</th><th>Kategori</th><th>📋 PoC</th><th>💰 Teklif</th><th>💵 Pipeline</th><th>Yayın</th><th>Durum</th><th></th></tr>';
         tbl.appendChild(thead);
         var tbody = document.createElement('tbody');
 
@@ -8113,11 +8397,59 @@ async function loadVendTab() {
           var psColor = psColors[p.publishStatus] || '#7c87a0';
           var psLabel = psLabels[p.publishStatus] || '';
 
+          // Performans rozeti
+          var perfBadge = '';
+          if (lcState === 'active' && p._lastActivity && p._lastActivity.ts > 0) {
+            var ageDays = (Date.now() - p._lastActivity.ts*1000) / 86400000;
+            if (ageDays < 7 && (p._pocTotal||0) >= 2) {
+              perfBadge = ' <span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:7px;background:rgba(34,208,120,.15);color:#22d078">🔥</span>';
+            } else if (ageDays < 14 && (p._pocTotal||0) >= 1) {
+              perfBadge = ' <span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:7px;background:rgba(125,180,255,.15);color:#7db4ff">⚡</span>';
+            } else if (ageDays > 60 && p.publishStatus === 'ready') {
+              perfBadge = ' <span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:7px;background:rgba(255,255,255,.05);color:var(--text-muted)" title="60+ gün hareketsiz">💤</span>';
+            }
+          }
+
+          // Son aktivite metni (ürün adı altında küçük)
+          var lastActHtml = '';
+          if (p._lastActivity && p._lastActivity.ts > 0) {
+            var diffMin = Math.floor((Date.now() - p._lastActivity.ts*1000)/60000);
+            var ago;
+            if (diffMin < 60) ago = diffMin + ' dk önce';
+            else if (diffMin < 1440) ago = Math.floor(diffMin/60) + ' saat önce';
+            else if (diffMin < 43200) ago = Math.floor(diffMin/1440) + ' gün önce';
+            else ago = Math.floor(diffMin/43200) + ' ay önce';
+            var actLbl = p._lastActivity.type === 'offer' ? 'teklif' : 'PoC';
+            lastActHtml = '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">⏱ '+ago+' ('+actLbl+')</div>';
+          }
+
+          // Teklif sütunu — kabul/toplam · oran
+          var offCell = '—';
+          if ((p._offTotal||0) > 0) {
+            var rate = p._acceptRate || 0;
+            var rateColor = rate >= 50 ? '#22d078' : rate >= 25 ? '#f0a429' : 'var(--text-muted)';
+            offCell = '<span style="font-weight:600;color:#f0a429">'+(p._offAccepted||0)+'/'+p._offTotal+'</span>'
+                    + ' <span style="font-size:10px;color:'+rateColor+';font-weight:700">%'+rate+'</span>';
+          }
+
+          // Pipeline sütunu
+          var pipeCell = (p._totalRevenue||0) > 0
+            ? '<span style="font-weight:600;color:#22d078;font-size:11.5px">'+formatMoney(p._totalRevenue,'TRY')+'</span>'
+            : '—';
+
+          // PoC sütunu
+          var pocCell = (p._pocTotal||0) > 0
+            ? '<span style="font-weight:700;color:#7db4ff">'+p._pocTotal+'</span>'
+              + ((p._pocActive||0) > 0 ? ' <span style="font-size:10px;color:#22d078" title="Aktif">●'+p._pocActive+'</span>' : '')
+            : '—';
+
           // Cells
           tr.innerHTML =
-            '<td style="font-weight:600">' + (p.name||'—') + '</td>' +
-            '<td style="font-size:12px">' + (p.category||'—') + '</td>' +
-            '<td style="font-size:12px">' + (p.country||'TR') + (p.origin==='domestic'?' 🇹🇷':' 🌍') + '</td>' +
+            '<td style="font-weight:600">' + (p.name||'—') + perfBadge + lastActHtml + '</td>' +
+            '<td style="font-size:12px">' + (p.category||'—') + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:1px">'+(p.country||'TR') + (p.origin==='domestic'?' 🇹🇷':' 🌍')+'</div></td>' +
+            '<td style="font-size:12px;text-align:center">' + pocCell + '</td>' +
+            '<td style="font-size:12px;text-align:center">' + offCell + '</td>' +
+            '<td style="font-size:11.5px;text-align:right">' + pipeCell + '</td>' +
             '<td>' + (psLabel ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;color:' + psColor + ';background:' + psColor + '18">' + psLabel + '</span>' : '—') + '</td>' +
             '<td>' + (lcState==='trash'
                 ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:#dc2626;background:rgba(220,38,38,.12)">🗑 ' + (trashDaysLeft(p)||0) + ' gün</span>'
