@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.46 | pochub.co -->
+<!-- PoCHub v4.47 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.46</title>
+<title>PoCHub.co — v4.47</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -431,7 +431,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.46';
+const VERSION = 'v4.47';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -669,6 +669,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.47':  ['MINOR: Portföyüm profesyonel yenileme — 8 istatistik kartı, performans lideri banner, aksiyon bekleyenler uyarısı, kategori/menşei içgörü paneli, kart zenginleştirme (PoC/teklif sayısı, son aktivite, performans rozeti)'],
   'v4.46':  ['MINOR: Etkinlik şablonları (klonla), zaman dilimi heatmap (gün/saat performansı), etkinlik içgörüleri paneli (en iyi format/kategori), otomatik etkinlik önerisi'],
   'v4.45':  ['MINOR: Vendor Dashboard\'a Lead Conversion paneli — etkinlik kayıt → PoC talep → teklif → kabul dönüşüm hunisi, müşteri segmenti analizi (sektör/şirket büyüklüğü)'],
   'v4.44':  ['MINOR: Etkinliklerim için trend karşılaştırma (geçen aya göre %), düşük doluluk uyarısı (kapasitesi <%30), en çok ilgi gören etkinlik kartı. Boyut optimizasyonu (utility class\'lar)'],
@@ -10539,6 +10540,60 @@ async function vendPortfolio(m) {
       items = items.filter(function(it){ return _activeIds2.indexOf(it.id) !== -1; });
     }
 
+    // ── v4.47: PoC ve Teklif sayılarını ürün başına hesapla ──
+    // Ürün adıyla eşleştirme (poc_requests.productName)
+    try {
+      var _pocSnapAll, _offSnapAll;
+      if (vtype === 'ureticid') {
+        // Üretici: kendi vendor'lığında olan PoC ve teklifler
+        var _r = await Promise.all([
+          getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
+          getDocs(query(collection(db,'offers'),       where('vendorId','==',CUR_USER.uid))),
+        ]);
+        _pocSnapAll = _r[0]; _offSnapAll = _r[1];
+      } else {
+        // Distribütör/entegratör: tüm PoC ve offer'lar (kendi rolüyle eşleşen ürünler için zaten filtrelenmiş items)
+        // Performans: sadece items'taki ürünlere bağlı kayıtlar
+        var _r = await Promise.all([
+          getDocs(collection(db,'poc_requests')),
+          getDocs(collection(db,'offers')),
+        ]);
+        _pocSnapAll = _r[0]; _offSnapAll = _r[1];
+      }
+      var _allPocs = _pocSnapAll.docs.map(function(d){ return d.data(); });
+      var _allOffs = _offSnapAll.docs.map(function(d){ return d.data(); });
+
+      items.forEach(function(it){
+        // Bu ürüne bağlı PoC'ler — productId veya productName ile
+        var pocsForItem = _allPocs.filter(function(p){
+          return p.productId === it.id || p.productName === it.name;
+        });
+        var offsForItem = _allOffs.filter(function(o){
+          return o.productId === it.id || o.productName === it.name;
+        });
+        it._pocTotal     = pocsForItem.length;
+        it._pocActive    = pocsForItem.filter(function(p){ return p.status==='active'; }).length;
+        it._pocPending   = pocsForItem.filter(function(p){ return p.status==='pending'; }).length;
+        it._pocCompleted = pocsForItem.filter(function(p){ return p.status==='completed'; }).length;
+        it._offTotal     = offsForItem.length;
+        it._offAccepted  = offsForItem.filter(function(o){ return o.status==='accepted'; }).length;
+        it._offPending   = offsForItem.filter(function(o){ return o.status==='pending'; }).length;
+        // KDV dahil toplam teklif tutarı (kabul edilenlerden)
+        it._totalRevenue = offsForItem
+          .filter(function(o){ return o.status==='accepted'; })
+          .reduce(function(s,o){ return s + (o.grossAmount || o.totalAmount || 0); }, 0);
+        // Son aktivite — en son PoC veya teklif
+        var lastEvent = null;
+        pocsForItem.concat(offsForItem).forEach(function(rec){
+          var ts = rec.createdAt?.seconds || 0;
+          if (ts > (lastEvent?.ts || 0)) {
+            lastEvent = { ts: ts, type: rec.status ? (rec.totalAmount?'offer':'poc') : 'event' };
+          }
+        });
+        it._lastActivity = lastEvent;
+      });
+    } catch(e) { console.warn('[portfolio] performans verisi yüklenemedi:', e); }
+
     // ── Kategoriler ve ülkeler ──────────────────────────────────
     var allCats = [...new Set(items.map(function(i){ return i.category; }).filter(Boolean))].sort();
     var allCountries = [...new Set(items.map(function(i){ return i.country; }).filter(Boolean))].sort();
@@ -10577,30 +10632,175 @@ async function vendPortfolio(m) {
 
       m.innerHTML = '';
 
-      // Başlık + istatistik
+      // ─── v4.47: PROFESYONEL HEADER + İSTATİSTİKLER ─────────────
+      var nowD = new Date();
+      var thirtyDayAgo = nowD.getTime() - (30 * 24 * 60 * 60 * 1000);
+
+      // İstatistik hesapları
+      var totalItems     = items.length;
+      var activeItems    = items.filter(function(i){ return i.status==='active'; }).length;
+      var publishedItems = items.filter(function(i){ return i.publishStatus === 'ready' || (!i.publishStatus && i.status === 'active'); }).length;
+      var pendingApproval= items.filter(function(i){
+        return i.publishStatus === 'awaiting_admin' || i.publishStatus === 'awaiting_integrator' || i.status === 'pending';
+      }).length;
+      var uniqueCats     = [...new Set(items.map(function(i){ return i.category; }).filter(Boolean))].length;
+      var totalPocs      = items.reduce(function(s,i){ return s + (i._pocTotal||0); }, 0);
+      var totalOffers    = items.reduce(function(s,i){ return s + (i._offTotal||0); }, 0);
+      var totalAccepted  = items.reduce(function(s,i){ return s + (i._offAccepted||0); }, 0);
+      var acceptRate     = totalOffers > 0 ? Math.round((totalAccepted/totalOffers)*100) : 0;
+      var totalRevenue   = items.reduce(function(s,i){ return s + (i._totalRevenue||0); }, 0);
+
+      // En popüler ürün (PoC sayısına göre)
+      var mostPopular = null;
+      items.forEach(function(it){
+        if ((it._pocTotal||0) > 0 && (!mostPopular || mostPopular._pocTotal < (it._pocTotal||0))) {
+          mostPopular = it;
+        }
+      });
+
+      // Aksiyon bekleyen ürünler (vendor için kritik)
+      var actionNeeded = items.filter(function(it){
+        if (vtype === 'ureticid') {
+          // Üretici: distribütör atanmamış + üretici hâlâ ekleyebilir
+          return (it.distributors||[]).length === 0 && it.status === 'active';
+        }
+        if (vtype === 'distributor') {
+          // Distribütör: entegratör atanmamış + ready yayında
+          return (it.integrators||[]).length === 0 && it.publishStatus === 'awaiting_integrator';
+        }
+        return false;
+      });
+
+      // Header
       var header = document.createElement('div');
-      header.style.cssText = 'margin-bottom:20px';
+      header.style.cssText = 'margin-bottom:14px';
       header.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">' +
+        '<div class="flx-bw-c" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">' +
         '<div>' +
         '<h2 style="font-size:18px;font-weight:700">' + (roleTitle[vtype]||'Portföyüm') + '</h2>' +
-        '<div style="font-size:12.5px;color:var(--text-secondary);margin-top:3px">' + (roleDesc[vtype]||'') + '</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:10px">' +
-        '<div style="text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:8px 16px">' +
-        '<div style="font-size:20px;font-weight:700;color:var(--color-primary)">' + items.length + '</div>' +
-        '<div style="font-size:10px;color:var(--text-muted)">Toplam</div>' +
-        '</div>' +
-        '<div style="text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:8px 16px">' +
-        '<div style="font-size:20px;font-weight:700;color:#22d078">' + items.filter(function(i){ return i.status==='active'; }).length + '</div>' +
-        '<div style="font-size:10px;color:var(--text-muted)">Aktif</div>' +
-        '</div>' +
-        (vtype==='integrator' ? '<div style="text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:8px 16px">' +
-        '<div style="font-size:20px;font-weight:700;color:#f0a429">' + items.reduce(function(s,i){ return s+(i.pocCount||0); },0) + '</div>' +
-        '<div style="font-size:10px;color:var(--text-muted)">PoC</div></div>' : '') +
+        '<div class="txt-sec-12" style="margin-top:3px">' + (roleDesc[vtype]||'') + '</div>' +
         '</div>' +
         '</div>';
       m.appendChild(header);
+
+      // 8 İstatistik kartı
+      var statsRow = document.createElement('div');
+      statsRow.className = 'stat-grid';
+      var statCards = [
+        ['Toplam',         totalItems,         '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+        ['Yayında',        publishedItems,     '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ['Onay Bekleyen',  pendingApproval,    '#f0a429', 'rgba(240,164,41,.08)', 'rgba(240,164,41,.2)'],
+        ['Kategori',       uniqueCats,         '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+        ['Toplam PoC',     totalPocs,          '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+        ['Toplam Teklif',  totalOffers,        '#f0a429', 'rgba(240,164,41,.08)', 'rgba(240,164,41,.2)'],
+        ['Kabul Oranı',    totalOffers ? acceptRate+'%' : '—', '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ['Pipeline',       totalRevenue ? formatMoney(totalRevenue, 'TRY').replace('₺','₺') : '—', '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+      ];
+      statCards.forEach(function(s){
+        var card = document.createElement('div');
+        card.className = 'stat-card';
+        card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4];
+        card.innerHTML = '<div style="font-size:'+(typeof s[1]==='string' && s[1].length>5 ? '14px':'18px')+';font-weight:800;color:'+s[2]+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s[1]+'</div>'
+                       + '<div class="stat-card-lbl">'+s[0]+'</div>';
+        statsRow.appendChild(card);
+      });
+      m.appendChild(statsRow);
+
+      // ── v4.47: PERFORMANS LİDERİ BANNER ─────
+      if (mostPopular && mostPopular._pocTotal > 0) {
+        var leadBanner = document.createElement('div');
+        leadBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+        leadBanner.innerHTML = '<div style="flex:1;min-width:200px">'
+          + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">⭐ PERFORMANS LİDERİ</div>'
+          + '<div style="font-size:13.5px;font-weight:700">'+mostPopular.name+'</div>'
+          + '<div class="txt-muted-12-mt2">'+mostPopular.category+(mostPopular._offAccepted>0?' · '+mostPopular._offAccepted+' kabul':'')+(mostPopular._totalRevenue>0?' · '+formatMoney(mostPopular._totalRevenue,'TRY'):'')+'</div>'
+          + '</div>'
+          + '<div style="text-align:right">'
+          + '<div style="font-size:24px;font-weight:800;color:#22d078">'+mostPopular._pocTotal+'</div>'
+          + '<div style="font-size:10.5px;color:var(--text-muted)">PoC Talebi</div>'
+          + '</div>';
+        m.appendChild(leadBanner);
+      }
+
+      // ── v4.47: AKSİYON BEKLEYENLER UYARISI ─────
+      if (actionNeeded.length > 0) {
+        var actBanner = document.createElement('div');
+        actBanner.style.cssText = 'background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+        var actMsg = vtype === 'ureticid'
+          ? actionNeeded.length+' ürününüze henüz <strong>distribütör atanmamış</strong>. Distribütör atayarak dağıtım ağınızı genişletin.'
+          : vtype === 'distributor'
+          ? actionNeeded.length+' ürün <strong>entegratör atanmasını bekliyor</strong>. Entegratör atayarak yayın akışını başlatın.'
+          : actionNeeded.length+' ürün için aksiyon gerekiyor.';
+        actBanner.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+          + '<div style="flex:1;min-width:200px">'
+          + '<div style="font-size:12.5px;color:#f0a429;font-weight:700;margin-bottom:4px">⚠️ Aksiyon Bekleyen</div>'
+          + '<div class="txt-muted-12">'+actMsg+'</div>'
+          + '</div>'
+          + '<button id="pf-action-detail" style="background:#f0a429;color:#000;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+          + '</div>';
+        m.appendChild(actBanner);
+
+        actBanner.querySelector('#pf-action-detail').addEventListener('click', function(){
+          var det = document.getElementById('pf-action-list');
+          if (det) { det.remove(); return; }
+          var listDiv = document.createElement('div');
+          listDiv.id = 'pf-action-list';
+          listDiv.style.cssText = 'background:rgba(240,164,41,.04);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+          listDiv.innerHTML = actionNeeded.slice(0,5).map(function(it){
+            return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(240,164,41,.1);font-size:12px">'
+              + '<div><strong>'+it.name+'</strong> <span class="txt-muted-12">· '+it.category+'</span></div>'
+              + '<div class="txt-muted-12">'+(vtype==='ureticid'?'Distribütör atanmamış':'Entegratör atanmamış')+'</div>'
+              + '</div>';
+          }).join('') + (actionNeeded.length > 5
+            ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(actionNeeded.length-5)+' diğer ürün</div>'
+            : '');
+          actBanner.parentNode.insertBefore(listDiv, actBanner.nextSibling);
+        });
+      }
+
+      // ── v4.47: İÇGÖRÜ PANELİ — Kategori & Menşei dağılımı ─────
+      if (totalItems >= 2) {
+        var catCount = {};
+        var originCount = {domestic:0, foreign:0};
+        items.forEach(function(it){
+          var cat = it.category || 'Diğer';
+          catCount[cat] = (catCount[cat]||0) + 1;
+          originCount[it.origin === 'domestic' ? 'domestic' : 'foreign']++;
+        });
+        var topCats = Object.entries(catCount).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
+        var insWrap = document.createElement('div');
+        insWrap.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
+        var insHtml = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 Portföy İçgörüleri</div>'
+          + '<div class="g2">';
+        // Sol: en çok kategoriler
+        insHtml += '<div>'
+          + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 En Çok Kategoriler</div>';
+        topCats.forEach(function(p){
+          var pctV = Math.round((p[1]/totalItems)*100);
+          insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            + '<span>'+p[0]+'</span>'
+            + '<span style="font-weight:700;color:#c4a8ff">'+p[1]+' <span class="txt-muted-12">(%'+pctV+')</span></span>'
+            + '</div>';
+        });
+        insHtml += '</div>';
+        // Sağ: menşei
+        insHtml += '<div>'
+          + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🌍 Menşei Dağılımı</div>';
+        var domPct = totalItems ? Math.round((originCount.domestic/totalItems)*100) : 0;
+        var forPct = totalItems ? Math.round((originCount.foreign/totalItems)*100) : 0;
+        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+          + '<span>🇹🇷 Yerli</span>'
+          + '<span style="font-weight:700;color:#22d078">'+originCount.domestic+' <span class="txt-muted-12">(%'+domPct+')</span></span>'
+          + '</div>';
+        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+          + '<span>🌍 Yabancı</span>'
+          + '<span style="font-weight:700;color:#7db4ff">'+originCount.foreign+' <span class="txt-muted-12">(%'+forPct+')</span></span>'
+          + '</div>';
+        insHtml += '</div>';
+        insHtml += '</div>';
+        insWrap.innerHTML = insHtml;
+        m.appendChild(insWrap);
+      }
 
       // Arama + filtreler
       var filterBar = document.createElement('div');
@@ -10726,6 +10926,53 @@ async function vendPortfolio(m) {
 
         if (item.avgRating) {
           html += '<div style="font-size:11.5px;color:#f59e0b">⭐ ' + item.avgRating.toFixed(1) + ' ortalama puan</div>';
+        }
+
+        // ── v4.47: Performans bilgisi ─────
+        if ((item._pocTotal||0) > 0 || (item._offTotal||0) > 0) {
+          // Performans rozeti hesapla
+          var perfBadge = '';
+          if (item._lastActivity && item._lastActivity.ts > 0) {
+            var lastActMs = item._lastActivity.ts * 1000;
+            var ageMs = Date.now() - lastActMs;
+            var ageDays = Math.floor(ageMs / (24*60*60*1000));
+            if (ageDays < 7 && (item._pocTotal||0) >= 2) {
+              perfBadge = '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(34,208,120,.15);color:#22d078">🔥 Aktif</span>';
+            } else if (ageDays < 14) {
+              perfBadge = '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(125,180,255,.15);color:#7db4ff">⚡ Trending</span>';
+            } else if (ageDays > 60) {
+              perfBadge = '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,.06);color:var(--text-muted)">💤 Pasif</span>';
+            }
+          }
+
+          html += '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">';
+          html += '<div style="display:flex;gap:5px;flex-wrap:wrap">';
+          if ((item._pocTotal||0) > 0) {
+            html += '<span style="font-size:10.5px;padding:2px 7px;border-radius:8px;background:rgba(125,180,255,.1);color:#7db4ff;font-weight:600" title="'+item._pocActive+' aktif, '+item._pocCompleted+' tamamlandı">📋 '+item._pocTotal+' PoC</span>';
+          }
+          if ((item._offTotal||0) > 0) {
+            html += '<span style="font-size:10.5px;padding:2px 7px;border-radius:8px;background:rgba(240,164,41,.1);color:#f0a429;font-weight:600" title="'+item._offAccepted+' kabul, '+item._offPending+' bekliyor">💰 '+item._offTotal+' Teklif</span>';
+          }
+          if ((item._totalRevenue||0) > 0) {
+            html += '<span style="font-size:10.5px;padding:2px 7px;border-radius:8px;background:rgba(34,208,120,.1);color:#22d078;font-weight:600" title="Kabul edilen tekliflerin KDV dahil toplamı">💵 '+formatMoney(item._totalRevenue,'TRY')+'</span>';
+          }
+          html += '</div>';
+          html += perfBadge;
+          html += '</div>';
+
+          // Son aktivite
+          if (item._lastActivity && item._lastActivity.ts > 0) {
+            var lastDate = new Date(item._lastActivity.ts * 1000);
+            var ageMs2 = Date.now() - lastDate.getTime();
+            var diffMin = Math.floor(ageMs2 / (60*1000));
+            var ago;
+            if (diffMin < 60) ago = diffMin + ' dakika önce';
+            else if (diffMin < 1440) ago = Math.floor(diffMin/60) + ' saat önce';
+            else if (diffMin < 43200) ago = Math.floor(diffMin/1440) + ' gün önce';
+            else ago = Math.floor(diffMin/43200) + ' ay önce';
+            var actLbl = item._lastActivity.type === 'offer' ? 'teklif' : 'PoC talebi';
+            html += '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">⏱ Son aktivite: '+ago+' ('+actLbl+')</div>';
+          }
         }
 
         card.innerHTML = html;
