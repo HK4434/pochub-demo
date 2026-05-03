@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.50 | pochub.co -->
+<!-- PoCHub v4.51 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.50</title>
+<title>PoCHub.co — v4.51</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -431,7 +431,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.50';
+const VERSION = 'v4.51';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -669,6 +669,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.51':  ['MINOR: Takvim & Planlama profesyonel yenileme — 8 istatistik kartı (Bugün, Bu Hafta, Bu Ay, Çakışma, Yaklaşan PoC, Yaklaşan Etkinlik, Tamamlanan, Boş Saat), bugünkü program banner, çakışma uyarısı, yaklaşan 7 gün banner, doluluk içgörüsü'],
   'v4.50':  ['MINOR: PoC Talepleri profesyonel yenileme — vendor operasyonel kalbi 8 stat kart, acil bakman lazım banner, en hızlı yanıt banner, içgörüler, preset filtreler, kart zenginleştirme (bekleme süresi, performans rozeti, geçen süre)'],
   'v4.49':  ['MINOR: Tekliflerim profesyonel yenileme — 8 istatistik kartı, en yüksek tutarlı kazanım banner, aksiyon bekleyenler (revize+süre dolan), teklif içgörüleri (kabul süresi, en verimli tip), hızlı filtre presetleri, kart zenginleştirme (süre kalan, performans rozeti, son aktivite)'],
   'v4.48':  ['MINOR: Ürünlerim profesyonel yenileme — 8 istatistik kartı, en performanslı ürün banner, aksiyon bekleyenler uyarısı, ürün içgörüleri paneli, hızlı filtre preset\'leri, tabloya PoC/teklif/pipeline/performans/son aktivite sütunları'],
@@ -7755,6 +7756,225 @@ async function loadVendTab() {
         + '<button id="vd-add-event" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">+ Etkinlik Oluştur</button>'
         + '</div>';
       m.appendChild(hdr);
+
+      // ── v4.51: İSTATİSTİK + BANNER'LAR ────────────────────────────
+      var nowMs = Date.now();
+      var nowD2 = new Date();
+      var todayStart = new Date(nowD2.getFullYear(), nowD2.getMonth(), nowD2.getDate());
+      var todayEnd = new Date(todayStart.getTime() + 86400000);
+      var weekEnd = new Date(todayStart.getTime() + 7*86400000);
+      var monthStart = new Date(nowD2.getFullYear(), nowD2.getMonth(), 1);
+      var monthEnd = new Date(nowD2.getFullYear(), nowD2.getMonth()+1, 1);
+
+      // Item'ları normalize et — her birinin date'ini Date objesi yap
+      function getItemDate(it) {
+        var ds = it.eventDate || it.date || it.startDate || it.preferredDateTime1 || '';
+        if (!ds) return null;
+        var d;
+        if (ds.toDate) d = ds.toDate();
+        else d = new Date(ds);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      var normalizedItems = allItems.map(function(it){
+        return {item:it, date:getItemDate(it)};
+      }).filter(function(x){ return x.date; });
+
+      // Bugün kayıtları (kronolojik)
+      var todayItems = normalizedItems
+        .filter(function(x){ return x.date >= todayStart && x.date < todayEnd; })
+        .sort(function(a,b){ return a.date - b.date; });
+
+      // Bu hafta (önümüzdeki 7 gün)
+      var weekItems = normalizedItems
+        .filter(function(x){ return x.date >= todayStart && x.date < weekEnd; })
+        .sort(function(a,b){ return a.date - b.date; });
+
+      // Bu ay
+      var monthItems = normalizedItems
+        .filter(function(x){ return x.date >= monthStart && x.date < monthEnd; });
+
+      // Yaklaşan PoC (active + gelecek tarihli)
+      var upcomingPocs = normalizedItems
+        .filter(function(x){ return x.item._type === 'poc' && x.date >= todayStart && x.item.status !== 'completed' && x.item.status !== 'rejected' && x.item.status !== 'cancelled'; });
+
+      // Yaklaşan etkinlikler
+      var upcomingEvents = normalizedItems
+        .filter(function(x){ return x.item._type === 'event' && x.date >= todayStart && x.item.status !== 'cancelled'; });
+
+      // Tamamlanan PoC sayısı (geçmiş ay)
+      var completedThisMonth = pocs.filter(function(p){
+        if (p.status !== 'completed') return false;
+        if (!p.completedAt?.seconds) return false;
+        return p.completedAt.seconds*1000 >= monthStart.getTime();
+      }).length;
+
+      // Çakışmaları bul (önümüzdeki 30 gün)
+      var conflicts = [];
+      var checkUntil = new Date(todayStart.getTime() + 30*86400000);
+      var inRange = normalizedItems.filter(function(x){ return x.date >= todayStart && x.date < checkUntil; });
+      // İki saat tampon ile çakışma kontrolü
+      for (var i = 0; i < inRange.length; i++) {
+        for (var j = i+1; j < inRange.length; j++) {
+          var diffMs = Math.abs(inRange[i].date - inRange[j].date);
+          if (diffMs < 2*3600*1000) { // 2 saat içinde
+            // Aynı saat bandında
+            conflicts.push({a:inRange[i], b:inRange[j]});
+          }
+        }
+      }
+      // Çakışmaları unique yap
+      var seenConfKey = {};
+      var uniqConflicts = [];
+      conflicts.forEach(function(c){
+        var key = [c.a.item.id, c.b.item.id].sort().join('_');
+        if (!seenConfKey[key]) { seenConfKey[key] = true; uniqConflicts.push(c); }
+      });
+
+      // Bu hafta meşgul saat hesabı (40 saat üzerinden)
+      // Her PoC ortalama 2 saat, etkinlik ortalama 1.5 saat varsayalım
+      var busyHours = 0;
+      weekItems.forEach(function(x){
+        busyHours += (x.item._type === 'event' ? 1.5 : 2);
+      });
+      var busyPct = Math.min(100, Math.round((busyHours/40)*100));
+      var freeHours = Math.max(0, 40 - busyHours);
+
+      // 8 stat kartı
+      var statsRow = document.createElement('div');
+      statsRow.className = 'stat-grid';
+      var statCards = [
+        ['Bugün',              todayItems.length,        '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ['Bu Hafta',           weekItems.length,         '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+        ['Bu Ay',              monthItems.length,        '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+        ['Çakışma',            uniqConflicts.length,     uniqConflicts.length>0?'#ff7070':'#5a6278', uniqConflicts.length>0?'rgba(255,112,112,.08)':'rgba(90,98,120,.06)', uniqConflicts.length>0?'rgba(255,112,112,.2)':'rgba(90,98,120,.18)'],
+        ['Yaklaşan PoC',       upcomingPocs.length,      '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+        ['Yaklaşan Etkinlik',  upcomingEvents.length,    '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+        ['Tamamlanan',         completedThisMonth,       '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ['Boş Saat',           Math.round(freeHours)+'sa', '#f0a429', 'rgba(240,164,41,.08)', 'rgba(240,164,41,.2)'],
+      ];
+      statCards.forEach(function(s){
+        var card = document.createElement('div');
+        card.className = 'stat-card';
+        card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4];
+        card.innerHTML = '<div style="font-size:'+(typeof s[1]==='string' && s[1].length>5 ? '14px':'18px')+';font-weight:800;color:'+s[2]+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s[1]+'</div>'
+                       + '<div class="stat-card-lbl">'+s[0]+'</div>';
+        statsRow.appendChild(card);
+      });
+      m.appendChild(statsRow);
+
+      // ── 🚨 BUGÜNKÜ PROGRAM BANNER ──
+      if (todayItems.length > 0) {
+        var todayBanner = document.createElement('div');
+        todayBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+        var todayHtml = '<div style="font-size:12.5px;color:#22d078;font-weight:700;margin-bottom:8px">🚨 BUGÜNKÜ PROGRAMIN ('+todayItems.length+' kayıt)</div>';
+        todayItems.slice(0,5).forEach(function(x){
+          var hh = String(x.date.getHours()).padStart(2,'0');
+          var mm = String(x.date.getMinutes()).padStart(2,'0');
+          var icon = x.item._type === 'poc' ? '📋' : '🎤';
+          var title = x.item.productName || x.item.title || x.item.name || '—';
+          var statusStr = '';
+          if (x.item._type === 'poc') {
+            statusStr = ' <span class="txt-muted-12">· '+(x.item.status==='active'?'Aktif':x.item.status==='pending'?'Bekliyor':x.item.status)+'</span>';
+          } else {
+            statusStr = ' <span class="txt-muted-12">· '+(x.item.registeredCount||0)+' kayıtlı</span>';
+          }
+          todayHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12.5px">'
+            + '<div><strong style="color:#22d078">🕐 '+hh+':'+mm+'</strong> · '+icon+' '+title+statusStr+'</div>'
+            + '</div>';
+        });
+        if (todayItems.length > 5) {
+          todayHtml += '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center">…ve '+(todayItems.length-5)+' diğer kayıt</div>';
+        }
+        todayBanner.innerHTML = todayHtml;
+        m.appendChild(todayBanner);
+      }
+
+      // ── ⚠️ ÇAKIŞMA UYARISI BANNER ──
+      if (uniqConflicts.length > 0) {
+        var confBanner = document.createElement('div');
+        confBanner.style.cssText = 'background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+        confBanner.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+          + '<div style="flex:1;min-width:200px">'
+          + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">⚠️ Çakışma Uyarısı</div>'
+          + '<div class="txt-muted-12">'+uniqConflicts.length+' çakışan kayıt var (2 saat tampon dahilinde). Müşteri sorunu yaşamamak için kontrol et.</div>'
+          + '</div>'
+          + '<button id="cal-conf-toggle" style="background:#ff7070;color:#fff;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Detay Göster</button>'
+          + '</div>';
+        m.appendChild(confBanner);
+
+        confBanner.querySelector('#cal-conf-toggle').addEventListener('click', function(){
+          var det = document.getElementById('cal-conf-list');
+          if (det) { det.remove(); return; }
+          var listDiv = document.createElement('div');
+          listDiv.id = 'cal-conf-list';
+          listDiv.style.cssText = 'background:rgba(255,112,112,.04);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+          listDiv.innerHTML = uniqConflicts.slice(0,5).map(function(c){
+            var t1 = c.a.item.productName || c.a.item.title || c.a.item.name || '—';
+            var t2 = c.b.item.productName || c.b.item.title || c.b.item.name || '—';
+            var d1 = c.a.date.toLocaleDateString('tr-TR') + ' ' + String(c.a.date.getHours()).padStart(2,'0') + ':' + String(c.a.date.getMinutes()).padStart(2,'0');
+            var d2 = c.b.date.toLocaleDateString('tr-TR') + ' ' + String(c.b.date.getHours()).padStart(2,'0') + ':' + String(c.b.date.getMinutes()).padStart(2,'0');
+            return '<div style="padding:8px 0;border-bottom:1px solid rgba(255,112,112,.1);font-size:12px">'
+              + '<div style="font-weight:600;margin-bottom:3px">⚡ '+(c.a.item._type==='poc'?'📋':'🎤')+' '+t1+' <span class="txt-muted-12">('+d1+')</span></div>'
+              + '<div style="font-weight:600">⚡ '+(c.b.item._type==='poc'?'📋':'🎤')+' '+t2+' <span class="txt-muted-12">('+d2+')</span></div>'
+              + '</div>';
+          }).join('');
+          confBanner.parentNode.insertBefore(listDiv, confBanner.nextSibling);
+        });
+      }
+
+      // ── 🔥 YAKLAŞAN 7 GÜN BANNER ──
+      var weekItemsExceptToday = weekItems.filter(function(x){ return x.date >= todayEnd; });
+      if (weekItemsExceptToday.length > 0) {
+        var dows2 = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+        var weekBanner = document.createElement('div');
+        weekBanner.style.cssText = 'background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+        var wHtml = '<div style="font-size:12.5px;color:#7db4ff;font-weight:700;margin-bottom:8px">🔥 YAKLAŞAN 7 GÜN ('+weekItemsExceptToday.length+' kayıt)</div>';
+        weekItemsExceptToday.slice(0,5).forEach(function(x){
+          var dow = dows2[x.date.getDay()];
+          var hh = String(x.date.getHours()).padStart(2,'0');
+          var mm = String(x.date.getMinutes()).padStart(2,'0');
+          var icon = x.item._type === 'poc' ? '📋' : '🎤';
+          var title = x.item.productName || x.item.title || x.item.name || '—';
+          wHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px">'
+            + '<div><strong>'+dow+' '+hh+':'+mm+'</strong> · '+icon+' '+title+'</div>'
+            + '</div>';
+        });
+        if (weekItemsExceptToday.length > 5) {
+          wHtml += '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center">…ve '+(weekItemsExceptToday.length-5)+' diğer kayıt</div>';
+        }
+        weekBanner.innerHTML = wHtml;
+        m.appendChild(weekBanner);
+      }
+
+      // ── 💡 DOLULUK ÖNGÖRÜSÜ ──
+      if (busyHours > 0 || weekItems.length === 0) {
+        var insBanner = document.createElement('div');
+        insBanner.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+        var msg = '';
+        if (busyPct === 0) {
+          msg = 'Bu hafta hiç planlanmış kaydın yok. Yeni etkinlik oluşturarak müşterilerle aktif kalabilirsin.';
+        } else if (busyPct < 30) {
+          msg = 'Bu hafta '+busyHours.toFixed(1)+' saat dolu (~%'+busyPct+'). Yeni etkinlik için bolca yer var.';
+        } else if (busyPct < 70) {
+          msg = 'Bu hafta '+busyHours.toFixed(1)+' saat dolu (~%'+busyPct+'). Dengeli bir program.';
+        } else if (busyPct < 100) {
+          msg = 'Bu hafta '+busyHours.toFixed(1)+' saat dolu (~%'+busyPct+'). Yoğun program — yeni kayıt eklerken dikkat.';
+        } else {
+          msg = 'Bu hafta '+busyHours.toFixed(1)+' saat dolu (~%'+busyPct+'+). Aşırı yüklü — kayıt ertelemeyi düşün.';
+        }
+        var color = busyPct < 30 ? '#22d078' : busyPct < 70 ? '#7db4ff' : busyPct < 100 ? '#f0a429' : '#ff7070';
+        insBanner.innerHTML = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+          + '<div style="flex:1;min-width:200px">'
+          + '<div style="font-size:12.5px;color:#c4a8ff;font-weight:700;margin-bottom:4px">💡 Doluluk Öngörüsü</div>'
+          + '<div class="txt-muted-12">'+msg+'</div>'
+          + '</div>'
+          + '<div style="text-align:right">'
+          + '<div style="font-size:20px;font-weight:800;color:'+color+'">%'+busyPct+'</div>'
+          + '<div style="font-size:10.5px;color:var(--text-muted)">haftalık</div>'
+          + '</div>'
+          + '</div>';
+        m.appendChild(insBanner);
+      }
 
       // Sekme seçici
       var tabs = document.createElement('div');
