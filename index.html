@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.52 | pochub.co -->
+<!-- PoCHub v4.54 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.52</title>
+<title>PoCHub.co — v4.54</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -383,6 +383,37 @@ button:focus-visible, a:focus-visible {
 
 /* Action row (kart altı) */
 .act-row     { display:flex; gap:6px; flex-wrap:wrap; border-top:1px solid var(--border); padding-top:10px; }
+
+/* ═══ v4.53: EK BOYUT OPTİMİZASYONU CLASS'LARI ═══ */
+.row-bb       { font-size:11.5px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+.bg-elev-pad10 { background:var(--bg-elevated); border-radius:8px; padding:10px; }
+.bg-elev-pad12 { background:var(--bg-elevated); border-radius:8px; padding:12px 14px; margin-bottom:12px; }
+.bg-elev-tile { background:var(--bg-elevated); border-radius:8px; padding:10px; text-align:center; }
+.flx-bw-c-mb14b { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.btn-x        { background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:22px; }
+.lbl-cap      { font-size:11px; font-weight:700; color:rgba(255,255,255,.3); letter-spacing:1.2px; text-transform:uppercase; }
+.lbl-success-700 { font-size:11px; color:#22d078; font-weight:700; margin-bottom:4px; }
+.lbl-warn-700 { font-size:12.5px; color:#f0a429; font-weight:700; margin-bottom:4px; }
+.lbl-purp-700 { font-size:13px; font-weight:700; color:#c4a8ff; margin-bottom:10px; }
+.tbl-th-l     { text-align:left; padding:8px 10px; font-size:11px; color:var(--text-muted); font-weight:700; }
+.act-row-orng { padding:6px 0; border-bottom:1px solid rgba(240,164,41,.1); font-size:12px; }
+.btn-warn     { background:#f0a429; color:#000; border:none; border-radius:6px; padding:6px 12px; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+.btn-danger   { background:#ff7070; color:#fff; border:none; border-radius:6px; padding:6px 12px; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+.txt-empty    { font-size:11px; color:var(--text-muted); margin-top:8px; text-align:center; }
+.flx-bw-s-mb10 { display:flex; justify-content:space-between; align-items:start; margin-bottom:10px; }
+.lbl-strong-mb { font-size:12px; font-weight:700; color:var(--text-primary); margin-bottom:8px; }
+.lbl-blk-mb6  { display:block; font-size:12px; color:rgba(255,255,255,.65); font-weight:600; margin-bottom:6px; }
+.bg-elev-pad9 { background:var(--bg-elevated); padding:9px 14px; text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:rgba(255,255,255,.35); }
+
+.txt-muted-12-mt3 { font-size:12px; color:var(--text-muted); margin-top:3px; }
+.flx-g6-mb8-wrap { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+.flx-c-g8-mb6   { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.txt-sec-13     { font-size:13px; color:var(--text-secondary); font-weight:400; }
+.th-pri-bb      { padding:10px 12px; text-align:left; font-size:11px; color:#374151; font-weight:700; border-bottom:1px solid var(--border); }
+.bg-1c2235      { background:#1c2235; border-color:rgba(255,255,255,.15); color:#e9ecf3; }
+.bg-elev-pad-light { background:var(--bg-elevated); padding:9px 14px; text-align:left; color:rgba(255,255,255,.7); }
+.flx-g8-mb14-wrap { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+
 </style>
 </head>
 <body>
@@ -431,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.52';
+const VERSION = 'v4.54';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -446,17 +477,16 @@ function formatTS(val, opts) {
 }
 function formatTSShort(val) { return formatTS(val, {day:'2-digit', month:'2-digit', year:'numeric'}); }
 
-
 /* ══════════════════════════════════════════════════════════════
    YAŞAM DÖNGÜSÜ HELPER'LARI (v4.39)
    ─────────────────────────────────────────────────────────────
    Aktif → Arşiv → Çöp Kutusu → Kalıcı Silme
-   
+
    Veri modeli (her koleksiyona aynı şekilde):
      archived:    boolean        — arşivde mi?
      archivedAt:  Timestamp      — ne zaman arşivlendi
      deletedAt:   Timestamp      — set edilince çöpte; 30 gün sonra otomatik silinir
-   
+
    Geri uyumluluk:
      Ürünlerde eski status:'archived' değeri archived:true olarak okunur.
      Bunlar henüz migrate edilmiyor ama görüntüde tutarlı davranıyor.
@@ -586,7 +616,6 @@ async function cleanupExpiredTrash(collectionName, ownerField, ownerId) {
   }
 }
 
-
 /* ══════════════════════════════════════════════════════════════
    KDV HESAPLAMA HELPER'LARI (v4.40)
    ─────────────────────────────────────────────────────────────
@@ -647,17 +676,16 @@ function getOfferVatInfo(offer) {
   };
 }
 
-
 /* ══════════════════════════════════════════════════════════════
    SÜRÜM YÖNETİMİ — DEĞİŞMEZ KURAL
    ─────────────────────────────────────────────────────────────
    Her değişiklik = Versiyon artışı. İstisna yok.
-   
+
    KURAL:
      Feature / Yeni özellik  → MINOR  (v4.9 → v4.10)
      Bug fix / Hata düzeltme → PATCH  (v4.9 → v4.9.1)
      Büyük yeniden yazım     → MAJOR  (v4 → v5)
-   
+
    YAPILACAKLAR:
      1. VERSION sabiti güncelle
      2. <title> güncelle
@@ -669,6 +697,8 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.54':  ['MAJOR: Vendor Dashboard tam yenileme — diğer 8 sayfaya tutarlı 8 stat kartı (trend ok\'larıyla), acil aksiyonlar banner, performans lideri banner, genel içgörüler, yaklaşan haftaya bakış'],
+  'v4.53':  ['PATCH: Boyut optimizasyonu — sıfır işlevsel değişiklik. Inline style → utility class dönüşümleri, çoklu whitespace temizliği, fazla boş satır temizliği. Hedef: 868 → 800 KB civarı.'],
   'v4.52':  ['MINOR: Mesajlar profesyonel yenileme — 8. ve son ana sayfa profesyonel seviyeye geldi. 8 istatistik kartı, en aktif müşteri banner, yanıtsız mesajlar uyarısı, mesaj içgörüleri, preset filtreler, sohbet kartı zenginleştirme'],
   'v4.51':  ['MINOR: Takvim & Planlama profesyonel yenileme — 8 istatistik kartı (Bugün, Bu Hafta, Bu Ay, Çakışma, Yaklaşan PoC, Yaklaşan Etkinlik, Tamamlanan, Boş Saat), bugünkü program banner, çakışma uyarısı, yaklaşan 7 gün banner, doluluk içgörüsü'],
   'v4.50':  ['MINOR: PoC Talepleri profesyonel yenileme — vendor operasyonel kalbi 8 stat kart, acil bakman lazım banner, en hızlı yanıt banner, içgörüler, preset filtreler, kart zenginleştirme (bekleme süresi, performans rozeti, geçen süre)'],
@@ -742,17 +772,17 @@ const CHANGELOG = {
 (function versionCheck() {
   const semver = VERSION.replace('v','').split('.').map(Number);
   const isValid = semver.length >= 2 && semver.length <= 3 && semver.every(n => !isNaN(n));
-  
+
   if (!isValid) {
     console.error('⛔ VERSİYON FORMAT HATASI:', VERSION, '→ Beklenen: vMAJOR.MINOR veya vMAJOR.MINOR.PATCH');
   }
-  
+
   const changes = CHANGELOG[VERSION];
   if (!changes) {
     console.warn("CHANGELOG eksik: " + VERSION);
   }
 
-  
+
   console.group('PoCHub ' + VERSION + ' | pochub.co');
   console.log('Değişiklikler:');
   (changes || ['(CHANGELOG girişi yok)']).forEach(c => console.log(' •', c));
@@ -1452,7 +1482,6 @@ function validateCatFields(modal, cat) {
   return missing;
 }
 
-
 /* ── DİL LİSTESİ ── */
 var POC_LANGUAGES = [
   {code:'tr',name:'Türkçe',flag:'🇹🇷'},
@@ -1696,7 +1725,6 @@ function publishStatusBadge(ps, origin, distCount, intCount) {
   return `<span class="status-badge" style="background:${bg};color:${col}">${lbl}${chain}</span>`;
 }
 
-
 /* ── VENDOR ETKİNLİK ÜRÜN SEÇİMİ ── */
 function renderEvProdList(prods, modal) {
   const list = modal ? modal.querySelector('#ev-prod-list') : document.getElementById('ev-prod-list');
@@ -1749,7 +1777,6 @@ function filterVendorProducts(q) {
 ════════════════════════════════════════ */
 let ACTIVE_CHAT_UNSUB = null;
 let ACTIVE_CHAT_POC_ID = null;
-
 
 // ══════════════════════════════════════════════════════
 // SEKME STANDART BAŞLIK YÜKLEYİCİ
@@ -2072,7 +2099,7 @@ async function loadMessagesTab(m, role) {
             + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">🚨 Sıra Sende — Yanıtsız Mesajlar</div>'
             + '<div class="txt-muted-12">'+unansweredList.length+' kişi senden cevap bekliyor. Hızlı yanıt müşteri memnuniyeti için kritik.</div>'
             + '</div>'
-            + '<button id="msg-unans-toggle" style="background:#ff7070;color:#fff;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+            + '<button id="msg-unans-toggle" class="btn-danger">Listeyi Gör</button>'
             + '</div>';
           m.appendChild(unansBanner);
 
@@ -2092,7 +2119,7 @@ async function loadMessagesTab(m, role) {
                 + '<div style="font-weight:700;color:'+waitColor+'">⏰ '+waitLbl+'</div>'
                 + '</div>';
             }).join('') + (unansweredList.length > 5
-              ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(unansweredList.length-5)+' diğer mesaj</div>'
+              ? '<div class="txt-empty">…ve '+(unansweredList.length-5)+' diğer mesaj</div>'
               : '');
             unansBanner.parentNode.insertBefore(listDiv, unansBanner.nextSibling);
           });
@@ -2106,7 +2133,7 @@ async function loadMessagesTab(m, role) {
           var topBanner = document.createElement('div');
           topBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
           topBanner.innerHTML = '<div style="flex:1;min-width:200px">'
-            + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">💬 EN AKTİF YAZIŞMA</div>'
+            + '<div class="lbl-success-700">💬 EN AKTİF YAZIŞMA</div>'
             + '<div style="font-size:13.5px;font-weight:700">'+topName+'</div>'
             + '<div class="txt-muted-12-mt2">'+topPocName+'</div>'
             + '</div>'
@@ -2132,16 +2159,16 @@ async function loadMessagesTab(m, role) {
 
           var insMsg = document.createElement('div');
           insMsg.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
-          var insHtmlMsg = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 Mesaj İçgörüleri</div>'
+          var insHtmlMsg = '<div class="lbl-purp-700">💡 Mesaj İçgörüleri</div>'
             + '<div class="g2">';
           // Sol: İletişim sağlığı
           insHtmlMsg += '<div>'
             + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 İletişim Sağlığı</div>'
-            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            + '<div  class="flx-bw-c row-bb">'
             +   '<span>Yanıt oranım</span>'
             +   '<span style="font-weight:700;color:'+(responseRate>=80?'#22d078':responseRate>=50?'#f0a429':'#ff7070')+'">%'+responseRate+'</span>'
             + '</div>'
-            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            + '<div  class="flx-bw-c row-bb">'
             +   '<span>Ort. mesaj/yazışma</span>'
             +   '<span style="font-weight:700;color:#7db4ff">'+avgMsgPerChat+'</span>'
             + '</div>'
@@ -2153,11 +2180,11 @@ async function loadMessagesTab(m, role) {
           // Sağ: Hareket
           insHtmlMsg += '<div>'
             + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🎯 Aktivite</div>'
-            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            + '<div  class="flx-bw-c row-bb">'
             +   '<span>Bugün mesaj alışverişi</span>'
             +   '<span style="font-weight:700;color:#22d078">'+msgStats.todayActive+'</span>'
             + '</div>'
-            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            + '<div  class="flx-bw-c row-bb">'
             +   '<span>Bu hafta yeni yazışma</span>'
             +   '<span style="font-weight:700;color:#c4a8ff">'+msgStats.thisWeekNew+'</span>'
             + '</div>'
@@ -2964,7 +2991,6 @@ async function openNotifPanel() {
   }
 }
 
-
 async function updateNotifBadge() {
   const badge = document.getElementById('notif-badge');
   if (!badge) return;
@@ -3493,19 +3519,19 @@ async function renderHome() {
       ).join('')}
     </div>
     <div style="display:grid;grid-template-columns:1fr 290px;gap:16px;align-items:start">
-      
+
       <div>
         <div class="card" style="padding:20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="flx-bw-c-mb14b">
             <div style="font-size:14px;font-weight:700" id="home-events-title">Yaklaşan Etkinlikler</div>
             <button class="btn-g btn-sm" id="home-all-events">Tümünü Gör →</button>
           </div>
           <div id="home-events-list"><div class="loading"><div class="spinner"></div>Yükleniyor...</div></div>
         </div>
       </div>
-      
+
       <div style="display:flex;flex-direction:column;gap:12px;position:sticky;top:56px">
-        
+
         <div class="card" style="padding:16px" id="cal-card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <button id="cal-prev" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:2px 6px">‹</button>
@@ -3514,7 +3540,7 @@ async function renderHome() {
           </div>
           <div id="cal-grid"></div>
         </div>
-        
+
         <div class="card" style="padding:14px">
           <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700;margin-bottom:9px">Kategoriler</div>
           <div id="home-cats"></div>
@@ -3716,7 +3742,7 @@ async function renderHome() {
 
   // Ay değişince listeyi güncelle — temiz listener
   const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-  
+
   async function changeMonth(delta) {
     calMonth += delta;
     if (calMonth < 0) { calMonth = 11; calYear--; }
@@ -3738,8 +3764,6 @@ async function renderHome() {
   el('cal-next').addEventListener('click', () => changeMonth(1));
   loadFeaturedProducts();
 }
-
-
 
 /* loadHomeEvents — renderHome içine taşındı */
 
@@ -3847,7 +3871,6 @@ async function openProductDetailModal(productId) {
   }
 }
 
-
 /* ══════════════════════════════════════════════════════
    POC DEGERLENDIRME MODAL — Musteri (v4.4)
 ══════════════════════════════════════════════════════ */
@@ -3859,9 +3882,9 @@ function openPocEvalModal(poc) {
     '<div class="flx-bw-c" style="margin-bottom:20px">' +
     '<div>' +
     '<div style="font-size:15px;font-weight:700">PoC Degerlendirmesi</div>' +
-    '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">' + (poc.productName||'') + '</div>' +
+    '<div class="txt-muted-12-mt3">' + (poc.productName||'') + '</div>' +
     '</div>' +
-    '<button id="eval-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:22px">x</button>' +
+    '<button id="eval-close" class="btn-x">x</button>' +
     '</div>' +
     '<label class="lbl">Teknik Degerlendirme Puani <span style="color:#ff7070">*</span></label>' +
     '<div id="star-rating" style="display:flex;gap:8px;margin-bottom:16px">' +
@@ -3971,8 +3994,8 @@ function openVendorPocNoteModal(poc) {
     '<div class="modal" style="max-width:480px">' +
     '<div class="flx-bw-c" style="margin-bottom:20px">' +
     '<div><div style="font-size:15px;font-weight:700">PoC Sonuc Notu</div>' +
-    '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">' + (poc.customerName||poc.customerCompany||'Musteri') + '</div></div>' +
-    '<button id="vnote-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:22px">x</button>' +
+    '<div class="txt-muted-12-mt3">' + (poc.customerName||poc.customerCompany||'Musteri') + '</div></div>' +
+    '<button id="vnote-close" class="btn-x">x</button>' +
     '</div>' +
     '<label class="lbl">Teknik Sonuc Notu</label>' +
     '<textarea class="inp" id="vnote-text" rows="5" placeholder="PoC sureci bulgulari ve musteriye oneriler..." style="resize:vertical;margin-bottom:12px">' + (poc.vendorNote||'') + '</textarea>' +
@@ -4011,7 +4034,6 @@ function openVendorPocNoteModal(poc) {
   });
 }
 
-
 /* ══════════════════════════════════════════════════════
    ETKİNLİK İPTAL MODAL — Vendor (v4.5)
    Zorunlu açıklama + kayıtlı katılımcılara bildirim
@@ -4024,9 +4046,9 @@ async function openEventCancelModal(eventId, eventTitle, registeredCount) {
     '<div class="flx-bw-c-mb18">' +
     '<div>' +
     '<div style="font-size:15px;font-weight:700;color:#ff7070">Etkinliği İptal Et</div>' +
-    '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">' + (eventTitle||'') + '</div>' +
+    '<div class="txt-muted-12-mt3">' + (eventTitle||'') + '</div>' +
     '</div>' +
-    '<button id="evc-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:22px">x</button>' +
+    '<button id="evc-close" class="btn-x">x</button>' +
     '</div>' +
 
     (registeredCount > 0 ?
@@ -4114,7 +4136,6 @@ async function openEventCancelModal(eventId, eventTitle, registeredCount) {
   });
 }
 
-
 /* ══════════════════════════════════════════════════════
    ETKİNLİK KATILIMCI LİSTESİ MODAL — v4.5.1
    Vendor ve Admin için — PDF export ile
@@ -4128,12 +4149,12 @@ async function openEventAttendeesModal(eventId, eventTitle) {
     '<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--border);flex-shrink:0">' +
     '<div>' +
     '<div style="font-size:16px;font-weight:700">Katılımcı Listesi</div>' +
-    '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">' + (eventTitle||'Etkinlik') + '</div>' +
+    '<div class="txt-muted-12-mt3">' + (eventTitle||'Etkinlik') + '</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;align-items:center">' +
     '<button id="ea-mail" class="btn-g btn-sm" style="font-size:12px;margin-right:4px">📧 Mail Gönder</button>' +
     '<button id="ea-pdf" class="btn-g btn-sm" style="font-size:12px">📄 PDF İndir</button>' +
-    '<button id="ea-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:22px">×</button>' +
+    '<button id="ea-close" class="btn-x">×</button>' +
     '</div>' +
     '</div>' +
     '<div id="ea-body" style="padding:20px 24px;overflow-y:auto;flex:1">' +
@@ -4182,11 +4203,11 @@ async function openEventAttendeesModal(eventId, eventTitle) {
     var tableHtml =
       '<table style="width:100%;border-collapse:collapse">' +
       '<thead><tr style="border-bottom:1px solid rgba(255,255,255,.1)">' +
-      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-muted);font-weight:700">#</th>' +
-      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-muted);font-weight:700">AD SOYAD / FİRMA</th>' +
-      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-muted);font-weight:700">E-POSTA</th>' +
-      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-muted);font-weight:700">KAYIT TARİHİ</th>' +
-      '<th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-muted);font-weight:700">DURUM</th>' +
+      '<th class="tbl-th-l">#</th>' +
+      '<th class="tbl-th-l">AD SOYAD / FİRMA</th>' +
+      '<th class="tbl-th-l">E-POSTA</th>' +
+      '<th class="tbl-th-l">KAYIT TARİHİ</th>' +
+      '<th class="tbl-th-l">DURUM</th>' +
       '</tr></thead><tbody>';
 
     regs.forEach(function(r, i) {
@@ -4270,7 +4291,6 @@ async function openEventAttendeesModal(eventId, eventTitle) {
   }
 }
 
-
 /* ══════════════════════════════════════════════════════
    ETKİNLİK KATILIMCI LİSTESİ — MAİL GÖNDER (v4.5.2)
    Çoklu alıcı, özelleştirilebilir mesaj, liste ekte özet
@@ -4295,9 +4315,9 @@ function openEventAttendeesMailModal(eventTitle, regs) {
     '<div class="flx-bw-c" style="margin-bottom:20px">' +
     '<div>' +
     '<div style="font-size:16px;font-weight:700">Katılımcı Listesini Gönder</div>' +
-    '<div style="font-size:12px;color:var(--text-muted);margin-top:3px">' + (eventTitle||'Etkinlik') + ' · ' + active + ' aktif, ' + total + ' toplam kayıt</div>' +
+    '<div class="txt-muted-12-mt3">' + (eventTitle||'Etkinlik') + ' · ' + active + ' aktif, ' + total + ' toplam kayıt</div>' +
     '</div>' +
-    '<button id="eam-close" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:22px">×</button>' +
+    '<button id="eam-close" class="btn-x">×</button>' +
     '</div>' +
 
     // Alıcılar
@@ -4488,7 +4508,6 @@ function openEventAttendeesMailModal(eventTitle, regs) {
   });
 }
 
-
 async function loadFeaturedProducts() {
   var section = el('featured-carousel-section');
   if (!section) return;
@@ -4580,7 +4599,7 @@ async function loadFeaturedProducts() {
           '<div style="position:relative;padding:22px 24px">' +
 
             // Üst satır: badge sol, dot + tarih sağ
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+            '<div class="flx-bw-c-mb14b">' +
               '<span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;'+
               'color:'+color+';background:rgba('+rgb+',.15);padding:4px 11px;border-radius:20px;border:1px solid rgba('+rgb+',.3)">'+
               '⭐ '+badge+'</span>' +
@@ -4648,7 +4667,6 @@ async function loadFeaturedProducts() {
     if (s2) s2.innerHTML = '';
   }
 }
-
 
 async function renderEvents() {
   const wrap = el('scr-events');
@@ -4729,12 +4747,12 @@ async function openEventDetail(eventId) {
     modal.innerHTML = `<div class="modal" style="max-width:600px">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:18px">
         <div style="flex:1">
-          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+          <div class="flx-g6-mb8-wrap">
             <span class="bdg" style="background:var(--bg-elevated);color:#7c87a0">${e.category||'—'}</span>
             <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${e.format||'Online'}</span>
             <span class="bdg" style="background:${feeBg};color:${feeCol}">${feeLabel}</span>
             ${e.language?('<span class="bdg" style="background:rgba(139,92,246,.12);color:#c4a8ff">'+langLabel(e.language)+'</span>'):''}
-            
+
           </div>
           <h2 style="font-size:17px;font-weight:700;line-height:1.3">${escHtml(cleanTitle(e.title))}</h2>
         </div>
@@ -5188,12 +5206,12 @@ async function openProductIntModal(productId, productName) {
       <div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:6px;padding:9px 13px;font-size:12px;color:#d97706;margin-bottom:14px">
         ⚠ En az 1 entegratör/iş ortağı atamanız gereklidir. Atama yapıldıktan sonra ürün katalogda yayına girecektir.
       </div>
-      <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Mevcut Entegratörler</div>
+      <div class="lbl-strong-mb">Mevcut Entegratörler</div>
       <div id="int-modal-list" style="min-height:60px;margin-bottom:12px">
         <div class="loading"><div class="spinner"></div>Yükleniyor...</div>
       </div>
       <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">
-        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Yeni Entegratör / İş Ortağı Ekle</div>
+        <div class="lbl-strong-mb">Yeni Entegratör / İş Ortağı Ekle</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <input class="inp" id="new-int-name" placeholder="Şirket adı *" list="int-modal-datalist" style="font-size:12.5px">
           <input class="inp" id="new-int-email" placeholder="E-posta" style="font-size:12.5px">
@@ -5358,12 +5376,12 @@ async function openProductDistModal(productId, productName, origin) {
         '<div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:6px;padding:9px 13px;font-size:12px;color:#f0a429;margin-bottom:14px">⚠ Yabancı menşeili ürün — en az 1 distribütör zorunludur.</div>' :
         '<div style="background:rgba(34,208,120,.08);border:1px solid rgba(34,208,120,.2);border-radius:6px;padding:9px 13px;font-size:12px;color:#16a34a;margin-bottom:14px">🇹🇷 Yerli menşeili ürün — distribütör opsiyoneldir.</div>'
       }
-      <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Mevcut Distribütörler</div>
+      <div class="lbl-strong-mb">Mevcut Distribütörler</div>
       <div id="dist-modal-list" style="min-height:60px;margin-bottom:12px">
         <div class="loading"><div class="spinner"></div>Yükleniyor...</div>
       </div>
       <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">
-        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Yeni Distribütör Ekle</div>
+        <div class="lbl-strong-mb">Yeni Distribütör Ekle</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <input class="inp" id="new-dist-name" placeholder="Şirket adı *" list="dist-modal-datalist" style="font-size:12.5px">
           <input class="inp" id="new-dist-email" placeholder="E-posta" style="font-size:12.5px">
@@ -5627,16 +5645,16 @@ async function submitCustomPoC() {
   var category    = el('cpoc-category')?.value;
   var desc        = el('cpoc-desc')?.value.trim();
   var location    = el('cpoc-location')?.value || 'Müşteri Lokasyonu';
-  
+
   if (!productName || !category || !desc) {
     el('cpoc-err').innerHTML = '<div class="alert alert-err">Ürün adı, kategori ve açıklama zorunludur.</div>';
     return;
   }
-  
+
   try {
     var btn = document.querySelector('#poc-custom-step .btn-p');
     btn.disabled = true; btn.textContent = 'Gönderiliyor...';
-    
+
     await addDoc(collection(db, 'poc_requests'), {
       customerId:    CUR_USER.uid,
       customerEmail: CUR_USER.email,
@@ -5653,7 +5671,7 @@ async function submitCustomPoC() {
       isCustomProduct: true,
       createdAt:     serverTimestamp(),
     });
-    
+
     // EmailJS bildirimi
     try {
       await emailjs.send('service_k3gfuw2','template_bavhw8b',{
@@ -5662,12 +5680,12 @@ async function submitCustomPoC() {
         details: 'Katalog dışı ürün PoC talebiniz alındı.\n\nÜrün: ' + productName + '\nVendor: ' + vendorName + '\nKategori: ' + category
       });
     } catch(e) {}
-    
+
     closePocModal();
     showToast('PoC talebiniz başarıyla gönderildi!');
     CUR_CUST_TAB = 'requests';
     loadCustTab();
-    
+
   } catch(e) {
     el('cpoc-err').innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
     var btn = document.querySelector('#poc-custom-step .btn-p');
@@ -5940,7 +5958,7 @@ async function custInvites(m) {
           var opts=['Tarih/sure muzakere etmek istiyorum','Lokasyon degisikligi oneriyorum','Kapsam hakkinda sorum var','Farkli bir mesaj yaz...'];
           var dlg=document.createElement('div'); dlg.className='modal-bg on';
           dlg.innerHTML='<div class="modal" style="max-width:420px;background:#0f1623;border:1px solid rgba(59,124,255,.25)">'
-            +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+            +'<div class="flx-bw-c-mb14b">'
             +'<h3 style="font-size:15px;font-weight:700">Vendor\u2019a Bildir</h3>'
             +'<button id="im-x" class="btn-close-X">×</button></div>'
             +'<div style="font-size:12px;color:rgba(150,165,190,.8);margin-bottom:12px">'+(inv.vendorCompany||inv.vendorName||'Vendor')+' \u2014 '+(inv.productName||'')+'</div>'
@@ -5999,7 +6017,6 @@ async function custInvites(m) {
     m.innerHTML = '<div class="alert alert-err">Davetler yüklenemedi: ' + e.message + '</div>';
   }
 }
-
 
 async function openPocAcceptModal(pocId) {
   var pocDoc = await getDoc(doc(db,'poc_requests',pocId));
@@ -6083,7 +6100,6 @@ async function openPocAcceptModal(pocId) {
     }
   });
 }
-
 
 function openPocCancelModal(pocId, pocTitle, vendorEmail, vendorName, onSuccess) {
   var modal = document.createElement('div');
@@ -6204,7 +6220,6 @@ function openPocCancelModal(pocId, pocTitle, vendorEmail, vendorName, onSuccess)
   });
 }
 
-
 function openPocTimeline(poc) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -6321,7 +6336,6 @@ function openPocTimeline(poc) {
   });
 }
 
-
 async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -6332,7 +6346,7 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       <button id="close-multi-poc" style="background:none;border:none;color:rgba(255,255,255,.65);cursor:pointer;font-size:20px">×</button>
     </div>
 
-    
+
     <div id="poc-step1">
       <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:12px">Adım 1 / 3 — Kategori Seçin</div>
       <div style="background:#f0f7ff;border:1px solid rgba(0,102,204,.2);border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
@@ -6347,7 +6361,7 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       </div>
     </div>
 
-    
+
     <div id="poc-step2" style="display:none">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <button id="poc-back1" style="background:none;border:none;color:#3b7cff;cursor:pointer;font-size:12.5px">← Geri</button>
@@ -6364,7 +6378,7 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       <button class="btn-p" id="poc-next2" style="width:100%;padding:11px;font-size:14px;margin-top:12px" disabled>Devam Et →</button>
     </div>
 
-    
+
     <div id="poc-step3" style="display:none">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <button id="poc-back2" style="background:none;border:none;color:#3b7cff;cursor:pointer;font-size:12.5px">← Geri</button>
@@ -6372,26 +6386,26 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       </div>
       <div id="poc-sel-summary" style="background:rgba(255,255,255,.06);border-radius:8px;padding:11px;margin-bottom:14px;font-size:12.5px"></div>
       <label class="lbl">PoC Başlığı *</label>
-      <input class="inp" id="poc-title" style="background:#1c2235;border-color:rgba(255,255,255,.15);color:#e9ecf3" placeholder="Örn: 1000 kullanıcı için Firewall değerlendirmesi">
+      <input  id="poc-title" class="inp bg-1c2235" placeholder="Örn: 1000 kullanıcı için Firewall değerlendirmesi">
       <label class="lbl">Gereksinimler / Notlar</label>
-      <textarea class="inp" id="poc-req" style="background:#1c2235;border-color:rgba(255,255,255,.15);color:#e9ecf3" rows="3" placeholder="Test ortamı, kullanıcı sayısı, özel gereksinimler..." style="resize:none"></textarea>
+      <textarea  id="poc-req" class="inp bg-1c2235" rows="3" placeholder="Test ortamı, kullanıcı sayısı, özel gereksinimler..." style="resize:none"></textarea>
       <label class="lbl">Tercih Edilen Tarih ve Saat *</label>
 
       <div style="font-size:11.5px;color:rgba(255,255,255,.65);margin-bottom:6px;margin-top:-4px">1. Tercih <span style="color:#ff7070">*</span> <span style="color:#5a6278">(Zorunlu)</span></div>
       <div class="g2" style="margin-bottom:10px">
-        <input class="inp" id="poc-date1" style="background:#1c2235;border-color:rgba(255,255,255,.15);color:#e9ecf3" type="date">
+        <input  id="poc-date1" class="inp bg-1c2235" type="date">
         <input class="inp" id="poc-time1" type="time" value="10:00">
       </div>
 
       <div style="font-size:11.5px;color:rgba(255,255,255,.65);margin-bottom:6px">2. Tercih <span style="color:#5a6278">(Opsiyonel — alternatif tarih)</span></div>
       <div class="g2" style="margin-bottom:8px">
-        <input class="inp" id="poc-date2" style="background:#1c2235;border-color:rgba(255,255,255,.15);color:#e9ecf3" type="date" style="opacity:.7">
+        <input  id="poc-date2" class="inp bg-1c2235" type="date" style="opacity:.7">
         <input class="inp" id="poc-time2" type="time" value="14:00" style="opacity:.7">
       </div>
 
       <div id="poc-conflict-warn" style="display:none;background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#f0a429;margin-bottom:8px"></div>
       <label class="lbl">PoC Lokasyonu</label>
-      <select class="inp" id="poc-location" style="background:#1c2235;border-color:rgba(255,255,255,.15);color:#e9ecf3">
+      <select  id="poc-location" class="inp bg-1c2235">
         <option value="customer">Müşteri Lokasyonu</option>
         <option value="vendor">Vendor / Üretici Lokasyonu</option>
         <option value="online">Online / Uzaktan</option>
@@ -6674,7 +6688,6 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
 
 window.closePocModal = () => el('poc-modal')?.classList.remove('on');
 
-
 /* ══════════════════════════════════════
    MÜŞTERİ PANELİ
 ══════════════════════════════════════ */
@@ -6703,7 +6716,7 @@ function renderCustomer() {
       ${tabs.map(([t,l])=>`<button class="si${CUR_CUST_TAB===t?' on':''}" data-t="${t}" id="ctab-${t}"><div class="sdot"></div>${l}</button>`).join('')}
       <div style="margin-top:12px;padding:0 8px">
         <button class="btn-p btn-sm" style="width:100%" onclick="openMultiVendorPocModal()">+ Yeni PoC Talebi</button>
-      
+
       <div style="text-align:center;padding:6px 0;font-family:monospace;font-size:10px;color:#5a6278">${VERSION}</div></div>
     </div>
     <div class="main-content" id="cust-main"></div>
@@ -6760,7 +6773,7 @@ async function loadCustTab() {
         var card=document.createElement('div');
         card.style.cssText='background:var(--bg-surface);border:1px solid '+(r.status==='active'?'rgba(59,124,255,.3)':'var(--border)')+';border-radius:12px;padding:16px';
         card.innerHTML=
-          '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">'
+          '<div class="flx-bw-s-mb10">'
           +'<div><div style="font-size:14px;font-weight:700">'+(r.productName||r.title||'--')+'</div>'
           +'<div class="txt-muted-12-mt2">'+(r.vendorName?r.vendorName+' - ':'')+ds+'</div></div>'
           +'<span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;color:'+sc+';background:'+sc+'18">'+sl+'</span></div>'
@@ -6782,7 +6795,6 @@ async function loadCustTab() {
     };
     renderReqs('','');
   }
-
 
   else if (CUR_CUST_TAB === 'dashboard') {
     m.innerHTML = '<div class="loading"><div class="spinner"></div>Dashboard y\u00fckleniyor...</div>';
@@ -6847,7 +6859,7 @@ async function loadCustTab() {
         +';border-radius:12px;padding:14px;cursor:pointer;transition:all .2s';
       card.innerHTML =
         '<div style="font-size:26px;font-weight:800;color:'+textColor+'">'+val+'</div>'
-        +'<div style="font-size:12px;color:var(--text-muted);margin-top:3px">'+label+'</div>'
+        +'<div class="txt-muted-12-mt3">'+label+'</div>'
         +(sub?'<div style="font-size:10px;margin-top:3px;color:'+textColor+'">'+sub+'</div>':'');
       if (tab) {
         card.addEventListener('click', function(){ CUR_CUST_TAB=tab; loadCustTab(); });
@@ -7172,7 +7184,7 @@ async function loadCustTab() {
         actions.appendChild(delBtn);
 
         card.innerHTML =
-          '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">'
+          '<div class="flx-bw-s-mb10">'
           +'<div>'+(topBadges?'<div style="margin-bottom:4px">'+topBadges+'</div>':'')
           +'<div style="font-size:14px;font-weight:700">'+(r.eventTitle||'—')+'</div>'
           +'<div class="txt-muted-12-mt2">'+(r.vendorName?'🏢 '+r.vendorName+' · ':'')+( fmtTypes[r.eventFormat]||r.eventFormat||'')+'</div></div>'
@@ -7330,16 +7342,16 @@ async function loadOffersWithComparison(m) {
 
             // Tutar + detay
             '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">' +
-            '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;text-align:center">' +
+            '<div class="bg-elev-tile">' +
             '<div class="lbl-mini">Toplam</div>' +
             '<div style="font-size:16px;font-weight:800;color:var(--color-primary)">' + (o.totalAmount||o.amount||0).toLocaleString('tr-TR') + ' ' + (o.currency||'₺') + '</div>' +
             '<div style="font-size:9.5px;color:var(--text-muted);margin-top:2px">' + (typeof o.vatRate === 'number' ? 'KDV %' + o.vatRate + ' dahil' : 'KDV bilgisi yok') + '</div>' +
             '</div>' +
-            '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;text-align:center">' +
+            '<div class="bg-elev-tile">' +
             '<div class="lbl-mini">Tip</div>' +
             '<div style="font-size:13px;font-weight:600">' + (o.offerTypeLabel||o.offerType||'—') + '</div>' +
             '</div>' +
-            '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;text-align:center">' +
+            '<div class="bg-elev-tile">' +
             '<div class="lbl-mini">Geçerlilik</div>' +
             '<div style="font-size:13px;font-weight:600">' + (o.validDays ? o.validDays + ' gün' : '—') + '</div>' +
             '</div>' +
@@ -7460,7 +7472,6 @@ async function loadOffersWithComparison(m) {
   }
 }
 
-
 function renderVendor() {
   if (!CUR_USER && !window._authResolved) {
     el('scr-vendor').innerHTML = '<div class="wrap"><div class="empty"><div class="empty-icon">⏳</div>Yükleniyor...</div></div>';
@@ -7516,12 +7527,13 @@ async function loadVendTab() {
   if (CUR_VEND_TAB === 'dashboard') {
     m.innerHTML = '<div class="loading"><div class="spinner"></div>Dashboard yükleniyor...</div>';
 
-    const [pocSnap, evSnap, offSnap, prodSnap, invSnap] = await Promise.all([
+    const [pocSnap, evSnap, offSnap, prodSnap, invSnap, regSnap] = await Promise.all([
       getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
       getDocs(query(collection(db,'public_events'),where('vendorId','==',CUR_USER.uid))),
       getDocs(query(collection(db,'offers'),       where('vendorId','==',CUR_USER.uid))),
       getDocs(query(collection(db,'products'),     where('vendorId','==',CUR_USER.uid))),
       getDocs(query(collection(db,'poc_invites'),  where('vendorId','==',CUR_USER.uid))),
+      getDocs(query(collection(db,'registrations'),where('vendorId','==',CUR_USER.uid))),
     ]);
 
     var pocs  = pocSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
@@ -7529,10 +7541,18 @@ async function loadVendTab() {
     var offs  = offSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var prods = prodSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var invs  = invSnap.docs.map(function(d){ return {...d.data(),id:d.id}; })
-      .filter(function(i){ return getLifecycleState(i) === 'active'; });  // çöp/arşiv hariç
+      .filter(function(i){ return getLifecycleState(i) === 'active'; });
+    var regs  = regSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var now   = new Date();
+    var nowMs = now.getTime();
 
-    // İstatistikler
+    // ── v4.54: Tarih sınırları (trend için) ─────────────────────
+    var thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    var lastMonthStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    var lastMonthEnd   = new Date(now.getFullYear(), now.getMonth(), 1);
+    var weekFwdEnd     = new Date(nowMs + 7*86400000);
+
+    // İstatistikler — mevcut
     var activePocs      = pocs.filter(function(p){ return p.status==='active'; }).length;
     var pendingPocs     = pocs.filter(function(p){ return p.status==='pending'; }).length;
     var pendingOffers   = offs.filter(function(o){ return o.status==='pending'; }).length;
@@ -7544,9 +7564,39 @@ async function loadVendTab() {
     var pendingInvites  = invs.filter(function(i){ return i.status==='pending'; }).length;
     var acceptedInvites = invs.filter(function(i){ return i.status==='accepted'; }).length;
 
-    // Pipeline hesapla (kabul edilen teklifler toplam tutarı)
+    // ── v4.54: 8. ve ek metrikler ──
+    var totalPipelineEvents = regs.length;  // Etkinlik kaydı = lead pipeline
+    var totalCustomers = [...new Set([...pocs.map(p=>p.customerId), ...offs.map(o=>o.customerId), ...regs.map(r=>r.customerId)].filter(Boolean))].length;
+
+    // Trend hesaplama: bu ay vs geçen ay
+    function inMonth(ts, start, end) {
+      if (!ts?.seconds) return false;
+      var t = ts.seconds * 1000;
+      return t >= start.getTime() && t < end.getTime();
+    }
+    var thisMonthPocs = pocs.filter(function(p){ return inMonth(p.createdAt, thisMonthStart, new Date()); }).length;
+    var lastMonthPocs = pocs.filter(function(p){ return inMonth(p.createdAt, lastMonthStart, lastMonthEnd); }).length;
+    var thisMonthOffs = offs.filter(function(o){ return inMonth(o.createdAt, thisMonthStart, new Date()); }).length;
+    var lastMonthOffs = offs.filter(function(o){ return inMonth(o.createdAt, lastMonthStart, lastMonthEnd); }).length;
+    var thisMonthAcc = acceptedOffers.filter(function(o){ return inMonth(o.respondedAt||o.createdAt, thisMonthStart, new Date()); }).length;
+    var lastMonthAcc = acceptedOffers.filter(function(o){ return inMonth(o.respondedAt||o.createdAt, lastMonthStart, lastMonthEnd); }).length;
+    var thisMonthPipeline = acceptedOffers.filter(function(o){ return inMonth(o.respondedAt||o.createdAt, thisMonthStart, new Date()); })
+      .reduce(function(s,o){ return s + (o.grossAmount||o.totalAmount||0); }, 0);
+    var lastMonthPipeline = acceptedOffers.filter(function(o){ return inMonth(o.respondedAt||o.createdAt, lastMonthStart, lastMonthEnd); })
+      .reduce(function(s,o){ return s + (o.grossAmount||o.totalAmount||0); }, 0);
+
+    function trendArrow(now, prev) {
+      if (prev === 0 && now === 0) return '';
+      if (prev === 0) return ' <span style="color:#22d078;font-size:10px;font-weight:700">↑Yeni</span>';
+      var pct = Math.round(((now - prev) / prev) * 100);
+      if (pct > 0)  return ' <span style="color:#22d078;font-size:10px;font-weight:700">↑%'+pct+'</span>';
+      if (pct < 0)  return ' <span style="color:#ff7070;font-size:10px;font-weight:700">↓%'+Math.abs(pct)+'</span>';
+      return ' <span style="color:var(--text-muted);font-size:10px">=0%</span>';
+    }
+
+    // Pipeline hesapla (kabul edilen teklifler toplam tutarı, KDV dahil)
     var pipeline = acceptedOffers.reduce(function(sum,o){
-      return sum + (o.totalAmount||(o.unitPrice||0)*(o.quantity||1)||0);
+      return sum + (o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0);
     }, 0);
 
     // Dönüşüm oranı: kabul/toplam teklif
@@ -7560,6 +7610,64 @@ async function loadVendTab() {
     });
     var topProds = Object.entries(pocByProd).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
 
+    // ── v4.54: Performans Lideri ─────
+    // En çok pipeline yaratan ürün
+    var prodPipeline = {};
+    acceptedOffers.forEach(function(o){
+      var k = o.productName || o.productId || '?';
+      var amt = o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0;
+      prodPipeline[k] = (prodPipeline[k]||0) + amt;
+    });
+    var perfLeader = null;
+    Object.entries(prodPipeline).forEach(function(e){
+      if (!perfLeader || perfLeader[1] < e[1]) perfLeader = e;
+    });
+
+    // ── v4.54: Acil Aksiyonlar (tüm sayfalardan toplu) ─────
+    var actionList = [];
+    // 1. Revizyon bekleyen teklifler
+    offs.filter(function(o){return o.status==='revision_requested';}).forEach(function(o){
+      actionList.push({type:'offer-revision', priority:1, item:o, label:'💰 Teklif revizyon', target:'offers-sent'});
+    });
+    // 2. 24+ saattir bekleyen pending PoC
+    pocs.filter(function(p){
+      if (p.status !== 'pending') return false;
+      var ageHr = p.createdAt?.seconds ? (nowMs - p.createdAt.seconds*1000)/3600000 : 0;
+      return ageHr >= 24;
+    }).forEach(function(p){
+      actionList.push({type:'poc-late', priority:2, item:p, label:'📋 PoC bekliyor 24+ saat', target:'requests'});
+    });
+    // 3. Süresi 3 gün veya az kalan pending teklifler
+    offs.filter(function(o){
+      if (o.status !== 'pending' || !o.validUntil?.seconds) return false;
+      var leftDays = (o.validUntil.seconds*1000 - nowMs)/86400000;
+      return leftDays >= 0 && leftDays <= 3;
+    }).forEach(function(o){
+      actionList.push({type:'offer-expire', priority:3, item:o, label:'⏰ Teklif süresi yakın', target:'offers-sent'});
+    });
+    // 4. Reddedilmiş ürünler
+    prods.filter(function(p){return p.status==='rejected';}).forEach(function(p){
+      actionList.push({type:'product-rejected', priority:4, item:p, label:'❌ Ürün reddedildi', target:'products'});
+    });
+    actionList.sort(function(a,b){ return a.priority - b.priority; });
+
+    // ── v4.54: Bu Hafta Yaklaşan ─────
+    var weekUpcoming = [];
+    pocs.forEach(function(p){
+      if (p.status !== 'active' || !p.preferredDateTime1) return;
+      var d = p.preferredDateTime1.toDate ? p.preferredDateTime1.toDate() : new Date(p.preferredDateTime1);
+      if (isNaN(d.getTime())) return;
+      if (d >= now && d < weekFwdEnd) weekUpcoming.push({type:'poc', date:d, item:p});
+    });
+    evs.forEach(function(e){
+      if (e.status !== 'published' && e.status !== 'active') return;
+      if (!e.eventDate) return;
+      var d = e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate);
+      if (isNaN(d.getTime())) return;
+      if (d >= now && d < weekFwdEnd) weekUpcoming.push({type:'event', date:d, item:e});
+    });
+    weekUpcoming.sort(function(a,b){ return a.date - b.date; });
+
     // Revizyon bekleyen teklifler — acil
     var urgentRevisions = offs.filter(function(o){ return o.status==='revision_requested'; })
       .sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); })
@@ -7572,29 +7680,34 @@ async function loadVendTab() {
 
     m.innerHTML = '';
 
-    // Karşılama
+    // ═══ KARŞILAMA (zenginleştirilmiş) ═══
+    var hr2 = now.getHours();
+    var greeting = hr2 < 6 ? 'İyi geceler' : hr2 < 12 ? 'Günaydın' : hr2 < 18 ? 'İyi günler' : 'İyi akşamlar';
     var welcome = document.createElement('div');
-    welcome.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px';
+    welcome.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px';
+    var welcomeRight = '';
+    if (actionList.length > 0) {
+      welcomeRight = '<div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);border-radius:8px;padding:8px 14px;font-size:12.5px;color:#ff7070;font-weight:600">⚠️ '+actionList.length+' aksiyon bekliyor</div>';
+    }
     welcome.innerHTML =
       '<div>'
-      +'<h2 style="font-size:20px;font-weight:800">'
-      +(CUR_PROFILE?.vendorType==='ureticid'?'🏭':CUR_PROFILE?.vendorType==='distributor'?'🚚':'🔧')
-      +' '+(CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Vendor')+'</h2>'
-      +'<div style="font-size:12px;color:var(--text-muted);margin-top:3px">'+new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</div>'
-      +'</div>'
-      +(revisionOffers>0 || pendingApproval>0
-        ? '<div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);border-radius:8px;padding:8px 14px;font-size:12.5px;color:#dc2626;font-weight:600">⚠ '+(revisionOffers>0?revisionOffers+' revizyon ':'')+( pendingApproval>0?pendingApproval+' ürün onay bekliyor':'')+'</div>'
-        : '');
+      + '<div style="font-size:13px;color:var(--text-muted);margin-bottom:2px">'+greeting+',</div>'
+      + '<h2 style="font-size:20px;font-weight:800">'
+      + (CUR_PROFILE?.vendorType==='ureticid'?'🏭':CUR_PROFILE?.vendorType==='distributor'?'🚚':'🔧')
+      + ' '+(CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Vendor')+'</h2>'
+      + '<div class="txt-muted-12-mt3">'+now.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</div>'
+      + '</div>'
+      + welcomeRight;
     m.appendChild(welcome);
 
-    // Stat kartları — tıklanabilir
-    function makeVendStatCard(val, label, sub, color, bg, border, tab) {
+    // ═══ 8 STAT KARTLARI (tıklanabilir + trend ok'ları) ═══
+    function makeVendStatCard(val, label, sub, trend, color, bg, border, tab) {
       var card = document.createElement('div');
       card.style.cssText = 'background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;cursor:pointer;transition:all .15s';
       card.innerHTML =
-        '<div style="font-size:26px;font-weight:800;color:'+color+';font-family:monospace;line-height:1">'+val+'</div>'
-        +'<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;font-weight:600">'+label+'</div>'
-        +(sub?'<div style="font-size:10.5px;margin-top:3px;color:'+color+'">'+sub+'</div>':'');
+        '<div style="font-size:'+(typeof val==='string' && val.length>6?'18px':'26px')+';font-weight:800;color:'+color+';font-family:monospace;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'
+        + '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;font-weight:600">'+label+(trend||'')+'</div>'
+        + (sub ? '<div style="font-size:10.5px;margin-top:3px;color:'+color+'">'+sub+'</div>' : '');
       card.addEventListener('click', function(){ CUR_VEND_TAB=tab; loadVendTab(); });
       card.addEventListener('mouseover', function(){ card.style.transform='translateY(-2px)'; card.style.borderColor=color; });
       card.addEventListener('mouseout',  function(){ card.style.transform=''; card.style.borderColor=border; });
@@ -7602,14 +7715,107 @@ async function loadVendTab() {
     }
 
     var statGrid = document.createElement('div');
-    statGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px';
-    statGrid.appendChild(makeVendStatCard(activePocs,    'Aktif PoC',        pendingPocs?'+'+pendingPocs+' bekliyor':'',  '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','requests'));
-    statGrid.appendChild(makeVendStatCard(pendingOffers, 'Bekleyen Teklif',  revisionOffers?revisionOffers+' revizyon':'','#f0a429','rgba(240,164,41,.07)','rgba(240,164,41,.2)','offers-sent'));
-    statGrid.appendChild(makeVendStatCard(activeProds,   'Aktif Ürün',       pendingApproval?pendingApproval+' onay bekliyor':'','#7db4ff','rgba(59,124,255,.07)','rgba(59,124,255,.2)','products'));
-    statGrid.appendChild(makeVendStatCard(upcomingEvs,   'Yaklaşan Etkinlik','',                                           '#c4a8ff','rgba(196,168,255,.07)','rgba(196,168,255,.2)','calendar'));
-    statGrid.appendChild(makeVendStatCard(pendingInvites,'Yanıtsız Davet',   acceptedInvites?acceptedInvites+' kabul':'',  '#22d078','rgba(34,208,120,.05)','rgba(34,208,120,.15)','invites'));
-    statGrid.appendChild(makeVendStatCard(convRate+'%',  'Teklif Dönüşüm',  offs.length+' teklif',                        '#3b7cff','rgba(59,124,255,.05)','rgba(59,124,255,.15)','offers-sent'));
+    statGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px';
+    statGrid.appendChild(makeVendStatCard(activePocs,    'Aktif PoC',        pendingPocs?'+'+pendingPocs+' bekliyor':'',  trendArrow(thisMonthPocs, lastMonthPocs), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','requests'));
+    statGrid.appendChild(makeVendStatCard(pendingOffers, 'Bekleyen Teklif',  revisionOffers?revisionOffers+' revizyon':'',trendArrow(thisMonthOffs, lastMonthOffs), '#f0a429','rgba(240,164,41,.07)','rgba(240,164,41,.2)','offers-sent'));
+    statGrid.appendChild(makeVendStatCard(activeProds,   'Aktif Ürün',       pendingApproval?pendingApproval+' onay bekliyor':'', '', '#7db4ff','rgba(59,124,255,.07)','rgba(59,124,255,.2)','products'));
+    statGrid.appendChild(makeVendStatCard(upcomingEvs,   'Yaklaşan Etkinlik','',                                           '', '#c4a8ff','rgba(196,168,255,.07)','rgba(196,168,255,.2)','calendar'));
+    statGrid.appendChild(makeVendStatCard(pendingInvites,'Yanıtsız Davet',   acceptedInvites?acceptedInvites+' kabul':'',  '', '#22d078','rgba(34,208,120,.05)','rgba(34,208,120,.15)','invites'));
+    statGrid.appendChild(makeVendStatCard(convRate+'%',  'Teklif Dönüşüm',   offs.length+' teklif',                        trendArrow(thisMonthAcc, lastMonthAcc), '#3b7cff','rgba(59,124,255,.05)','rgba(59,124,255,.15)','offers-sent'));
+    statGrid.appendChild(makeVendStatCard(totalCustomers,'Müşteri',          regs.length?regs.length+' kayıt':'',          '', '#c4a8ff','rgba(196,168,255,.05)','rgba(196,168,255,.15)','requests'));
+    statGrid.appendChild(makeVendStatCard(
+      pipeline > 0 ? formatMoney(pipeline,'TRY') : '—',
+      'Pipeline ₺',
+      acceptedOffers.length+' kabul',
+      trendArrow(thisMonthPipeline, lastMonthPipeline),
+      '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','offers-sent'));
     m.appendChild(statGrid);
+
+    // ═══ 🚨 ACİL AKSİYONLAR BANNER (önceliklendirilmiş) ═══
+    if (actionList.length > 0) {
+      var actBan = document.createElement('div');
+      actBan.style.cssText = 'background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+      actBan.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+        + '<div style="flex:1;min-width:200px">'
+        + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">🚨 Acil Aksiyonlar — '+actionList.length+' kayıt</div>'
+        + '<div class="txt-muted-12">Revizyon bekleyen teklifler, geç kalan PoC\'ler, süresi yakın teklifler ve reddedilen ürünler — hepsi öncelik sırasıyla.</div>'
+        + '</div>'
+        + '<button id="dash-act-toggle" class="btn-danger">Listeyi Gör</button>'
+        + '</div>';
+      m.appendChild(actBan);
+
+      actBan.querySelector('#dash-act-toggle').addEventListener('click', function(){
+        var det = document.getElementById('dash-act-list');
+        if (det) { det.remove(); return; }
+        var listDiv = document.createElement('div');
+        listDiv.id = 'dash-act-list';
+        listDiv.style.cssText = 'background:rgba(255,112,112,.04);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+        listDiv.innerHTML = actionList.slice(0,7).map(function(a){
+          var name = a.item.productName || a.item.title || a.item.name || '—';
+          var detail = a.item.customerName || a.item.customerEmail || '';
+          return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(255,112,112,.1);font-size:12px;cursor:pointer" data-target="'+a.target+'">'
+            + '<div><strong>'+name+'</strong>'+(detail?' <span class="txt-muted-12">· '+detail+'</span>':'')+'</div>'
+            + '<div style="font-size:11px;color:#ff7070;font-weight:600">'+a.label+'</div>'
+            + '</div>';
+        }).join('') + (actionList.length > 7
+          ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(actionList.length-7)+' diğer aksiyon</div>'
+          : '');
+        actBan.parentNode.insertBefore(listDiv, actBan.nextSibling);
+        // Tıklanan satırın hedefine git
+        listDiv.querySelectorAll('[data-target]').forEach(function(row){
+          row.addEventListener('click', function(){
+            CUR_VEND_TAB = row.dataset.target;
+            loadVendTab();
+          });
+        });
+      });
+    }
+
+    // ═══ 🏆 PERFORMANS LİDERİ BANNER ═══
+    if (perfLeader && perfLeader[1] > 0) {
+      var leadBan = document.createElement('div');
+      leadBan.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+      var prodName = perfLeader[0];
+      var prodAmt = perfLeader[1];
+      var pocCnt = pocByProd[prodName] || 0;
+      leadBan.innerHTML = '<div style="flex:1;min-width:200px">'
+        + '<div class="lbl-success-700">🏆 PERFORMANS LİDERİ ÜRÜN</div>'
+        + '<div style="font-size:13.5px;font-weight:700">'+prodName+'</div>'
+        + '<div class="txt-muted-12-mt3">'+pocCnt+' PoC talebi · KDV dahil pipeline</div>'
+        + '</div>'
+        + '<div style="text-align:right">'
+        + '<div style="font-size:20px;font-weight:800;color:#22d078">'+formatMoney(prodAmt,'TRY')+'</div>'
+        + '<div style="font-size:10.5px;color:var(--text-muted)">toplam kazanç</div>'
+        + '</div>';
+      m.appendChild(leadBan);
+    }
+
+    // ═══ 📅 BU HAFTA YAKLAŞAN BANNER ═══
+    if (weekUpcoming.length > 0) {
+      var weekBan = document.createElement('div');
+      weekBan.style.cssText = 'background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+      var dows = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+      var wHtml = '<div style="font-size:12.5px;color:#7db4ff;font-weight:700;margin-bottom:8px">📅 BU HAFTA YAKLAŞAN ('+weekUpcoming.length+' kayıt)</div>';
+      weekUpcoming.slice(0,5).forEach(function(w){
+        var dow = dows[w.date.getDay()];
+        var hh = String(w.date.getHours()).padStart(2,'0');
+        var mm = String(w.date.getMinutes()).padStart(2,'0');
+        var icon = w.type === 'poc' ? '📋' : '🎤';
+        var title = w.item.productName || w.item.title || w.item.name || '—';
+        var sub = w.type === 'event' ? ' <span class="txt-muted-12">· '+(w.item.registeredCount||0)+' kayıt</span>' : '';
+        wHtml += '<div class="flx-bw-c" style="padding:4px 0;font-size:12px">'
+          + '<div><strong>'+dow+' '+hh+':'+mm+'</strong> · '+icon+' '+title+sub+'</div>'
+          + '</div>';
+      });
+      if (weekUpcoming.length > 5) {
+        wHtml += '<div class="txt-empty">…ve '+(weekUpcoming.length-5)+' diğer kayıt</div>';
+      }
+      weekBan.innerHTML = wHtml;
+      m.appendChild(weekBan);
+    }
+
+    // Eski statGrid kaldırıldı (yukarı taşındı), eski makeVendStatCard hâlâ tanımlı ama kullanılmıyor
+    // Aşağıda kalan: Pipeline+Top ürünler 2-col, Revizyon, Aktif PoC, Quick Actions, Lead Conversion
 
     // Pipeline + Top ürünler — 2 kolon
     var twoCol = document.createElement('div');
@@ -7629,7 +7835,7 @@ async function loadVendTab() {
         var pct = offs.length>0 ? Math.round(cnt/offs.length*100) : 0;
         var colors = {pending:'#f0a429',accepted:'#22d078',rejected:'#ff7070',revision_requested:'#d97706'};
         var labels = {pending:'Bekliyor',accepted:'Kabul',rejected:'Red',revision_requested:'Revizyon'};
-        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        return '<div class="flx-c-g8-mb6">'
           +'<div style="font-size:12px;color:'+colors[s]+';width:70px;flex-shrink:0">'+labels[s]+'</div>'
           +'<div style="flex:1;background:rgba(255,255,255,.08);border-radius:3px;height:5px"><div style="background:'+colors[s]+';width:'+pct+'%;height:5px;border-radius:3px"></div></div>'
           +'<div style="font-size:11px;font-family:monospace;color:var(--text-muted);width:30px;text-align:right">'+cnt+'</div>'
@@ -7935,7 +8141,7 @@ async function loadVendTab() {
       });
 
       var html = '<div class="cal-wrapper" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+      html += '<div class="flx-bw-c-mb14b">';
       html += '<button id="cal-prev-m" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px">‹</button>';
       html += '<div style="font-size:15px;font-weight:700">'+months[month]+' '+year+'</div>';
       html += '<button id="cal-next-m" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px">›</button>';
@@ -8124,7 +8330,7 @@ async function loadVendTab() {
           + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">⚠️ Çakışma Uyarısı</div>'
           + '<div class="txt-muted-12">'+uniqConflicts.length+' çakışan kayıt var (2 saat tampon dahilinde). Müşteri sorunu yaşamamak için kontrol et.</div>'
           + '</div>'
-          + '<button id="cal-conf-toggle" style="background:#ff7070;color:#fff;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Detay Göster</button>'
+          + '<button id="cal-conf-toggle" class="btn-danger">Detay Göster</button>'
           + '</div>';
         m.appendChild(confBanner);
 
@@ -8256,7 +8462,7 @@ async function loadVendTab() {
             var sl       = stLabels[ev.status]||ev.status;
             var dateStr  = ev.eventDate?.toDate ? ev.eventDate.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}) : (ev.eventDate||'—');
             return '<div style="background:var(--bg-surface);border:1px solid '+(isPast?'var(--border)':'rgba(59,124,255,.2)')+';border-radius:12px;padding:16px;margin-bottom:10px">'
-              + '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">'
+              + '<div class="flx-bw-s-mb10">'
               + '<div>'
               + '<div style="font-size:14px;font-weight:700">'+(ev.title||'—')+'</div>'
               + '<div class="txt-muted-12-mt2">📅 '+dateStr+(isPast?' (Geçti)':'')+' · '+(ev.format||'—')+'</div>'
@@ -8395,7 +8601,7 @@ async function loadVendTab() {
         var popup = document.createElement('div');
         popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
         popup.innerHTML = '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:360px;width:90%;max-height:80vh;overflow-y:auto">'
-          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+          + '<div class="flx-bw-c-mb14b">'
           + '<div style="font-size:14px;font-weight:700">'+day+' '+months[month]+' '+year+'</div>'
           + '<button id="popup-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-secondary)">×</button>'
           + '</div>'
@@ -8600,7 +8806,7 @@ async function loadVendTab() {
           var leadBanner = document.createElement('div');
           leadBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
           leadBanner.innerHTML = '<div style="flex:1;min-width:200px">'
-            + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">⭐ EN PERFORMANSLI ÜRÜN</div>'
+            + '<div class="lbl-success-700">⭐ EN PERFORMANSLI ÜRÜN</div>'
             + '<div style="font-size:13.5px;font-weight:700">'+perfLeader.name+'</div>'
             + '<div class="txt-muted-12-mt2">'+(perfLeader.category||'—')
             + (perfLeader._offAccepted>0 ? ' · '+perfLeader._offAccepted+' kabul' : '')
@@ -8621,10 +8827,10 @@ async function loadVendTab() {
           actBanner.style.cssText = 'background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
           actBanner.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
             + '<div style="flex:1;min-width:200px">'
-            + '<div style="font-size:12.5px;color:#f0a429;font-weight:700;margin-bottom:4px">⚠️ Bu Ürünlere Bakman Lazım</div>'
+            + '<div class="lbl-warn-700">⚠️ Bu Ürünlere Bakman Lazım</div>'
             + '<div class="txt-muted-12">'+actionList.length+' ürün için aksiyon gerekli — reddedilen, geç onay, entegratör/distribütör eksik.</div>'
             + '</div>'
-            + '<button id="pr-act-toggle" style="background:#f0a429;color:#000;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+            + '<button id="pr-act-toggle" class="btn-warn">Listeyi Gör</button>'
             + '</div>';
           m.appendChild(actBanner);
 
@@ -8635,12 +8841,12 @@ async function loadVendTab() {
             listDiv.id = 'pr-act-list';
             listDiv.style.cssText = 'background:rgba(240,164,41,.04);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
             listDiv.innerHTML = actionList.slice(0,5).map(function(a){
-              return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(240,164,41,.1);font-size:12px">'
+              return '<div  class="flx-bw-c act-row-orng">'
                 + '<div><strong>'+a.p.name+'</strong> <span class="txt-muted-12">· '+(a.p.category||'')+'</span></div>'
                 + '<div class="txt-muted-12">'+a.reason+'</div>'
                 + '</div>';
             }).join('') + (actionList.length > 5
-              ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(actionList.length-5)+' diğer ürün</div>'
+              ? '<div class="txt-empty">…ve '+(actionList.length-5)+' diğer ürün</div>'
               : '');
             actBanner.parentNode.insertBefore(listDiv, actBanner.nextSibling);
           });
@@ -8685,7 +8891,7 @@ async function loadVendTab() {
 
           var insWrap = document.createElement('div');
           insWrap.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
-          var insHtml = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 Ürün İçgörüleri</div>'
+          var insHtml = '<div class="lbl-purp-700">💡 Ürün İçgörüleri</div>'
             + '<div class="g2">';
           // Sol: en çok PoC çeken kategoriler
           insHtml += '<div>'
@@ -8695,7 +8901,7 @@ async function loadVendTab() {
           } else {
             topCatByPoc.forEach(function(p){
               if (p[1].poc === 0) return;
-              insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+              insHtml += '<div  class="flx-bw-c row-bb">'
                 + '<span>'+p[0]+'</span>'
                 + '<span style="font-weight:700;color:#c4a8ff">'+p[1].poc+' PoC <span class="txt-muted-12">('+p[1].cnt+' ürün)</span></span>'
                 + '</div>';
@@ -8705,12 +8911,12 @@ async function loadVendTab() {
           // Sağ: özet metrikler
           insHtml += '<div>'
             + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📈 Performans Özeti</div>'
-            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            + '<div  class="flx-bw-c row-bb">'
             +   '<span>Verimli menşei</span>'
             +   '<span style="font-weight:700;color:#22d078">'+bestOriginLbl+'</span>'
             + '</div>'
             + (avgApproval !== null
-              ? '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span>Ort. onay süresi</span><span style="font-weight:700;color:#7db4ff">'+avgApproval+' gün</span></div>'
+              ? '<div  class="flx-bw-c row-bb"><span>Ort. onay süresi</span><span style="font-weight:700;color:#7db4ff">'+avgApproval+' gün</span></div>'
               : '')
             + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
             +   '<span>Ortalama kabul oranı</span>'
@@ -9157,10 +9363,10 @@ async function loadVendTab() {
           lowBanner.style.cssText = 'background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
           lowBanner.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap">'
             + '<div style="flex:1;min-width:200px">'
-            + '<div style="font-size:12.5px;color:#f0a429;font-weight:700;margin-bottom:4px">⚠️ Düşük Doluluk Uyarısı</div>'
+            + '<div class="lbl-warn-700">⚠️ Düşük Doluluk Uyarısı</div>'
             + '<div class="txt-muted-12">'+stat.lowFillUpcoming.length+' yaklaşan etkinliğin doluluğu %30 altında. Müşterilere hatırlatma göndererek katılımı artırabilirsiniz.</div>'
             + '</div>'
-            + '<button id="ev-low-fill-detail" style="background:#f0a429;color:#000;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+            + '<button id="ev-low-fill-detail" class="btn-warn">Listeyi Gör</button>'
             + '</div>';
           m.appendChild(lowBanner);
 
@@ -9182,7 +9388,7 @@ async function loadVendTab() {
                   + '<div style="font-weight:700;color:#f0a429">'+reg+'/'+cap+' · %'+Math.round(e._fr)+'</div>'
                   + '</div>';
               }).join('') + (stat.lowFillUpcoming.length > 5
-                ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(stat.lowFillUpcoming.length-5)+' diğer etkinlik</div>'
+                ? '<div class="txt-empty">…ve '+(stat.lowFillUpcoming.length-5)+' diğer etkinlik</div>'
                 : '');
             lowBanner.parentNode.insertBefore(listDiv, lowBanner.nextSibling);
           });
@@ -9195,7 +9401,7 @@ async function loadVendTab() {
           var popBanner = document.createElement('div');
           popBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
           popBanner.innerHTML = '<div style="flex:1;min-width:200px">'
-            + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">🔥 EN ÇOK İLGİ GÖREN</div>'
+            + '<div class="lbl-success-700">🔥 EN ÇOK İLGİ GÖREN</div>'
             + '<div style="font-size:13.5px;font-weight:700">'+(pop.title||'—')+'</div>'
             + '<div class="txt-muted-12-mt2">📅 '+popDate+(pop.format?' · '+(pop.format==='online'?'🌐 Online':pop.format==='hybrid'?'🔄 Hibrit':'📍 Yüz Yüze'):'')+'</div>'
             + '</div>'
@@ -9266,7 +9472,7 @@ async function loadVendTab() {
 
           var insWrap = document.createElement('div');
           insWrap.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
-          var insHtml = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 İçgörüler · Geçmiş '+pastEvents.length+' etkinlik analizi</div>';
+          var insHtml = '<div class="lbl-purp-700">💡 İçgörüler · Geçmiş '+pastEvents.length+' etkinlik analizi</div>';
 
           if (bestFmt) {
             var fmtLbl = bestFmt.fmt === 'online' ? '🌐 Online' : bestFmt.fmt === 'hybrid' ? '🔄 Hibrit' : '📍 Yüz Yüze';
@@ -9694,7 +9900,7 @@ async function loadVendTab() {
         accepted: offers.filter(function(o){return o.status==='accepted';}).length,
         revision: offers.filter(function(o){return o.status==='revision_requested';}).length,
       };
-      var statsHtml = '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
+      var statsHtml = '<div class="flx-g8-mb14-wrap">' +
         [['Toplam','#e9ecf3',stats.total],['Bekliyor','#f0a429',stats.pending],
          ['Kabul','#22d078',stats.accepted],['Revizyon','#d97706',stats.revision]].map(function(s) {
           return '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:70px">' +
@@ -9722,7 +9928,7 @@ async function loadVendTab() {
           '<div style="font-size:10px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:.6px;margin-bottom:8px">SÜREÇ</div>';
 
         // Gönderildi
-        timelineHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        timelineHtml += '<div class="flx-c-g8-mb6">' +
           '<div style="width:7px;height:7px;border-radius:50%;background:#22d078;flex-shrink:0"></div>' +
           '<div style="font-size:12px;color:#22d078;font-weight:600">Gönderildi</div>' +
           '<div style="font-size:11px;color:rgba(255,255,255,.3);margin-left:auto">'+dateStr+'</div></div>';
@@ -9739,17 +9945,17 @@ async function loadVendTab() {
 
         // Sonuç
         if (o.status === 'accepted') {
-          timelineHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+          timelineHtml += '<div class="flx-c-g8-mb6">' +
             '<div style="width:7px;height:7px;border-radius:50%;background:#22d078;flex-shrink:0"></div>' +
             '<div style="font-size:12px;color:#22d078;font-weight:600">✓ Kabul Edildi</div>' +
             (respStr?'<div style="font-size:11px;color:rgba(255,255,255,.3);margin-left:auto">'+respStr+'</div>':'') + '</div>';
         } else if (o.status === 'rejected') {
-          timelineHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+          timelineHtml += '<div class="flx-c-g8-mb6">' +
             '<div style="width:7px;height:7px;border-radius:50%;background:#ff7070;flex-shrink:0"></div>' +
             '<div style="font-size:12px;color:#ff7070;font-weight:600">✕ Reddedildi</div>' +
             (respStr?'<div style="font-size:11px;color:rgba(255,255,255,.3);margin-left:auto">'+respStr+'</div>':'') + '</div>';
         } else if (o.status === 'revision_requested') {
-          timelineHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+          timelineHtml += '<div class="flx-c-g8-mb6">' +
             '<div style="width:9px;height:9px;border-radius:50%;background:#d97706;box-shadow:0 0 6px #d97706;flex-shrink:0"></div>' +
             '<div style="font-size:12px;color:#d97706;font-weight:700">↩ Revizyon Bekleniyor</div></div>';
         } else if (o.status === 'pending') {
@@ -9839,7 +10045,7 @@ async function loadVendTab() {
           ';border-radius:12px;padding:18px;margin-bottom:12px;transition:border-color .2s';
 
         card.innerHTML =
-          '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">' +
+          '<div class="flx-bw-s-mb10">' +
           '<div>' +
           '<div style="font-size:14px;font-weight:700">'+(o.productName||'—')+perfBadge+'</div>' +
           '<div class="txt-muted-12-mt2">👤 '+(o.customerName||o.customerEmail||'—')+(sentAgoTxt?' · '+sentAgoTxt:'')+'</div>' +
@@ -10023,13 +10229,13 @@ async function loadVendTab() {
       '<div id="ofs-trash-banner"></div>' +
       '<input id="ofs-search" class="inp" placeholder="🔍 Ürün, müşteri veya not ara..." style="margin-bottom:10px;font-size:13px">' +
       '<div id="ofs-filters">' +
-      '<div id="ofs-presets" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap"></div>' +
-      '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">' +
+      '<div id="ofs-presets" class="flx-g6-mb8-wrap"></div>' +
+      '<div class="flx-g6-mb8-wrap">' +
       [['','Tümü'],['pending','Bekliyor'],['accepted','Kabul'],['rejected','Reddedildi'],['revision_requested','Revizyon'],['archived','Arşiv']].map(function(p) {
         return '<button class="ofs-sf btn-g btn-sm" data-val="'+p[0]+'" style="font-size:12px">'+p[1]+'</button>';
       }).join('') +
       '</div>' +
-      '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
+      '<div class="flx-g8-mb14-wrap">' +
       '<select id="ofs-cust" class="inp" style="width:auto;font-size:12px;margin-bottom:0">' +
       '<option value="">Tüm Müşteriler</option>' +
       custList.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('') +
@@ -10077,7 +10283,7 @@ async function loadVendTab() {
       var winBanner = document.createElement('div');
       winBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
       winBanner.innerHTML = '<div style="flex:1;min-width:200px">'
-        + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">🏆 EN YÜKSEK KAZANILMIŞ TEKLİF</div>'
+        + '<div class="lbl-success-700">🏆 EN YÜKSEK KAZANILMIŞ TEKLİF</div>'
         + '<div style="font-size:13.5px;font-weight:700">'+(biggestWin.productName||'—')+'</div>'
         + '<div class="txt-muted-12-mt2">'+(biggestWin.customerName||biggestWin.customerEmail||'—')
         + (biggestWin.respondedAt?.toDate ? ' · '+biggestWin.respondedAt.toDate().toLocaleDateString('tr-TR') : '')
@@ -10096,10 +10302,10 @@ async function loadVendTab() {
       actBanO.style.cssText = 'background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
       actBanO.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
         + '<div style="flex:1;min-width:200px">'
-        + '<div style="font-size:12.5px;color:#f0a429;font-weight:700;margin-bottom:4px">⚠️ Aksiyon Bekleyen Teklifler</div>'
+        + '<div class="lbl-warn-700">⚠️ Aksiyon Bekleyen Teklifler</div>'
         + '<div class="txt-muted-12">'+actionOffers.length+' teklif için aksiyon gerekli — revizyon istenenler, süresi dolmak üzere olanlar veya uzun süredir yanıt alamayanlar.</div>'
         + '</div>'
-        + '<button id="ofs-act-toggle" style="background:#f0a429;color:#000;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+        + '<button id="ofs-act-toggle" class="btn-warn">Listeyi Gör</button>'
         + '</div>';
       statsArea.appendChild(actBanO);
 
@@ -10111,12 +10317,12 @@ async function loadVendTab() {
         listDiv.style.cssText = 'background:rgba(240,164,41,.04);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
         listDiv.innerHTML = actionOffers.slice(0,5).map(function(a){
           var amt = a.o.grossAmount || a.o.totalAmount || 0;
-          return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(240,164,41,.1);font-size:12px">'
+          return '<div  class="flx-bw-c act-row-orng">'
             + '<div><strong>'+(a.o.productName||'—')+'</strong> <span class="txt-muted-12">· '+(a.o.customerName||a.o.customerEmail||'—')+(amt>0?' · '+formatMoney(amt, a.o.currency||'TRY'):'')+'</span></div>'
             + '<div class="txt-muted-12">'+a.reason+'</div>'
             + '</div>';
         }).join('') + (actionOffers.length > 5
-          ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(actionOffers.length-5)+' diğer teklif</div>'
+          ? '<div class="txt-empty">…ve '+(actionOffers.length-5)+' diğer teklif</div>'
           : '');
         actBanO.parentNode.insertBefore(listDiv, actBanO.nextSibling);
       });
@@ -10126,19 +10332,19 @@ async function loadVendTab() {
     if (offers.length >= 2) {
       var insO = document.createElement('div');
       insO.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
-      var insHtml2 = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 Teklif İçgörüleri</div>'
+      var insHtml2 = '<div class="lbl-purp-700">💡 Teklif İçgörüleri</div>'
         + '<div class="g2">';
       // Sol
       insHtml2 += '<div>'
         + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 Performans</div>';
       if (avgAcceptDays !== null) {
-        insHtml2 += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        insHtml2 += '<div  class="flx-bw-c row-bb">'
           + '<span>Ort. kabul süresi</span>'
           + '<span style="font-weight:700;color:#7db4ff">'+avgAcceptDays+' gün</span>'
           + '</div>';
       }
       if (avgAcceptedAmount > 0) {
-        insHtml2 += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        insHtml2 += '<div  class="flx-bw-c row-bb">'
           + '<span>Ort. kabul tutarı</span>'
           + '<span style="font-weight:700;color:#22d078">'+formatMoney(avgAcceptedAmount,'TRY')+'</span>'
           + '</div>';
@@ -10152,14 +10358,14 @@ async function loadVendTab() {
       insHtml2 += '<div>'
         + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🎯 Strateji</div>';
       if (bestType) {
-        insHtml2 += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        insHtml2 += '<div  class="flx-bw-c row-bb">'
           + '<span>En verimli teklif tipi</span>'
           + '<span style="font-weight:700;color:#c4a8ff">'+bestType.label+' <span class="txt-muted-12">(%'+bestType.rate+')</span></span>'
           + '</div>';
       } else {
         insHtml2 += '<div class="txt-muted-12" style="padding:5px 0;font-style:italic">Yeterli veri yok (en az 2 yanıtlanmış teklif gerekli)</div>';
       }
-      insHtml2 += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+      insHtml2 += '<div  class="flx-bw-c row-bb">'
         + '<span>Yanıt bekleyen</span>'
         + '<span style="font-weight:700;color:#f0a429">'+statsO.pending+'</span>'
         + '</div>';
@@ -10269,7 +10475,7 @@ async function loadVendTab() {
     });
 
     renderList();
-  
+
 
   // Revize et & gönder
     m.querySelectorAll('.resend-offer-btn').forEach(b => {
@@ -10291,10 +10497,9 @@ async function loadVendTab() {
         openOfferDetailModal(o, 'vendor');
       });
     });
-  
+
   }
 }
-
 
 function openEditProd(prodId, name, category, country, description, supportModel, catFieldsData) {
   var modal = document.createElement('div');
@@ -10331,7 +10536,7 @@ function openEditProd(prodId, name, category, country, description, supportModel
     '<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;background:linear-gradient(135deg,#0f1623 0%,#16203a 100%)">' +
     '<div><div style="font-size:16px;font-weight:700">Ürün Düzenle</div>' +
     '<div class="txt-muted-12-mt2">Kategori değiştirirseniz teknik alanlar güncellenir</div></div>' +
-    '<button id="close-edit-modal" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:22px">×</button>' +
+    '<button id="close-edit-modal" class="btn-x">×</button>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:300px 1fr;flex:1;overflow:hidden">' +
 
@@ -10410,7 +10615,6 @@ function openEditProd(prodId, name, category, country, description, supportModel
     }
   });
 }
-
 
 async function vendRequests(m) {
   if (!m) return;
@@ -10587,7 +10791,7 @@ async function vendRequests(m) {
         ? Math.round(fastestPoC._respHr)+' saat'
         : Math.round(fastestPoC._respHr/24)+' gün';
       fastBanner.innerHTML = '<div style="flex:1;min-width:200px">'
-        + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">🔥 EN HIZLI YANITLANAN PoC</div>'
+        + '<div class="lbl-success-700">🔥 EN HIZLI YANITLANAN PoC</div>'
         + '<div style="font-size:13.5px;font-weight:700">'+(fastestPoC.productName||fastestPoC.title||'—')+'</div>'
         + '<div class="txt-muted-12-mt2">'+(fastestPoC.customerName||fastestPoC.customerEmail||'Müşteri')+'</div>'
         + '</div>'
@@ -10607,7 +10811,7 @@ async function vendRequests(m) {
         + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">🚨 Acil Bakman Lazım</div>'
         + '<div class="txt-muted-12">'+actionPoCs.length+' PoC için aksiyon gerekli — uzun süredir bekleyenler veya tarihi geçmiş aktif PoC\'ler. Müşteri kaybı riski!</div>'
         + '</div>'
-        + '<button id="rq-urg-toggle" style="background:#ff7070;color:#fff;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+        + '<button id="rq-urg-toggle" class="btn-danger">Listeyi Gör</button>'
         + '</div>';
       m.appendChild(urgBan);
 
@@ -10623,7 +10827,7 @@ async function vendRequests(m) {
             + '<div class="txt-muted-12">'+a.reason+'</div>'
             + '</div>';
         }).join('') + (actionPoCs.length > 5
-          ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(actionPoCs.length-5)+' diğer PoC</div>'
+          ? '<div class="txt-empty">…ve '+(actionPoCs.length-5)+' diğer PoC</div>'
           : '');
         urgBan.parentNode.insertBefore(listDiv, urgBan.nextSibling);
       });
@@ -10633,13 +10837,13 @@ async function vendRequests(m) {
     if (reqs.length >= 2) {
       var insR = document.createElement('div');
       insR.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
-      var insHtml = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 PoC İçgörüleri</div>'
+      var insHtml = '<div class="lbl-purp-700">💡 PoC İçgörüleri</div>'
         + '<div class="g2">';
       // Sol: Performans
       insHtml += '<div>'
         + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 Performans</div>';
       if (avgResponseHr !== null) {
-        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        insHtml += '<div  class="flx-bw-c row-bb">'
           + '<span>Ort. yanıt süresi</span>'
           + '<span style="font-weight:700;color:'+(avgResponseHr<24?'#22d078':avgResponseHr<72?'#f0a429':'#ff7070')+'">'+avgResponseLabel+'</span>'
           + '</div>';
@@ -10650,7 +10854,7 @@ async function vendRequests(m) {
         .map(function(r){ return (r.completedAt.seconds - r.acceptedAt.seconds) / 86400; });
       if (pocDurations.length > 0) {
         avgPocDays = Math.round(pocDurations.reduce(function(s,d){return s+d;},0) / pocDurations.length);
-        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        insHtml += '<div  class="flx-bw-c row-bb">'
           + '<span>Ort. PoC süresi</span>'
           + '<span style="font-weight:700;color:#7db4ff">'+avgPocDays+' gün</span>'
           + '</div>';
@@ -10664,12 +10868,12 @@ async function vendRequests(m) {
       insHtml += '<div>'
         + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🎯 Talep Paterni</div>';
       if (topProd) {
-        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        insHtml += '<div  class="flx-bw-c row-bb">'
           + '<span>En çok talep gelen ürün</span>'
           + '<span style="font-weight:700;color:#c4a8ff">'+topProd[0]+' <span class="txt-muted-12">('+topProd[1].cnt+')</span></span>'
           + '</div>';
       }
-      insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+      insHtml += '<div  class="flx-bw-c row-bb">'
         + '<span>Yoğun saat dilimi</span>'
         + '<span style="font-weight:700;color:#7db4ff">'+topHourLabel+'</span>'
         + '</div>';
@@ -10801,7 +11005,7 @@ async function vendRequests(m) {
       var card = document.createElement('div');
       card.style.cssText = 'background:var(--bg-surface);border:1px solid '+(r.status==='pending'?'rgba(240,164,41,.35)':r.status==='active'?'rgba(59,124,255,.3)':'var(--border)')+';border-radius:12px;padding:16px';
       card.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">'
+        '<div class="flx-bw-s-mb10">'
         + '<div style="flex:1">'
         +   '<div style="font-size:14px;font-weight:700">'+(r.productName||r.title||'--')+perfBadge+'</div>'
         +   '<div class="txt-muted-12-mt2">'+custLine+'</div>'
@@ -10914,7 +11118,6 @@ async function vendRequests(m) {
   };
   render('','','');
 }
-
 
 async function vendInvites(m) {
   if (!m) return;
@@ -11389,7 +11592,6 @@ async function vendInvites(m) {
   render('', '', 'active');
 }
 
-
 // ════════════════════════════════════════════════════════════════
 // Davet Detay Modal — vendor için (v4.41)
 // ════════════════════════════════════════════════════════════════
@@ -11419,14 +11621,14 @@ function openInviteDetailModal(inv) {
     '</div>' +
 
     // Müşteri
-    '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px 14px;margin-bottom:12px">' +
+    '<div class="bg-elev-pad12">' +
     '<div class="lbl-mini-mb4">MÜŞTERİ</div>' +
     '<div style="font-size:14px;font-weight:700">'+(inv.customerName||inv.customerEmail||'—')+'</div>' +
     '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">'+(inv.customerEmail||'—')+'</div>' +
     '</div>' +
 
     // Ürün
-    '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px 14px;margin-bottom:12px">' +
+    '<div class="bg-elev-pad12">' +
     '<div class="lbl-mini-mb4">ÜRÜN</div>' +
     '<div style="font-size:14px;font-weight:700">'+(inv.productName||'—')+'</div>' +
     (inv.productCategory ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">'+inv.productCategory+'</div>' : '') +
@@ -11442,7 +11644,7 @@ function openInviteDetailModal(inv) {
     '<div style="font-size:13px;font-weight:600">'+(locLabels[inv.pocLocation]||inv.pocLocation||'—')+'</div></div>' +
     '</div>' +
 
-    (inv.pocScope ? '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
+    (inv.pocScope ? '<div class="bg-elev-pad12">'
       + '<div class="lbl-mini-mb4">PoC KAPSAMI</div>'
       + '<div style="font-size:13px;line-height:1.6">'+inv.pocScope+'</div>'
       + '</div>' : '') +
@@ -11473,7 +11675,6 @@ function openInviteDetailModal(inv) {
   modal.querySelector('#id-close2').addEventListener('click', function(){ modal.remove(); });
   modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
 }
-
 
 // ════════════════════════════════════════════════════════════════
 // Davet Düzenle Modal — sadece pending davetler için (v4.41)
@@ -11577,7 +11778,6 @@ function openEditInviteModal(inv, onSaved) {
   });
 }
 
-
 async function openSendInviteModal() {
   if (!CUR_USER || CUR_PROFILE?.role !== 'vendor') {
     showToast('Bu özellik yalnızca vendor hesapları için geçerlidir.', 'err');
@@ -11650,7 +11850,7 @@ async function openSendInviteModal() {
     '<div style="flex:1;overflow-y:auto;padding:18px 22px">' +
 
     // Ürün
-    '<label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">Davet Edilecek Ürün <span style="color:#ff7070">*</span></label>' +
+    '<label class="lbl-blk-mb6">Davet Edilecek Ürün <span style="color:#ff7070">*</span></label>' +
     '<select id="inv-product" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px;margin-bottom:14px">' +
     '<option value="">Ürün seçin...</option>' + prodOptions + '</select>' +
 
@@ -11658,23 +11858,23 @@ async function openSendInviteModal() {
     '<div style="background:rgba(59,124,255,.06);border:1px solid rgba(59,124,255,.15);border-radius:8px;padding:14px;margin-bottom:14px">' +
     '<div style="font-size:11px;font-weight:700;color:#7db4ff;letter-spacing:.6px;margin-bottom:12px">POC DETAYLARI</div>' +
 
-    '<label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">PoC Kapsamı / Ne Test Edilecek?</label>' +
+    '<label class="lbl-blk-mb6">PoC Kapsamı / Ne Test Edilecek?</label>' +
     '<textarea id="inv-scope" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px;resize:vertical;margin-bottom:10px" rows="2" placeholder="Örn: Firewall performans testi, 1000 kullanıcı simülasyonu..."></textarea>' +
 
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
-    '<div><label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">Tahmini Süre</label>' +
+    '<div><label class="lbl-blk-mb6">Tahmini Süre</label>' +
     '<select id="inv-duration" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px">' +
     '<option value="1 Saat">1 Saat</option><option value="2 Saat" selected>2 Saat</option>' +
     '<option value="Yarım Gün">Yarım Gün</option><option value="1 Gün">1 Gün</option>' +
     '<option value="1 Hafta">1 Hafta</option><option value="Müzakereye Açık">Müzakereye Açık</option>' +
     '</select></div>' +
-    '<div><label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">Lokasyon Tercihi</label>' +
+    '<div><label class="lbl-blk-mb6">Lokasyon Tercihi</label>' +
     '<select id="inv-location" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px">' +
     '<option value="online">Online / Uzaktan</option><option value="customer">Müşteri Lokasyonu</option>' +
     '<option value="vendor">Vendor Lokasyonu</option><option value="hybrid">Hibrit</option>' +
     '</select></div></div>' +
 
-    '<label style="display:block;font-size:12px;color:rgba(255,255,255,.65);font-weight:600;margin-bottom:6px">Özel Mesaj / Davet Notu</label>' +
+    '<label class="lbl-blk-mb6">Özel Mesaj / Davet Notu</label>' +
     '<textarea id="inv-message" style="width:100%;background:#1c2235;border:1px solid rgba(255,255,255,.15);color:#e9ecf3;border-radius:7px;padding:8px 12px;font:inherit;font-size:13px;resize:vertical" rows="3" placeholder="Müşteriye iletmek istediğiniz özel notlar..."></textarea>' +
     '</div>' +
 
@@ -11858,9 +12058,6 @@ async function openSendInviteModal() {
     loadVendTab();
   });
 }
-
-
-
 
 async function vendPortfolio(m) {
   const vtype = CUR_PROFILE?.vendorType || 'ureticid';
@@ -12147,7 +12344,7 @@ async function vendPortfolio(m) {
         var leadBanner = document.createElement('div');
         leadBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
         leadBanner.innerHTML = '<div style="flex:1;min-width:200px">'
-          + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">⭐ PERFORMANS LİDERİ</div>'
+          + '<div class="lbl-success-700">⭐ PERFORMANS LİDERİ</div>'
           + '<div style="font-size:13.5px;font-weight:700">'+mostPopular.name+'</div>'
           + '<div class="txt-muted-12-mt2">'+mostPopular.category+(mostPopular._offAccepted>0?' · '+mostPopular._offAccepted+' kabul':'')+(mostPopular._totalRevenue>0?' · '+formatMoney(mostPopular._totalRevenue,'TRY'):'')+'</div>'
           + '</div>'
@@ -12169,10 +12366,10 @@ async function vendPortfolio(m) {
           : actionNeeded.length+' ürün için aksiyon gerekiyor.';
         actBanner.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
           + '<div style="flex:1;min-width:200px">'
-          + '<div style="font-size:12.5px;color:#f0a429;font-weight:700;margin-bottom:4px">⚠️ Aksiyon Bekleyen</div>'
+          + '<div class="lbl-warn-700">⚠️ Aksiyon Bekleyen</div>'
           + '<div class="txt-muted-12">'+actMsg+'</div>'
           + '</div>'
-          + '<button id="pf-action-detail" style="background:#f0a429;color:#000;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+          + '<button id="pf-action-detail" class="btn-warn">Listeyi Gör</button>'
           + '</div>';
         m.appendChild(actBanner);
 
@@ -12183,12 +12380,12 @@ async function vendPortfolio(m) {
           listDiv.id = 'pf-action-list';
           listDiv.style.cssText = 'background:rgba(240,164,41,.04);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
           listDiv.innerHTML = actionNeeded.slice(0,5).map(function(it){
-            return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(240,164,41,.1);font-size:12px">'
+            return '<div  class="flx-bw-c act-row-orng">'
               + '<div><strong>'+it.name+'</strong> <span class="txt-muted-12">· '+it.category+'</span></div>'
               + '<div class="txt-muted-12">'+(vtype==='ureticid'?'Distribütör atanmamış':'Entegratör atanmamış')+'</div>'
               + '</div>';
           }).join('') + (actionNeeded.length > 5
-            ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(actionNeeded.length-5)+' diğer ürün</div>'
+            ? '<div class="txt-empty">…ve '+(actionNeeded.length-5)+' diğer ürün</div>'
             : '');
           actBanner.parentNode.insertBefore(listDiv, actBanner.nextSibling);
         });
@@ -12206,14 +12403,14 @@ async function vendPortfolio(m) {
         var topCats = Object.entries(catCount).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
         var insWrap = document.createElement('div');
         insWrap.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
-        var insHtml = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 Portföy İçgörüleri</div>'
+        var insHtml = '<div class="lbl-purp-700">💡 Portföy İçgörüleri</div>'
           + '<div class="g2">';
         // Sol: en çok kategoriler
         insHtml += '<div>'
           + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 En Çok Kategoriler</div>';
         topCats.forEach(function(p){
           var pctV = Math.round((p[1]/totalItems)*100);
-          insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+          insHtml += '<div  class="flx-bw-c row-bb">'
             + '<span>'+p[0]+'</span>'
             + '<span style="font-weight:700;color:#c4a8ff">'+p[1]+' <span class="txt-muted-12">(%'+pctV+')</span></span>'
             + '</div>';
@@ -12224,7 +12421,7 @@ async function vendPortfolio(m) {
           + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🌍 Menşei Dağılımı</div>';
         var domPct = totalItems ? Math.round((originCount.domestic/totalItems)*100) : 0;
         var forPct = totalItems ? Math.round((originCount.foreign/totalItems)*100) : 0;
-        insHtml += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        insHtml += '<div  class="flx-bw-c row-bb">'
           + '<span>🇹🇷 Yerli</span>'
           + '<span style="font-weight:700;color:#22d078">'+originCount.domestic+' <span class="txt-muted-12">(%'+domPct+')</span></span>'
           + '</div>';
@@ -12443,8 +12640,6 @@ async function vendPortfolio(m) {
   }
 }
 
-
-
 async function openAddToPortfolio() {
   const snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
   var allProds = snap.docs.map(d=>({...d.data(),id:d.id})).filter(p=>p.vendorId!==CUR_USER.uid);
@@ -12593,8 +12788,8 @@ async function admRoles(m) {
     renderRows(all.filter(u=>(!roleFilter||u.role===roleFilter)&&(!q||(u.displayName||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)||(u.company||'').toLowerCase().includes(q))));
   }
   m.innerHTML=
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-    '<h2 style="font-size:18px;font-weight:700">Rol Yönetimi <span id="roles-cnt" style="font-size:13px;color:var(--text-secondary);font-weight:400"></span></h2>'+
+    '<div class="flx-bw-c-mb14b">'+
+    '<h2 style="font-size:18px;font-weight:700">Rol Yönetimi <span id="roles-cnt" class="txt-sec-13"></span></h2>'+
     '<input class="inp" id="roles-s" placeholder="Ad veya e-posta..." style="width:240px;font-size:12.5px"></div>'+
     '<div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#f0a429;margin-bottom:12px">'+
     '⚠ Rol değişikliği anında geçerli olur. Kendi rolünüzü değiştiremezsiniz.</div>'+
@@ -12616,7 +12811,6 @@ async function admRoles(m) {
     });
   });
 }
-
 
 async function renderVendorCalendar(m) {
   // Tüm vendor verilerini çek
@@ -12772,7 +12966,7 @@ async function renderVendorCalendar(m) {
   }
 
   // Ana layout
-  m.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+  m.innerHTML = '<div class="flx-bw-c-mb14b">' +
     '<h2 style="font-size:18px;font-weight:700">PoC Takvimim</h2>' +
     '<div style="display:flex;gap:8px;align-items:center">' +
     '<input class="inp" id="vcal-search" placeholder="Ürün, müşteri veya başlık ara..." style="width:240px;font-size:12.5px">' +
@@ -13365,7 +13559,6 @@ async function openAddProductModal(prefillCat) {
   });
 }
 
-
 async function openNewEventModal() {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -13561,7 +13754,6 @@ async function openNewEventModal() {
   });
 }
 
-
 function renderAdmin() {
   if (!CUR_USER && !window._authResolved) {
     el('scr-admin').innerHTML = '<div class="wrap"><div class="empty"><div class="empty-icon">⏳</div>Yükleniyor...</div></div>';
@@ -13731,7 +13923,6 @@ async function openAdmUserEditModal(userId, name, email, company, role, phone) {
   });
 }
 
-
 async function admUsers(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Kullanıcılar yükleniyor...</div>';
   const snap = await getDocs(collection(db,'users'));
@@ -13841,14 +14032,14 @@ async function admUsers(m) {
           '<button id="u-modal-close" class="btn-close-X">×</button>' +
           '</div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">' +
-          '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px"><div class="lbl-mini">Ad Soyad</div><b>'+(u.displayName||'—')+'</b></div>' +
-          '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px"><div class="lbl-mini">E-posta</div>'+(u.email||'—')+'</div>' +
-          '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px"><div class="lbl-mini">Şirket</div>'+(u.company||'—')+'</div>' +
-          '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px"><div class="lbl-mini">Rol</div>'+(u.role||'—')+(u.vendorType?' / '+(vtypes[u.vendorType]||u.vendorType):'')+'</div>' +
-          '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px"><div class="lbl-mini">Ülke</div>'+(u.country||'—')+'</div>' +
-          '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px"><div class="lbl-mini">Telefon</div>'+(u.phone||'—')+'</div>' +
-          '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px"><div class="lbl-mini">Kayıt Tarihi</div>'+dateStr2+'</div>' +
-          '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px"><div class="lbl-mini">Premium</div>'+(u.premium?'⭐ Evet':'Hayır')+'</div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">Ad Soyad</div><b>'+(u.displayName||'—')+'</b></div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">E-posta</div>'+(u.email||'—')+'</div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">Şirket</div>'+(u.company||'—')+'</div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">Rol</div>'+(u.role||'—')+(u.vendorType?' / '+(vtypes[u.vendorType]||u.vendorType):'')+'</div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">Ülke</div>'+(u.country||'—')+'</div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">Telefon</div>'+(u.phone||'—')+'</div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">Kayıt Tarihi</div>'+dateStr2+'</div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">Premium</div>'+(u.premium?'⭐ Evet':'Hayır')+'</div>' +
           '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;grid-column:1/-1"><div class="lbl-mini">UID</div><code style="font-size:11px">'+u.id+'</code></div>' +
           '</div>' +
           '<button id="u-modal-close2" class="btn-g" style="width:100%;margin-top:16px">Kapat</button>' +
@@ -13886,7 +14077,7 @@ async function admUsers(m) {
     '<input id="u-search" class="inp" placeholder="🔍 Ad, e-posta, şirket, ülke veya telefon ara..." style="margin-bottom:10px;font-size:13px">' +
 
     // Filtreler — satır 1
-    '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">' +
+    '<div class="flx-g6-mb8-wrap">' +
     [['','Tüm Roller'],['customer','Müşteri'],['vendor','Vendor'],['admin','Admin']].map(function(pair) {
       return '<button class="u-rf btn-g btn-sm" data-val="'+pair[0]+'" style="font-size:12px">'+pair[1]+'</button>';
     }).join('') +
@@ -13897,7 +14088,7 @@ async function admUsers(m) {
     '</div>' +
 
     // Filtreler — satır 2
-    '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
+    '<div class="flx-g8-mb14-wrap">' +
     '<select id="u-premium" class="inp" style="width:auto;font-size:12px;margin-bottom:0">' +
     '<option value="">Tüm Üyelik</option>' +
     '<option value="yes">⭐ Premium</option>' +
@@ -13954,7 +14145,6 @@ async function admUsers(m) {
 
   applyFilter();
 }
-
 
 async function openAdmProdEditModal(prodId, name, cat, desc, country) {
   var cats = await getCategories();
@@ -14036,7 +14226,6 @@ async function openAdmProdEditModal(prodId, name, cat, desc, country) {
     }
   });
 }
-
 
 async function admProducts(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Ürünler yükleniyor...</div>';
@@ -14243,7 +14432,7 @@ async function admProducts(m) {
     '<input id="ap-search" class="inp" placeholder="🔍 Ürün adı, vendor, kategori, ülke veya açıklama..." style="margin-bottom:10px;font-size:13px">' +
 
     // Filtreler — satır 1: durum bazlı
-    '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">' +
+    '<div class="flx-g6-mb8-wrap">' +
     [['','Tüm Durumlar'],['pending','Bekliyor'],['active','Aktif'],['rejected','Reddedildi'],['archived','Arşiv']].map(function(pair) {
       return '<button class="ap-sf btn-g btn-sm" data-val="'+pair[0]+'" style="font-size:12px">'+pair[1]+'</button>';
     }).join('') +
@@ -14254,7 +14443,7 @@ async function admProducts(m) {
     '</div>' +
 
     // Filtreler — satır 2: detay
-    '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
+    '<div class="flx-g8-mb14-wrap">' +
     '<select id="ap-cat" class="inp" style="width:auto;font-size:12px;margin-bottom:0">' +
     '<option value="">Tüm Kategoriler</option>' +
     cats.map(function(cat){ return '<option value="'+cat+'">'+cat+'</option>'; }).join('') +
@@ -14322,7 +14511,6 @@ async function admProducts(m) {
   applyFilter();
 }
 
-
 async function admRequests(m) {
   const snap = await getDocs(collection(db,'poc_requests'));
   var all = snap.docs.map(d=>({...d.data(),id:d.id}));
@@ -14350,8 +14538,8 @@ async function admRequests(m) {
       return (!stFilter||r.status===stFilter)&&(!q||(r.title||'').toLowerCase().includes(q)||(r.customerName||'').toLowerCase().includes(q)||(r.vendorName||'').toLowerCase().includes(q)||(r.productName||'').toLowerCase().includes(q));
     }));
   }
-  m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-    '<h2 style="font-size:18px;font-weight:700">PoC Talepleri <span id="r-cnt" style="font-size:13px;color:var(--text-secondary);font-weight:400"></span></h2>'+
+  m.innerHTML='<div class="flx-bw-c-mb14b">'+
+    '<h2 style="font-size:18px;font-weight:700">PoC Talepleri <span id="r-cnt" class="txt-sec-13"></span></h2>'+
     '<input class="inp" id="r-search" placeholder="Başlık, müşteri veya vendor..." style="width:260px;font-size:12.5px"></div>'+
     '<div style="display:flex;gap:8px;margin-bottom:12px">'+
     '<button class="btn-p btn-sm r-sf" data-s="">Tümü</button>'+
@@ -14432,10 +14620,10 @@ async function admEvents(m) {
     filtered = applyPeriod(filtered);
     renderRows(filtered);
   }
-  m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-    '<h2 style="font-size:18px;font-weight:700">Tüm Etkinlikler <span id="ev-cnt" style="font-size:13px;color:var(--text-secondary);font-weight:400"></span></h2>'+
+  m.innerHTML='<div class="flx-bw-c-mb14b">'+
+    '<h2 style="font-size:18px;font-weight:700">Tüm Etkinlikler <span id="ev-cnt" class="txt-sec-13"></span></h2>'+
     '<input class="inp" id="ev-search2" placeholder="Başlık veya vendor..." style="width:240px;font-size:12.5px"></div>'+
-    '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">'+
+    '<div class="flx-g6-mb8-wrap">'+
     '<span style="font-size:11px;color:var(--text-muted);padding:6px 4px;align-self:center">Durum:</span>'+
     '<button class="btn-p btn-sm ev-sf" data-s="">Tümü</button>'+
     '<button class="btn-g btn-sm ev-sf" data-s="published">Yayında</button>'+
@@ -14709,7 +14897,6 @@ async function admDataHealth(m) {
   }
 }
 
-
 async function admOffers(m) {
   const snap = await getDocs(collection(db,'offers'));
   var all = snap.docs.map(d=>({...d.data(),id:d.id}));
@@ -14756,8 +14943,8 @@ async function admOffers(m) {
       return (!stFilter||o.status===stFilter)&&(!q||(o.productName||'').toLowerCase().includes(q)||(o.vendorName||'').toLowerCase().includes(q)||(o.customerName||'').toLowerCase().includes(q));
     }));
   }
-  m.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-    '<h2 style="font-size:18px;font-weight:700">Teklifler <span id="of-cnt" style="font-size:13px;color:var(--text-secondary);font-weight:400"></span></h2>'+
+  m.innerHTML='<div class="flx-bw-c-mb14b">'+
+    '<h2 style="font-size:18px;font-weight:700">Teklifler <span id="of-cnt" class="txt-sec-13"></span></h2>'+
     '<input class="inp" id="of-search" placeholder="Ürün, vendor veya müşteri..." style="width:250px;font-size:12.5px"></div>'+
     '<div style="display:flex;gap:8px;margin-bottom:12px">'+
     '<button class="btn-p btn-sm of-sf" data-s="">Tümü</button>'+
@@ -14772,7 +14959,6 @@ async function admOffers(m) {
     b.className='btn-p btn-sm of-sf'; stFilter=b.dataset.s; applyFilter();
   });});
 }
-
 
 async function admCategories(m) {
   try {
@@ -14817,8 +15003,8 @@ async function admCategories(m) {
     }
 
     m.innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-      '<h2 style="font-size:18px;font-weight:700">Kategori Yönetimi <span id="cat-cnt" style="font-size:13px;color:var(--text-secondary);font-weight:400"></span></h2>' +
+      '<div class="flx-bw-c-mb14b">' +
+      '<h2 style="font-size:18px;font-weight:700">Kategori Yönetimi <span id="cat-cnt" class="txt-sec-13"></span></h2>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
       '<input class="inp" id="cat-search" placeholder="Kategori ara..." style="width:220px;font-size:12.5px">' +
       '<button class="btn-g btn-sm" id="sync-cats-btn" style="font-size:12px">🔄 Eksik Kategorileri Ekle</button>' +
@@ -15268,7 +15454,6 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
   });
 }
 
-
 window.openSendOfferModal = openSendOfferModal;
 
 // ══════════════════════════════════════════════════════
@@ -15359,7 +15544,6 @@ function openOfferDetailModal(o, viewerRole) {
 }
 window.openOfferDetailModal = openOfferDetailModal;
 
-
 // ── URL Hash Router ─────────────────────────────────────────────
 function parseAndNavigate(hash) {
   if (!hash || hash === '#') return;
@@ -15388,8 +15572,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-
-
 </script>
 
 <!-- EmailJS CDN -->
@@ -15403,5 +15585,4 @@ window.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
-
 
