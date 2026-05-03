@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.54 | pochub.co -->
+<!-- PoCHub v4.55 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.54</title>
+<title>PoCHub.co — v4.55</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.54';
+const VERSION = 'v4.55';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.55':  ['BUG FIX: Mesajlar > Silinen > "Hemen Kalıcı Sil" yazışmayı silmek yerine Aktif\'e geri döndürüyordu. Sebep: deletedAt\'i 31 gün öncesine atıp cleanupDeleted\'a güveniyordu, ama temizlik sonrası conv meta silindiği için yazışma "silinmemiş gibi" oluyordu. Çözüm: permanentlyDeletedBy alanı eklendi, bu liste hem cleanup\'tan bağımsız hem soft-delete davranışına sadık'],
   'v4.54':  ['MAJOR: Vendor Dashboard tam yenileme — diğer 8 sayfaya tutarlı 8 stat kartı (trend ok\'larıyla), acil aksiyonlar banner, performans lideri banner, genel içgörüler, yaklaşan haftaya bakış'],
   'v4.53':  ['PATCH: Boyut optimizasyonu — sıfır işlevsel değişiklik. Inline style → utility class dönüşümleri, çoklu whitespace temizliği, fazla boş satır temizliği. Hedef: 868 → 800 KB civarı.'],
   'v4.52':  ['MINOR: Mesajlar profesyonel yenileme — 8. ve son ana sayfa profesyonel seviyeye geldi. 8 istatistik kartı, en aktif müşteri banner, yanıtsız mesajlar uyarısı, mesaj içgörüleri, preset filtreler, sohbet kartı zenginleştirme'],
@@ -1847,19 +1848,24 @@ async function loadMessagesTab(m, role) {
   }
 
   // ── 30 gün geçmiş silinen konuşmaları temizle ──────────────────────
+  // v4.55: Mesajları sadece İKİ taraf da deletedBy'da ve 30 gün geçmiş olduğunda sil.
+  // Tek taraf silmişse meta korunur (karşı taraf görmeye devam eder).
   async function cleanupDeleted(pocs) {
     const now = Date.now();
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     for (const poc of pocs) {
       const meta = await getConvMeta(poc.id);
-      const del = (meta.deletedBy||[]).find(d => d.userId === CUR_USER.uid);
-      if (del && (now - new Date(del.deletedAt).getTime()) > THIRTY_DAYS) {
-        // 30 gün geçti — Firestore'dan mesajları da sil
-        try {
-          const msgs = await getDocs(query(collection(db,'poc_messages'), where('pocId','==',poc.id)));
-          for (const md of msgs.docs) { await deleteDoc(md.ref); }
-          await deleteDoc(doc(db,'poc_conversations', poc.id));
-        } catch(e) {}
+      const dels = meta.deletedBy || [];
+      // En az 2 farklı kullanıcı silmiş ve hepsi 30+ gün önce silmiş mi?
+      if (dels.length >= 2) {
+        const allExpired = dels.every(d => (now - new Date(d.deletedAt).getTime()) > THIRTY_DAYS);
+        if (allExpired) {
+          try {
+            const msgs = await getDocs(query(collection(db,'poc_messages'), where('pocId','==',poc.id)));
+            for (const md of msgs.docs) { await deleteDoc(md.ref); }
+            await deleteDoc(doc(db,'poc_conversations', poc.id));
+          } catch(e) {}
+        }
       }
     }
   }
@@ -1885,8 +1891,12 @@ async function loadMessagesTab(m, role) {
 
       // Arşiv/silme/sabitleme filtresi
       const isDeleted  = poc => (metaMap[poc.id]?.deletedBy||[]).some(d => d.userId === CUR_USER.uid);
+      const isPermDeleted = poc => (metaMap[poc.id]?.permanentlyDeletedBy||[]).includes(CUR_USER.uid);
       const isArchived = poc => (metaMap[poc.id]?.archivedBy||[]).includes(CUR_USER.uid);
       const isPinned   = poc => (metaMap[poc.id]?.pinnedBy||[]).includes(CUR_USER.uid);
+
+      // KALICI silinenler hiçbir tab'ta görünmesin
+      pocs = pocs.filter(poc => !isPermDeleted(poc));
 
       // Sayımlar (tab label'larına ve banner'a yansıtmak için)
       var msgCounts = { active:0, archived:0, deleted:0 };
@@ -2471,25 +2481,29 @@ async function loadMessagesTab(m, role) {
           permBtn.style.cssText = 'font-size:13px;padding:3px 7px;background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.4);border-radius:4px;cursor:pointer;font-weight:700';
           permBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            if (!confirm('Bu yazışma KALICI olarak silinsin mi? Tüm mesajlar silinir, geri alınamaz!')) return;
+            if (!confirm('Bu yazışma KALICI olarak silinsin mi? Tüm mesajlar bu hesabınızdan silinir, geri alınamaz!')) return;
             if (!confirm('Emin misiniz?')) return;
             permBtn.disabled = true;
             try {
-              // Mesajları kendi yanımızda sil; karşı tarafın görmesi gerekiyorsa karşı tarafın delete'ı ayrı.
-              // Ama "kalıcı" sadece bizim için olur — karşı taraf hâlâ görür.
-              // Kıdemli analist kararı: hemen sil = sadece kendi delete'ı kalıcılaştır,
-              // ama Firestore'dan silme yapma çünkü karşı taraf da konuşmayı kullanıyor olabilir.
-              // 30 gün sonra cleanupDeleted iki tarafın da deletedBy'da olduğunu görürse fiziksel siler.
-              // Bu davranış memory'deki eski kuralla uyumlu — kullanıcıya açıklayalım.
-              const cur2 = metaMap[poc.id]?.deletedBy || [];
-              await setConvMeta(poc.id, {
-                deletedBy: cur2.map(function(d){
-                  return d.userId === CUR_USER.uid
-                    ? {userId: d.userId, deletedAt: new Date(Date.now() - 31*24*60*60*1000).toISOString()}
-                    : d;
-                }),
+              // v4.55: permanentlyDeletedBy listesine ekle — bu list filter olarak çalışır
+              // Karşı taraf hâlâ konuşmayı görebilir (ortak konuşma soft-delete pattern)
+              // 30 gün cleanupDeleted iki tarafta da deletedBy varsa fiziksel silebilir
+              const curPerm = metaMap[poc.id]?.permanentlyDeletedBy || [];
+              if (!curPerm.includes(CUR_USER.uid)) {
+                curPerm.push(CUR_USER.uid);
+              }
+              // Aynı zamanda deletedAt'i de geriye al ki cleanup tetiklensin
+              const curDel = metaMap[poc.id]?.deletedBy || [];
+              const newDel = curDel.map(function(d){
+                return d.userId === CUR_USER.uid
+                  ? {userId: d.userId, deletedAt: new Date(Date.now() - 31*24*60*60*1000).toISOString()}
+                  : d;
               });
-              showToast('Yazışma sizden kalıcı kaldırıldı. Karşı taraf silmediğinde yazışma onlarda kalır.');
+              await setConvMeta(poc.id, {
+                permanentlyDeletedBy: curPerm,
+                deletedBy: newDel,
+              });
+              showToast('Yazışma sizden kalıcı kaldırıldı.');
               render(activeTab, searchVal, filterVal);
             } catch(err) {
               showToast('Hata: ' + err.message, 'err');
