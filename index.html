@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.55 | pochub.co -->
+<!-- PoCHub v4.56 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.55</title>
+<title>PoCHub.co — v4.56</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.55';
+const VERSION = 'v4.56';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.56':  ['MINOR: Müşteri Gelen Teklifler profesyonel yenileme — 8 stat kartı (Toplam, Bekleyen Karar, Kabul, Red, Revize, Toplam Yatırım, Bekleyen Tutar, Aktif Vendor), karar bekleyen banner, en iyi fiyat banner, teklif içgörüleri, hızlı filtre presetleri, kart zenginleştirme (süre kalan, performans rozeti, geçen süre)'],
   'v4.55':  ['BUG FIX: Mesajlar > Silinen > "Hemen Kalıcı Sil" yazışmayı silmek yerine Aktif\'e geri döndürüyordu. Sebep: deletedAt\'i 31 gün öncesine atıp cleanupDeleted\'a güveniyordu, ama temizlik sonrası conv meta silindiği için yazışma "silinmemiş gibi" oluyordu. Çözüm: permanentlyDeletedBy alanı eklendi, bu liste hem cleanup\'tan bağımsız hem soft-delete davranışına sadık'],
   'v4.54':  ['MAJOR: Vendor Dashboard tam yenileme — diğer 8 sayfaya tutarlı 8 stat kartı (trend ok\'larıyla), acil aksiyonlar banner, performans lideri banner, genel içgörüler, yaklaşan haftaya bakış'],
   'v4.53':  ['PATCH: Boyut optimizasyonu — sıfır işlevsel değişiklik. Inline style → utility class dönüşümleri, çoklu whitespace temizliği, fazla boş satır temizliği. Hedef: 868 → 800 KB civarı.'],
@@ -7241,7 +7242,7 @@ async function loadOffersWithComparison(m) {
     // Filtre seçenekleri
     var vendors = [...new Set(offers.map(function(o){ return o.vendorName; }).filter(Boolean))].sort();
 
-    var filters = {status:'', vendor:'', dateFrom:'', dateTo:'', search:''};
+    var filters = {status:'', vendor:'', dateFrom:'', dateTo:'', search:'', preset:''};
 
     function matchDate(o) {
       if (!filters.dateFrom && !filters.dateTo) return true;
@@ -7260,8 +7261,136 @@ async function loadOffersWithComparison(m) {
       revision_requested: {c:'#d97706', bg:'rgba(217,119,6,.1)',  l:'↩ Revizyon'},
     };
 
+    // ── v4.56: MÜŞTERİ İSTATİSTİK + İÇGÖRÜ HESAPLAMALARI ────────────
+    var nowMsC = Date.now();
+    var statsC = {
+      total:        offers.length,
+      pending:      offers.filter(function(o){return o.status==='pending';}).length,
+      accepted:     offers.filter(function(o){return o.status==='accepted';}).length,
+      rejected:     offers.filter(function(o){return o.status==='rejected';}).length,
+      revision:     offers.filter(function(o){return o.status==='revision_requested';}).length,
+    };
+    // Toplam yatırım (kabul edilenlerin KDV dahil toplamı)
+    var totalSpentC = offers
+      .filter(function(o){return o.status==='accepted';})
+      .reduce(function(s,o){ return s + (o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0); }, 0);
+    // Bekleyen tutar
+    var pendingValueC = offers
+      .filter(function(o){return o.status==='pending' || o.status==='revision_requested';})
+      .reduce(function(s,o){ return s + (o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0); }, 0);
+    // Aktif vendor sayısı
+    var activeVendorsC = [...new Set(offers.map(function(o){ return o.vendorId || o.vendorName; }).filter(Boolean))].length;
+
+    // En iyi fiyat teklifi (pending+revision arasında en düşük tutarlı)
+    var bestPriceOffer = null;
+    offers.filter(function(o){return o.status==='pending' || o.status==='revision_requested';}).forEach(function(o){
+      var amt = o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0;
+      if (amt > 0 && (!bestPriceOffer || (bestPriceOffer.grossAmount||bestPriceOffer.totalAmount||(bestPriceOffer.unitPrice||0)*(bestPriceOffer.quantity||1)) > amt)) {
+        bestPriceOffer = o;
+      }
+    });
+
+    // Karar bekleyen teklifler — birleşik öncelikli liste
+    var actionOffersC = [];
+    offers.forEach(function(o){
+      if (o.status === 'pending') {
+        // Süresi 3 gün veya az kalan
+        if (o.validUntil?.seconds) {
+          var leftMs = o.validUntil.seconds*1000 - nowMsC;
+          var leftDays = Math.ceil(leftMs / 86400000);
+          if (leftDays <= 3 && leftDays >= 0) {
+            actionOffersC.push({o:o, reason:'Geçerlilik '+leftDays+' gün içinde dolacak', priority:1});
+            return;
+          } else if (leftDays < 0) {
+            actionOffersC.push({o:o, reason:'Geçerlilik süresi dolmuş', priority:1});
+            return;
+          }
+        }
+        // 20+ gündür eski
+        if (o.createdAt?.seconds) {
+          var ageDaysC = Math.floor((nowMsC - o.createdAt.seconds*1000)/86400000);
+          if (ageDaysC > 20) {
+            actionOffersC.push({o:o, reason:ageDaysC+' gündür karar verilmedi', priority:3});
+          }
+        }
+      } else if (o.status === 'revision_requested') {
+        actionOffersC.push({o:o, reason:'Revizyon istediğin teklif — vendor yanıtı bekleniyor', priority:2});
+      }
+    });
+    actionOffersC.sort(function(a,b){ return a.priority - b.priority; });
+
+    // Vendor başına teklif sayısı (en aktif vendor)
+    var vendorOfferCount = {};
+    offers.forEach(function(o){
+      var vk = o.vendorName || o.vendorId || '—';
+      if (!vendorOfferCount[vk]) vendorOfferCount[vk] = {cnt:0, accepted:0};
+      vendorOfferCount[vk].cnt++;
+      if (o.status === 'accepted') vendorOfferCount[vk].accepted++;
+    });
+    var topVendor = null;
+    Object.entries(vendorOfferCount).forEach(function(e){
+      if (!topVendor || topVendor[1].cnt < e[1].cnt) topVendor = e;
+    });
+
+    // En çok teklif aldığım ürün
+    var prodOfferCount = {};
+    offers.forEach(function(o){
+      var pk = o.productName || '—';
+      if (!prodOfferCount[pk]) prodOfferCount[pk] = 0;
+      prodOfferCount[pk]++;
+    });
+    var topProd = Object.entries(prodOfferCount).sort(function(a,b){return b[1]-a[1];})[0];
+
+    // Ortalama karar süresi (kabul/red için)
+    var decisionTimes = offers
+      .filter(function(o){ return (o.status==='accepted' || o.status==='rejected') && o.respondedAt?.seconds && o.createdAt?.seconds; })
+      .map(function(o){ return (o.respondedAt.seconds - o.createdAt.seconds) / 86400; });
+    var avgDecisionDays = decisionTimes.length > 0
+      ? Math.round(decisionTimes.reduce(function(s,d){return s+d;},0) / decisionTimes.length)
+      : null;
+
+    // Ortalama teklif tutarı
+    var avgOfferAmount = 0;
+    if (offers.length > 0) {
+      var totalAmt = offers.reduce(function(s,o){ return s + (o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0); }, 0);
+      avgOfferAmount = Math.round(totalAmt / offers.length);
+    }
+
     function renderOffers() {
       var filtered = offers.filter(function(o) {
+        if (filters.preset) {
+          // Preset filtreleri
+          if (filters.preset === 'urgent') {
+            if (o.status !== 'pending' && o.status !== 'revision_requested') return false;
+            if (o.status === 'revision_requested') return true;
+            if (o.validUntil?.seconds) {
+              var leftDays2 = (o.validUntil.seconds*1000 - nowMsC) / 86400000;
+              if (leftDays2 <= 3) return true;
+            }
+            if (o.createdAt?.seconds) {
+              var ageD2 = Math.floor((nowMsC - o.createdAt.seconds*1000)/86400000);
+              if (ageD2 > 20) return true;
+            }
+            return false;
+          }
+          if (filters.preset === 'high') {
+            var sortedAmts = offers
+              .filter(function(o2){ return (o2.grossAmount||o2.totalAmount||(o2.unitPrice||0)*(o2.quantity||1)||0) > 0; })
+              .map(function(o2){ return o2.grossAmount||o2.totalAmount||(o2.unitPrice||0)*(o2.quantity||1); })
+              .sort(function(a,b){ return b-a; });
+            var cutoff = sortedAmts.length > 0 ? sortedAmts[Math.floor(sortedAmts.length*0.2)] || 0 : 0;
+            return (o.grossAmount||o.totalAmount||(o.unitPrice||0)*(o.quantity||1)||0) >= cutoff && cutoff > 0;
+          }
+          if (filters.preset === 'expiring') {
+            if (o.status !== 'pending' || !o.validUntil?.seconds) return false;
+            var leftDays3 = (o.validUntil.seconds*1000 - nowMsC) / 86400000;
+            return leftDays3 >= 0 && leftDays3 <= 7;
+          }
+          if (filters.preset === 'new') {
+            if (!o.createdAt?.seconds) return false;
+            return (nowMsC - o.createdAt.seconds*1000) < 7*86400000;
+          }
+        }
         if (filters.status && o.status !== filters.status) return false;
         if (filters.vendor && o.vendorName !== filters.vendor) return false;
         if (!matchDate(o)) return false;
@@ -7282,11 +7411,174 @@ async function loadOffersWithComparison(m) {
       hdr.innerHTML =
         '<div class="flx-bw-c-mb14">' +
         '<div class="flx-c-g10">' +
-        '<h2 style="font-size:18px;font-weight:700">Gelen Teklifler</h2>' +
+        '<h2 style="font-size:18px;font-weight:700">📥 Gelen Teklifler</h2>' +
         (pendCount > 0 ? '<span style="background:#f0a429;color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:12px">' + pendCount + ' yanıt bekliyor</span>' : '') +
         '<span class="txt-muted-12">' + offers.length + ' teklif</span>' +
         '</div></div>';
       m.appendChild(hdr);
+
+      // ── 8 İSTATİSTİK KARTI ──
+      var statsRowC = document.createElement('div');
+      statsRowC.className = 'stat-grid';
+      var statCardsC = [
+        ['Toplam',          statsC.total,                                                  '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+        ['Bekleyen Karar',  statsC.pending,                                                statsC.pending>0?'#f0a429':'#5a6278', statsC.pending>0?'rgba(240,164,41,.08)':'rgba(90,98,120,.06)', statsC.pending>0?'rgba(240,164,41,.2)':'rgba(90,98,120,.18)'],
+        ['Kabul',           statsC.accepted,                                               '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ['Red',             statsC.rejected,                                               '#ff7070', 'rgba(255,112,112,.08)','rgba(255,112,112,.2)'],
+        ['Revize',          statsC.revision,                                               statsC.revision>0?'#d97706':'#5a6278', statsC.revision>0?'rgba(217,119,6,.08)':'rgba(90,98,120,.06)', statsC.revision>0?'rgba(217,119,6,.2)':'rgba(90,98,120,.18)'],
+        ['Toplam Yatırım',  totalSpentC > 0 ? formatMoney(totalSpentC,'TRY') : '—',        '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ['Bekleyen Tutar',  pendingValueC > 0 ? formatMoney(pendingValueC,'TRY') : '—',    '#f0a429', 'rgba(240,164,41,.08)', 'rgba(240,164,41,.2)'],
+        ['Aktif Vendor',    activeVendorsC,                                                '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+      ];
+      statCardsC.forEach(function(s){
+        var card = document.createElement('div');
+        card.className = 'stat-card';
+        card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4];
+        card.innerHTML = '<div style="font-size:'+(typeof s[1]==='string' && s[1].length>5 ? '14px':'18px')+';font-weight:800;color:'+s[2]+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s[1]+'</div>'
+                       + '<div class="stat-card-lbl">'+s[0]+'</div>';
+        statsRowC.appendChild(card);
+      });
+      m.appendChild(statsRowC);
+
+      // ── 🚨 KARAR BEKLEYEN TEKLİFLER BANNER ──
+      if (actionOffersC.length > 0) {
+        var actBanC = document.createElement('div');
+        actBanC.style.cssText = 'background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+        actBanC.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+          + '<div style="flex:1;min-width:200px">'
+          + '<div style="font-size:12.5px;color:#f0a429;font-weight:700;margin-bottom:4px">⚠️ Karar Bekleyen Teklifler</div>'
+          + '<div class="txt-muted-12">'+actionOffersC.length+' teklif için kararın gerekli — süresi dolmak üzere, revizyon yanıtı bekleyen veya uzun süredir bekleyen teklifler.</div>'
+          + '</div>'
+          + '<button id="cof-act-toggle" class="btn-warn">Listeyi Gör</button>'
+          + '</div>';
+        m.appendChild(actBanC);
+
+        actBanC.querySelector('#cof-act-toggle').addEventListener('click', function(){
+          var det = document.getElementById('cof-act-list');
+          if (det) { det.remove(); return; }
+          var listDiv = document.createElement('div');
+          listDiv.id = 'cof-act-list';
+          listDiv.style.cssText = 'background:rgba(240,164,41,.04);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+          listDiv.innerHTML = actionOffersC.slice(0,5).map(function(a){
+            var amt = a.o.grossAmount || a.o.totalAmount || (a.o.unitPrice||0)*(a.o.quantity||1) || 0;
+            return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(240,164,41,.1);font-size:12px">'
+              + '<div><strong>'+(a.o.productName||'—')+'</strong> <span class="txt-muted-12">· '+(a.o.vendorName||'—')+(amt>0?' · '+formatMoney(amt, a.o.currency||'TRY'):'')+'</span></div>'
+              + '<div class="txt-muted-12">'+a.reason+'</div>'
+              + '</div>';
+          }).join('') + (actionOffersC.length > 5
+            ? '<div class="txt-empty">…ve '+(actionOffersC.length-5)+' diğer teklif</div>'
+            : '');
+          actBanC.parentNode.insertBefore(listDiv, actBanC.nextSibling);
+        });
+      }
+
+      // ── 🏆 EN İYİ FİYAT BANNER ──
+      if (bestPriceOffer) {
+        var bestAmt = bestPriceOffer.grossAmount || bestPriceOffer.totalAmount || (bestPriceOffer.unitPrice||0)*(bestPriceOffer.quantity||1) || 0;
+        var bestBan = document.createElement('div');
+        bestBan.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+        bestBan.innerHTML = '<div style="flex:1;min-width:200px">'
+          + '<div class="lbl-success-700">🏆 EN İYİ FİYAT TEKLİFİ (bekleyenler arasında)</div>'
+          + '<div style="font-size:13.5px;font-weight:700">'+(bestPriceOffer.productName||'—')+'</div>'
+          + '<div class="txt-muted-12-mt3">'+(bestPriceOffer.vendorName||'—')
+          + '</div>'
+          + '</div>'
+          + '<div style="text-align:right">'
+          + '<div style="font-size:20px;font-weight:800;color:#22d078">'+formatMoney(bestAmt, bestPriceOffer.currency || 'TRY')+'</div>'
+          + '<div style="font-size:10.5px;color:var(--text-muted)">'+(typeof bestPriceOffer.vatRate === 'number' ? 'KDV %'+bestPriceOffer.vatRate+' dahil' : 'KDV bilgisi yok')+'</div>'
+          + '</div>';
+        m.appendChild(bestBan);
+      }
+
+      // ── 💡 TEKLİF İÇGÖRÜLERİ ──
+      if (offers.length >= 2) {
+        var insC = document.createElement('div');
+        insC.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
+        var insHtmlC = '<div class="lbl-purp-700">💡 Teklif İçgörüleri</div>'
+          + '<div class="g2">';
+        // Sol — Karar dinamiklerim
+        insHtmlC += '<div>'
+          + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 Karar Dinamiklerim</div>';
+        if (avgDecisionDays !== null) {
+          insHtmlC += '<div class="flx-bw-c row-bb">'
+            + '<span>Ort. karar süremm</span>'
+            + '<span style="font-weight:700;color:#7db4ff">'+avgDecisionDays+' gün</span>'
+            + '</div>';
+        }
+        if (avgOfferAmount > 0) {
+          insHtmlC += '<div class="flx-bw-c row-bb">'
+            + '<span>Ort. teklif tutarı</span>'
+            + '<span style="font-weight:700;color:#22d078">'+formatMoney(avgOfferAmount,'TRY')+'</span>'
+            + '</div>';
+        }
+        var customerAcceptRate = offers.length > 0 ? Math.round((statsC.accepted / offers.length) * 100) : 0;
+        insHtmlC += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+          + '<span>Kabul oranım</span>'
+          + '<span style="font-weight:700;color:#22d078">%'+customerAcceptRate+'</span>'
+          + '</div>';
+        insHtmlC += '</div>';
+        // Sağ — Pazar görüşü
+        insHtmlC += '<div>'
+          + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🎯 Pazar Görüşüm</div>';
+        if (topProd) {
+          insHtmlC += '<div class="flx-bw-c row-bb">'
+            + '<span>En çok teklif aldığım ürün</span>'
+            + '<span style="font-weight:700;color:#c4a8ff">'+topProd[0]+' <span class="txt-muted-12">('+topProd[1]+')</span></span>'
+            + '</div>';
+        }
+        if (topVendor) {
+          insHtmlC += '<div class="flx-bw-c row-bb">'
+            + '<span>En aktif vendor</span>'
+            + '<span style="font-weight:700;color:#c4a8ff">'+topVendor[0]+' <span class="txt-muted-12">('+topVendor[1].cnt+' teklif)</span></span>'
+            + '</div>';
+        }
+        insHtmlC += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+          + '<span>Bekleyen pipeline</span>'
+          + '<span style="font-weight:700;color:#f0a429">'+(pendingValueC?formatMoney(pendingValueC,'TRY'):'—')+'</span>'
+          + '</div>';
+        insHtmlC += '</div>';
+        insHtmlC += '</div>';
+        insC.innerHTML = insHtmlC;
+        m.appendChild(insC);
+      }
+
+      // ── 🚀 PRESET FİLTRELER ──
+      var presetRowC = document.createElement('div');
+      presetRowC.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap';
+      var presetsC = [
+        ['', 'Tümü', 0, 'rgba(255,255,255,.06)', 'var(--text-secondary)', 'rgba(255,255,255,.12)'],
+        ['urgent', '🚨 Acil Karar', actionOffersC.length, 'rgba(240,164,41,.08)', '#f0a429', 'rgba(240,164,41,.25)'],
+        ['high', '💰 Yüksek Tutarlı', offers.filter(function(o){
+            var sortedA = offers.filter(function(oo){ return (oo.grossAmount||oo.totalAmount||(oo.unitPrice||0)*(oo.quantity||1)||0) > 0; })
+              .map(function(oo){ return oo.grossAmount||oo.totalAmount||(oo.unitPrice||0)*(oo.quantity||1); })
+              .sort(function(a,b){return b-a;});
+            var cut = sortedA.length > 0 ? sortedA[Math.floor(sortedA.length*0.2)] || 0 : 0;
+            return (o.grossAmount||o.totalAmount||(o.unitPrice||0)*(o.quantity||1)||0) >= cut && cut > 0;
+          }).length, 'rgba(34,208,120,.08)', '#22d078', 'rgba(34,208,120,.25)'],
+        ['expiring', '⏰ Süresi Yakın', offers.filter(function(o){
+            if (o.status !== 'pending' || !o.validUntil?.seconds) return false;
+            var ld = (o.validUntil.seconds*1000 - nowMsC) / 86400000;
+            return ld >= 0 && ld <= 7;
+          }).length, 'rgba(255,112,112,.08)', '#ff7070', 'rgba(255,112,112,.25)'],
+        ['new', '🆕 Yeni Gelen', offers.filter(function(o){
+            if (!o.createdAt?.seconds) return false;
+            return (nowMsC - o.createdAt.seconds*1000) < 7*86400000;
+          }).length, 'rgba(125,180,255,.08)', '#7db4ff', 'rgba(125,180,255,.25)'],
+      ];
+      presetsC.forEach(function(pr){
+        var b = document.createElement('button');
+        var isOn = (filters.preset||'') === pr[0];
+        b.style.cssText = 'padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid '+pr[5]+';background:'+(isOn?pr[4]:pr[3])+';color:'+(isOn?(pr[0]==='urgent'?'#000':'#fff'):pr[4]);
+        b.innerHTML = pr[1] + (pr[2] > 0 ? ' <span style="opacity:.7">('+pr[2]+')</span>' : '');
+        b.addEventListener('click', function(){
+          filters.preset = (filters.preset === pr[0]) ? '' : pr[0];
+          // Diğer filtreleri sıfırla
+          filters.status = ''; filters.vendor = ''; filters.dateFrom = ''; filters.dateTo = ''; filters.search = '';
+          renderOffers();
+        });
+        presetRowC.appendChild(b);
+      });
+      m.appendChild(presetRowC);
 
       // Arama
       var searchEl = document.createElement('input');
@@ -7334,6 +7626,45 @@ async function loadOffersWithComparison(m) {
           var poc    = pocs.find(function(p){ return p.id===o.pocId; });
           var dateStr = o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('tr-TR') : '—';
 
+          // ── v4.56: Müşteri kartına performans rozeti + süre kalan ──
+          var perfBadgeC = '';
+          var leftBadgeC = '';
+          var sentAgoTxtC = '';
+
+          // Yeni teklif rozeti (24 saat içinde gelen)
+          if (o.status === 'pending' && o.createdAt?.seconds) {
+            var ageHrC = (nowMsC - o.createdAt.seconds*1000)/3600000;
+            if (ageHrC < 24) {
+              perfBadgeC = ' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(34,208,120,.15);color:#22d078">🆕 Yeni</span>';
+            } else if (ageHrC > 240) {
+              perfBadgeC = ' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,.05);color:var(--text-muted)" title="10+ gün karar verilmedi">💤 Bekleyen</span>';
+            }
+          }
+
+          // Süre kalan badge (pending + validUntil)
+          if (o.status === 'pending' && o.validUntil?.seconds) {
+            var leftMsC = o.validUntil.seconds*1000 - nowMsC;
+            var leftDaysC = Math.ceil(leftMsC / 86400000);
+            if (leftDaysC < 0) {
+              leftBadgeC = '<div style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,112,112,.15);color:#ff7070;margin-top:4px">⏰ Süresi dolmuş</div>';
+            } else if (leftDaysC <= 3) {
+              leftBadgeC = '<div style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(240,164,41,.15);color:#f0a429;margin-top:4px">⏰ '+leftDaysC+' gün kaldı</div>';
+            } else if (leftDaysC <= 7) {
+              leftBadgeC = '<div style="display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(125,180,255,.1);color:#7db4ff;margin-top:4px">⏰ '+leftDaysC+' gün kaldı</div>';
+            }
+          }
+
+          // Geçen süre etiketi (ne zamandır bende)
+          if (o.createdAt?.seconds) {
+            var diffMinC = Math.floor((nowMsC - o.createdAt.seconds*1000)/60000);
+            var ago3;
+            if (diffMinC < 60) ago3 = diffMinC + ' dakika önce';
+            else if (diffMinC < 1440) ago3 = Math.floor(diffMinC/60) + ' saat önce';
+            else if (diffMinC < 43200) ago3 = Math.floor(diffMinC/1440) + ' gün önce';
+            else ago3 = Math.floor(diffMinC/43200) + ' ay önce';
+            sentAgoTxtC = ' · 📅 '+ago3;
+          }
+
           var card = document.createElement('div');
           card.style.cssText = 'background:#0f1623;border:1px solid ' +
             (o.status==='pending' ? 'rgba(59,124,255,.3)' : 'var(--border)') +
@@ -7347,9 +7678,10 @@ async function loadOffersWithComparison(m) {
           card.innerHTML =
             '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">' +
             '<div>' +
-            '<div style="font-size:14px;font-weight:700">' + (o.productName||'—') + '</div>' +
-            '<div class="txt-muted-12-mt2">Vendor: ' + (o.vendorName||'—') + ' · ' + dateStr + '</div>' +
+            '<div style="font-size:14px;font-weight:700">' + (o.productName||'—') + perfBadgeC + '</div>' +
+            '<div class="txt-muted-12-mt2">Vendor: ' + (o.vendorName||'—') + sentAgoTxtC + '</div>' +
             (poc ? '<div style="font-size:11px;color:var(--text-muted);margin-top:1px">PoC: ' + (poc.productName||poc.title||'—') + '</div>' : '') +
+            leftBadgeC +
             '</div>' +
             '<span style="font-size:12px;font-weight:700;padding:4px 12px;border-radius:12px;color:' + st.c + ';background:' + st.bg + '">' + st.l + '</span>' +
             '</div>' +
