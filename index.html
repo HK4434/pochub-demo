@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.58 | pochub.co -->
+<!-- PoCHub v4.59 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.58</title>
+<title>PoCHub.co — v4.59</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.58';
+const VERSION = 'v4.59';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.59':  ['MINOR: Müşteri Gelen Davetler profesyonel yenileme — 8 stat kartı, karar bekleyen banner, en çok davet eden vendor, davet içgörüleri, hızlı filtre presetleri, kart zenginleştirme (süre kalan, performans rozeti, vendor güvenilirlik)'],
   'v4.58':  ['MINOR: Müşteri PoC Taleplerim profesyonel yenileme — 8 stat kartı, yanıt bekleyenler banner, en hızlı vendor banner, PoC içgörüleri, hızlı filtre presetleri, kart zenginleştirme (bekleme süresi, performans rozeti, vendor güvenilirlik)'],
   'v4.57':  ['MINOR: Müşteri Etkinlik Kayıtlarım profesyonel yenileme — 8 stat kartı, bu hafta katılacaklarım banner, geçmiş yolculuğum banner, etkinlik içgörüleri, hızlı filtre preset\'leri, kart zenginleştirme (geri sayım, performans rozeti, format ikonu)'],
   'v4.56':  ['MINOR: Müşteri Gelen Teklifler profesyonel yenileme — 8 stat kartı (Toplam, Bekleyen Karar, Kabul, Red, Revize, Toplam Yatırım, Bekleyen Tutar, Aktif Vendor), karar bekleyen banner, en iyi fiyat banner, teklif içgörüleri, hızlı filtre presetleri, kart zenginleştirme (süre kalan, performans rozeti, geçen süre)'],
@@ -5808,8 +5809,131 @@ async function custInvites(m) {
     var stLabels = {pending:'Yanıt Bekliyor', accepted:'Kabul Edildi', declined:'Reddedildi', expired:'Süresi Doldu'};
     var pendingCount = invites.filter(function(i){ return i.status==='pending'; }).length;
 
-    var render = function(searchVal, filterStatus) {
+    // ── v4.59: İSTATİSTİK + İÇGÖRÜ HESAPLAMALARI ───────────────
+    var nowMsCi = Date.now();
+    var thisMonthStartCi = new Date();
+    thisMonthStartCi.setDate(1); thisMonthStartCi.setHours(0,0,0,0);
+    thisMonthStartCi = thisMonthStartCi.getTime();
+    var weekAgoMsCi = nowMsCi - 7*86400000;
+
+    var statsCi = {
+      total:        invites.length,
+      pending:      pendingCount,
+      accepted:     invites.filter(function(i){return i.status==='accepted';}).length,
+      declined:     invites.filter(function(i){return i.status==='declined';}).length,
+      expired:      invites.filter(function(i){return i.status==='expired';}).length,
+      thisMonth:    invites.filter(function(i){
+        if (!i.createdAt?.seconds) return false;
+        return i.createdAt.seconds*1000 >= thisMonthStartCi;
+      }).length,
+      newThisWeek:  invites.filter(function(i){
+        if (!i.createdAt?.seconds) return false;
+        return i.createdAt.seconds*1000 >= weekAgoMsCi;
+      }).length,
+    };
+
+    // Süresi 3 gün veya az kalan pending davetler
+    var expiringSoon = invites.filter(function(i){
+      if (i.status !== 'pending' || !i.expiresAt?.seconds) return false;
+      var leftDays = (i.expiresAt.seconds*1000 - nowMsCi)/86400000;
+      return leftDays >= 0 && leftDays <= 3;
+    }).length;
+
+    // Aktif (beni davet eden) vendor sayısı
+    var activeVendorsCi = [...new Set(invites.map(function(i){ return i.vendorId || i.vendorCompany || i.vendorName; }).filter(Boolean))].length;
+
+    // Kabul oranı (accepted / (accepted + declined))
+    var responseDecisions = statsCi.accepted + statsCi.declined;
+    var acceptRate = responseDecisions > 0 ? Math.round((statsCi.accepted / responseDecisions) * 100) : 0;
+
+    // Karar bekleyen davetler birleşik liste
+    var actionInvites = [];
+    invites.filter(function(i){return i.status==='pending';}).forEach(function(i){
+      // Süresi 3 gün veya az kalan
+      if (i.expiresAt?.seconds) {
+        var leftMs = i.expiresAt.seconds*1000 - nowMsCi;
+        var leftDays2 = Math.ceil(leftMs / 86400000);
+        if (leftDays2 < 0) {
+          actionInvites.push({i:i, reason:'Geçerlilik dolmuş', priority:1});
+          return;
+        } else if (leftDays2 <= 3) {
+          actionInvites.push({i:i, reason:'Süresi '+leftDays2+' gün içinde dolacak', priority:1});
+          return;
+        }
+      }
+      // 7+ gündür eski
+      if (i.createdAt?.seconds) {
+        var ageDaysCi = Math.floor((nowMsCi - i.createdAt.seconds*1000)/86400000);
+        if (ageDaysCi > 7) {
+          actionInvites.push({i:i, reason:ageDaysCi+' gündür yanıtsız', priority:2});
+        }
+      }
+    });
+    actionInvites.sort(function(a,b){ return a.priority - b.priority; });
+
+    // Vendor başına davet sayısı (en aktif vendor)
+    var vendorInviteCount = {};
+    invites.forEach(function(i){
+      var vk = i.vendorCompany || i.vendorName || i.vendorId || '—';
+      if (!vendorInviteCount[vk]) vendorInviteCount[vk] = {cnt:0, accepted:0};
+      vendorInviteCount[vk].cnt++;
+      if (i.status === 'accepted') vendorInviteCount[vk].accepted++;
+    });
+    var topVendorCi = null;
+    Object.entries(vendorInviteCount).forEach(function(e){
+      if (!topVendorCi || topVendorCi[1].cnt < e[1].cnt) topVendorCi = e;
+    });
+
+    // En çok davet aldığım PoC tipi (lokasyon)
+    var locCountCi = {online:0, customer:0, vendor:0, hybrid:0};
+    invites.forEach(function(i){
+      if (locCountCi[i.pocLocation] !== undefined) locCountCi[i.pocLocation]++;
+    });
+    var maxLocCi = Math.max(locCountCi.online, locCountCi.customer, locCountCi.vendor, locCountCi.hybrid);
+    var preferredLocCi = '—';
+    if (maxLocCi > 0) {
+      if (locCountCi.online === maxLocCi) preferredLocCi = '🌐 Online';
+      else if (locCountCi.customer === maxLocCi) preferredLocCi = '📍 Müşteri Lok.';
+      else if (locCountCi.vendor === maxLocCi) preferredLocCi = '🏢 Vendor Lok.';
+      else preferredLocCi = '🔄 Hibrit';
+    }
+
+    // Ortalama karar süresi
+    var decisionTimes = invites
+      .filter(function(i){ return (i.status==='accepted' || i.status==='declined') && i.respondedAt?.seconds && i.createdAt?.seconds; })
+      .map(function(i){ return (i.respondedAt.seconds - i.createdAt.seconds) / 86400; });
+    var avgDecisionDaysCi = decisionTimes.length > 0
+      ? Math.round(decisionTimes.reduce(function(s,d){return s+d;},0) / decisionTimes.length * 10) / 10
+      : null;
+
+    var render = function(searchVal, filterStatus, preset) {
       var filtered = invites.filter(function(inv) {
+        // Preset filtreleri
+        if (preset === 'urgent') {
+          if (inv.status !== 'pending') return false;
+          // Süresi yakın veya 7+ gün eski
+          if (inv.expiresAt?.seconds) {
+            var ld = (inv.expiresAt.seconds*1000 - nowMsCi)/86400000;
+            if (ld <= 3) return true;
+          }
+          if (inv.createdAt?.seconds) {
+            var ad = (nowMsCi - inv.createdAt.seconds*1000)/86400000;
+            if (ad > 7) return true;
+          }
+          return false;
+        }
+        if (preset === 'expiring') {
+          if (inv.status !== 'pending' || !inv.expiresAt?.seconds) return false;
+          var ld2 = (inv.expiresAt.seconds*1000 - nowMsCi)/86400000;
+          return ld2 >= 0 && ld2 <= 7;
+        }
+        if (preset === 'new') {
+          if (!inv.createdAt?.seconds) return false;
+          return inv.createdAt.seconds*1000 >= weekAgoMsCi;
+        }
+        if (preset === 'accepted_only') {
+          return inv.status === 'accepted';
+        }
         if (filterStatus && inv.status !== filterStatus) return false;
         if (searchVal) {
           var q = searchVal.toLowerCase();
@@ -5828,11 +5952,155 @@ async function custInvites(m) {
       hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
       hdr.innerHTML =
         '<div class="flx-c-g10">' +
-        '<h2 style="font-size:18px;font-weight:700">Gelen Davetler</h2>' +
+        '<h2 style="font-size:18px;font-weight:700">📨 Gelen Davetler</h2>' +
         (pendingCount > 0 ? '<span style="background:#3b7cff;color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:12px">' + pendingCount + ' yeni</span>' : '') +
         '<span class="txt-muted-12">' + invites.length + ' davet</span>' +
         '</div>';
       m.appendChild(hdr);
+
+      // ── 8 İSTATİSTİK KARTI ──
+      var statsRowCi = document.createElement('div');
+      statsRowCi.className = 'stat-grid';
+      var statCardsCi = [
+        ['Toplam Davet',   statsCi.total,    '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+        ['Bekleyen Yanıt', statsCi.pending,  statsCi.pending>0?'#f0a429':'#5a6278', statsCi.pending>0?'rgba(240,164,41,.08)':'rgba(90,98,120,.06)', statsCi.pending>0?'rgba(240,164,41,.2)':'rgba(90,98,120,.18)'],
+        ['Kabul Ettiğim',  statsCi.accepted, '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ['Reddettiğim',    statsCi.declined, '#ff7070', 'rgba(255,112,112,.08)','rgba(255,112,112,.2)'],
+        ['Bu Ay Yeni',     statsCi.thisMonth,'#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+        ['Süresi Yakın',   expiringSoon,     expiringSoon>0?'#ff7070':'#5a6278', expiringSoon>0?'rgba(255,112,112,.08)':'rgba(90,98,120,.06)', expiringSoon>0?'rgba(255,112,112,.2)':'rgba(90,98,120,.18)'],
+        ['Aktif Vendor',   activeVendorsCi,  '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+        ['Kabul Oranım',   responseDecisions>0 ? acceptRate+'%' : '—', '#22d078', 'rgba(34,208,120,.08)','rgba(34,208,120,.2)'],
+      ];
+      statCardsCi.forEach(function(s){
+        var card = document.createElement('div');
+        card.className = 'stat-card';
+        card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4];
+        card.innerHTML = '<div style="font-size:'+(typeof s[1]==='string' && s[1].length>5 ? '14px':'18px')+';font-weight:800;color:'+s[2]+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s[1]+'</div>'
+                       + '<div class="stat-card-lbl">'+s[0]+'</div>';
+        statsRowCi.appendChild(card);
+      });
+      m.appendChild(statsRowCi);
+
+      // ── 🚨 KARAR BEKLEYEN DAVETLER BANNER ──
+      if (actionInvites.length > 0) {
+        var actBanCi = document.createElement('div');
+        actBanCi.style.cssText = 'background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+        actBanCi.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+          + '<div style="flex:1;min-width:200px">'
+          + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">🚨 Karar Bekleyen Davetler</div>'
+          + '<div class="txt-muted-12">'+actionInvites.length+' davet için kararın gerekli — süresi yakın veya uzun süredir yanıtsız davetler var.</div>'
+          + '</div>'
+          + '<button id="ci-act-toggle" class="btn-danger">Listeyi Gör</button>'
+          + '</div>';
+        m.appendChild(actBanCi);
+
+        actBanCi.querySelector('#ci-act-toggle').addEventListener('click', function(){
+          var det = document.getElementById('ci-act-list');
+          if (det) { det.remove(); return; }
+          var listDiv = document.createElement('div');
+          listDiv.id = 'ci-act-list';
+          listDiv.style.cssText = 'background:rgba(255,112,112,.04);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+          listDiv.innerHTML = actionInvites.slice(0,5).map(function(a){
+            return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(255,112,112,.1);font-size:12px">'
+              + '<div><strong>'+(a.i.productName||'—')+'</strong> <span class="txt-muted-12">· '+(a.i.vendorCompany||a.i.vendorName||'—')+'</span></div>'
+              + '<div class="txt-muted-12">'+a.reason+'</div>'
+              + '</div>';
+          }).join('') + (actionInvites.length > 5
+            ? '<div class="txt-empty">…ve '+(actionInvites.length-5)+' diğer davet</div>'
+            : '');
+          actBanCi.parentNode.insertBefore(listDiv, actBanCi.nextSibling);
+        });
+      }
+
+      // ── 🏆 EN ÇOK DAVET EDEN VENDOR BANNER ──
+      if (topVendorCi && topVendorCi[1].cnt >= 2) {
+        var topName = topVendorCi[0];
+        var topCnt = topVendorCi[1].cnt;
+        var topAcc = topVendorCi[1].accepted;
+        var vendorBanCi = document.createElement('div');
+        vendorBanCi.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+        vendorBanCi.innerHTML = '<div style="flex:1;min-width:200px">'
+          + '<div class="lbl-success-700">🏆 EN ÇOK DAVET ALAN VENDOR\'IN</div>'
+          + '<div style="font-size:13.5px;font-weight:700">'+topName+'</div>'
+          + '<div class="txt-muted-12-mt3">Sana '+topCnt+' davet gönderdi · '+topAcc+' tanesini kabul ettin</div>'
+          + '</div>'
+          + '<div style="text-align:right">'
+          + '<div style="font-size:20px;font-weight:800;color:#22d078">'+topCnt+'</div>'
+          + '<div style="font-size:10.5px;color:var(--text-muted)">davet</div>'
+          + '</div>';
+        m.appendChild(vendorBanCi);
+      }
+
+      // ── 💡 DAVET İÇGÖRÜLERİM ──
+      if (invites.length >= 2) {
+        var insCi = document.createElement('div');
+        insCi.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
+        var insHtmlCi = '<div class="lbl-purp-700">💡 Davet İçgörülerim</div>'
+          + '<div class="g2">';
+        // Sol — Davranışım
+        insHtmlCi += '<div>'
+          + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 Davranışım</div>'
+          + '<div class="flx-bw-c row-bb">'
+          +   '<span>Kabul oranım</span>'
+          +   '<span style="font-weight:700;color:#22d078">'+(responseDecisions>0?'%'+acceptRate:'—')+'</span>'
+          + '</div>';
+        if (avgDecisionDaysCi !== null) {
+          insHtmlCi += '<div class="flx-bw-c row-bb">'
+            + '<span>Ort. karar süremm</span>'
+            + '<span style="font-weight:700;color:#7db4ff">'+avgDecisionDaysCi+' gün</span>'
+            + '</div>';
+        }
+        insHtmlCi += '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+          + '<span>Bu hafta yeni</span>'
+          + '<span style="font-weight:700;color:#f0a429">'+statsCi.newThisWeek+'</span>'
+          + '</div>'
+          + '</div>';
+        // Sağ — Vendor Görüşü
+        insHtmlCi += '<div>'
+          + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🎯 Vendor Görüşü</div>';
+        if (topVendorCi) {
+          insHtmlCi += '<div class="flx-bw-c row-bb">'
+            + '<span>En çok davet alan</span>'
+            + '<span style="font-weight:700;color:#c4a8ff">'+topVendorCi[0]+' <span class="txt-muted-12">('+topVendorCi[1].cnt+')</span></span>'
+            + '</div>';
+        }
+        insHtmlCi += '<div class="flx-bw-c row-bb">'
+          + '<span>En çok davet PoC tipi</span>'
+          + '<span style="font-weight:700;color:#7db4ff">'+preferredLocCi+'</span>'
+          + '</div>'
+          + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+          + '<span>Aktif vendor sayısı</span>'
+          + '<span style="font-weight:700;color:#c4a8ff">'+activeVendorsCi+'</span>'
+          + '</div>'
+          + '</div>';
+        insHtmlCi += '</div>';
+        insCi.innerHTML = insHtmlCi;
+        m.appendChild(insCi);
+      }
+
+      // ── 🚀 PRESET FİLTRELER ──
+      var presetRowCi = document.createElement('div');
+      presetRowCi.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap';
+      var presetsCi = [
+        ['', 'Tümü', 0, 'rgba(255,255,255,.06)', 'var(--text-secondary)', 'rgba(255,255,255,.12)'],
+        ['urgent', '🚨 Karar Bekleyen', actionInvites.length, 'rgba(255,112,112,.08)', '#ff7070', 'rgba(255,112,112,.25)'],
+        ['expiring', '⏰ Süresi Yakın', invites.filter(function(i){
+            if (i.status !== 'pending' || !i.expiresAt?.seconds) return false;
+            var ld = (i.expiresAt.seconds*1000 - nowMsCi)/86400000;
+            return ld >= 0 && ld <= 7;
+          }).length, 'rgba(240,164,41,.08)', '#f0a429', 'rgba(240,164,41,.25)'],
+        ['new', '🆕 Yeni Gelen', statsCi.newThisWeek, 'rgba(125,180,255,.08)', '#7db4ff', 'rgba(125,180,255,.25)'],
+        ['accepted_only', '✅ Kabul Ettiklerim', statsCi.accepted, 'rgba(34,208,120,.08)', '#22d078', 'rgba(34,208,120,.25)'],
+      ];
+      presetsCi.forEach(function(pr){
+        var b = document.createElement('button');
+        var isOn = (preset||'') === pr[0];
+        b.style.cssText = 'padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid '+pr[5]+';background:'+(isOn?pr[4]:pr[3])+';color:'+(isOn?'#fff':pr[4]);
+        b.innerHTML = pr[1] + (pr[2] > 0 ? ' <span style="opacity:.7">('+pr[2]+')</span>' : '');
+        b.addEventListener('click', function(){ render(searchVal, '', pr[0]); });
+        presetRowCi.appendChild(b);
+      });
+      m.appendChild(presetRowCi);
 
       // Arama + Filtreler
       var filterBar = document.createElement('div');
@@ -5847,7 +6115,7 @@ async function custInvites(m) {
 
       if (!filtered.length) {
         m.innerHTML += '<div class="empty"><div class="empty-icon">📨</div>' +
-          (searchVal||filterStatus ? 'Arama sonucu bulunamadı.' : 'Henüz davet almadınız.') + '</div>';
+          (searchVal||filterStatus||preset ? 'Arama sonucu bulunamadı.' : 'Henüz davet almadınız.') + '</div>';
       } else {
         var listEl = document.createElement('div');
         listEl.style.cssText = 'display:flex;flex-direction:column;gap:12px';
@@ -5859,6 +6127,55 @@ async function custInvites(m) {
           var dateStr = inv.createdAt?.toDate ? inv.createdAt.toDate().toLocaleDateString('tr-TR') : '—';
           var locLabels = {online:'🌐 Online',customer:'📍 Müşteri Lok.',vendor:'🏢 Vendor Lok.',hybrid:'🔄 Hibrit'};
 
+          // ── v4.59: Süre kalan + performans rozeti + geçen süre ──
+          var perfBadgeCi = '';
+          var leftBadgeCi = '';
+          var sentAgoCi = '';
+
+          // Pending'de süre kontrolü
+          if (isPending) {
+            if (inv.createdAt?.seconds) {
+              var ageHrCi = (nowMsCi - inv.createdAt.seconds*1000)/3600000;
+              if (ageHrCi < 24) {
+                perfBadgeCi = ' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(34,208,120,.15);color:#22d078">🆕 Yeni</span>';
+              } else if (ageHrCi > 168) {
+                perfBadgeCi = ' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,.05);color:var(--text-muted)" title="7+ gündür yanıt vermedin">💤 Eski</span>';
+              }
+            }
+            if (inv.expiresAt?.seconds) {
+              var leftMsCi = inv.expiresAt.seconds*1000 - nowMsCi;
+              var leftDaysCi = Math.ceil(leftMsCi / 86400000);
+              if (leftDaysCi < 0) {
+                leftBadgeCi = '<div style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,112,112,.15);color:#ff7070;margin-top:4px">⏰ Süresi dolmuş</div>';
+              } else if (leftDaysCi <= 3) {
+                leftBadgeCi = '<div style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(240,164,41,.15);color:#f0a429;margin-top:4px">⏰ '+leftDaysCi+' gün kaldı</div>';
+                if (!perfBadgeCi.includes('Eski')) {
+                  perfBadgeCi = ' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(240,164,41,.15);color:#f0a429">🔥 Süresi Yakın</span>';
+                }
+              } else if (leftDaysCi <= 7) {
+                leftBadgeCi = '<div style="display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(125,180,255,.1);color:#7db4ff;margin-top:4px">⏰ '+leftDaysCi+' gün kaldı</div>';
+              }
+            }
+          }
+
+          // Geçen süre etiketi
+          if (inv.createdAt?.seconds) {
+            var diffMinCi = Math.floor((nowMsCi - inv.createdAt.seconds*1000)/60000);
+            var ago5;
+            if (diffMinCi < 60) ago5 = diffMinCi + ' dakika önce';
+            else if (diffMinCi < 1440) ago5 = Math.floor(diffMinCi/60) + ' saat önce';
+            else if (diffMinCi < 43200) ago5 = Math.floor(diffMinCi/1440) + ' gün önce';
+            else ago5 = Math.floor(diffMinCi/43200) + ' ay önce';
+            sentAgoCi = ' · 📅 '+ago5;
+          }
+
+          // Vendor güvenilirlik bilgisi (vendor'ın bana gönderdiği toplam ve kabul ettiklerim)
+          var vendorTrustCi = '';
+          var vKey = inv.vendorCompany || inv.vendorName || inv.vendorId;
+          if (vKey && vendorInviteCount[vKey] && vendorInviteCount[vKey].cnt > 1) {
+            vendorTrustCi = '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;font-style:italic">💡 Bu vendor sana '+vendorInviteCount[vKey].cnt+' davet gönderdi, '+vendorInviteCount[vKey].accepted+' tanesini kabul ettin</div>';
+          }
+
           var card = document.createElement('div');
           card.style.cssText = 'background:#0f1623;border:1px solid ' +
             (isPending ? 'rgba(59,124,255,.35)' : 'rgba(59,124,255,.2)') +
@@ -5867,8 +6184,10 @@ async function custInvites(m) {
           card.innerHTML =
             '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">' +
             '<div>' +
-            '<div style="font-size:14px;font-weight:700">' + (inv.vendorCompany||inv.vendorName||'—') + '</div>' +
-            '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">' + (inv.vendorType||'') + ' · ' + dateStr + '</div>' +
+            '<div style="font-size:14px;font-weight:700">' + (inv.vendorCompany||inv.vendorName||'—') + perfBadgeCi + '</div>' +
+            '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">' + (inv.vendorType||'') + sentAgoCi + '</div>' +
+            leftBadgeCi +
+            vendorTrustCi +
             '</div>' +
             '<span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;color:' + stColor + ';background:' + stColor + '18">' + stLabel + '</span>' +
             '</div>' +
@@ -5908,9 +6227,9 @@ async function custInvites(m) {
       }
 
       // Eventler
-      m.querySelector('#ci-search')?.addEventListener('input', function() { render(this.value, filterStatus); });
+      m.querySelector('#ci-search')?.addEventListener('input', function() { render(this.value, filterStatus, ''); });
       m.querySelectorAll('.ci-filter').forEach(function(btn) {
-        btn.addEventListener('click', function() { render(searchVal, btn.dataset.val); });
+        btn.addEventListener('click', function() { render(searchVal, btn.dataset.val, ''); });
       });
 
       // Kabul
@@ -6029,7 +6348,7 @@ async function custInvites(m) {
       });
     };
 
-    render('', '');
+    render('', '', '');
   } catch(e) {
     m.innerHTML = '<div class="alert alert-err">Davetler yüklenemedi: ' + e.message + '</div>';
   }
