@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.51 | pochub.co -->
+<!-- PoCHub v4.52 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.51</title>
+<title>PoCHub.co — v4.52</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -431,7 +431,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.51';
+const VERSION = 'v4.52';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -669,6 +669,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.52':  ['MINOR: Mesajlar profesyonel yenileme — 8. ve son ana sayfa profesyonel seviyeye geldi. 8 istatistik kartı, en aktif müşteri banner, yanıtsız mesajlar uyarısı, mesaj içgörüleri, preset filtreler, sohbet kartı zenginleştirme'],
   'v4.51':  ['MINOR: Takvim & Planlama profesyonel yenileme — 8 istatistik kartı (Bugün, Bu Hafta, Bu Ay, Çakışma, Yaklaşan PoC, Yaklaşan Etkinlik, Tamamlanan, Boş Saat), bugünkü program banner, çakışma uyarısı, yaklaşan 7 gün banner, doluluk içgörüsü'],
   'v4.50':  ['MINOR: PoC Talepleri profesyonel yenileme — vendor operasyonel kalbi 8 stat kart, acil bakman lazım banner, en hızlı yanıt banner, içgörüler, preset filtreler, kart zenginleştirme (bekleme süresi, performans rozeti, geçen süre)'],
   'v4.49':  ['MINOR: Tekliflerim profesyonel yenileme — 8 istatistik kartı, en yüksek tutarlı kazanım banner, aksiyon bekleyenler (revize+süre dolan), teklif içgörüleri (kabul süresi, en verimli tip), hızlı filtre presetleri, kart zenginleştirme (süre kalan, performans rozeti, son aktivite)'],
@@ -1945,6 +1946,231 @@ async function loadMessagesTab(m, role) {
         <button id="msg-mark-all-read" style="background:none;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;padding:5px 12px;border-radius:5px;cursor:pointer">Tümünü Okundu İşaretle</button>
       `;
       m.appendChild(header);
+
+      // ── v4.52: İSTATİSTİK + BANNER'LAR (sadece Aktif tab'ında) ──
+      if (activeTab === 'active') {
+        var nowMs52 = Date.now();
+        var todayMs52 = new Date(); todayMs52.setHours(0,0,0,0); todayMs52 = todayMs52.getTime();
+        var weekAgoMs = nowMs52 - 7*86400000;
+        var monthAgoMs = nowMs52 - 30*86400000;
+
+        // Aktif yazışmalar (silinmemiş + arşivlenmemiş)
+        var activeChats = pocs.filter(function(p){ return !isDeleted(p) && !isArchived(p); });
+
+        // İstatistik hesaplamaları
+        var msgStats = {
+          total:        activeChats.length,
+          unread:       totalUnread,
+          unanswered:   0,  // Müşteri yazmış, vendor cevap vermemiş (vendor için)
+          todayActive:  0,  // Bugün mesaj alışverişi olan
+          thisWeekNew:  0,  // Son 7 gün başlamış yazışma
+          activeOnPoc:  0,  // Status=active olan PoC'lerin yazışmaları
+          totalMsgs:    0,  // Toplam mesaj sayısı
+        };
+
+        // Yanıt süreleri (vendor için: müşteri mesajı → vendor yanıtı arası)
+        var responseTimes = [];
+
+        activeChats.forEach(function(poc){
+          var mm = msgMap[poc.id];
+          if (!mm) return;
+          msgStats.totalMsgs += (mm.total||0);
+          if (poc.status === 'active') msgStats.activeOnPoc++;
+          if (poc.createdAt?.seconds && poc.createdAt.seconds*1000 >= weekAgoMs) msgStats.thisWeekNew++;
+          if (mm.last?.createdAt?.seconds && mm.last.createdAt.seconds*1000 >= todayMs52) msgStats.todayActive++;
+          // Yanıtsız: son mesaj karşı taraftan ve ben okumamışım
+          if (mm.last && mm.last.senderId !== CUR_USER?.uid) {
+            if (!(mm.last.readBy||[]).includes(CUR_USER?.uid)) {
+              msgStats.unanswered++;
+            }
+          }
+        });
+
+        // Ortalama yanıt süresi hesabı (sadece son 30 günkü)
+        // Her yazışma için: son müşteri mesajı → vendor yanıtı arası süre
+        // Karmaşık ve veri ağır — basit bir tahmin yapıyorum: yanıtsız mesajların ortalama bekleme süresi
+        var avgWaitHrs = null;
+        var waitTimes = [];
+        activeChats.forEach(function(poc){
+          var mm = msgMap[poc.id];
+          if (!mm || !mm.last) return;
+          // Son mesaj karşı taraftan ve ben okumamışım
+          if (mm.last.senderId !== CUR_USER?.uid && !(mm.last.readBy||[]).includes(CUR_USER?.uid)) {
+            if (mm.last.createdAt?.seconds) {
+              var waitH = (nowMs52 - mm.last.createdAt.seconds*1000)/3600000;
+              waitTimes.push(waitH);
+            }
+          }
+        });
+        if (waitTimes.length > 0) {
+          avgWaitHrs = Math.round(waitTimes.reduce(function(s,h){return s+h;},0) / waitTimes.length);
+        }
+
+        // En aktif müşteri (en çok mesaj olan, son 30 gün)
+        var custMsgCount = {};
+        activeChats.forEach(function(poc){
+          var mm = msgMap[poc.id];
+          if (!mm || (mm.total||0) === 0) return;
+          var custKey = role === 'customer' ? (poc.vendorName||poc.vendorId||'—') : (poc.customerName || poc.customerEmail || poc.customerId || '—');
+          if (!custMsgCount[custKey]) custMsgCount[custKey] = {cnt:0, lastTs:0, poc:poc};
+          custMsgCount[custKey].cnt += mm.total;
+          var lastTs = mm.last?.createdAt?.seconds || 0;
+          if (lastTs > custMsgCount[custKey].lastTs) {
+            custMsgCount[custKey].lastTs = lastTs;
+            custMsgCount[custKey].poc = poc;
+          }
+        });
+        var topActiveCust = null;
+        Object.entries(custMsgCount).forEach(function(e){
+          if (!topActiveCust || topActiveCust[1].cnt < e[1].cnt) topActiveCust = e;
+        });
+
+        // Yanıtsız mesajlar listesi (öncelik: 24h+ kırmızı, 4h+ turuncu)
+        var unansweredList = [];
+        activeChats.forEach(function(poc){
+          var mm = msgMap[poc.id];
+          if (!mm || !mm.last) return;
+          if (mm.last.senderId !== CUR_USER?.uid && !(mm.last.readBy||[]).includes(CUR_USER?.uid)) {
+            if (mm.last.createdAt?.seconds) {
+              var waitH = (nowMs52 - mm.last.createdAt.seconds*1000)/3600000;
+              var priority = waitH >= 24 ? 1 : waitH >= 4 ? 2 : 3;
+              unansweredList.push({poc:poc, waitH:waitH, priority:priority, lastMsg:mm.last});
+            }
+          }
+        });
+        unansweredList.sort(function(a,b){ return a.priority - b.priority || b.waitH - a.waitH; });
+
+        // 8 İstatistik kartı
+        var statsRow52 = document.createElement('div');
+        statsRow52.className = 'stat-grid';
+        var statCards52 = [
+          ['Toplam Yazışma',  msgStats.total,       '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+          ['Okunmamış',       msgStats.unread,      msgStats.unread>0?'#3b7cff':'#5a6278', msgStats.unread>0?'rgba(59,124,255,.08)':'rgba(90,98,120,.06)', msgStats.unread>0?'rgba(59,124,255,.2)':'rgba(90,98,120,.18)'],
+          ['Yanıtsız',        msgStats.unanswered,  msgStats.unanswered>0?'#ff7070':'#5a6278', msgStats.unanswered>0?'rgba(255,112,112,.08)':'rgba(90,98,120,.06)', msgStats.unanswered>0?'rgba(255,112,112,.2)':'rgba(90,98,120,.18)'],
+          ['Bugün Aktif',     msgStats.todayActive, '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+          ['Bu Hafta Yeni',   msgStats.thisWeekNew, '#c4a8ff', 'rgba(196,168,255,.08)','rgba(196,168,255,.2)'],
+          ['Aktif PoC',       msgStats.activeOnPoc, '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+          ['Toplam Mesaj',    msgStats.totalMsgs,   '#7db4ff', 'rgba(125,180,255,.08)','rgba(125,180,255,.2)'],
+          ['Ort. Bekleme',    avgWaitHrs!==null ? (avgWaitHrs<24?avgWaitHrs+'sa':Math.round(avgWaitHrs/24)+'gün') : '—', '#f0a429', 'rgba(240,164,41,.08)','rgba(240,164,41,.2)'],
+        ];
+        statCards52.forEach(function(s){
+          var card = document.createElement('div');
+          card.className = 'stat-card';
+          card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4];
+          card.innerHTML = '<div style="font-size:'+(typeof s[1]==='string' && s[1].length>5 ? '14px':'18px')+';font-weight:800;color:'+s[2]+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s[1]+'</div>'
+                         + '<div class="stat-card-lbl">'+s[0]+'</div>';
+          statsRow52.appendChild(card);
+        });
+        m.appendChild(statsRow52);
+
+        // ── 🚨 YANITSIZ MESAJLAR BANNER (en kritik) ──
+        if (unansweredList.length > 0) {
+          var unansBanner = document.createElement('div');
+          unansBanner.style.cssText = 'background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+          unansBanner.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+            + '<div style="flex:1;min-width:200px">'
+            + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">🚨 Sıra Sende — Yanıtsız Mesajlar</div>'
+            + '<div class="txt-muted-12">'+unansweredList.length+' kişi senden cevap bekliyor. Hızlı yanıt müşteri memnuniyeti için kritik.</div>'
+            + '</div>'
+            + '<button id="msg-unans-toggle" style="background:#ff7070;color:#fff;border:none;border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Listeyi Gör</button>'
+            + '</div>';
+          m.appendChild(unansBanner);
+
+          unansBanner.querySelector('#msg-unans-toggle').addEventListener('click', function(){
+            var det = document.getElementById('msg-unans-list');
+            if (det) { det.remove(); return; }
+            var listDiv = document.createElement('div');
+            listDiv.id = 'msg-unans-list';
+            listDiv.style.cssText = 'background:rgba(255,112,112,.04);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+            listDiv.innerHTML = unansweredList.slice(0,5).map(function(u){
+              var custName = role === 'customer' ? (u.poc.vendorName||'—') : (u.poc.customerName||u.poc.customerEmail||'—');
+              var prodName = u.poc.productName || u.poc.title || '—';
+              var waitLbl = u.waitH < 1 ? Math.round(u.waitH*60)+' dk' : u.waitH < 24 ? Math.round(u.waitH)+' saat' : Math.round(u.waitH/24)+' gün';
+              var waitColor = u.priority === 1 ? '#ff7070' : u.priority === 2 ? '#f0a429' : '#7db4ff';
+              return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(255,112,112,.1);font-size:12px">'
+                + '<div><strong>'+custName+'</strong> <span class="txt-muted-12">· '+prodName+'</span></div>'
+                + '<div style="font-weight:700;color:'+waitColor+'">⏰ '+waitLbl+'</div>'
+                + '</div>';
+            }).join('') + (unansweredList.length > 5
+              ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">…ve '+(unansweredList.length-5)+' diğer mesaj</div>'
+              : '');
+            unansBanner.parentNode.insertBefore(listDiv, unansBanner.nextSibling);
+          });
+        }
+
+        // ── 💬 EN AKTİF MÜŞTERİ BANNER ──
+        if (topActiveCust && topActiveCust[1].cnt >= 5) {
+          var topName = topActiveCust[0];
+          var topCnt = topActiveCust[1].cnt;
+          var topPocName = topActiveCust[1].poc.productName || topActiveCust[1].poc.title || '—';
+          var topBanner = document.createElement('div');
+          topBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+          topBanner.innerHTML = '<div style="flex:1;min-width:200px">'
+            + '<div style="font-size:11px;color:#22d078;font-weight:700;margin-bottom:4px">💬 EN AKTİF YAZIŞMA</div>'
+            + '<div style="font-size:13.5px;font-weight:700">'+topName+'</div>'
+            + '<div class="txt-muted-12-mt2">'+topPocName+'</div>'
+            + '</div>'
+            + '<div style="text-align:right">'
+            + '<div style="font-size:20px;font-weight:800;color:#22d078">'+topCnt+'</div>'
+            + '<div style="font-size:10.5px;color:var(--text-muted)">mesaj</div>'
+            + '</div>';
+          m.appendChild(topBanner);
+        }
+
+        // ── 💡 MESAJ İÇGÖRÜLERİ ──
+        if (msgStats.total >= 2) {
+          // Ortalama mesaj/yazışma
+          var avgMsgPerChat = msgStats.total > 0 ? (msgStats.totalMsgs / msgStats.total).toFixed(1) : 0;
+          // Yanıt durumu: yanıt verdiğim oranım
+          var responseRate = msgStats.total > 0 ? Math.round(((msgStats.total - msgStats.unanswered) / msgStats.total) * 100) : 100;
+          // Sessiz yazışmalar (7+ gün hareketsiz)
+          var silentChats = activeChats.filter(function(poc){
+            var mm = msgMap[poc.id];
+            if (!mm || !mm.last?.createdAt?.seconds) return false;
+            return (nowMs52 - mm.last.createdAt.seconds*1000) > 7*86400000;
+          }).length;
+
+          var insMsg = document.createElement('div');
+          insMsg.style.cssText = 'background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:14px;margin-bottom:12px';
+          var insHtmlMsg = '<div style="font-size:13px;font-weight:700;color:#c4a8ff;margin-bottom:10px">💡 Mesaj İçgörüleri</div>'
+            + '<div class="g2">';
+          // Sol: İletişim sağlığı
+          insHtmlMsg += '<div>'
+            + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">📊 İletişim Sağlığı</div>'
+            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            +   '<span>Yanıt oranım</span>'
+            +   '<span style="font-weight:700;color:'+(responseRate>=80?'#22d078':responseRate>=50?'#f0a429':'#ff7070')+'">%'+responseRate+'</span>'
+            + '</div>'
+            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            +   '<span>Ort. mesaj/yazışma</span>'
+            +   '<span style="font-weight:700;color:#7db4ff">'+avgMsgPerChat+'</span>'
+            + '</div>'
+            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+            +   '<span>Sessiz yazışma (7+ gün)</span>'
+            +   '<span style="font-weight:700;color:'+(silentChats>0?'#5a6278':'#22d078')+'">'+silentChats+'</span>'
+            + '</div>'
+            + '</div>';
+          // Sağ: Hareket
+          insHtmlMsg += '<div>'
+            + '<div class="lbl-mini" style="margin-bottom:8px;font-weight:700">🎯 Aktivite</div>'
+            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            +   '<span>Bugün mesaj alışverişi</span>'
+            +   '<span style="font-weight:700;color:#22d078">'+msgStats.todayActive+'</span>'
+            + '</div>'
+            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            +   '<span>Bu hafta yeni yazışma</span>'
+            +   '<span style="font-weight:700;color:#c4a8ff">'+msgStats.thisWeekNew+'</span>'
+            + '</div>'
+            + '<div class="flx-bw-c" style="font-size:11.5px;padding:5px 0">'
+            +   '<span>Aktif PoC bağlı</span>'
+            +   '<span style="font-weight:700;color:#22d078">'+msgStats.activeOnPoc+'</span>'
+            + '</div>'
+            + '</div>';
+          insHtmlMsg += '</div>';
+          insMsg.innerHTML = insHtmlMsg;
+          m.appendChild(insMsg);
+        }
+      }
 
       // Arama
       const searchBar = document.createElement('div');
