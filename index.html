@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.59 | pochub.co -->
+<!-- PoCHub v4.60 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.59</title>
+<title>PoCHub.co — v4.60</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.59';
+const VERSION = 'v4.60';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.60':  ['MAJOR: Müşteri Dashboard tam yenileme — vendor dashboard\'una simetrik tutarlılık. 8 stat kartı (trend ok\'larıyla), zaman bazlı karşılama, acil aksiyonlar banner, en güvenilir vendor banner, bu hafta yaklaşan banner. Önceki içerikler korundu.'],
   'v4.59':  ['MINOR: Müşteri Gelen Davetler profesyonel yenileme — 8 stat kartı, karar bekleyen banner, en çok davet eden vendor, davet içgörüleri, hızlı filtre presetleri, kart zenginleştirme (süre kalan, performans rozeti, vendor güvenilirlik)'],
   'v4.58':  ['MINOR: Müşteri PoC Taleplerim profesyonel yenileme — 8 stat kartı, yanıt bekleyenler banner, en hızlı vendor banner, PoC içgörüleri, hızlı filtre presetleri, kart zenginleştirme (bekleme süresi, performans rozeti, vendor güvenilirlik)'],
   'v4.57':  ['MINOR: Müşteri Etkinlik Kayıtlarım profesyonel yenileme — 8 stat kartı, bu hafta katılacaklarım banner, geçmiş yolculuğum banner, etkinlik içgörüleri, hızlı filtre preset\'leri, kart zenginleştirme (geri sayım, performans rozeti, format ikonu)'],
@@ -7486,7 +7487,7 @@ async function loadCustTab() {
       getDocs(query(collection(db,'poc_requests'),  where('customerId','==',CUR_USER.uid))),
       getDocs(query(collection(db,'offers'),         where('customerId','==',CUR_USER.uid))),
       getDocs(query(collection(db,'offers'),         where('customerEmail','==',CUR_USER.email))),
-      getDocs(query(collection(db,'poc_invites'),    where('customerEmail','==',CUR_USER.email), where('status','==','pending'))),
+      getDocs(query(collection(db,'poc_invites'),    where('customerEmail','==',CUR_USER.email))),
       getDocs(query(collection(db,'registrations'),  where('userId','==',CUR_USER.uid))),
     ]);
 
@@ -7497,17 +7498,135 @@ async function loadCustTab() {
 
     var pocs = pocSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var regsD = regSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    var allInvites = invSnap.docs.map(function(d){ return {...d.data(),id:d.id}; })
+      .filter(function(inv){ return getLifecycleState(inv) === 'active' && inv.status !== 'cancelled'; });
     var now = new Date();
+    var nowMsD = now.getTime();
+
+    // ── v4.60: Tarih sınırları (trend için) ────────────────────
+    var thisMonthStartD = new Date(now.getFullYear(), now.getMonth(), 1);
+    var lastMonthStartD = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    var lastMonthEndD = new Date(now.getFullYear(), now.getMonth(), 1);
+    var weekFwdEnd = new Date(nowMsD + 7*86400000);
+
+    function inMonthD(ts, start, end) {
+      if (!ts?.seconds) return false;
+      var t = ts.seconds * 1000;
+      return t >= start.getTime() && t < end.getTime();
+    }
+    function trendArrowD(now, prev) {
+      if (prev === 0 && now === 0) return '';
+      if (prev === 0) return ' <span style="color:#22d078;font-size:10px;font-weight:700">↑Yeni</span>';
+      var pct = Math.round(((now - prev) / prev) * 100);
+      if (pct > 0)  return ' <span style="color:#22d078;font-size:10px;font-weight:700">↑%'+pct+'</span>';
+      if (pct < 0)  return ' <span style="color:#ff7070;font-size:10px;font-weight:700">↓%'+Math.abs(pct)+'</span>';
+      return ' <span style="color:var(--text-muted);font-size:10px">=0%</span>';
+    }
 
     var activePocs     = pocs.filter(function(p){ return p.status==='active'; }).length;
     var pendingPocs    = pocs.filter(function(p){ return p.status==='pending'; }).length;
+    var completedPocs  = pocs.filter(function(p){ return p.status==='completed'; }).length;
     var pendingOffers  = allOffs.filter(function(o){ return o.status==='pending'; }).length;
     var revisionOffers = allOffs.filter(function(o){ return o.status==='revision_requested'; }).length;
-    var pendingInvites = invSnap.docs.filter(function(d){
-      var inv = d.data();
-      return getLifecycleState(inv) === 'active' && inv.status !== 'cancelled';
-    }).length;
-    var upcomingRegs   = regsD.filter(function(r){ return r.eventDate && new Date(r.eventDate) >= now; }).length;
+    var acceptedOffers = allOffs.filter(function(o){ return o.status==='accepted'; });
+    var pendingInvites = allInvites.filter(function(inv){ return inv.status === 'pending'; }).length;
+    var upcomingRegs   = regsD.filter(function(r){ return r.eventDate && new Date(r.eventDate) >= now && r.status !== 'cancelled'; }).length;
+
+    // ── v4.60: Yeni metrikler ──
+    var totalSpentD = acceptedOffers.reduce(function(s,o){ return s + (o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0); }, 0);
+    var pendingValueD = allOffs.filter(function(o){ return o.status==='pending' || o.status==='revision_requested'; })
+      .reduce(function(s,o){ return s + (o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0); }, 0);
+    var activeVendorsD = [...new Set([
+      ...pocs.map(function(p){return p.vendorId || p.vendorName;}),
+      ...allOffs.map(function(o){return o.vendorId || o.vendorName;}),
+      ...allInvites.map(function(i){return i.vendorId || i.vendorCompany;}),
+    ].filter(Boolean))].length;
+
+    // Trend hesaplamaları
+    var thisMonthPocs = pocs.filter(function(p){ return inMonthD(p.createdAt, thisMonthStartD, new Date()); }).length;
+    var lastMonthPocs = pocs.filter(function(p){ return inMonthD(p.createdAt, lastMonthStartD, lastMonthEndD); }).length;
+    var thisMonthOffs = allOffs.filter(function(o){ return inMonthD(o.createdAt, thisMonthStartD, new Date()); }).length;
+    var lastMonthOffs = allOffs.filter(function(o){ return inMonthD(o.createdAt, lastMonthStartD, lastMonthEndD); }).length;
+    var thisMonthSpent = acceptedOffers.filter(function(o){ return inMonthD(o.respondedAt||o.createdAt, thisMonthStartD, new Date()); })
+      .reduce(function(s,o){ return s + (o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0); }, 0);
+    var lastMonthSpent = acceptedOffers.filter(function(o){ return inMonthD(o.respondedAt||o.createdAt, lastMonthStartD, lastMonthEndD); })
+      .reduce(function(s,o){ return s + (o.grossAmount || o.totalAmount || (o.unitPrice||0)*(o.quantity||1) || 0); }, 0);
+    var thisMonthCompleted = pocs.filter(function(p){ return p.status==='completed' && inMonthD(p.completedAt||p.createdAt, thisMonthStartD, new Date()); }).length;
+    var lastMonthCompleted = pocs.filter(function(p){ return p.status==='completed' && inMonthD(p.completedAt||p.createdAt, lastMonthStartD, lastMonthEndD); }).length;
+
+    // ── v4.60: Acil Aksiyonlar (4 kategori birleşik) ──
+    var actionListD = [];
+    allInvites.filter(function(inv){ return inv.status === 'pending'; }).forEach(function(inv){
+      if (inv.expiresAt?.seconds) {
+        var leftDays = (inv.expiresAt.seconds*1000 - nowMsD) / 86400000;
+        if (leftDays >= 0 && leftDays <= 3) {
+          actionListD.push({type:'invite-expiring', priority:1, item:inv, label:'📨 Davet süresi yakın', target:'invites'});
+        } else if (leftDays < 0) {
+          actionListD.push({type:'invite-expired', priority:1, item:inv, label:'📨 Davet süresi doldu', target:'invites'});
+        }
+      }
+    });
+    allOffs.filter(function(o){ return o.status === 'pending'; }).forEach(function(o){
+      if (o.validUntil?.seconds) {
+        var leftDays2 = (o.validUntil.seconds*1000 - nowMsD) / 86400000;
+        if (leftDays2 >= 0 && leftDays2 <= 3) {
+          actionListD.push({type:'offer-expiring', priority:2, item:o, label:'💰 Teklif süresi yakın', target:'offers'});
+        }
+      }
+    });
+    allOffs.filter(function(o){ return o.status === 'revision_requested'; }).forEach(function(o){
+      actionListD.push({type:'offer-revision', priority:3, item:o, label:'↩ Revizyon yanıtı bekleniyor', target:'offers'});
+    });
+    pocs.filter(function(p){
+      if (p.status !== 'pending') return false;
+      var ageHr = p.createdAt?.seconds ? (nowMsD - p.createdAt.seconds*1000)/3600000 : 0;
+      return ageHr >= 72;
+    }).forEach(function(p){
+      actionListD.push({type:'poc-late', priority:4, item:p, label:'📋 PoC 3+ gündür yanıtsız', target:'requests'});
+    });
+    actionListD.sort(function(a,b){ return a.priority - b.priority; });
+
+    // ── v4.60: En Güvenilir Vendor ──
+    var vendorStats = {};
+    allInvites.forEach(function(inv){
+      var vk = inv.vendorCompany || inv.vendorName || inv.vendorId;
+      if (!vk) return;
+      if (!vendorStats[vk]) vendorStats[vk] = {total:0, accepted:0, name:vk};
+      vendorStats[vk].total++;
+      if (inv.status === 'accepted') vendorStats[vk].accepted++;
+    });
+    pocs.forEach(function(p){
+      var vk = p.vendorName || p.vendorId;
+      if (!vk) return;
+      if (!vendorStats[vk]) vendorStats[vk] = {total:0, accepted:0, name:vk};
+      vendorStats[vk].total++;
+      if (p.status === 'completed' || p.status === 'active') vendorStats[vk].accepted++;
+    });
+    var trustedVendor = null;
+    Object.values(vendorStats).forEach(function(v){
+      if (v.total >= 2) {
+        v.rate = (v.accepted / v.total) * 100;
+        if (!trustedVendor || trustedVendor.rate < v.rate || (trustedVendor.rate === v.rate && trustedVendor.total < v.total)) {
+          trustedVendor = v;
+        }
+      }
+    });
+
+    // ── v4.60: Bu Hafta Yaklaşan ──
+    var weekUpcomingD = [];
+    pocs.forEach(function(p){
+      if (p.status !== 'active' || !p.preferredDateTime1) return;
+      var d = p.preferredDateTime1.toDate ? p.preferredDateTime1.toDate() : new Date(p.preferredDateTime1);
+      if (isNaN(d.getTime())) return;
+      if (d >= now && d < weekFwdEnd) weekUpcomingD.push({type:'poc', date:d, item:p});
+    });
+    regsD.filter(function(r){ return r.status !== 'cancelled'; }).forEach(function(r){
+      if (!r.eventDate) return;
+      var d = new Date(r.eventDate);
+      if (isNaN(d.getTime())) return;
+      if (d >= now && d < weekFwdEnd) weekUpcomingD.push({type:'event', date:d, item:r});
+    });
+    weekUpcomingD.sort(function(a,b){ return a.date - b.date; });
 
     var recentOffers = allOffs
       .filter(function(o){ return o.status==='pending' || o.status==='revision_requested'; })
@@ -7521,60 +7640,128 @@ async function loadCustTab() {
 
     m.innerHTML = '';
 
-    // Karşılama
+    // ═══ v4.60: ZAMAN BAZLI KARŞILAMA + ACİL ROZET ═══
+    var hr2 = now.getHours();
+    var greetingD = hr2 < 6 ? 'İyi geceler' : hr2 < 12 ? 'Günaydın' : hr2 < 18 ? 'İyi günler' : 'İyi akşamlar';
     var welcome = document.createElement('div');
-    welcome.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px';
+    welcome.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px';
+    var welcomeRightD = '';
+    if (actionListD.length > 0) {
+      welcomeRightD = '<div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);border-radius:8px;padding:8px 14px;font-size:12.5px;color:#ff7070;font-weight:600">⚠️ '+actionListD.length+' aksiyon bekliyor</div>';
+    }
     welcome.innerHTML =
       '<div>'
-      +'<h2 style="font-size:20px;font-weight:800">Hoş Geldiniz, '+(CUR_PROFILE?.displayName||CUR_PROFILE?.company||CUR_USER.email.split('@')[0])+' \ud83d\udc4b</h2>'
-      +'<div style="font-size:13px;color:var(--text-muted);margin-top:3px">'+new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</div>'
-      +'</div>';
+      + '<div style="font-size:13px;color:var(--text-muted);margin-bottom:2px">'+greetingD+',</div>'
+      + '<h2 style="font-size:20px;font-weight:800">👋 '+(CUR_PROFILE?.displayName||CUR_PROFILE?.company||CUR_USER.email.split('@')[0])+'</h2>'
+      + '<div class="txt-muted-12-mt3">'+now.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</div>'
+      + '</div>'
+      + welcomeRightD;
     m.appendChild(welcome);
 
-    // Stat kartları
-    var statsGrid = document.createElement('div');
-    statsGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px';
-
-    function makeStatCard(val, label, sub, bgColor, borderColor, textColor, tab) {
+    // ═══ v4.60: 8 STAT KARTLARI (trend ok'larıyla) ═══
+    function makeCustStatCard(val, label, sub, trend, color, bg, border, tab) {
       var card = document.createElement('div');
-      card.style.cssText =
-        'background:'+bgColor+';border:1px solid '+borderColor
-        +';border-radius:12px;padding:14px;cursor:pointer;transition:all .2s';
+      card.style.cssText = 'background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;cursor:pointer;transition:all .15s';
       card.innerHTML =
-        '<div style="font-size:26px;font-weight:800;color:'+textColor+'">'+val+'</div>'
-        +'<div class="txt-muted-12-mt3">'+label+'</div>'
-        +(sub?'<div style="font-size:10px;margin-top:3px;color:'+textColor+'">'+sub+'</div>':'');
+        '<div style="font-size:'+(typeof val==='string' && val.length>6?'18px':'26px')+';font-weight:800;color:'+color+';font-family:monospace;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'
+        + '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;font-weight:600">'+label+(trend||'')+'</div>'
+        + (sub ? '<div style="font-size:10.5px;margin-top:3px;color:'+color+'">'+sub+'</div>' : '');
       if (tab) {
         card.addEventListener('click', function(){ CUR_CUST_TAB=tab; loadCustTab(); });
-        card.addEventListener('mouseover', function(){ card.style.borderColor=textColor; card.style.transform='translateY(-1px)'; });
-        card.addEventListener('mouseout',  function(){ card.style.borderColor=borderColor; card.style.transform=''; });
+        card.addEventListener('mouseover', function(){ card.style.transform='translateY(-2px)'; card.style.borderColor=color; });
+        card.addEventListener('mouseout',  function(){ card.style.transform=''; card.style.borderColor=border; });
       }
       return card;
     }
 
-    statsGrid.appendChild(makeStatCard(
-      activePocs, 'Aktif PoC',
-      pendingPocs ? '+'+pendingPocs+' bekliyor' : '',
-      'rgba(34,208,120,.07)', 'rgba(34,208,120,.2)', '#22d078', 'requests'
-    ));
-    statsGrid.appendChild(makeStatCard(
-      pendingOffers, 'Bekleyen Teklif',
-      revisionOffers ? revisionOffers+' revizyon' : '',
-      'rgba(59,124,255,.07)', 'rgba(59,124,255,.2)', '#7db4ff', 'offers'
-    ));
-    statsGrid.appendChild(makeStatCard(
-      pendingInvites, 'Yeni Davet',
-      pendingInvites ? 'Yan\u0131t bekleniyor' : '',
-      pendingInvites ? 'rgba(240,164,41,.1)' : 'rgba(255,255,255,.04)',
-      pendingInvites ? 'rgba(240,164,41,.3)' : 'rgba(255,255,255,.1)',
-      pendingInvites ? '#f0a429' : 'rgba(255,255,255,.35)',
-      'invites'
-    ));
-    statsGrid.appendChild(makeStatCard(
-      upcomingRegs, 'Yakla\u015fan Etkinlik', '',
-      'rgba(196,168,255,.07)', 'rgba(196,168,255,.2)', '#c4a8ff', 'registrations'
-    ));
-    m.appendChild(statsGrid);
+    var statsGridD = document.createElement('div');
+    statsGridD.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px';
+
+    statsGridD.appendChild(makeCustStatCard(activePocs, 'Aktif PoC', pendingPocs?'+'+pendingPocs+' bekliyor':'', trendArrowD(thisMonthPocs, lastMonthPocs), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','requests'));
+    statsGridD.appendChild(makeCustStatCard(pendingOffers, 'Bekleyen Teklif', revisionOffers?revisionOffers+' revizyon':'', trendArrowD(thisMonthOffs, lastMonthOffs), '#7db4ff','rgba(59,124,255,.07)','rgba(59,124,255,.2)','offers'));
+    statsGridD.appendChild(makeCustStatCard(pendingInvites, 'Yeni Davet', pendingInvites?'Yanıt bekleniyor':'', '', pendingInvites?'#f0a429':'rgba(255,255,255,.35)', pendingInvites?'rgba(240,164,41,.1)':'rgba(255,255,255,.04)', pendingInvites?'rgba(240,164,41,.3)':'rgba(255,255,255,.1)','invites'));
+    statsGridD.appendChild(makeCustStatCard(upcomingRegs, 'Yaklaşan Etkinlik', '', '', '#c4a8ff','rgba(196,168,255,.07)','rgba(196,168,255,.2)','registrations'));
+    statsGridD.appendChild(makeCustStatCard(totalSpentD>0?formatMoney(totalSpentD,'TRY'):'—', 'Toplam Yatırım', acceptedOffers.length+' kabul', trendArrowD(thisMonthSpent, lastMonthSpent), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','offers'));
+    statsGridD.appendChild(makeCustStatCard(pendingValueD>0?formatMoney(pendingValueD,'TRY'):'—', 'Bekleyen Tutar', '', '', '#f0a429','rgba(240,164,41,.07)','rgba(240,164,41,.2)','offers'));
+    statsGridD.appendChild(makeCustStatCard(activeVendorsD, 'Aktif Vendor', '', '', '#c4a8ff','rgba(196,168,255,.05)','rgba(196,168,255,.15)','requests'));
+    statsGridD.appendChild(makeCustStatCard(completedPocs, 'Tamamlanan PoC', '', trendArrowD(thisMonthCompleted, lastMonthCompleted), '#7db4ff','rgba(125,180,255,.05)','rgba(125,180,255,.15)','requests'));
+    m.appendChild(statsGridD);
+
+    // ═══ v4.60: 🚨 ACİL AKSİYONLAR BANNER ═══
+    if (actionListD.length > 0) {
+      var actBanD = document.createElement('div');
+      actBanD.style.cssText = 'background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+      actBanD.innerHTML = '<div class="flx-bw-s" style="gap:10px;flex-wrap:wrap">'
+        + '<div style="flex:1;min-width:200px">'
+        + '<div style="font-size:12.5px;color:#ff7070;font-weight:700;margin-bottom:4px">🚨 Acil Aksiyonlar — '+actionListD.length+' kayıt</div>'
+        + '<div class="txt-muted-12">Süresi yakın davetler, süresi yakın teklifler, revizyon yanıtı bekleyenler ve uzun süredir bekleyen PoC\'ler.</div>'
+        + '</div>'
+        + '<button id="cust-dash-act-toggle" class="btn-danger">Listeyi Gör</button>'
+        + '</div>';
+      m.appendChild(actBanD);
+
+      actBanD.querySelector('#cust-dash-act-toggle').addEventListener('click', function(){
+        var det = document.getElementById('cust-dash-act-list');
+        if (det) { det.remove(); return; }
+        var listDiv = document.createElement('div');
+        listDiv.id = 'cust-dash-act-list';
+        listDiv.style.cssText = 'background:rgba(255,112,112,.04);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px';
+        listDiv.innerHTML = actionListD.slice(0,7).map(function(a){
+          var name = a.item.productName || a.item.title || '—';
+          var detail = a.item.vendorName || a.item.vendorCompany || '';
+          return '<div class="flx-bw-c" style="padding:6px 0;border-bottom:1px solid rgba(255,112,112,.1);font-size:12px;cursor:pointer" data-target="'+a.target+'">'
+            + '<div><strong>'+name+'</strong>'+(detail?' <span class="txt-muted-12">· '+detail+'</span>':'')+'</div>'
+            + '<div style="font-size:11px;color:#ff7070;font-weight:600">'+a.label+'</div>'
+            + '</div>';
+        }).join('') + (actionListD.length > 7
+          ? '<div class="txt-empty">…ve '+(actionListD.length-7)+' diğer aksiyon</div>'
+          : '');
+        actBanD.parentNode.insertBefore(listDiv, actBanD.nextSibling);
+        listDiv.querySelectorAll('[data-target]').forEach(function(row){
+          row.addEventListener('click', function(){ CUR_CUST_TAB = row.dataset.target; loadCustTab(); });
+        });
+      });
+    }
+
+    // ═══ v4.60: 🏆 EN GÜVENİLİR VENDOR BANNER ═══
+    if (trustedVendor && trustedVendor.total >= 2) {
+      var trustBan = document.createElement('div');
+      trustBan.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(125,180,255,.08));border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+      trustBan.innerHTML = '<div style="flex:1;min-width:200px">'
+        + '<div class="lbl-success-700">🏆 EN GÜVENİLİR VENDOR\'IN</div>'
+        + '<div style="font-size:13.5px;font-weight:700">'+trustedVendor.name+'</div>'
+        + '<div class="txt-muted-12-mt3">'+trustedVendor.total+' iş ilişkisi · '+trustedVendor.accepted+' başarılı sonuç</div>'
+        + '</div>'
+        + '<div style="text-align:right">'
+        + '<div style="font-size:20px;font-weight:800;color:#22d078">%'+Math.round(trustedVendor.rate)+'</div>'
+        + '<div style="font-size:10.5px;color:var(--text-muted)">başarı oranı</div>'
+        + '</div>';
+      m.appendChild(trustBan);
+    }
+
+    // ═══ v4.60: 📅 BU HAFTA YAKLAŞAN BANNER ═══
+    if (weekUpcomingD.length > 0) {
+      var weekBanD = document.createElement('div');
+      weekBanD.style.cssText = 'background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
+      var dows = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+      var wHtml = '<div style="font-size:12.5px;color:#7db4ff;font-weight:700;margin-bottom:8px">📅 BU HAFTA YAKLAŞAN ('+weekUpcomingD.length+' kayıt)</div>';
+      weekUpcomingD.slice(0,5).forEach(function(w){
+        var dow = dows[w.date.getDay()];
+        var hh = String(w.date.getHours()).padStart(2,'0');
+        var mm = String(w.date.getMinutes()).padStart(2,'0');
+        var icon = w.type === 'poc' ? '📋' : '🎤';
+        var title = w.item.productName || w.item.eventTitle || w.item.title || '—';
+        var sub = ' <span class="txt-muted-12">· '+(w.item.vendorName||'')+'</span>';
+        wHtml += '<div class="flx-bw-c" style="padding:4px 0;font-size:12px">'
+          + '<div><strong>'+dow+' '+hh+':'+mm+'</strong> · '+icon+' '+title+sub+'</div>'
+          + '</div>';
+      });
+      if (weekUpcomingD.length > 5) {
+        wHtml += '<div class="txt-empty">…ve '+(weekUpcomingD.length-5)+' diğer kayıt</div>';
+      }
+      weekBanD.innerHTML = wHtml;
+      m.appendChild(weekBanD);
+    }
 
     // Hızlı aksiyonlar
     var qaSection = document.createElement('div');
