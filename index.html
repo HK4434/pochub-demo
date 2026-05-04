@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.64 | pochub.co -->
+<!-- PoCHub v4.65 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.64</title>
+<title>PoCHub.co — v4.65</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.64';
+const VERSION = 'v4.65';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.65':  ['MAJOR: Premium Phase 1.2 — Vendor Aboneliğim sayfası, Paketler karşılaştırma sayfası, manuel havale ödeme akışı, vendor tipi default önerisi, free tier banner, yıllık/aylık fatura toggle (%X indirim).'],
   'v4.64':  ['MAJOR: Premium İş Modeli Phase 1.1 — Veri Modeli + Sistem Ayarları + Paket Tanımları. Admin paneline 2 yeni sekme: Paket Tanımları (CRUD) ve Sistem Ayarları (38 parametre). pochub_config ve pochub_packages koleksiyonları aktif. Default 4 paket (Starter/Pro/Business/Enterprise) ilk kayıtta otomatik seed.'],
   'v4.63':  ['SEED: Çoklu kategori ürün üreticisi — 35+ kategoriye 70+ ürün, üretici/distribütör/entegratör rotasyonu. Katalog testleri için zengin veri seti.'],
   'v4.62':  ['SEED BUG FIX: "Tüm Test Verisini Sil" düzgün çalışmıyordu. Firestore rules nedeniyle başkasının ID\'siyle oluşturulan test kayıtları silinemiyordu, ama hata mesajı gösterilmiyordu. Çözüm: per-doc hata yakalama + ayrıntılı log + Firestore rules ipucu.'],
@@ -8970,6 +8971,7 @@ function renderVendor() {
     ['dashboard','Dashboard'],['requests','PoC Talepleri'],['calendar','Takvim'],
     ['products','Ürünlerim'],['portfolio','Portföyüm'],
     ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','💰 Tekliflerim'],['messages','💬 Mesajlar'],
+    ['subscription','💎 Aboneliğim'],
   ];
   el('scr-vendor').innerHTML = `<div class="dash">
     <div class="sbar">
@@ -9004,6 +9006,7 @@ async function loadVendTab() {
   if (CUR_VEND_TAB === 'invites')   { await vendInvites(m);   return; }
   if (CUR_VEND_TAB === 'messages')  { await loadMessagesTab(m, 'vendor'); return; }
   if (CUR_VEND_TAB === 'requests')  { await vendRequests(m);  return; }
+  if (CUR_VEND_TAB === 'subscription') { await vendSubscription(m); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     m.innerHTML = '<div class="loading"><div class="spinner"></div>Dashboard yükleniyor...</div>';
 
@@ -13537,6 +13540,476 @@ async function openSendInviteModal() {
       (failed ? '. ' + failed + ' başarısız.' : '.'));
     loadVendTab();
   });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.65: VENDOR ABONELİĞİM SAYFASI
+// ════════════════════════════════════════════════════════════════════
+async function vendSubscription(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Aboneliğin yükleniyor...</div>';
+  try {
+    // 1. Sistem ayarları
+    const cfgSnap = await getDoc(doc(db,'pochub_config','system'));
+    const cfg = cfgSnap.exists() ? cfgSnap.data() : {};
+    // 2. Tüm paketler
+    const pkgSnap = await getDocs(collection(db,'pochub_packages'));
+    var allPackages = pkgSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    allPackages.sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
+    var visiblePackages = allPackages.filter(function(p){ return p.isActive && p.isVisible; });
+
+    // 3. Vendor mevcut aboneliği
+    const subRef = doc(db,'vendor_subscriptions',CUR_USER.uid);
+    const subSnap = await getDoc(subRef);
+    var subscription = subSnap.exists() ? subSnap.data() : null;
+    var currentPkg = subscription ? allPackages.find(function(p){ return p.id === subscription.currentPackageId; }) : null;
+    var currentTier = currentPkg ? currentPkg.tier : 'free';
+
+    // 4. Vendor tipi default önerisi
+    var vendorType = CUR_PROFILE?.vendorType || 'ureticid';
+    var recommendedTier = cfg.vendorTypeRecommendations?.[vendorType] || 'professional';
+    var recommendedPkg = visiblePackages.find(function(p){ return p.tier === recommendedTier; });
+
+    // 5. Yıllık indirim
+    var yearlyEnabled = cfg.yearlyDiscount?.enabled !== false;
+    var yearlyPercent = cfg.yearlyDiscount?.discountPercent || 15;
+
+    // 6. Bekleyen ödeme talebi var mı? (manuel havale onayı)
+    const pendingPaymentSnap = await getDocs(query(
+      collection(db,'subscription_history'),
+      where('vendorId','==',CUR_USER.uid),
+      where('status','==','pending')
+    ));
+    var pendingPayments = pendingPaymentSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+
+    m.innerHTML = '';
+
+    // ═══ Header ═══
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px';
+    hdr.innerHTML =
+      '<div>'
+      + '<h2 style="font-size:18px;font-weight:700">💎 Aboneliğim</h2>'
+      + '<div class="txt-muted-12-mt3">Mevcut paket, kullanım ve faturalama</div>'
+      + '</div>'
+      + '<button class="btn-g btn-sm" id="sub-view-pkgs">Paketleri Gör</button>';
+    m.appendChild(hdr);
+
+    // ═══ Bekleyen Ödeme Uyarısı ═══
+    if (pendingPayments.length > 0) {
+      var pp = document.createElement('div');
+      pp.style.cssText = 'background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.3);border-radius:8px;padding:12px 14px;margin-bottom:14px';
+      pp.innerHTML =
+        '<div style="font-size:12.5px;color:#f0a429;font-weight:700;margin-bottom:4px">⏳ Manuel Havale Onayı Bekliyor</div>'
+        + '<div class="txt-muted-12">'+pendingPayments.length+' ödeme talebiniz admin onayında. Onaylandığında paketiniz aktif olacak.</div>';
+      m.appendChild(pp);
+    }
+
+    // ═══ MEVCUT PAKET KARTI ═══
+    var tierColors = {free:'#5a6278', starter:'#7db4ff', professional:'#22d078', business:'#f0a429', enterprise:'#c4a8ff'};
+    var color = tierColors[currentTier] || '#5a6278';
+
+    var mainCard = document.createElement('div');
+    mainCard.style.cssText = 'background:linear-gradient(135deg,'+color+'15,'+color+'05);border:2px solid '+color+'40;border-radius:12px;padding:18px;margin-bottom:16px';
+
+    if (!subscription || currentTier === 'free') {
+      // FREE TIER GÖRÜNÜMÜ
+      mainCard.innerHTML =
+        '<div class="flx-bw-s-mb10">'
+        + '<div>'
+        + '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">Mevcut Plan</div>'
+        + '<div style="font-size:24px;font-weight:800">Free Plan</div>'
+        + '</div>'
+        + '<div style="text-align:right">'
+        + '<div style="font-size:24px;font-weight:800;color:'+color+'">₺0</div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">/ay</div>'
+        + '</div>'
+        + '</div>'
+        + '<div style="background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:10px 12px;margin-bottom:12px">'
+        + '<div style="font-size:13px;font-weight:600;color:#ff7070;margin-bottom:4px">⚠️ PoC Kabul Edemezsiniz</div>'
+        + '<div class="txt-muted-12">Free plan ile profil görüntüleyebilir, ürün ekleyebilir, müşteri davet edebilirsiniz, ancak <strong>PoC kabul</strong> için ücretli pakete ihtiyacınız var.</div>'
+        + '</div>'
+        + (recommendedPkg
+          ? '<div style="background:rgba(125,180,255,.08);border:1px solid rgba(125,180,255,.25);border-radius:8px;padding:10px 12px">'
+            + '<div style="font-size:11px;color:#7db4ff;font-weight:700;margin-bottom:4px">💡 Sizin için önerilen</div>'
+            + '<div class="flx-bw-c">'
+            +   '<div><strong>'+recommendedPkg.name+'</strong> · '+(vendorType==='ureticid'?'Üretici':vendorType==='distributor'?'Distribütör':'Entegratör')+' için ideal</div>'
+            +   '<button class="btn-p btn-sm" id="sub-recommend-cta">İncele</button>'
+            + '</div>'
+            + '</div>'
+          : '');
+    } else {
+      // PAKETLI VENDOR GÖRÜNÜMÜ
+      var endDate = subscription.endDate?.toDate ? subscription.endDate.toDate() : null;
+      var daysLeft = endDate ? Math.ceil((endDate.getTime() - Date.now())/86400000) : 0;
+      var pocUsed = subscription.pocUsedThisCycle || 0;
+      var pocQuota = currentPkg.pocQuota === -1 ? '∞' : currentPkg.pocQuota;
+      var pocPercent = currentPkg.pocQuota === -1 ? 0 : (pocQuota > 0 ? (pocUsed / pocQuota) * 100 : 0);
+      var inviteUsed = subscription.inviteUsedThisCycle || 0;
+      var inviteQuota = currentPkg.inviteQuotaPerMonth === -1 ? '∞' : currentPkg.inviteQuotaPerMonth;
+      var invitePercent = currentPkg.inviteQuotaPerMonth === -1 ? 0 : (inviteQuota > 0 ? (inviteUsed / inviteQuota) * 100 : 0);
+
+      mainCard.innerHTML =
+        '<div class="flx-bw-s-mb10">'
+        + '<div>'
+        + '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">Mevcut Paket</div>'
+        + '<div style="font-size:24px;font-weight:800">'+currentPkg.name+'</div>'
+        + (subscription.status === 'grace_period' ? '<div style="font-size:11px;color:#ff7070;font-weight:700;margin-top:2px">⚠️ Grace Period</div>' : '')
+        + '</div>'
+        + '<div style="text-align:right">'
+        + '<div style="font-size:24px;font-weight:800;color:'+color+'">₺'+(currentPkg.price||0).toLocaleString('tr-TR')+'</div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">/ay</div>'
+        + (endDate ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:4px">Bitiş: '+endDate.toLocaleDateString('tr-TR')+(daysLeft>=0?' ('+daysLeft+' gün)':' (geçti)')+'</div>' : '')
+        + '</div>'
+        + '</div>'
+        // Kullanım çubukları
+        + '<div style="margin-top:12px">'
+        + '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">📊 Bu Döngü Kullanım</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">'
+        // PoC
+        + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:10px">'
+        +   '<div class="flx-bw-c" style="margin-bottom:6px">'
+        +     '<span style="font-size:12px;font-weight:600">📋 PoC Kabul</span>'
+        +     '<span style="font-size:13px;font-weight:700;color:'+color+'">'+pocUsed+' / '+pocQuota+'</span>'
+        +   '</div>'
+        +   (currentPkg.pocQuota !== -1 ? '<div style="background:rgba(255,255,255,.05);height:6px;border-radius:3px;overflow:hidden"><div style="background:'+color+';height:100%;width:'+Math.min(100,pocPercent)+'%;transition:width .3s"></div></div>' : '<div style="font-size:10.5px;color:'+color+';font-weight:700">Sınırsız</div>')
+        + '</div>'
+        // Davet
+        + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:10px">'
+        +   '<div class="flx-bw-c" style="margin-bottom:6px">'
+        +     '<span style="font-size:12px;font-weight:600">📨 Davet</span>'
+        +     '<span style="font-size:13px;font-weight:700;color:'+color+'">'+inviteUsed+' / '+inviteQuota+'</span>'
+        +   '</div>'
+        +   (currentPkg.inviteQuotaPerMonth !== -1 ? '<div style="background:rgba(255,255,255,.05);height:6px;border-radius:3px;overflow:hidden"><div style="background:'+color+';height:100%;width:'+Math.min(100,invitePercent)+'%;transition:width .3s"></div></div>' : '<div style="font-size:10.5px;color:'+color+';font-weight:700">Sınırsız</div>')
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }
+
+    m.appendChild(mainCard);
+
+    // ═══ EARLY ADOPTER PROMOSYON BANNER (kayıt sonrası ilk X gün) ═══
+    if (cfg.earlyAdopter?.enabled && (!subscription || currentTier === 'free')) {
+      var trialDays = cfg.earlyAdopter?.trialDurationDays || 90;
+      var trialTier = cfg.earlyAdopter?.trialTier || 'professional';
+      var trialPkg = visiblePackages.find(function(p){ return p.tier === trialTier; });
+      var eligibleUntil = cfg.earlyAdopter?.eligibleUntil || '2026-12-31';
+      var stillEligible = new Date(eligibleUntil).getTime() > Date.now();
+
+      if (stillEligible && trialPkg) {
+        var ea = document.createElement('div');
+        ea.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.1),rgba(125,180,255,.1));border:1px solid rgba(34,208,120,.3);border-radius:8px;padding:12px 14px;margin-bottom:14px';
+        ea.innerHTML =
+          '<div class="flx-bw-c" style="gap:10px;flex-wrap:wrap">'
+          + '<div style="flex:1;min-width:200px">'
+          + '<div class="lbl-success-700">🎁 ERKEN ABONE FIRSATI</div>'
+          + '<div style="font-size:13px;font-weight:700;margin-top:4px">'+trialDays+' Gün Ücretsiz '+trialPkg.name+'</div>'
+          + '<div class="txt-muted-12-mt3">'+trialDays+' gün boyunca '+trialPkg.name+' özelliklerini deneyimleyebilirsin. '+new Date(eligibleUntil).toLocaleDateString('tr-TR')+' tarihine kadar geçerli.</div>'
+          + '</div>'
+          + '<button class="btn-p btn-sm" id="sub-ea-claim">Trial Talep Et</button>'
+          + '</div>';
+        m.appendChild(ea);
+      }
+    }
+
+    // ═══ HIZLI BİLGİLER ═══
+    if (currentPkg) {
+      var info = document.createElement('div');
+      info.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px';
+      info.innerHTML =
+        '<div style="font-size:13px;font-weight:700;margin-bottom:10px">📋 Paket Özellikleri</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:12.5px">'
+        + (Array.isArray(currentPkg.features) ? currentPkg.features.map(function(f){
+            return '<div style="display:flex;gap:6px;align-items:center"><span style="color:'+color+'">✓</span> '+f+'</div>';
+          }).join('') : '')
+        + '</div>';
+      m.appendChild(info);
+    }
+
+    // ═══ Aksiyonlar ═══
+    if (subscription && currentTier !== 'free') {
+      var actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px';
+      actions.innerHTML =
+        '<button class="btn-g btn-sm" id="sub-upgrade">⬆️ Paket Yükselt/Düşür</button>'
+        + '<button class="btn-g btn-sm" id="sub-history">📜 Ödeme Geçmişi</button>'
+        + '<button class="btn-red btn-sm" id="sub-cancel">İptal Et</button>';
+      m.appendChild(actions);
+
+      el('sub-upgrade')?.addEventListener('click', function(){ openPackageBrowser(allPackages, cfg, subscription); });
+      el('sub-history')?.addEventListener('click', function(){ openPaymentHistory(); });
+      el('sub-cancel')?.addEventListener('click', async function(){
+        if (!confirm('Aboneliğinizi iptal etmek istediğinize emin misiniz?\n\nMevcut paket bitiş tarihinde sona erer, sonra Free Plan\'a düşersiniz.')) return;
+        try {
+          await updateDoc(subRef, { autoRenew: false, cancelledAt: serverTimestamp() });
+          showToast('Aboneliğin iptal edildi. Bitiş tarihinde Free\'ye geçeceksin.');
+          loadVendTab();
+        } catch(e) { showToast('Hata: '+e.message,'err'); }
+      });
+    }
+
+    // Event handlers
+    el('sub-view-pkgs')?.addEventListener('click', function(){ openPackageBrowser(allPackages, cfg, subscription); });
+    el('sub-recommend-cta')?.addEventListener('click', function(){ openPackageBrowser(allPackages, cfg, subscription, recommendedPkg?.id); });
+    el('sub-ea-claim')?.addEventListener('click', async function(){
+      if (!confirm('Erken abone fırsatını talep etmek istiyor musun?')) return;
+      try {
+        var trialDays = cfg.earlyAdopter?.trialDurationDays || 90;
+        var trialTier = cfg.earlyAdopter?.trialTier || 'professional';
+        var trialPkg = visiblePackages.find(function(p){ return p.tier === trialTier; });
+        if (!trialPkg) throw new Error('Trial paketi bulunamadı');
+
+        var endTs = Date.now() + trialDays*86400000;
+        await setDoc(subRef, {
+          vendorId: CUR_USER.uid,
+          currentPackageId: trialPkg.id,
+          currentTier: trialPkg.tier,
+          status: 'active',
+          startDate: serverTimestamp(),
+          endDate: { seconds: Math.floor(endTs/1000), nanoseconds: 0 },
+          autoRenew: false,
+          isTrial: true,
+          pocUsedThisCycle: 0,
+          inviteUsedThisCycle: 0,
+          totalPocAccepted: 0,
+          totalPaidAmount: 0,
+          consecutiveUnpaidMonths: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        // History
+        await addDoc(collection(db,'subscription_history'), {
+          vendorId: CUR_USER.uid,
+          packageId: trialPkg.id,
+          action: 'trial_started',
+          fromPackageId: null,
+          toPackageId: trialPkg.id,
+          amount: 0,
+          currency: 'TRY',
+          paymentMethod: 'free',
+          status: 'paid',
+          createdAt: serverTimestamp(),
+          paidAt: serverTimestamp(),
+        });
+        // User profile
+        await updateDoc(doc(db,'users',CUR_USER.uid), {
+          subscriptionTier: trialPkg.tier,
+          hasActiveSubscription: true,
+        });
+        showToast('🎉 Trial başlatıldı! '+trialDays+' gün '+trialPkg.name+' aktif.');
+        loadVendTab();
+      } catch(e) { showToast('Hata: '+e.message,'err'); }
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// PAKET BROWSER MODAL (vendor için)
+// ════════════════════════════════════════════════════════════════════
+function openPackageBrowser(allPackages, cfg, currentSub, highlightPkgId) {
+  var visiblePackages = allPackages.filter(function(p){ return p.isActive && p.isVisible; });
+  var yearlyEnabled = cfg.yearlyDiscount?.enabled !== false;
+  var yearlyPercent = cfg.yearlyDiscount?.discountPercent || 15;
+  var billingMode = 'monthly'; // 'monthly' | 'yearly'
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
+
+  function renderModal() {
+    var tierColors = {free:'#5a6278', starter:'#7db4ff', professional:'#22d078', business:'#f0a429', enterprise:'#c4a8ff'};
+    var pkgsHtml = visiblePackages.map(function(p){
+      var color = tierColors[p.tier] || '#7db4ff';
+      var displayPrice = billingMode === 'yearly' && p.yearlyPrice ? p.yearlyPrice : p.price;
+      var perLabel = billingMode === 'yearly' ? '/yıl' : '/ay';
+      var monthlyEq = billingMode === 'yearly' && p.yearlyPrice ? Math.round(p.yearlyPrice/12) : null;
+      var isHighlight = p.id === highlightPkgId;
+      var isCurrent = currentSub && currentSub.currentPackageId === p.id;
+
+      return '<div style="background:var(--bg-surface);border:'+(isHighlight||isCurrent?'2px':'1px')+' solid '+(isCurrent?color:isHighlight?color+'80':color+'40')+';border-radius:12px;padding:14px;position:relative;display:flex;flex-direction:column;gap:8px">'
+        + (isHighlight ? '<div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:'+color+';color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px;white-space:nowrap">⭐ ÖNERİLEN</div>' : '')
+        + (isCurrent ? '<div style="position:absolute;top:-10px;right:8px;background:'+color+';color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px">MEVCUT</div>' : '')
+        + '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+p.tier+'</div>'
+        + '<div style="font-size:18px;font-weight:800">'+p.name+'</div>'
+        + '<div><span style="font-size:24px;font-weight:800;color:'+color+'">'+(displayPrice>0?'₺'+displayPrice.toLocaleString('tr-TR'):'Ücretsiz')+'</span><span style="font-size:11px;color:var(--text-muted)"> '+(displayPrice>0?perLabel:'')+'</span></div>'
+        + (monthlyEq ? '<div style="font-size:10.5px;color:'+color+';font-weight:600">≈ ₺'+monthlyEq.toLocaleString('tr-TR')+'/ay</div>' : '')
+        + '<div style="font-size:11px;color:var(--text-muted);padding:8px 0;border-top:1px solid var(--border)">'
+        +   '<div><strong>'+(p.pocQuota===-1?'Sınırsız':p.pocQuota)+'</strong> PoC/ay</div>'
+        +   '<div><strong>'+(p.productLimit===-1?'∞':p.productLimit)+'</strong> ürün</div>'
+        +   '<div><strong>'+(p.inviteQuotaPerMonth===-1?'∞':p.inviteQuotaPerMonth)+'</strong> davet/ay</div>'
+        +   (p.pocOverflowPrice>0 ? '<div>Aşan: ₺'+p.pocOverflowPrice+'/PoC</div>' : '')
+        + '</div>'
+        + '<ul style="list-style:none;padding:0;margin:0;font-size:11.5px;display:flex;flex-direction:column;gap:4px">'
+        +   (Array.isArray(p.features) ? p.features.slice(0,5).map(function(f){ return '<li style="display:flex;gap:4px"><span style="color:'+color+'">✓</span><span>'+f+'</span></li>'; }).join('') : '')
+        + '</ul>'
+        + '<button class="pkg-buy" data-pkg="'+p.id+'" style="margin-top:auto;background:'+(p.tier==='free'?'transparent':color)+';color:'+(p.tier==='free'?color:'#fff')+';border:1px solid '+color+';border-radius:6px;padding:8px;font-weight:700;cursor:pointer;font-size:13px">'+(isCurrent?'Mevcut Paketin':p.tier==='free'?'Ücretsiz':'Bu Paketi Al')+'</button>'
+        + '</div>';
+    }).join('');
+
+    modal.innerHTML =
+      '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:1200px;width:100%;max-height:95vh;overflow-y:auto">'
+      + '<div class="flx-bw-c" style="margin-bottom:16px">'
+      +   '<h3 style="font-size:18px;font-weight:700">💎 Paket Seç</h3>'
+      +   '<button id="pb-close" style="background:transparent;border:0;font-size:22px;cursor:pointer;color:var(--text-secondary)">×</button>'
+      + '</div>'
+      // Aylık/Yıllık toggle
+      + (yearlyEnabled
+        ? '<div style="display:flex;justify-content:center;gap:10px;margin-bottom:18px">'
+          + '<button id="pb-monthly" class="btn-'+(billingMode==='monthly'?'p':'g')+' btn-sm">Aylık</button>'
+          + '<button id="pb-yearly" class="btn-'+(billingMode==='yearly'?'p':'g')+' btn-sm">Yıllık <span style="background:#22d078;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:4px">%'+yearlyPercent+' İNDİRİM</span></button>'
+          + '</div>'
+        : '')
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:24px">'
+      + pkgsHtml
+      + '</div>'
+      + '<div style="margin-top:18px;padding:12px;background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.2);border-radius:8px;font-size:11.5px;color:var(--text-secondary)">'
+      +   '💡 <strong>Not:</strong> Tüm paketler manuel havale ile satın alınabilir. iyzico entegrasyonu yakında eklenecek (v4.68).'
+      + '</div>'
+      + '</div>';
+  }
+  renderModal();
+  document.body.appendChild(modal);
+
+  function rebind() {
+    modal.querySelector('#pb-close')?.addEventListener('click', function(){ modal.remove(); });
+    modal.querySelector('#pb-monthly')?.addEventListener('click', function(){ billingMode='monthly'; renderModal(); rebind(); });
+    modal.querySelector('#pb-yearly')?.addEventListener('click', function(){ billingMode='yearly'; renderModal(); rebind(); });
+    modal.querySelectorAll('.pkg-buy').forEach(function(b){
+      b.addEventListener('click', function(){
+        var pkgId = b.dataset.pkg;
+        var pkg = allPackages.find(function(p){ return p.id===pkgId; });
+        if (!pkg) return;
+        if (pkg.tier === 'free') { showToast('Free plan zaten varsayılandır.','warn'); return; }
+        if (currentSub && currentSub.currentPackageId === pkgId) { showToast('Bu zaten mevcut paketin.','warn'); return; }
+        modal.remove();
+        openPaymentRequestModal(pkg, billingMode, cfg);
+      });
+    });
+  }
+  rebind();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ÖDEME TALEP MODAL (manuel havale)
+// ════════════════════════════════════════════════════════════════════
+function openPaymentRequestModal(pkg, billingMode, cfg) {
+  var amount = billingMode === 'yearly' && pkg.yearlyPrice ? pkg.yearlyPrice : pkg.price;
+  var label = billingMode === 'yearly' ? 'Yıllık' : 'Aylık';
+  var period = billingMode === 'yearly' ? 365 : (pkg.duration || 30);
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:500px;width:100%">'
+    + '<div class="flx-bw-c" style="margin-bottom:16px">'
+    +   '<h3 style="font-size:16px;font-weight:700">💳 Paket Satın Al</h3>'
+    +   '<button id="pr-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+    + '</div>'
+    + '<div style="background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.2);border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+    +   '<div style="font-size:11px;color:#22d078;font-weight:700;text-transform:uppercase;letter-spacing:1px">Sipariş Özeti</div>'
+    +   '<div style="font-size:14px;font-weight:700;margin-top:4px">'+pkg.name+' · '+label+'</div>'
+    +   '<div class="flx-bw-c" style="margin-top:8px;font-size:13px">'
+    +     '<span>Tutar</span><strong>₺'+amount.toLocaleString('tr-TR')+'</strong>'
+    +   '</div>'
+    +   '<div class="flx-bw-c" style="font-size:11.5px;color:var(--text-muted);margin-top:4px">'
+    +     '<span>Süre</span><span>'+period+' gün</span>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="margin-bottom:14px">'
+    +   '<label class="lbl-mini">Ödeme Yöntemi</label>'
+    +   '<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">'
+    +     '<label style="display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:rgba(125,180,255,.06)"><input type="radio" name="pm" value="manual" checked><div><strong>🏦 Manuel Havale</strong><div class="txt-muted-12-mt2">Banka havalesi yaparsın, admin onaylar, paket aktif olur</div></div></label>'
+    +     '<label style="display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;cursor:not-allowed;opacity:.5"><input type="radio" name="pm" value="iyzico" disabled><div><strong>💳 Kredi Kartı (iyzico)</strong><div class="txt-muted-12-mt2">Yakında — v4.68\'de aktif olacak</div></div></label>'
+    +   '</div>'
+    + '</div>'
+    + '<div id="manual-info" style="background:rgba(240,164,41,.06);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
+    +   '<div style="font-weight:700;color:#f0a429;margin-bottom:6px">🏦 Havale Bilgileri</div>'
+    +   '<div style="line-height:1.7">'
+    +   '<strong>Hesap Sahibi:</strong> PoCHub Teknoloji A.Ş.<br>'
+    +   '<strong>IBAN:</strong> TR00 0000 0000 0000 0000 0000 00<br>'
+    +   '<strong>Açıklama:</strong> '+CUR_USER.uid.substring(0,8)+' / '+pkg.tier
+    +   '</div>'
+    +   '<div style="margin-top:6px;font-size:11px;color:var(--text-muted)">Havale yaptıktan sonra "Talep Oluştur" tuşuna bas. Admin 24 saat içinde onaylar.</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px"><button class="btn-p" id="pr-create" style="flex:1">📝 Ödeme Talebi Oluştur</button><button class="btn-g" id="pr-cancel">Vazgeç</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#pr-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#pr-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#pr-create').addEventListener('click', async function(){
+    try {
+      // subscription_history'ye pending kayıt ekle
+      await addDoc(collection(db,'subscription_history'), {
+        vendorId: CUR_USER.uid,
+        vendorName: CUR_PROFILE?.company || CUR_USER.email,
+        packageId: pkg.id,
+        packageName: pkg.name,
+        action: 'purchase',
+        fromPackageId: null,
+        toPackageId: pkg.id,
+        amount: amount,
+        currency: 'TRY',
+        billingMode: billingMode,
+        durationDays: period,
+        paymentMethod: 'bank_transfer',
+        status: 'pending', // admin onayı bekliyor
+        createdAt: serverTimestamp(),
+      });
+      showToast('✅ Ödeme talebin oluşturuldu. Admin onayından sonra paketin aktif olacak.');
+      modal.remove();
+      loadVendTab();
+    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ÖDEME GEÇMİŞİ MODAL
+// ════════════════════════════════════════════════════════════════════
+async function openPaymentHistory() {
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:12px;padding:20px;max-width:600px;width:100%"><div class="loading"><div class="spinner"></div>Yükleniyor...</div></div>';
+  document.body.appendChild(modal);
+
+  try {
+    const snap = await getDocs(query(collection(db,'subscription_history'), where('vendorId','==',CUR_USER.uid)));
+    var items = snap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    items.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+
+    var actionLabels = {purchase:'Satın alma',renew:'Yenileme',upgrade:'Yükseltme',downgrade:'Düşürme',cancel:'İptal',trial_started:'Trial Başlangıç'};
+    var statusColors = {paid:'#22d078',pending:'#f0a429',failed:'#ff7070',refunded:'#7db4ff'};
+    var statusLabels = {paid:'Ödendi',pending:'Beklemede',failed:'Başarısız',refunded:'İade'};
+
+    var listHtml = items.length === 0
+      ? '<div style="text-align:center;color:var(--text-muted);padding:30px">Henüz ödeme geçmişin yok.</div>'
+      : items.map(function(h){
+          var d = h.createdAt?.toDate ? h.createdAt.toDate().toLocaleString('tr-TR') : '—';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)">'
+            + '<div>'
+            +   '<div style="font-size:13px;font-weight:600">'+(actionLabels[h.action]||h.action)+' · '+(h.packageName||h.toPackageId||'-')+'</div>'
+            +   '<div class="txt-muted-12-mt2">'+d+' · '+(h.paymentMethod==='bank_transfer'?'Havale':h.paymentMethod==='free'?'Ücretsiz':h.paymentMethod)+'</div>'
+            + '</div>'
+            + '<div style="text-align:right">'
+            +   (h.amount > 0 ? '<div style="font-size:14px;font-weight:700">₺'+(h.amount||0).toLocaleString('tr-TR')+'</div>' : '<div style="font-size:14px;font-weight:700;color:var(--text-muted)">Ücretsiz</div>')
+            +   '<div style="font-size:11px;font-weight:700;color:'+(statusColors[h.status]||'#5a6278')+'">'+(statusLabels[h.status]||h.status)+'</div>'
+            + '</div>'
+            + '</div>';
+        }).join('');
+
+    modal.innerHTML =
+      '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto">'
+      + '<div class="flx-bw-c" style="margin-bottom:14px">'
+      +   '<h3 style="font-size:16px;font-weight:700">📜 Ödeme Geçmişi</h3>'
+      +   '<button id="ph-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+      + '</div>'
+      + listHtml
+      + '</div>';
+    modal.querySelector('#ph-close').addEventListener('click', function(){ modal.remove(); });
+  } catch(e) {
+    modal.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
 }
 
 async function vendPortfolio(m) {
