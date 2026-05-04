@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.63 | pochub.co -->
+<!-- PoCHub v4.64 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.63</title>
+<title>PoCHub.co — v4.64</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.63';
+const VERSION = 'v4.64';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.64':  ['MAJOR: Premium İş Modeli Phase 1.1 — Veri Modeli + Sistem Ayarları + Paket Tanımları. Admin paneline 2 yeni sekme: Paket Tanımları (CRUD) ve Sistem Ayarları (38 parametre). pochub_config ve pochub_packages koleksiyonları aktif. Default 4 paket (Starter/Pro/Business/Enterprise) ilk kayıtta otomatik seed.'],
   'v4.63':  ['SEED: Çoklu kategori ürün üreticisi — 35+ kategoriye 70+ ürün, üretici/distribütör/entegratör rotasyonu. Katalog testleri için zengin veri seti.'],
   'v4.62':  ['SEED BUG FIX: "Tüm Test Verisini Sil" düzgün çalışmıyordu. Firestore rules nedeniyle başkasının ID\'siyle oluşturulan test kayıtları silinemiyordu, ama hata mesajı gösterilmiyordu. Çözüm: per-doc hata yakalama + ayrıntılı log + Firestore rules ipucu.'],
   'v4.61':  ['SEED: Kapsamlı seed yenileme — çoklu vendor/müşteri oluşturucular, mega senaryo yükleyici, acil durum/trend tetikleyici, sayfa bazlı detaylı testler. Seed dosyası baştan inşa edildi.'],
@@ -15254,6 +15255,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['packages','💎 Paketler'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -15284,6 +15286,8 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'requests')   { await admRequests(m);   return; }
     if (CUR_ADM_TAB === 'events')     { await admEvents(m);     return; }
     if (CUR_ADM_TAB === 'offers')     { await admOffers(m);     return; }
+    if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
+    if (CUR_ADM_TAB === 'settings')   { await admSettings(m);   return; }
   if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
 
     // DASHBOARD
@@ -16373,6 +16377,635 @@ async function admDataHealth(m) {
 
   } catch(e) {
     m.innerHTML = '<div class="alert alert-err">Analiz hatası: ' + e.message + '</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.64: PREMIUM İŞ MODELİ — Paket Tanımları + Sistem Ayarları
+// ════════════════════════════════════════════════════════════════════
+
+// Default paketler (sistem ilk açıldığında otomatik seed edilir)
+const DEFAULT_PACKAGES = [
+  {
+    id: 'free',
+    name: 'Free',
+    tier: 'free',
+    duration: 0,
+    price: 0,
+    yearlyPrice: 0,
+    currency: 'TRY',
+    pocQuota: 0,
+    pocOverflowPrice: 0,
+    productLimit: 3,
+    inviteQuotaPerMonth: 0,
+    overrideLimit: 1,
+    featuredDaysPerWeek: 0,
+    continuousFeatured: false,
+    features: ['Profil görünür', 'Müşteri davet edebilir', 'PoC kabul edemez'],
+    recommendedFor: [],
+    isActive: true,
+    isVisible: true,
+    displayOrder: 0,
+  },
+  {
+    id: 'starter',
+    name: 'Starter',
+    tier: 'starter',
+    duration: 30,
+    price: 2500,
+    yearlyPrice: 25500,
+    currency: 'TRY',
+    pocQuota: 5,
+    pocOverflowPrice: 750,
+    productLimit: 25,
+    inviteQuotaPerMonth: 10,
+    overrideLimit: 2,
+    featuredDaysPerWeek: 0,
+    continuousFeatured: false,
+    features: ['5 PoC kontenjanı/ay', '25 ürün limiti', '10 davet/ay', 'E-posta destek', 'Performans rozetleri'],
+    recommendedFor: ['integrator'],
+    isActive: true,
+    isVisible: true,
+    displayOrder: 1,
+  },
+  {
+    id: 'professional',
+    name: 'Professional',
+    tier: 'professional',
+    duration: 30,
+    price: 7500,
+    yearlyPrice: 76500,
+    currency: 'TRY',
+    pocQuota: 20,
+    pocOverflowPrice: 500,
+    productLimit: 100,
+    inviteQuotaPerMonth: 50,
+    overrideLimit: 5,
+    featuredDaysPerWeek: 1,
+    continuousFeatured: false,
+    features: ['20 PoC kontenjanı/ay', '100 ürün limiti', '50 davet/ay', 'E-posta + Telefon destek', 'Trend analitik', 'Lead Conversion paneli', 'Müşteri segmenti', 'Haftada 1 gün ana sayfa featured'],
+    recommendedFor: ['distributor'],
+    isActive: true,
+    isVisible: true,
+    displayOrder: 2,
+  },
+  {
+    id: 'business',
+    name: 'Business',
+    tier: 'business',
+    duration: 30,
+    price: 14000,
+    yearlyPrice: 142800,
+    currency: 'TRY',
+    pocQuota: 50,
+    pocOverflowPrice: 350,
+    productLimit: 200,
+    inviteQuotaPerMonth: 100,
+    overrideLimit: 10,
+    featuredDaysPerWeek: 3,
+    continuousFeatured: false,
+    features: ['50 PoC kontenjanı/ay', '200 ürün limiti', '100 davet/ay', 'Telefon + WhatsApp destek', 'Tüm Pro özellikleri', 'Detay+Trend+Export analitik', 'Haftada 3 gün ana sayfa featured', 'Kısmi üst sıra önceliği'],
+    recommendedFor: [],
+    isActive: true,
+    isVisible: true,
+    displayOrder: 3,
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    tier: 'enterprise',
+    duration: 30,
+    price: 25000,
+    yearlyPrice: 255000,
+    currency: 'TRY',
+    pocQuota: -1, // sınırsız
+    pocOverflowPrice: 0,
+    productLimit: -1,
+    inviteQuotaPerMonth: -1,
+    overrideLimit: -1,
+    featuredDaysPerWeek: 7,
+    continuousFeatured: true,
+    features: ['Sınırsız PoC kabul', 'Sınırsız ürün', 'Sınırsız davet', 'Atanmış hesap yöneticisi', 'Tam analitik + Export', 'Sürekli ana sayfa featured', 'Üst sıra önceliği', 'Sınırsız override'],
+    recommendedFor: ['ureticid'],
+    isActive: true,
+    isVisible: true,
+    displayOrder: 4,
+  },
+];
+
+// Default sistem ayarları
+const DEFAULT_CONFIG = {
+  freeTier: {
+    pocAcceptanceMode: 'no_acceptance',
+    freePocsPerPeriod: 0,
+    freePeriodDays: 30,
+    productLimit: 3,
+    inviteLimit: 0,
+  },
+  earlyAdopter: {
+    enabled: true,
+    trialDurationDays: 90,
+    trialTier: 'professional',
+    requireCardForTrial: false,
+    autoConvertToPaid: false,
+    eligibleUntil: '2026-12-31',
+  },
+  overrideSettings: {
+    overridePriceMultiplier: 1.5,
+  },
+  suspend: {
+    unpaidPocThreshold: 3,
+    gracePeriodDays: 7,
+    autoSuspend: true,
+  },
+  quotaWarnings: {
+    warningPercents: [75, 100],
+  },
+  vendorTypeRecommendations: {
+    ureticid: 'enterprise',
+    distributor: 'professional',
+    integrator: 'starter',
+  },
+  yearlyDiscount: {
+    enabled: true,
+    discountPercent: 15,
+  },
+  featuredVisibility: {
+    homepageProductSlots: 6,
+    paidVendorPriority: 70,
+    freeVendorPriority: 30,
+    rotationDays: 7,
+  },
+  refundPolicy: {
+    yearlyTrialDays: 14,
+    monthlyRefundable: false,
+    proratedUpgrade: true,
+  },
+  paymentMethods: {
+    iyzico: { enabled: true, autoRenew: true },
+    manualTransfer: { enabled: true, requiresAdminApproval: true },
+  },
+};
+
+// Yardımcı: Default paketleri seed et (yoksa)
+async function seedDefaultPackagesIfNeeded() {
+  try {
+    const snap = await getDocs(collection(db, 'pochub_packages'));
+    if (snap.docs.length > 0) return false; // zaten var
+    for (const pkg of DEFAULT_PACKAGES) {
+      await setDoc(doc(db, 'pochub_packages', pkg.id), {
+        ...pkg,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    return true;
+  } catch(e) {
+    console.error('Paket seed hatası:', e);
+    return false;
+  }
+}
+
+// Yardımcı: Default sistem ayarlarını seed et (yoksa)
+async function seedDefaultConfigIfNeeded() {
+  try {
+    const ref = doc(db, 'pochub_config', 'system');
+    const snap = await getDoc(ref);
+    if (snap.exists()) return false; // zaten var
+    await setDoc(ref, {
+      ...DEFAULT_CONFIG,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      updatedBy: CUR_USER?.uid || null,
+    });
+    return true;
+  } catch(e) {
+    console.error('Config seed hatası:', e);
+    return false;
+  }
+}
+
+// Admin: Paket Tanımları Sayfası
+async function admPackages(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Paketler yükleniyor...</div>';
+  try {
+    // İlk seed kontrolü
+    const seeded = await seedDefaultPackagesIfNeeded();
+    const snap = await getDocs(collection(db, 'pochub_packages'));
+    var packages = snap.docs.map(d => ({...d.data(), id: d.id}));
+    packages.sort((a,b) => (a.displayOrder||0) - (b.displayOrder||0));
+
+    m.innerHTML = '';
+
+    // Header
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px';
+    hdr.innerHTML =
+      '<div>'
+      + '<h2 style="font-size:18px;font-weight:700">💎 Paket Tanımları</h2>'
+      + '<div class="txt-muted-12-mt3">'+packages.length+' paket tanımlı</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button class="btn-g btn-sm" id="pkg-reseed">🔄 Default\'a Sıfırla</button>'
+      + '<button class="btn-p btn-sm" id="pkg-add">+ Yeni Paket</button>'
+      + '</div>';
+    m.appendChild(hdr);
+
+    if (seeded) {
+      var info = document.createElement('div');
+      info.className = 'alert alert-ok';
+      info.style.marginBottom = '12px';
+      info.textContent = '✅ İlk kullanım için 5 default paket otomatik oluşturuldu (Free + 4 ücretli paket).';
+      m.appendChild(info);
+    }
+
+    // Paket grid
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px';
+
+    packages.forEach(function(pkg) {
+      var card = document.createElement('div');
+      var tierColors = {free:'#5a6278', starter:'#7db4ff', professional:'#22d078', business:'#f0a429', enterprise:'#c4a8ff'};
+      var color = tierColors[pkg.tier] || '#7db4ff';
+      card.style.cssText = 'background:var(--bg-surface);border:2px solid '+color+'40;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s';
+      card.innerHTML =
+        '<div class="flx-bw-s-mb10">'
+        + '<div>'
+        + '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+pkg.tier+'</div>'
+        + '<div style="font-size:18px;font-weight:800">'+pkg.name+'</div>'
+        + '</div>'
+        + '<div style="text-align:right">'
+        + '<div style="font-size:18px;font-weight:800;color:'+color+'">'+(pkg.price>0?'₺'+pkg.price.toLocaleString('tr-TR'):'Ücretsiz')+'</div>'
+        + (pkg.duration>0?'<div style="font-size:11px;color:var(--text-muted)">/'+pkg.duration+' gün</div>':'')
+        + '</div>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:10px">'
+        + '<div><span style="color:var(--text-muted)">PoC:</span> <strong>'+(pkg.pocQuota===-1?'Sınırsız':pkg.pocQuota)+'</strong></div>'
+        + '<div><span style="color:var(--text-muted)">Ürün:</span> <strong>'+(pkg.productLimit===-1?'∞':pkg.productLimit)+'</strong></div>'
+        + '<div><span style="color:var(--text-muted)">Davet:</span> <strong>'+(pkg.inviteQuotaPerMonth===-1?'∞':pkg.inviteQuotaPerMonth)+'</strong></div>'
+        + '<div><span style="color:var(--text-muted)">Aşan:</span> <strong>'+(pkg.pocOverflowPrice>0?'₺'+pkg.pocOverflowPrice:'—')+'</strong></div>'
+        + '</div>'
+        + (pkg.featuredDaysPerWeek > 0
+          ? '<div style="font-size:11px;color:'+color+';font-weight:600;margin-bottom:6px">🌟 '+(pkg.continuousFeatured?'Sürekli':pkg.featuredDaysPerWeek+' gün/hafta')+' featured</div>'
+          : '')
+        + '<div style="display:flex;gap:6px;margin-top:10px">'
+        + '<button class="btn-g btn-sm pkg-edit" data-id="'+pkg.id+'" style="flex:1">✏️ Düzenle</button>'
+        + (pkg.tier!=='free' ? '<button class="btn-red btn-sm pkg-del" data-id="'+pkg.id+'">🗑</button>' : '')
+        + '</div>';
+      grid.appendChild(card);
+    });
+    m.appendChild(grid);
+
+    // Event handlers
+    grid.querySelectorAll('.pkg-edit').forEach(function(b){
+      b.addEventListener('click', function(){ openPackageEditor(b.dataset.id, packages); });
+    });
+    grid.querySelectorAll('.pkg-del').forEach(function(b){
+      b.addEventListener('click', async function(){
+        if (!confirm('Bu paket silinecek. Emin misiniz? (Mevcut aboneler etkilenebilir!)')) return;
+        try {
+          await deleteDoc(doc(db,'pochub_packages',b.dataset.id));
+          showToast('Paket silindi.');
+          loadAdmTab();
+        } catch(e) { showToast('Hata: '+e.message,'err'); }
+      });
+    });
+    el('pkg-add')?.addEventListener('click', function(){ openPackageEditor(null, packages); });
+    el('pkg-reseed')?.addEventListener('click', async function(){
+      if (!confirm('TÜM paketler silinip default 5 paket geri yüklenecek. Emin misiniz?')) return;
+      try {
+        const allSnap = await getDocs(collection(db,'pochub_packages'));
+        for (const d of allSnap.docs) await deleteDoc(d.ref);
+        for (const pkg of DEFAULT_PACKAGES) {
+          await setDoc(doc(db,'pochub_packages',pkg.id), {...pkg, createdAt:serverTimestamp(), updatedAt:serverTimestamp()});
+        }
+        showToast('Default paketler geri yüklendi.');
+        loadAdmTab();
+      } catch(e) { showToast('Hata: '+e.message,'err'); }
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
+}
+
+// Paket düzenleme modal'ı
+function openPackageEditor(pkgId, allPackages) {
+  const isNew = !pkgId;
+  const pkg = isNew
+    ? {id:'', name:'', tier:'starter', duration:30, price:0, yearlyPrice:0, currency:'TRY', pocQuota:0, pocOverflowPrice:0, productLimit:0, inviteQuotaPerMonth:0, overrideLimit:0, featuredDaysPerWeek:0, continuousFeatured:false, features:[], recommendedFor:[], isActive:true, isVisible:true, displayOrder:99}
+    : allPackages.find(p => p.id === pkgId);
+  if (!pkg) { showToast('Paket bulunamadı','err'); return; }
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto">'
+    + '<div class="flx-bw-c" style="margin-bottom:16px"><h3 style="font-size:16px;font-weight:700">💎 '+(isNew?'Yeni Paket':'Paket Düzenle: '+pkg.name)+'</h3>'
+    + '<button id="pe-close" style="background:transparent;border:0;font-size:20px;cursor:pointer;color:var(--text-secondary)">×</button></div>'
+    + '<div style="display:grid;gap:10px">'
+    + '<div><label class="lbl-mini">Paket ID (değiştirilemez)</label><input class="inp" id="pe-id" value="'+pkg.id+'" '+(isNew?'':'disabled')+'></div>'
+    + '<div><label class="lbl-mini">Paket Adı</label><input class="inp" id="pe-name" value="'+pkg.name+'"></div>'
+    + '<div class="g2">'
+    + '<div><label class="lbl-mini">Tier</label><select class="inp" id="pe-tier">'+['free','starter','professional','business','enterprise'].map(function(t){return '<option value="'+t+'"'+(pkg.tier===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div>'
+    + '<div><label class="lbl-mini">Görüntüleme Sırası</label><input class="inp" type="number" id="pe-order" value="'+pkg.displayOrder+'"></div>'
+    + '</div>'
+    + '<div class="g2">'
+    + '<div><label class="lbl-mini">Aylık Fiyat (TRY)</label><input class="inp" type="number" id="pe-price" value="'+pkg.price+'"></div>'
+    + '<div><label class="lbl-mini">Yıllık Fiyat (TRY)</label><input class="inp" type="number" id="pe-yprice" value="'+pkg.yearlyPrice+'"></div>'
+    + '</div>'
+    + '<div class="g2">'
+    + '<div><label class="lbl-mini">Süre (gün)</label><input class="inp" type="number" id="pe-duration" value="'+pkg.duration+'"></div>'
+    + '<div><label class="lbl-mini">PoC Kontenjanı (-1 = sınırsız)</label><input class="inp" type="number" id="pe-poc" value="'+pkg.pocQuota+'"></div>'
+    + '</div>'
+    + '<div class="g2">'
+    + '<div><label class="lbl-mini">Aşan PoC Fiyatı (TRY)</label><input class="inp" type="number" id="pe-overflow" value="'+pkg.pocOverflowPrice+'"></div>'
+    + '<div><label class="lbl-mini">Ürün Limiti (-1 = ∞)</label><input class="inp" type="number" id="pe-prod" value="'+pkg.productLimit+'"></div>'
+    + '</div>'
+    + '<div class="g2">'
+    + '<div><label class="lbl-mini">Davet/Ay Limiti (-1 = ∞)</label><input class="inp" type="number" id="pe-invite" value="'+pkg.inviteQuotaPerMonth+'"></div>'
+    + '<div><label class="lbl-mini">Override Hakkı/Ay (-1 = ∞)</label><input class="inp" type="number" id="pe-override" value="'+pkg.overrideLimit+'"></div>'
+    + '</div>'
+    + '<div class="g2">'
+    + '<div><label class="lbl-mini">Featured Gün/Hafta (0-7)</label><input class="inp" type="number" id="pe-featured" min="0" max="7" value="'+pkg.featuredDaysPerWeek+'"></div>'
+    + '<div><label class="lbl-mini">Sürekli Featured</label><select class="inp" id="pe-continuous"><option value="false"'+(!pkg.continuousFeatured?' selected':'')+'>Hayır</option><option value="true"'+(pkg.continuousFeatured?' selected':'')+'>Evet</option></select></div>'
+    + '</div>'
+    + '<div><label class="lbl-mini">Özellikler (her satıra bir özellik)</label><textarea class="inp" id="pe-features" rows="5">'+(Array.isArray(pkg.features)?pkg.features.join('\n'):'')+'</textarea></div>'
+    + '<div><label class="lbl-mini">Önerilen Vendor Tipleri (virgülle: ureticid,distributor,integrator)</label><input class="inp" id="pe-recommend" value="'+(Array.isArray(pkg.recommendedFor)?pkg.recommendedFor.join(','):'')+'"></div>'
+    + '<div class="g2">'
+    + '<div><label class="lbl-mini">Aktif Mi?</label><select class="inp" id="pe-active"><option value="true"'+(pkg.isActive?' selected':'')+'>Evet</option><option value="false"'+(!pkg.isActive?' selected':'')+'>Hayır</option></select></div>'
+    + '<div><label class="lbl-mini">Görünür Mi?</label><select class="inp" id="pe-visible"><option value="true"'+(pkg.isVisible?' selected':'')+'>Evet (satışta)</option><option value="false"'+(!pkg.isVisible?' selected':'')+'>Hayır (gizli)</option></select></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn-p" id="pe-save" style="flex:1">💾 Kaydet</button><button class="btn-g" id="pe-cancel">İptal</button></div>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#pe-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#pe-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#pe-save').addEventListener('click', async function(){
+    var newId = modal.querySelector('#pe-id').value.trim() || pkg.id;
+    if (!newId) { showToast('ID zorunlu','err'); return; }
+    var data = {
+      name: modal.querySelector('#pe-name').value.trim(),
+      tier: modal.querySelector('#pe-tier').value,
+      duration: parseInt(modal.querySelector('#pe-duration').value) || 30,
+      price: parseInt(modal.querySelector('#pe-price').value) || 0,
+      yearlyPrice: parseInt(modal.querySelector('#pe-yprice').value) || 0,
+      currency: 'TRY',
+      pocQuota: parseInt(modal.querySelector('#pe-poc').value),
+      pocOverflowPrice: parseInt(modal.querySelector('#pe-overflow').value) || 0,
+      productLimit: parseInt(modal.querySelector('#pe-prod').value),
+      inviteQuotaPerMonth: parseInt(modal.querySelector('#pe-invite').value),
+      overrideLimit: parseInt(modal.querySelector('#pe-override').value),
+      featuredDaysPerWeek: parseInt(modal.querySelector('#pe-featured').value) || 0,
+      continuousFeatured: modal.querySelector('#pe-continuous').value === 'true',
+      features: modal.querySelector('#pe-features').value.split('\n').map(function(s){return s.trim();}).filter(function(s){return s;}),
+      recommendedFor: modal.querySelector('#pe-recommend').value.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}),
+      isActive: modal.querySelector('#pe-active').value === 'true',
+      isVisible: modal.querySelector('#pe-visible').value === 'true',
+      displayOrder: parseInt(modal.querySelector('#pe-order').value) || 99,
+      updatedAt: serverTimestamp(),
+      updatedBy: CUR_USER?.uid || null,
+    };
+    if (isNew) data.createdAt = serverTimestamp();
+    try {
+      await setDoc(doc(db,'pochub_packages',newId), data, {merge:!isNew});
+      showToast(isNew?'Paket oluşturuldu':'Paket güncellendi');
+      modal.remove();
+      loadAdmTab();
+    } catch(e) { showToast('Kaydetme hatası: '+e.message,'err'); }
+  });
+}
+
+// Admin: Sistem Ayarları Sayfası
+async function admSettings(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Ayarlar yükleniyor...</div>';
+  try {
+    const seeded = await seedDefaultConfigIfNeeded();
+    const snap = await getDoc(doc(db, 'pochub_config', 'system'));
+    if (!snap.exists()) {
+      m.innerHTML = '<div class="alert alert-err">Sistem ayarları bulunamadı.</div>';
+      return;
+    }
+    var cfg = snap.data();
+
+    m.innerHTML = '';
+
+    // Header
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px';
+    hdr.innerHTML =
+      '<div>'
+      + '<h2 style="font-size:18px;font-weight:700">🔧 Sistem Ayarları</h2>'
+      + '<div class="txt-muted-12-mt3">Premium iş modeli parametreleri</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button class="btn-g btn-sm" id="cfg-reseed">🔄 Default\'a Sıfırla</button>'
+      + '<button class="btn-p btn-sm" id="cfg-save">💾 Tüm Ayarları Kaydet</button>'
+      + '</div>';
+    m.appendChild(hdr);
+
+    if (seeded) {
+      var info = document.createElement('div');
+      info.className = 'alert alert-ok';
+      info.style.marginBottom = '12px';
+      info.textContent = '✅ İlk kullanım için default sistem ayarları otomatik oluşturuldu.';
+      m.appendChild(info);
+    }
+
+    var info2 = document.createElement('div');
+    info2.style.cssText = 'background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--text-secondary)';
+    info2.innerHTML = '💡 <strong>Not:</strong> Buradan yapılan değişiklikler hemen aktif olur. Mevcut aboneler etkilenmeden devam eder, sadece yeni kayıtlar/yenilemeler yeni değerleri kullanır.';
+    m.appendChild(info2);
+
+    // Form üretici
+    function section(title, color) {
+      var sec = document.createElement('div');
+      sec.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;border-left:3px solid '+color;
+      sec.innerHTML = '<h3 style="font-size:14px;font-weight:700;margin-bottom:10px">'+title+'</h3>';
+      return sec;
+    }
+    function field(label, id, type, value, hint) {
+      var w = document.createElement('div');
+      w.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;gap:10px;flex-wrap:wrap';
+      var inputHtml;
+      if (type === 'select') {
+        inputHtml = '<select class="inp" id="'+id+'" style="width:140px">'+value.options.map(function(o){return '<option value="'+o.v+'"'+(value.cur===o.v?' selected':'')+'>'+o.l+'</option>';}).join('')+'</select>';
+      } else if (type === 'toggle') {
+        inputHtml = '<select class="inp" id="'+id+'" style="width:120px"><option value="true"'+(value?' selected':'')+'>Açık</option><option value="false"'+(!value?' selected':'')+'>Kapalı</option></select>';
+      } else {
+        inputHtml = '<input class="inp" type="'+type+'" id="'+id+'" value="'+value+'" style="width:140px;text-align:right">';
+      }
+      w.innerHTML =
+        '<div style="flex:1;min-width:200px">'
+        + '<div style="font-size:13px;font-weight:600">'+label+'</div>'
+        + (hint ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">'+hint+'</div>' : '')
+        + '</div>'
+        + inputHtml;
+      return w;
+    }
+
+    // Free Tier
+    var s1 = section('🆓 Free Tier Davranışı', '#5a6278');
+    s1.appendChild(field('PoC Kabul Modu', 'cfg-free-mode', 'select', {
+      cur: cfg.freeTier?.pocAcceptanceMode || 'no_acceptance',
+      options: [{v:'no_acceptance',l:'Kabul Edemez'}, {v:'periodic_free',l:'Periyodik Ücretsiz'}]
+    }, 'no_acceptance: hiç PoC kabul edemez | periodic_free: belirli aralıklarla ücretsiz hak'));
+    s1.appendChild(field('Periyot Başına Ücretsiz PoC', 'cfg-free-pocs', 'number', cfg.freeTier?.freePocsPerPeriod ?? 0));
+    s1.appendChild(field('Periyot Süresi (gün)', 'cfg-free-period', 'number', cfg.freeTier?.freePeriodDays ?? 30));
+    s1.appendChild(field('Ürün Limiti', 'cfg-free-products', 'number', cfg.freeTier?.productLimit ?? 3));
+    s1.appendChild(field('Davet Limiti/ay', 'cfg-free-invites', 'number', cfg.freeTier?.inviteLimit ?? 0));
+    m.appendChild(s1);
+
+    // Early Adopter
+    var s2 = section('🎁 İlk Kullanıcı Promosyonu (Early Adopter)', '#22d078');
+    s2.appendChild(field('Aktif Mi?', 'cfg-ea-enabled', 'toggle', cfg.earlyAdopter?.enabled ?? true));
+    s2.appendChild(field('Trial Süresi (gün)', 'cfg-ea-days', 'number', cfg.earlyAdopter?.trialDurationDays ?? 90));
+    s2.appendChild(field('Trial Paketi', 'cfg-ea-tier', 'select', {
+      cur: cfg.earlyAdopter?.trialTier || 'professional',
+      options: [{v:'starter',l:'Starter'},{v:'professional',l:'Professional'},{v:'business',l:'Business'},{v:'enterprise',l:'Enterprise'}]
+    }, 'Yeni vendor\'a otomatik atanan trial paketi'));
+    s2.appendChild(field('Kart Bilgisi Zorunlu Mu?', 'cfg-ea-card', 'toggle', cfg.earlyAdopter?.requireCardForTrial ?? false));
+    s2.appendChild(field('Trial Sonu Otomatik Ücretli', 'cfg-ea-auto', 'toggle', cfg.earlyAdopter?.autoConvertToPaid ?? false));
+    s2.appendChild(field('Geçerlilik Tarihi', 'cfg-ea-until', 'date', cfg.earlyAdopter?.eligibleUntil || '2026-12-31', 'Bu tarihe kadar kayıt olanlar yararlanır'));
+    m.appendChild(s2);
+
+    // Override
+    var s3 = section('⚡ Override Sistemi', '#f0a429');
+    s3.appendChild(field('Override Fiyat Zammı (% - caydırıcı)', 'cfg-ov-mult', 'number', Math.round(((cfg.overrideSettings?.overridePriceMultiplier ?? 1.5) - 1) * 100), 'Override yapılan PoC için normal fiyat üzerine zam'));
+    m.appendChild(s3);
+
+    // Suspend
+    var s4 = section('⚠️ Suspend Kuralları', '#ff7070');
+    s4.appendChild(field('Suspend Eşiği (kaç ödenmemiş PoC)', 'cfg-sus-threshold', 'number', cfg.suspend?.unpaidPocThreshold ?? 3));
+    s4.appendChild(field('Grace Period (gün)', 'cfg-sus-grace', 'number', cfg.suspend?.gracePeriodDays ?? 7, 'Ödeme bittikten sonra ek süre'));
+    s4.appendChild(field('Otomatik Suspend', 'cfg-sus-auto', 'toggle', cfg.suspend?.autoSuspend ?? true));
+    m.appendChild(s4);
+
+    // Vendor Recommendations
+    var s5 = section('🏷️ Vendor Tipi Default Önerileri', '#7db4ff');
+    s5.appendChild(field('Üretici Önerilen Paket', 'cfg-rec-uretici', 'select', {
+      cur: cfg.vendorTypeRecommendations?.ureticid || 'enterprise',
+      options: [{v:'starter',l:'Starter'},{v:'professional',l:'Professional'},{v:'business',l:'Business'},{v:'enterprise',l:'Enterprise'}]
+    }));
+    s5.appendChild(field('Distribütör Önerilen Paket', 'cfg-rec-distri', 'select', {
+      cur: cfg.vendorTypeRecommendations?.distributor || 'professional',
+      options: [{v:'starter',l:'Starter'},{v:'professional',l:'Professional'},{v:'business',l:'Business'},{v:'enterprise',l:'Enterprise'}]
+    }));
+    s5.appendChild(field('Entegratör Önerilen Paket', 'cfg-rec-integrator', 'select', {
+      cur: cfg.vendorTypeRecommendations?.integrator || 'starter',
+      options: [{v:'starter',l:'Starter'},{v:'professional',l:'Professional'},{v:'business',l:'Business'},{v:'enterprise',l:'Enterprise'}]
+    }));
+    m.appendChild(s5);
+
+    // Yıllık İndirim
+    var s6 = section('💰 Yıllık Paket İndirimi', '#22d078');
+    s6.appendChild(field('İndirim Aktif Mi?', 'cfg-yd-enabled', 'toggle', cfg.yearlyDiscount?.enabled ?? true));
+    s6.appendChild(field('İndirim Yüzdesi (%)', 'cfg-yd-percent', 'number', cfg.yearlyDiscount?.discountPercent ?? 15, 'Yıllık ödemede indirim oranı'));
+    m.appendChild(s6);
+
+    // Featured Visibility
+    var s7 = section('🌟 Ana Sayfa Öne Çıkanlar', '#c4a8ff');
+    s7.appendChild(field('Toplam Slot Sayısı', 'cfg-feat-slots', 'number', cfg.featuredVisibility?.homepageProductSlots ?? 6));
+    s7.appendChild(field('Paid Vendor Önceliği (%)', 'cfg-feat-paid', 'number', cfg.featuredVisibility?.paidVendorPriority ?? 70));
+    s7.appendChild(field('Free Vendor Rotasyon (%)', 'cfg-feat-free', 'number', cfg.featuredVisibility?.freeVendorPriority ?? 30));
+    s7.appendChild(field('Rotasyon Periyodu (gün)', 'cfg-feat-rot', 'number', cfg.featuredVisibility?.rotationDays ?? 7));
+    m.appendChild(s7);
+
+    // Para İade
+    var s8 = section('🔁 Para İade Politikası', '#7db4ff');
+    s8.appendChild(field('Yıllık Paket İade Süresi (gün)', 'cfg-rp-yearly', 'number', cfg.refundPolicy?.yearlyTrialDays ?? 14));
+    s8.appendChild(field('Aylık Paket İade Edilebilir', 'cfg-rp-monthly', 'toggle', cfg.refundPolicy?.monthlyRefundable ?? false));
+    s8.appendChild(field('Yükseltmede Prorate', 'cfg-rp-prorate', 'toggle', cfg.refundPolicy?.proratedUpgrade ?? true));
+    m.appendChild(s8);
+
+    // Payment
+    var s9 = section('💳 Ödeme Yöntemleri', '#f0a429');
+    s9.appendChild(field('iyzico Aktif Mi?', 'cfg-pay-iyzico', 'toggle', cfg.paymentMethods?.iyzico?.enabled ?? true));
+    s9.appendChild(field('iyzico Otomatik Yenileme', 'cfg-pay-auto', 'toggle', cfg.paymentMethods?.iyzico?.autoRenew ?? true));
+    s9.appendChild(field('Manuel Havale Aktif Mi?', 'cfg-pay-manual', 'toggle', cfg.paymentMethods?.manualTransfer?.enabled ?? true));
+    m.appendChild(s9);
+
+    // Quota Warnings
+    var s10 = section('🔔 Quota Uyarı Eşikleri', '#f0a429');
+    s10.appendChild(field('Uyarı 1 (% kullanım)', 'cfg-qw-1', 'number', (cfg.quotaWarnings?.warningPercents||[75,100])[0] || 75));
+    s10.appendChild(field('Uyarı 2 (% kullanım)', 'cfg-qw-2', 'number', (cfg.quotaWarnings?.warningPercents||[75,100])[1] || 100));
+    m.appendChild(s10);
+
+    // Save
+    el('cfg-save').addEventListener('click', async function(){
+      try {
+        var newCfg = {
+          freeTier: {
+            pocAcceptanceMode: el('cfg-free-mode').value,
+            freePocsPerPeriod: parseInt(el('cfg-free-pocs').value)||0,
+            freePeriodDays: parseInt(el('cfg-free-period').value)||30,
+            productLimit: parseInt(el('cfg-free-products').value)||3,
+            inviteLimit: parseInt(el('cfg-free-invites').value)||0,
+          },
+          earlyAdopter: {
+            enabled: el('cfg-ea-enabled').value === 'true',
+            trialDurationDays: parseInt(el('cfg-ea-days').value)||90,
+            trialTier: el('cfg-ea-tier').value,
+            requireCardForTrial: el('cfg-ea-card').value === 'true',
+            autoConvertToPaid: el('cfg-ea-auto').value === 'true',
+            eligibleUntil: el('cfg-ea-until').value || '2026-12-31',
+          },
+          overrideSettings: {
+            overridePriceMultiplier: 1 + (parseInt(el('cfg-ov-mult').value)||50)/100,
+          },
+          suspend: {
+            unpaidPocThreshold: parseInt(el('cfg-sus-threshold').value)||3,
+            gracePeriodDays: parseInt(el('cfg-sus-grace').value)||7,
+            autoSuspend: el('cfg-sus-auto').value === 'true',
+          },
+          quotaWarnings: {
+            warningPercents: [parseInt(el('cfg-qw-1').value)||75, parseInt(el('cfg-qw-2').value)||100],
+          },
+          vendorTypeRecommendations: {
+            ureticid: el('cfg-rec-uretici').value,
+            distributor: el('cfg-rec-distri').value,
+            integrator: el('cfg-rec-integrator').value,
+          },
+          yearlyDiscount: {
+            enabled: el('cfg-yd-enabled').value === 'true',
+            discountPercent: parseInt(el('cfg-yd-percent').value)||15,
+          },
+          featuredVisibility: {
+            homepageProductSlots: parseInt(el('cfg-feat-slots').value)||6,
+            paidVendorPriority: parseInt(el('cfg-feat-paid').value)||70,
+            freeVendorPriority: parseInt(el('cfg-feat-free').value)||30,
+            rotationDays: parseInt(el('cfg-feat-rot').value)||7,
+          },
+          refundPolicy: {
+            yearlyTrialDays: parseInt(el('cfg-rp-yearly').value)||14,
+            monthlyRefundable: el('cfg-rp-monthly').value === 'true',
+            proratedUpgrade: el('cfg-rp-prorate').value === 'true',
+          },
+          paymentMethods: {
+            iyzico: { enabled: el('cfg-pay-iyzico').value === 'true', autoRenew: el('cfg-pay-auto').value === 'true' },
+            manualTransfer: { enabled: el('cfg-pay-manual').value === 'true', requiresAdminApproval: true },
+          },
+          updatedAt: serverTimestamp(),
+          updatedBy: CUR_USER?.uid || null,
+        };
+        await setDoc(doc(db,'pochub_config','system'), newCfg, {merge:true});
+        showToast('✅ Sistem ayarları kaydedildi.');
+      } catch(e) { showToast('Kaydetme hatası: '+e.message,'err'); }
+    });
+
+    el('cfg-reseed').addEventListener('click', async function(){
+      if (!confirm('Tüm ayarlar default değerlere sıfırlanacak. Emin misiniz?')) return;
+      try {
+        await setDoc(doc(db,'pochub_config','system'), {...DEFAULT_CONFIG, updatedAt:serverTimestamp(), updatedBy:CUR_USER?.uid||null});
+        showToast('✅ Default ayarlar geri yüklendi.');
+        loadAdmTab();
+      } catch(e) { showToast('Hata: '+e.message,'err'); }
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
   }
 }
 
