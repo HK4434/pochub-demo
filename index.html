@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.65 | pochub.co -->
+<!-- PoCHub v4.66 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.65</title>
+<title>PoCHub.co — v4.66</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.65';
+const VERSION = 'v4.66';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.66':  ['MAJOR: Premium Phase 1.3 — Kontenjan kontrolü PoC kabul akışına entegre edildi. Free tier paket alın modal\'ı, quota dolu modal (aşan öde/yükselt), pocUsedThisCycle artırma, poc_charges kayıt, admin Manuel Havale Onayları sekmesi.'],
   'v4.65':  ['MAJOR: Premium Phase 1.2 — Vendor Aboneliğim sayfası, Paketler karşılaştırma sayfası, manuel havale ödeme akışı, vendor tipi default önerisi, free tier banner, yıllık/aylık fatura toggle (%X indirim).'],
   'v4.64':  ['MAJOR: Premium İş Modeli Phase 1.1 — Veri Modeli + Sistem Ayarları + Paket Tanımları. Admin paneline 2 yeni sekme: Paket Tanımları (CRUD) ve Sistem Ayarları (38 parametre). pochub_config ve pochub_packages koleksiyonları aktif. Default 4 paket (Starter/Pro/Business/Enterprise) ilk kayıtta otomatik seed.'],
   'v4.63':  ['SEED: Çoklu kategori ürün üreticisi — 35+ kategoriye 70+ ürün, üretici/distribütör/entegratör rotasyonu. Katalog testleri için zengin veri seti.'],
@@ -10047,10 +10048,12 @@ async function loadVendTab() {
             b.addEventListener('click', async function(){
               if(!confirm('PoC kabul edilsin mi?')) return;
               b.disabled=true;
-              await updateDoc(doc(db,'poc_requests',b.dataset.id),{status:'active',vendorId:CUR_USER.uid,vendorName:CUR_PROFILE?.company||CUR_USER.email,acceptedAt:serverTimestamp()});
-              pocs = pocs.map(function(x){return x.id===b.dataset.id?{...x,status:'active'}:x;});
-              showToast('PoC kabul edildi.');
-              renderMain();
+              var pocData = pocs.find(function(x){return x.id===b.dataset.id;});
+              await vendorAcceptPocWithQuotaCheck(b.dataset.id, CUR_USER.uid, pocData, function(){
+                pocs = pocs.map(function(x){return x.id===b.dataset.id?{...x,status:'active'}:x;});
+                renderMain();
+              });
+              b.disabled=false;
             });
           });
           m.querySelectorAll('.poc-msg-q').forEach(function(b){
@@ -12522,23 +12525,10 @@ async function vendRequests(m) {
     lst.querySelectorAll('.rq-acc').forEach(function(b){
       b.addEventListener('click', async function(){
         if (!confirm('Bu PoC talebini kabul etmek istediğinizden emin misiniz?')) return;
-        try {
-          await updateDoc(doc(db,'poc_requests',b.dataset.id), { status:'active', acceptedAt: serverTimestamp() });
-          var r = reqs.find(function(x){ return x.id===b.dataset.id; });
-          if (r && r.customerId) {
-            await addDoc(collection(db,'notifications'), {
-              userId: r.customerId,
-              type: 'poc_accepted',
-              title: 'PoC Talebiniz Kabul Edildi',
-              message: (CUR_PROFILE?.displayName||CUR_PROFILE?.company||'Vendor') + ' "' + (r.productName||r.title||'PoC') + '" talebinizi kabul etti.',
-              relatedId: r.id,
-              read: false,
-              createdAt: serverTimestamp(),
-            });
-          }
-          showToast('✓ PoC talebi kabul edildi.');
+        var r = reqs.find(function(x){ return x.id===b.dataset.id; });
+        await vendorAcceptPocWithQuotaCheck(b.dataset.id, CUR_USER.uid, r, async function(){
           await vendRequests(m);
-        } catch(e){ showToast('Hata: '+e.message,'err'); }
+        });
       });
     });
     lst.querySelectorAll('.rq-rej').forEach(function(b){
@@ -13540,6 +13530,311 @@ async function openSendInviteModal() {
       (failed ? '. ' + failed + ' başarısız.' : '.'));
     loadVendTab();
   });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.66: KONTENJAN KONTROLÜ + PoC KABUL AKIŞI HELPER'LARI
+// ════════════════════════════════════════════════════════════════════
+
+// Vendor'ın PoC kabul edebilirliğini kontrol et
+// Returns: { allowed, reason, message, source, amount, package, options }
+async function canVendorAcceptPoC(vendorId) {
+  try {
+    // 1. Vendor billing — suspend mi?
+    const billSnap = await getDoc(doc(db,'vendor_billing',vendorId));
+    if (billSnap.exists() && billSnap.data().isSuspended) {
+      return {
+        allowed: false,
+        reason: 'suspended',
+        message: 'Hesabınız ödenmemiş PoC borçları nedeniyle askıya alındı. Cari hesabınızı kapatın ve yeniden aktif olun.',
+      };
+    }
+
+    // 2. Subscription kontrolü
+    const subSnap = await getDoc(doc(db,'vendor_subscriptions',vendorId));
+    if (!subSnap.exists()) {
+      return {
+        allowed: false,
+        reason: 'no_subscription',
+        message: 'PoC kabul edebilmek için bir paket satın almanız gerekiyor.',
+        options: ['buy_package', 'request_override'],
+      };
+    }
+    const sub = subSnap.data();
+    if (sub.status !== 'active' && sub.status !== 'grace_period') {
+      return {
+        allowed: false,
+        reason: 'expired',
+        message: 'Aboneliğiniz aktif değil. Lütfen yenileyin veya yeni paket alın.',
+        options: ['buy_package', 'request_override'],
+      };
+    }
+
+    // 3. Paket detayı
+    const pkgSnap = await getDoc(doc(db,'pochub_packages',sub.currentPackageId));
+    if (!pkgSnap.exists()) {
+      return { allowed: false, reason: 'package_not_found', message: 'Paket bilgisi bulunamadı.' };
+    }
+    const pkg = {...pkgSnap.data(), id: pkgSnap.id};
+
+    // 4. Enterprise → sınırsız
+    if (pkg.tier === 'enterprise' || pkg.pocQuota === -1) {
+      return {
+        allowed: true,
+        source: 'enterprise_unlimited',
+        amount: 0,
+        package: pkg,
+        subscription: sub,
+      };
+    }
+
+    // 5. Kontenjan dahilinde mi?
+    const used = sub.pocUsedThisCycle || 0;
+    if (used < pkg.pocQuota) {
+      return {
+        allowed: true,
+        source: 'monthly_quota',
+        amount: 0,
+        package: pkg,
+        subscription: sub,
+        remaining: pkg.pocQuota - used,
+      };
+    }
+
+    // 6. Kontenjan dolu — aşan ödeme seçeneği
+    return {
+      allowed: 'with_payment',
+      source: 'overflow',
+      amount: pkg.pocOverflowPrice || 0,
+      package: pkg,
+      subscription: sub,
+      reason: 'quota_exceeded',
+      message: 'Aylık PoC kontenjanınız doldu. Bu PoC için ekstra ödeme yapmanız veya paketi yükseltmeniz gerekiyor.',
+      options: ['pay_overflow', 'upgrade_package', 'request_override'],
+    };
+  } catch(e) {
+    console.error('canVendorAcceptPoC error:', e);
+    return { allowed: false, reason: 'error', message: 'Kontrol hatası: '+e.message };
+  }
+}
+
+// PoC kabul akışı — kontenjan kontrolü + transaction + bildirim
+// onAccepted callback: kabul başarılı olunca render güncellemek için
+async function vendorAcceptPocWithQuotaCheck(pocId, vendorId, pocData, onAccepted) {
+  const check = await canVendorAcceptPoC(vendorId);
+
+  if (check.allowed === true) {
+    // Kontenjan dahilinde / Enterprise — direkt kabul
+    return await _executePocAcceptance(pocId, vendorId, pocData, check, onAccepted);
+  }
+
+  if (check.allowed === 'with_payment') {
+    // Kontenjan dolu, modal göster
+    openOverflowOptionsModal(pocId, pocData, check, onAccepted);
+    return;
+  }
+
+  // Kabul edilemez (suspend, no_subscription, expired)
+  if (check.reason === 'suspended') {
+    alert('⚠️ Hesap Askıda\n\n' + check.message);
+    return;
+  }
+
+  // Free tier veya expired → paket satın alma modal'ı
+  openNoSubscriptionModal(pocId, pocData, check, onAccepted);
+}
+
+// PoC kabulünü gerçekleştir (transaction)
+async function _executePocAcceptance(pocId, vendorId, pocData, quotaCheck, onAccepted) {
+  try {
+    var pkg = quotaCheck.package;
+    var source = quotaCheck.source;
+    var chargeAmount = quotaCheck.amount || 0;
+    var chargeStatus = source === 'overflow_paid' ? 'paid' : 'covered';
+
+    // 1. PoC update
+    await updateDoc(doc(db,'poc_requests',pocId), {
+      status: 'active',
+      vendorId: vendorId,
+      vendorName: CUR_PROFILE?.company || CUR_USER.email,
+      acceptedAt: serverTimestamp(),
+      acceptedSource: source,
+    });
+
+    // 2. poc_charges kayıt
+    const chargeRef = await addDoc(collection(db,'poc_charges'), {
+      pocId: pocId,
+      vendorId: vendorId,
+      customerId: pocData?.customerId || null,
+      amount: chargeAmount,
+      source: source,
+      status: chargeStatus,
+      packageId: pkg?.id || null,
+      packageTier: pkg?.tier || null,
+      paidAt: chargeStatus === 'paid' ? serverTimestamp() : null,
+      createdAt: serverTimestamp(),
+    });
+
+    // 3. Subscription update — pocUsedThisCycle++ (sadece Enterprise hariç quota'lardan düşürülür)
+    if (source === 'monthly_quota' || source === 'enterprise_unlimited') {
+      await updateDoc(doc(db,'vendor_subscriptions',vendorId), {
+        pocUsedThisCycle: (quotaCheck.subscription.pocUsedThisCycle || 0) + 1,
+        totalPocAccepted: (quotaCheck.subscription.totalPocAccepted || 0) + 1,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    // 4. PoC'ye chargeId ekle
+    await updateDoc(doc(db,'poc_requests',pocId), { chargeId: chargeRef.id });
+
+    // 5. Bildirim — müşteri
+    if (pocData?.customerId) {
+      await addDoc(collection(db,'notifications'), {
+        userId: pocData.customerId,
+        type: 'poc_accepted',
+        title: 'PoC Talebiniz Kabul Edildi',
+        message: (CUR_PROFILE?.displayName||CUR_PROFILE?.company||'Vendor') + ' "' + (pocData.productName||pocData.title||'PoC') + '" talebinizi kabul etti.',
+        relatedId: pocId,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+    }
+
+    // 6. Vendor'a quota uyarısı (eşik aşıldıysa)
+    if (source === 'monthly_quota' && pkg.pocQuota > 0) {
+      var newUsed = (quotaCheck.subscription.pocUsedThisCycle || 0) + 1;
+      var pct = (newUsed / pkg.pocQuota) * 100;
+      if (pct >= 100) {
+        await addDoc(collection(db,'notifications'), {
+          userId: vendorId,
+          type: 'quota_warning_100',
+          title: '⚠️ PoC Kontenjanın Doldu',
+          message: 'Aylık ' + pkg.pocQuota + ' PoC kontenjanın doldu. Aşan PoC\'ler için ' + (pkg.pocOverflowPrice ? '₺'+pkg.pocOverflowPrice : 'paket yükseltme') + ' ücreti uygulanır.',
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } else if (pct >= 75 && (newUsed - 1) / pkg.pocQuota * 100 < 75) {
+        // %75 eşiği yeni geçildi
+        await addDoc(collection(db,'notifications'), {
+          userId: vendorId,
+          type: 'quota_warning_75',
+          title: '🔔 Kontenjan %75 Doldu',
+          message: 'Aylık PoC kontenjanının %75\'ini kullandın (' + newUsed + '/' + pkg.pocQuota + ').',
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+    }
+
+    showToast('✓ PoC kabul edildi.' + (chargeAmount > 0 ? ' Aşan ödeme: ₺' + chargeAmount : ''));
+    if (onAccepted) onAccepted();
+  } catch(e) {
+    showToast('Kabul hatası: '+e.message,'err');
+    throw e;
+  }
+}
+
+// Free tier / paketi olmayan vendor için modal
+function openNoSubscriptionModal(pocId, pocData, check, onAccepted) {
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:480px;width:100%">'
+    + '<div class="flx-bw-c" style="margin-bottom:12px">'
+    +   '<h3 style="font-size:16px;font-weight:700">⚠️ Paket Gerekli</h3>'
+    +   '<button id="ns-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+    + '</div>'
+    + '<div style="background:rgba(255,112,112,.06);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:12px;margin-bottom:14px">'
+    +   '<div style="font-size:13px;font-weight:600;color:#ff7070;margin-bottom:4px">' + (check.reason === 'expired' ? 'Aboneliğin Süresi Dolmuş' : 'Free Plan ile PoC Kabul Edemezsin') + '</div>'
+    +   '<div class="txt-muted-12">'+check.message+'</div>'
+    + '</div>'
+    + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">'
+    +   'PoC kabul edebilmek için iki seçeneğin var:'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px">'
+    +   '<button class="btn-p" id="ns-buy" style="text-align:left;padding:12px">'
+    +     '<div style="font-weight:700;font-size:13px">💎 Paket Satın Al</div>'
+    +     '<div style="font-size:11px;font-weight:400;opacity:.85;margin-top:2px">Aylık veya yıllık paket al, sınırsız avantajlar</div>'
+    +   '</button>'
+    +   '<button class="btn-g" id="ns-override" style="text-align:left;padding:12px">'
+    +     '<div style="font-weight:700;font-size:13px">⚡ Acil Onay Talep Et</div>'
+    +     '<div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">Admin\'den özel onay iste — bu PoC için sonradan faturalandırma (v4.67\'de aktif olacak)</div>'
+    +   '</button>'
+    +   '<button class="btn-g" id="ns-cancel" style="margin-top:6px">Vazgeç</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#ns-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ns-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ns-buy').addEventListener('click', function(){
+    modal.remove();
+    CUR_VEND_TAB = 'subscription';
+    loadVendTab();
+    el('scr-vendor').querySelectorAll('.si').forEach(function(b){ b.classList.toggle('on',b.dataset.t==='subscription'); });
+  });
+  modal.querySelector('#ns-override').addEventListener('click', function(){
+    showToast('⚡ Acil onay özelliği v4.67\'de aktif olacak.', 'warn');
+  });
+}
+
+// Quota dolu modal — 3 seçenek
+function openOverflowOptionsModal(pocId, pocData, check, onAccepted) {
+  var pkg = check.package;
+  var amount = check.amount;
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:520px;width:100%">'
+    + '<div class="flx-bw-c" style="margin-bottom:12px">'
+    +   '<h3 style="font-size:16px;font-weight:700">📊 Kontenjan Doldu</h3>'
+    +   '<button id="oo-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+    + '</div>'
+    + '<div style="background:rgba(240,164,41,.06);border:1px solid rgba(240,164,41,.25);border-radius:8px;padding:12px;margin-bottom:14px">'
+    +   '<div style="font-size:13px;font-weight:600;color:#f0a429;margin-bottom:4px">⚠️ Aylık PoC Kontenjanın Doldu</div>'
+    +   '<div class="txt-muted-12">'+pkg.name+' paketinde '+pkg.pocQuota+' PoC kontenjanını kullandın. Bu PoC için 3 seçeneğin var:</div>'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px">'
+    + (amount > 0
+      ? '<button class="btn-p" id="oo-overflow" style="text-align:left;padding:12px">'
+        + '<div style="font-weight:700;font-size:13px">💰 Aşan PoC Ödemesi — ₺'+amount.toLocaleString('tr-TR')+'</div>'
+        + '<div style="font-size:11px;font-weight:400;opacity:.85;margin-top:2px">Bu PoC için ekstra ödeme yap, hemen kabul et. Faturaya işlenir.</div>'
+        + '</button>'
+      : '')
+    +   '<button class="btn-g" id="oo-upgrade" style="text-align:left;padding:12px">'
+    +     '<div style="font-weight:700;font-size:13px">⬆️ Paketi Yükselt</div>'
+    +     '<div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">Daha yüksek pakete geç, daha fazla kontenjan kazan</div>'
+    +   '</button>'
+    +   '<button class="btn-g" id="oo-override" style="text-align:left;padding:12px">'
+    +     '<div style="font-weight:700;font-size:13px">⚡ Acil Onay Talep Et</div>'
+    +     '<div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">Admin\'den onay iste, sonradan faturalandırma (v4.67\'de aktif)</div>'
+    +   '</button>'
+    +   '<button class="btn-g" id="oo-cancel" style="margin-top:6px">Vazgeç</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#oo-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#oo-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#oo-upgrade').addEventListener('click', function(){
+    modal.remove();
+    CUR_VEND_TAB = 'subscription';
+    loadVendTab();
+    el('scr-vendor').querySelectorAll('.si').forEach(function(b){ b.classList.toggle('on',b.dataset.t==='subscription'); });
+  });
+  modal.querySelector('#oo-override').addEventListener('click', function(){
+    showToast('⚡ Acil onay özelliği v4.67\'de aktif olacak.', 'warn');
+  });
+  if (amount > 0) {
+    modal.querySelector('#oo-overflow').addEventListener('click', async function(){
+      if (!confirm('Aşan PoC için ₺'+amount.toLocaleString('tr-TR')+' ödeme yapılacak ve faturaya eklenecek. Onaylıyor musun?')) return;
+      modal.remove();
+      // overflow_paid akışı
+      var cQuotaCheck = {...check, source:'overflow_paid', amount: amount};
+      await _executePocAcceptance(pocId, CUR_USER.uid, pocData, cQuotaCheck, onAccepted);
+    });
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -15728,7 +16023,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['packages','💎 Paketler'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -15760,6 +16055,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'events')     { await admEvents(m);     return; }
     if (CUR_ADM_TAB === 'offers')     { await admOffers(m);     return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
+    if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'settings')   { await admSettings(m);   return; }
   if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
 
@@ -17477,6 +17773,217 @@ async function admSettings(m) {
       } catch(e) { showToast('Hata: '+e.message,'err'); }
     });
 
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.66: ADMIN — MANUEL HAVALE ONAYLARI
+// ════════════════════════════════════════════════════════════════════
+async function admPayments(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Ödeme talepleri yükleniyor...</div>';
+  try {
+    const snap = await getDocs(collection(db,'subscription_history'));
+    var allHistory = snap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    allHistory.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+
+    var pending = allHistory.filter(function(h){ return h.status === 'pending'; });
+    var paid = allHistory.filter(function(h){ return h.status === 'paid'; });
+    var failed = allHistory.filter(function(h){ return h.status === 'failed' || h.status === 'rejected'; });
+
+    var currentTab = 'pending';
+
+    function render() {
+      m.innerHTML = '';
+
+      // Header
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'margin-bottom:14px';
+      hdr.innerHTML =
+        '<h2 style="font-size:18px;font-weight:700">💳 Ödeme Onayları</h2>'
+        + '<div class="txt-muted-12-mt3">Manuel havale ödeme talepleri ve geçmiş</div>';
+      m.appendChild(hdr);
+
+      // Stat kartları
+      var stats = document.createElement('div');
+      stats.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px';
+      var statCards = [
+        ['Bekleyen', pending.length, '#f0a429', 'rgba(240,164,41,.08)', 'rgba(240,164,41,.2)'],
+        ['Onaylanmış', paid.length, '#22d078', 'rgba(34,208,120,.08)', 'rgba(34,208,120,.2)'],
+        ['Reddedilmiş', failed.length, '#ff7070', 'rgba(255,112,112,.08)', 'rgba(255,112,112,.2)'],
+        ['Toplam Gelir', '₺' + paid.reduce(function(s,h){return s+(h.amount||0);},0).toLocaleString('tr-TR'), '#7db4ff', 'rgba(125,180,255,.08)', 'rgba(125,180,255,.2)'],
+      ];
+      statCards.forEach(function(s){
+        var card = document.createElement('div');
+        card.style.cssText = 'background:'+s[3]+';border:1px solid '+s[4]+';border-radius:8px;padding:10px;text-align:center';
+        card.innerHTML =
+          '<div style="font-size:'+(typeof s[1]==='string'?'16px':'20px')+';font-weight:800;color:'+s[2]+'">'+s[1]+'</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">'+s[0]+'</div>';
+        stats.appendChild(card);
+      });
+      m.appendChild(stats);
+
+      // Tab filter
+      var tabRow = document.createElement('div');
+      tabRow.style.cssText = 'display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap';
+      [['pending','⏳ Bekleyen ('+pending.length+')'],['paid','✅ Onaylanmış'],['failed','❌ Reddedilmiş'],['all','📋 Tümü']].forEach(function(t){
+        var b = document.createElement('button');
+        b.className = 'btn-' + (currentTab===t[0]?'p':'g') + ' btn-sm';
+        b.textContent = t[1];
+        b.addEventListener('click', function(){ currentTab = t[0]; render(); });
+        tabRow.appendChild(b);
+      });
+      m.appendChild(tabRow);
+
+      // Liste
+      var items = currentTab === 'pending' ? pending
+        : currentTab === 'paid' ? paid
+        : currentTab === 'failed' ? failed
+        : allHistory;
+
+      if (items.length === 0) {
+        m.innerHTML += '<div class="empty"><div class="empty-icon">💳</div>Bu kategoride kayıt yok.</div>';
+        return;
+      }
+
+      var list = document.createElement('div');
+      list.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+
+      items.forEach(function(h){
+        var actionLabels = {purchase:'Satın Alma',renew:'Yenileme',upgrade:'Yükseltme',downgrade:'Düşürme',cancel:'İptal',trial_started:'Trial'};
+        var statusColors = {paid:'#22d078',pending:'#f0a429',failed:'#ff7070',rejected:'#ff7070',refunded:'#7db4ff'};
+        var statusLabels = {paid:'Ödendi',pending:'Bekliyor',failed:'Başarısız',rejected:'Reddedildi',refunded:'İade'};
+        var dt = h.createdAt?.toDate ? h.createdAt.toDate().toLocaleString('tr-TR') : '—';
+        var sc = statusColors[h.status] || '#5a6278';
+
+        var card = document.createElement('div');
+        card.style.cssText = 'background:var(--bg-surface);border:1px solid '+(h.status==='pending'?'rgba(240,164,41,.3)':'var(--border)')+';border-radius:8px;padding:14px';
+        card.innerHTML =
+          '<div class="flx-bw-s-mb10">'
+          +   '<div>'
+          +     '<div style="font-size:13px;font-weight:700">'+(actionLabels[h.action]||h.action)+' · '+(h.packageName||h.toPackageId||'-')+'</div>'
+          +     '<div class="txt-muted-12-mt2">'+(h.vendorName||h.vendorId||'—')+' · '+dt+'</div>'
+          +     (h.billingMode ? '<div class="txt-muted-12-mt2">'+(h.billingMode==='yearly'?'Yıllık':'Aylık')+' · '+(h.durationDays||30)+' gün</div>' : '')
+          +   '</div>'
+          +   '<div style="text-align:right">'
+          +     '<div style="font-size:16px;font-weight:800">'+(h.amount > 0 ? '₺'+h.amount.toLocaleString('tr-TR') : 'Ücretsiz')+'</div>'
+          +     '<div style="font-size:11px;font-weight:700;color:'+sc+';margin-top:2px">'+(statusLabels[h.status]||h.status)+'</div>'
+          +   '</div>'
+          + '</div>'
+          + '<div style="font-size:11.5px;color:var(--text-muted)">Yöntem: '+(h.paymentMethod==='bank_transfer'?'🏦 Manuel Havale':h.paymentMethod==='free'?'🆓 Ücretsiz':h.paymentMethod==='credit_card'?'💳 Kredi Kartı':h.paymentMethod)+'</div>'
+          + (h.status === 'pending' && h.action !== 'trial_started' ? '<div style="margin-top:10px;display:flex;gap:6px"><button class="pay-approve btn-p btn-sm" data-id="'+h.id+'">✅ Onayla & Aktive Et</button><button class="pay-reject btn-red btn-sm" data-id="'+h.id+'">❌ Reddet</button></div>' : '')
+          + (h.rejectionReason ? '<div style="margin-top:8px;font-size:11.5px;color:#ff7070;background:rgba(255,112,112,.06);padding:6px 8px;border-radius:6px"><strong>Red sebebi:</strong> '+h.rejectionReason+'</div>' : '')
+          + (h.approvedBy ? '<div style="margin-top:6px;font-size:10.5px;color:var(--text-muted);font-style:italic">'+(h.status==='paid'?'✅ Onaylayan: ':'❌ Reddeden: ')+h.approvedBy+'</div>' : '');
+        list.appendChild(card);
+      });
+      m.appendChild(list);
+
+      // Onayla
+      list.querySelectorAll('.pay-approve').forEach(function(b){
+        b.addEventListener('click', async function(){
+          var item = items.find(function(x){ return x.id === b.dataset.id; });
+          if (!item) return;
+          if (!confirm('Bu ödemeyi onaylamak ve vendor\'ın paketini aktive etmek istiyor musun?\n\nVendor: '+(item.vendorName||item.vendorId)+'\nPaket: '+(item.packageName||item.toPackageId)+'\nTutar: ₺'+(item.amount||0).toLocaleString('tr-TR'))) return;
+
+          try {
+            // 1. Paket bilgisini çek
+            const pkgSnap = await getDoc(doc(db,'pochub_packages',item.toPackageId));
+            if (!pkgSnap.exists()) throw new Error('Paket bulunamadı');
+            const pkg = pkgSnap.data();
+
+            // 2. vendor_subscriptions oluştur/güncelle
+            const subRef = doc(db,'vendor_subscriptions',item.vendorId);
+            const subSnap = await getDoc(subRef);
+            const isUpgrade = subSnap.exists();
+            var durationMs = (item.durationDays || 30) * 86400000;
+            var endTs = Date.now() + durationMs;
+
+            await setDoc(subRef, {
+              vendorId: item.vendorId,
+              currentPackageId: item.toPackageId,
+              currentTier: pkg.tier,
+              status: 'active',
+              startDate: serverTimestamp(),
+              endDate: { seconds: Math.floor(endTs/1000), nanoseconds: 0 },
+              autoRenew: false,
+              isTrial: false,
+              pocUsedThisCycle: 0,
+              inviteUsedThisCycle: 0,
+              totalPocAccepted: subSnap.exists() ? (subSnap.data().totalPocAccepted || 0) : 0,
+              totalPaidAmount: (subSnap.exists() ? (subSnap.data().totalPaidAmount || 0) : 0) + (item.amount || 0),
+              consecutiveUnpaidMonths: 0,
+              billingMode: item.billingMode || 'monthly',
+              updatedAt: serverTimestamp(),
+              createdAt: subSnap.exists() ? subSnap.data().createdAt : serverTimestamp(),
+              lastBilledAt: serverTimestamp(),
+            }, { merge: true });
+
+            // 3. users tablosunda subscriptionTier güncelle
+            await updateDoc(doc(db,'users',item.vendorId), {
+              subscriptionTier: pkg.tier,
+              hasActiveSubscription: true,
+            });
+
+            // 4. subscription_history'yi paid'e çevir
+            await updateDoc(doc(db,'subscription_history',item.id), {
+              status: 'paid',
+              paidAt: serverTimestamp(),
+              approvedBy: CUR_PROFILE?.displayName || CUR_USER.email,
+              approvedAt: serverTimestamp(),
+            });
+
+            // 5. Vendor'a bildirim
+            await addDoc(collection(db,'notifications'), {
+              userId: item.vendorId,
+              type: 'subscription_purchased',
+              title: '🎉 Paketin Aktive Edildi',
+              message: pkg.name + ' paketin admin onayıyla aktive edildi. Aylık ' + (pkg.pocQuota === -1 ? 'sınırsız' : pkg.pocQuota) + ' PoC kontenjanın hazır.',
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+
+            showToast('✅ Ödeme onaylandı, paket aktif edildi.');
+            await admPayments(m);
+          } catch(e) {
+            showToast('Hata: '+e.message,'err');
+          }
+        });
+      });
+
+      // Reddet
+      list.querySelectorAll('.pay-reject').forEach(function(b){
+        b.addEventListener('click', async function(){
+          var item = items.find(function(x){ return x.id === b.dataset.id; });
+          if (!item) return;
+          var reason = prompt('Red sebebi (vendor\'a gösterilecek):', 'Havale ödeme hesaba ulaşmadı.');
+          if (reason === null) return;
+          try {
+            await updateDoc(doc(db,'subscription_history',item.id), {
+              status: 'rejected',
+              rejectionReason: reason || 'Belirtilmedi',
+              approvedBy: CUR_PROFILE?.displayName || CUR_USER.email,
+              approvedAt: serverTimestamp(),
+            });
+            // Vendor bildirim
+            await addDoc(collection(db,'notifications'), {
+              userId: item.vendorId,
+              type: 'subscription_renewal_failed',
+              title: '❌ Ödeme Talebin Reddedildi',
+              message: (item.packageName||'Paket') + ' satın alma talebin reddedildi. Sebep: ' + reason,
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+            showToast('Ödeme reddedildi.');
+            await admPayments(m);
+          } catch(e) {
+            showToast('Hata: '+e.message,'err');
+          }
+        });
+      });
+    }
+
+    render();
   } catch(e) {
     m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
   }
