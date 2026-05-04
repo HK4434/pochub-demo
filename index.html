@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.66 | pochub.co -->
+<!-- PoCHub v4.67 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.66</title>
+<title>PoCHub.co — v4.67</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.66';
+const VERSION = 'v4.67';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.67':  ['MAJOR: Premium Phase 1.4 — Admin Override + Cari Hesap sistemi. Vendor Acil Onay Talep Et akışı, admin Override Talepleri sekmesi, Cari Hesap sayfası, ödenmemiş PoC takibi, otomatik suspend (3+ borç), borç ödeme akışı.'],
   'v4.66':  ['MAJOR: Premium Phase 1.3 — Kontenjan kontrolü PoC kabul akışına entegre edildi. Free tier paket alın modal\'ı, quota dolu modal (aşan öde/yükselt), pocUsedThisCycle artırma, poc_charges kayıt, admin Manuel Havale Onayları sekmesi.'],
   'v4.65':  ['MAJOR: Premium Phase 1.2 — Vendor Aboneliğim sayfası, Paketler karşılaştırma sayfası, manuel havale ödeme akışı, vendor tipi default önerisi, free tier banner, yıllık/aylık fatura toggle (%X indirim).'],
   'v4.64':  ['MAJOR: Premium İş Modeli Phase 1.1 — Veri Modeli + Sistem Ayarları + Paket Tanımları. Admin paneline 2 yeni sekme: Paket Tanımları (CRUD) ve Sistem Ayarları (38 parametre). pochub_config ve pochub_packages koleksiyonları aktif. Default 4 paket (Starter/Pro/Business/Enterprise) ilk kayıtta otomatik seed.'],
@@ -8972,7 +8973,7 @@ function renderVendor() {
     ['dashboard','Dashboard'],['requests','PoC Talepleri'],['calendar','Takvim'],
     ['products','Ürünlerim'],['portfolio','Portföyüm'],
     ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','💰 Tekliflerim'],['messages','💬 Mesajlar'],
-    ['subscription','💎 Aboneliğim'],
+    ['subscription','💎 Aboneliğim'],['billing','💳 Cari Hesap'],
   ];
   el('scr-vendor').innerHTML = `<div class="dash">
     <div class="sbar">
@@ -9008,6 +9009,7 @@ async function loadVendTab() {
   if (CUR_VEND_TAB === 'messages')  { await loadMessagesTab(m, 'vendor'); return; }
   if (CUR_VEND_TAB === 'requests')  { await vendRequests(m);  return; }
   if (CUR_VEND_TAB === 'subscription') { await vendSubscription(m); return; }
+  if (CUR_VEND_TAB === 'billing') { await vendBilling(m); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     m.innerHTML = '<div class="loading"><div class="spinner"></div>Dashboard yükleniyor...</div>';
 
@@ -13758,7 +13760,7 @@ function openNoSubscriptionModal(pocId, pocData, check, onAccepted) {
     +   '</button>'
     +   '<button class="btn-g" id="ns-override" style="text-align:left;padding:12px">'
     +     '<div style="font-weight:700;font-size:13px">⚡ Acil Onay Talep Et</div>'
-    +     '<div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">Admin\'den özel onay iste — bu PoC için sonradan faturalandırma (v4.67\'de aktif olacak)</div>'
+    +     '<div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">Admin\'den özel onay iste — bu PoC için sonradan faturalandırma yapılır</div>'
     +   '</button>'
     +   '<button class="btn-g" id="ns-cancel" style="margin-top:6px">Vazgeç</button>'
     + '</div>'
@@ -13774,7 +13776,8 @@ function openNoSubscriptionModal(pocId, pocData, check, onAccepted) {
     el('scr-vendor').querySelectorAll('.si').forEach(function(b){ b.classList.toggle('on',b.dataset.t==='subscription'); });
   });
   modal.querySelector('#ns-override').addEventListener('click', function(){
-    showToast('⚡ Acil onay özelliği v4.67\'de aktif olacak.', 'warn');
+    modal.remove();
+    openOverrideRequestModal(pocId, pocData, check, onAccepted);
   });
 }
 
@@ -13808,7 +13811,7 @@ function openOverflowOptionsModal(pocId, pocData, check, onAccepted) {
     +   '</button>'
     +   '<button class="btn-g" id="oo-override" style="text-align:left;padding:12px">'
     +     '<div style="font-weight:700;font-size:13px">⚡ Acil Onay Talep Et</div>'
-    +     '<div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">Admin\'den onay iste, sonradan faturalandırma (v4.67\'de aktif)</div>'
+    +     '<div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">Admin\'den onay iste, sonradan faturalandırma yapılır</div>'
     +   '</button>'
     +   '<button class="btn-g" id="oo-cancel" style="margin-top:6px">Vazgeç</button>'
     + '</div>'
@@ -13824,7 +13827,8 @@ function openOverflowOptionsModal(pocId, pocData, check, onAccepted) {
     el('scr-vendor').querySelectorAll('.si').forEach(function(b){ b.classList.toggle('on',b.dataset.t==='subscription'); });
   });
   modal.querySelector('#oo-override').addEventListener('click', function(){
-    showToast('⚡ Acil onay özelliği v4.67\'de aktif olacak.', 'warn');
+    modal.remove();
+    openOverrideRequestModal(pocId, pocData, check, onAccepted);
   });
   if (amount > 0) {
     modal.querySelector('#oo-overflow').addEventListener('click', async function(){
@@ -13834,6 +13838,358 @@ function openOverflowOptionsModal(pocId, pocData, check, onAccepted) {
       var cQuotaCheck = {...check, source:'overflow_paid', amount: amount};
       await _executePocAcceptance(pocId, CUR_USER.uid, pocData, cQuotaCheck, onAccepted);
     });
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.67: ACİL ONAY (OVERRIDE) TALEP MODAL
+// ════════════════════════════════════════════════════════════════════
+async function openOverrideRequestModal(pocId, pocData, check, onAccepted) {
+  // Mevcut paket yoksa standart fiyat (Starter aşan), varsa paketin aşan fiyatı + zam
+  var basePrice = check.package?.pocOverflowPrice || 750; // free vendor için default
+  // Override fiyat zammı config'den
+  const cfgSnap = await getDoc(doc(db,'pochub_config','system'));
+  const cfg = cfgSnap.exists() ? cfgSnap.data() : {};
+  var multiplier = cfg.overrideSettings?.overridePriceMultiplier || 1.5;
+  var overrideAmount = Math.round(basePrice * multiplier);
+
+  // Önceki override taleplerini kontrol et (aylık limit)
+  const lastMonth = Date.now() - 30 * 86400000;
+  const prevSnap = await getDocs(query(
+    collection(db, 'admin_overrides'),
+    where('vendorId','==',CUR_USER.uid),
+  ));
+  var thisMonthOverrides = prevSnap.docs.filter(function(d){
+    var data = d.data();
+    return (data.createdAt?.seconds || 0) * 1000 >= lastMonth;
+  }).length;
+
+  // Vendor'ın tier'ina göre limit
+  var tier = check.subscription?.currentTier || 'free';
+  var pkgLimit = check.package?.overrideLimit;
+  if (pkgLimit === undefined || pkgLimit === null) {
+    var limits = { free: 1, starter: 2, professional: 5, business: 10, enterprise: -1 };
+    pkgLimit = limits[tier] !== undefined ? limits[tier] : 1;
+  }
+  var limitReached = pkgLimit !== -1 && thisMonthOverrides >= pkgLimit;
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:520px;width:100%">'
+    + '<div class="flx-bw-c" style="margin-bottom:14px">'
+    +   '<h3 style="font-size:16px;font-weight:700">⚡ Acil Onay Talebi</h3>'
+    +   '<button id="or-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+    + '</div>'
+    + (limitReached
+      ? '<div class="alert alert-err" style="margin-bottom:14px">⚠️ Bu ay override limitine ulaştın ('+thisMonthOverrides+'/'+pkgLimit+'). Yeni talep oluşturamazsın. Paketi yükselterek limiti artırabilirsin.</div>'
+      : '<div style="background:rgba(240,164,41,.06);border:1px solid rgba(240,164,41,.25);border-radius:8px;padding:12px;margin-bottom:14px">'
+        +   '<div style="font-size:13px;font-weight:600;color:#f0a429;margin-bottom:6px">⚡ Bu Nedir?</div>'
+        +   '<div class="txt-muted-12">Admin\'den bu PoC için özel onay talep ediyorsun. Onaylanırsa PoC aktif hale gelir, ücret cari hesabına işlenir ve sonradan ödeyebilirsin.</div>'
+        + '</div>'
+        + '<div style="background:rgba(255,112,112,.06);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:12px;margin-bottom:14px">'
+        +   '<div style="font-size:13px;font-weight:600;margin-bottom:8px">💰 Faturalandırma Detayı</div>'
+        +   '<div class="flx-bw-c" style="font-size:12.5px;padding:3px 0"><span>Standart aşan PoC fiyatı</span><span>₺'+basePrice.toLocaleString('tr-TR')+'</span></div>'
+        +   '<div class="flx-bw-c" style="font-size:12.5px;padding:3px 0;color:#ff7070"><span>Override zammı (%'+Math.round((multiplier-1)*100)+')</span><span>+₺'+(overrideAmount-basePrice).toLocaleString('tr-TR')+'</span></div>'
+        +   '<div class="flx-bw-c" style="font-size:14px;padding:6px 0;border-top:1px solid rgba(255,112,112,.2);margin-top:6px;font-weight:700"><span>Toplam Borç</span><span style="color:#ff7070">₺'+overrideAmount.toLocaleString('tr-TR')+'</span></div>'
+        + '</div>'
+        + '<div style="background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.2);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11.5px;color:var(--text-muted)">'
+        +   '⚠️ Bu ay '+thisMonthOverrides+'/'+(pkgLimit===-1?'∞':pkgLimit)+' override talep ettin. '+(pkgLimit===-1?'Sınırsız hakkın var.':'Limit aşılırsa yeni talep oluşturamazsın.')
+        + '</div>'
+        + '<div style="margin-bottom:12px">'
+        +   '<label class="lbl-mini">Talep Sebebi (admin\'in görmesi için)</label>'
+        +   '<textarea class="inp" id="or-reason" rows="3" placeholder="Örn: Müşteri 5 yıllık partnerimiz, paketi yenilemeyi unuttuk, bu PoC çok kritik..."></textarea>'
+        + '</div>'
+      )
+    + '<div style="display:flex;gap:8px">'
+    + (!limitReached ? '<button class="btn-warn" id="or-submit" style="flex:1">⚡ Acil Onay Talep Et</button>' : '')
+    +   '<button class="btn-g" id="or-cancel">'+(limitReached?'Kapat':'Vazgeç')+'</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#or-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#or-cancel').addEventListener('click', function(){ modal.remove(); });
+
+  if (!limitReached) {
+    modal.querySelector('#or-submit').addEventListener('click', async function(){
+      var reason = (modal.querySelector('#or-reason').value || '').trim();
+      if (reason.length < 10) {
+        showToast('Lütfen en az 10 karakterlik bir sebep yaz.','warn');
+        return;
+      }
+      try {
+        // admin_overrides koleksiyonuna talep ekle
+        await addDoc(collection(db,'admin_overrides'), {
+          pocId: pocId,
+          pocTitle: pocData?.productName || pocData?.title || 'PoC',
+          vendorId: CUR_USER.uid,
+          vendorName: CUR_PROFILE?.displayName || CUR_PROFILE?.company || CUR_USER.email,
+          customerId: pocData?.customerId || null,
+          customerName: pocData?.customerName || pocData?.customerCompany || '',
+          reason: reason,
+          baseAmount: basePrice,
+          overrideAmount: overrideAmount,
+          multiplier: multiplier,
+          status: 'pending',
+          tier: tier,
+          packageId: check.package?.id || null,
+          createdAt: serverTimestamp(),
+        });
+        // Admin bildirimleri (tüm admin'lere)
+        const adminSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
+        for (const ad of adminSnap.docs) {
+          await addDoc(collection(db,'notifications'), {
+            userId: ad.id,
+            type: 'admin_override_request',
+            title: '⚡ Yeni Override Talebi',
+            message: (CUR_PROFILE?.company || CUR_USER.email) + ' "' + (pocData?.productName||'PoC') + '" için acil onay istiyor (₺' + overrideAmount.toLocaleString('tr-TR') + ').',
+            relatedId: pocId,
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+        showToast('✅ Acil onay talebin gönderildi. Admin yanıtladığında bildirim alacaksın.');
+        modal.remove();
+      } catch(e) { showToast('Hata: '+e.message,'err'); }
+    });
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.67: VENDOR CARİ HESAP SAYFASI (vendor menüsünden de erişilir)
+// ════════════════════════════════════════════════════════════════════
+async function vendBilling(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Cari hesap yükleniyor...</div>';
+  try {
+    const billRef = doc(db,'vendor_billing',CUR_USER.uid);
+    const billSnap = await getDoc(billRef);
+    var billing = billSnap.exists() ? billSnap.data() : { unpaidBalance: 0, unpaidPocCount: 0 };
+
+    // Bekleyen poc_charges'leri çek
+    const chargesSnap = await getDocs(query(
+      collection(db,'poc_charges'),
+      where('vendorId','==',CUR_USER.uid),
+      where('status','==','pending_invoice')
+    ));
+    var charges = chargesSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    charges.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+
+    // Suspend eşiği
+    const cfgSnap = await getDoc(doc(db,'pochub_config','system'));
+    const cfg = cfgSnap.exists() ? cfgSnap.data() : {};
+    var threshold = cfg.suspend?.unpaidPocThreshold || 3;
+
+    var totalDebt = charges.reduce(function(s,c){ return s + (c.amount || 0); }, 0);
+    var unpaidCount = charges.length;
+
+    m.innerHTML = '';
+
+    // Header
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'margin-bottom:14px';
+    hdr.innerHTML =
+      '<h2 style="font-size:18px;font-weight:700">💳 Cari Hesap</h2>'
+      + '<div class="txt-muted-12-mt3">Ödenmemiş override PoC borçları</div>';
+    m.appendChild(hdr);
+
+    if (unpaidCount === 0) {
+      var ok = document.createElement('div');
+      ok.style.cssText = 'background:rgba(34,208,120,.08);border:1px solid rgba(34,208,120,.25);border-radius:12px;padding:24px;text-align:center';
+      ok.innerHTML =
+        '<div style="font-size:36px;margin-bottom:8px">✅</div>'
+        + '<div style="font-size:15px;font-weight:700;color:#22d078;margin-bottom:6px">Cari Hesabın Temiz</div>'
+        + '<div class="txt-muted-12">Ödenmemiş borcun yok. PoC kabul akışın normal şekilde devam ediyor.</div>';
+      m.appendChild(ok);
+      return;
+    }
+
+    // Üst özet kart
+    var isCritical = unpaidCount >= threshold;
+    var color = isCritical ? '#ff7070' : (unpaidCount >= threshold-1 ? '#f0a429' : '#7db4ff');
+    var summary = document.createElement('div');
+    summary.style.cssText = 'background:linear-gradient(135deg,'+color+'15,'+color+'05);border:2px solid '+color+'40;border-radius:12px;padding:18px;margin-bottom:14px';
+    summary.innerHTML =
+      '<div class="flx-bw-s-mb10">'
+      +   '<div>'
+      +     '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+(billing.isSuspended?'⛔ Hesap Askıda':isCritical?'⚠️ Suspend Eşiği':'Borçlu PoC')+'</div>'
+      +     '<div style="font-size:24px;font-weight:800;color:'+color+'">'+unpaidCount+' / '+threshold+' PoC</div>'
+      +     '<div class="txt-muted-12-mt3">'+(billing.isSuspended?'Tüm borçları öde, hesabın anında aktif olur.':isCritical?'Bu eşik aşıldı! Ödeme yapılana kadar yeni PoC kabul edemezsin.':(threshold-unpaidCount)+' borç daha eklenince hesabın askıya alınacak.')+'</div>'
+      +   '</div>'
+      +   '<div style="text-align:right">'
+      +     '<div style="font-size:24px;font-weight:800;color:'+color+'">₺'+totalDebt.toLocaleString('tr-TR')+'</div>'
+      +     '<div class="txt-muted-12">toplam borç</div>'
+      +   '</div>'
+      + '</div>'
+      + '<button class="btn-p" id="bill-pay-all" style="width:100%;margin-top:8px">💰 Tümünü Öde — ₺'+totalDebt.toLocaleString('tr-TR')+'</button>';
+    m.appendChild(summary);
+
+    // Borçlu PoC listesi
+    var listHdr = document.createElement('div');
+    listHdr.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:8px';
+    listHdr.textContent = 'Borçlu PoC\'ler ('+unpaidCount+')';
+    m.appendChild(listHdr);
+
+    var list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+    for (const ch of charges) {
+      // PoC bilgisini çek
+      var pocSnap = null;
+      try { pocSnap = await getDoc(doc(db,'poc_requests',ch.pocId)); } catch(e) {}
+      var poc = pocSnap?.exists() ? pocSnap.data() : null;
+
+      var dt = ch.createdAt?.toDate ? ch.createdAt.toDate().toLocaleDateString('tr-TR') : '—';
+
+      var card = document.createElement('div');
+      card.style.cssText = 'background:var(--bg-surface);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:14px';
+      card.innerHTML =
+        '<div class="flx-bw-s-mb10">'
+        +   '<div>'
+        +     '<div style="font-size:13px;font-weight:700">'+(poc?.productName||poc?.title||'PoC')+'</div>'
+        +     '<div class="txt-muted-12-mt2">'+(poc?.customerName||poc?.customerCompany||'—')+' · '+dt+'</div>'
+        +     '<div style="font-size:11px;color:#f0a429;margin-top:3px">⚡ Admin override ile kabul edildi</div>'
+        +   '</div>'
+        +   '<div style="text-align:right">'
+        +     '<div style="font-size:16px;font-weight:800;color:#ff7070">₺'+(ch.amount||0).toLocaleString('tr-TR')+'</div>'
+        +     '<button class="bill-pay-one btn-warn btn-sm" data-id="'+ch.id+'" data-amount="'+ch.amount+'" data-poc="'+ch.pocId+'" style="margin-top:6px">💰 Öde</button>'
+        +   '</div>'
+        + '</div>';
+      list.appendChild(card);
+    }
+    m.appendChild(list);
+
+    // Tek ödeme
+    list.querySelectorAll('.bill-pay-one').forEach(function(b){
+      b.addEventListener('click', function(){
+        openBillingPaymentModal([b.dataset.id], parseFloat(b.dataset.amount), 'single');
+      });
+    });
+
+    // Tümünü öde
+    el('bill-pay-all').addEventListener('click', function(){
+      var ids = charges.map(function(c){ return c.id; });
+      openBillingPaymentModal(ids, totalDebt, 'bulk');
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Cari hesap yükleme hatası: '+e.message+'</div>';
+  }
+}
+
+// Cari hesap ödeme modal'ı (manuel havale akışı)
+function openBillingPaymentModal(chargeIds, amount, mode) {
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:480px;width:100%">'
+    + '<div class="flx-bw-c" style="margin-bottom:14px">'
+    +   '<h3 style="font-size:16px;font-weight:700">💰 Borç Ödeme</h3>'
+    +   '<button id="bp-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+    + '</div>'
+    + '<div style="background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.2);border-radius:8px;padding:12px;margin-bottom:14px">'
+    +   '<div class="flx-bw-c" style="font-size:13px"><span>'+(mode==='bulk'?chargeIds.length+' PoC borcu':'1 PoC borcu')+'</span><strong>₺'+amount.toLocaleString('tr-TR')+'</strong></div>'
+    + '</div>'
+    + '<div style="background:rgba(240,164,41,.06);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
+    +   '<div style="font-weight:700;color:#f0a429;margin-bottom:6px">🏦 Havale Bilgileri</div>'
+    +   '<strong>Hesap Sahibi:</strong> PoCHub Teknoloji A.Ş.<br>'
+    +   '<strong>IBAN:</strong> TR00 0000 0000 0000 0000 0000 00<br>'
+    +   '<strong>Açıklama:</strong> '+CUR_USER.uid.substring(0,8)+' / borc'
+    +   '<div style="margin-top:6px;font-size:11px;color:var(--text-muted)">Havale yaptıktan sonra "Ödeme Talebimi Gönder" tıkla. Admin onayından sonra borçlar kapanır.</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px"><button class="btn-p" id="bp-submit" style="flex:1">📝 Ödeme Talebi Gönder</button><button class="btn-g" id="bp-cancel">Vazgeç</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#bp-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#bp-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#bp-submit').addEventListener('click', async function(){
+    try {
+      // poc_charges → status='invoiced' (ödeme talebi gönderildi, admin onayı bekliyor)
+      for (const id of chargeIds) {
+        await updateDoc(doc(db,'poc_charges',id), {
+          status: 'invoiced',
+          paymentRequestedAt: serverTimestamp(),
+        });
+      }
+      // Admin bildirim
+      const adminSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
+      for (const ad of adminSnap.docs) {
+        await addDoc(collection(db,'notifications'), {
+          userId: ad.id,
+          type: 'manual_transfer_pending',
+          title: '🏦 Borç Ödeme Talebi',
+          message: (CUR_PROFILE?.company || CUR_USER.email) + ' ' + chargeIds.length + ' borç için ₺' + amount.toLocaleString('tr-TR') + ' ödeme talebi gönderdi.',
+          relatedId: CUR_USER.uid,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+      showToast('✅ Ödeme talebin gönderildi. Admin onayından sonra borçlar kapanacak.');
+      modal.remove();
+      loadVendTab();
+    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  });
+}
+
+// Vendor billing güncelleme + suspend kontrolü (utility)
+async function updateVendorBilling(vendorId, deltaAmount, deltaCount) {
+  try {
+    const billRef = doc(db,'vendor_billing',vendorId);
+    const billSnap = await getDoc(billRef);
+    var current = billSnap.exists() ? billSnap.data() : { unpaidBalance:0, unpaidPocCount:0, isSuspended:false };
+
+    var newBalance = (current.unpaidBalance || 0) + deltaAmount;
+    var newCount = (current.unpaidPocCount || 0) + deltaCount;
+    if (newBalance < 0) newBalance = 0;
+    if (newCount < 0) newCount = 0;
+
+    // Suspend eşiği config'den
+    const cfgSnap = await getDoc(doc(db,'pochub_config','system'));
+    const cfg = cfgSnap.exists() ? cfgSnap.data() : {};
+    var threshold = cfg.suspend?.unpaidPocThreshold || 3;
+    var autoSuspend = cfg.suspend?.autoSuspend !== false;
+
+    var shouldSuspend = autoSuspend && newCount >= threshold && !current.isSuspended;
+    var shouldUnsuspend = current.isSuspended && newCount === 0;
+
+    var update = {
+      vendorId: vendorId,
+      unpaidBalance: newBalance,
+      unpaidPocCount: newCount,
+      updatedAt: serverTimestamp(),
+    };
+    if (shouldSuspend) {
+      update.isSuspended = true;
+      update.suspendedAt = serverTimestamp();
+      update.suspendReason = 'unpaid_' + newCount + '+';
+    } else if (shouldUnsuspend) {
+      update.isSuspended = false;
+      update.suspendedAt = null;
+      update.suspendReason = null;
+    }
+    await setDoc(billRef, update, { merge: true });
+
+    // user.isSuspendedDueToBilling
+    if (shouldSuspend || shouldUnsuspend) {
+      await updateDoc(doc(db,'users',vendorId), {
+        isSuspendedDueToBilling: shouldSuspend,
+      });
+      // Bildirim
+      await addDoc(collection(db,'notifications'), {
+        userId: vendorId,
+        type: shouldSuspend ? 'account_suspended' : 'account_reactivated',
+        title: shouldSuspend ? '⛔ Hesabın Askıya Alındı' : '✅ Hesabın Yeniden Aktif',
+        message: shouldSuspend
+          ? newCount + ' adet ödenmemiş PoC borcun nedeniyle hesabın askıya alındı. Yeni PoC kabul edemezsin. Borçlarını ödeyerek hesabını aktif edebilirsin.'
+          : 'Tüm borçların ödendi. Hesabın yeniden aktif. PoC kabul edebilirsin.',
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+    }
+    return { newBalance, newCount, suspended: shouldSuspend, unsuspended: shouldUnsuspend };
+  } catch(e) {
+    console.error('updateVendorBilling error:', e);
   }
 }
 
@@ -16023,7 +16379,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -16056,6 +16412,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'offers')     { await admOffers(m);     return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
+    if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
     if (CUR_ADM_TAB === 'settings')   { await admSettings(m);   return; }
   if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
 
@@ -17788,13 +18145,24 @@ async function admPayments(m) {
     var allHistory = snap.docs.map(function(d){ return {...d.data(), id:d.id}; });
     allHistory.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
+    // v4.67: Borç ödeme talepleri (poc_charges status='invoiced')
+    const chargesSnap = await getDocs(query(collection(db,'poc_charges'), where('status','==','invoiced')));
+    var billingPayments = chargesSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    billingPayments.sort(function(a,b){ return (b.paymentRequestedAt?.seconds||0)-(a.paymentRequestedAt?.seconds||0); });
+    // Vendor başına grupla
+    var billingByVendor = {};
+    billingPayments.forEach(function(c){
+      if (!billingByVendor[c.vendorId]) billingByVendor[c.vendorId] = [];
+      billingByVendor[c.vendorId].push(c);
+    });
+
     var pending = allHistory.filter(function(h){ return h.status === 'pending'; });
     var paid = allHistory.filter(function(h){ return h.status === 'paid'; });
     var failed = allHistory.filter(function(h){ return h.status === 'failed' || h.status === 'rejected'; });
 
     var currentTab = 'pending';
 
-    function render() {
+    async function render() {
       m.innerHTML = '';
 
       // Header
@@ -17827,7 +18195,8 @@ async function admPayments(m) {
       // Tab filter
       var tabRow = document.createElement('div');
       tabRow.style.cssText = 'display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap';
-      [['pending','⏳ Bekleyen ('+pending.length+')'],['paid','✅ Onaylanmış'],['failed','❌ Reddedilmiş'],['all','📋 Tümü']].forEach(function(t){
+      var billingPendingCount = billingPayments.length;
+      [['pending','⏳ Paket Bekleyen ('+pending.length+')'],['billing','💳 Borç Ödemeleri ('+billingPendingCount+')'],['paid','✅ Onaylanmış'],['failed','❌ Reddedilmiş'],['all','📋 Tümü']].forEach(function(t){
         var b = document.createElement('button');
         b.className = 'btn-' + (currentTab===t[0]?'p':'g') + ' btn-sm';
         b.textContent = t[1];
@@ -17835,6 +18204,110 @@ async function admPayments(m) {
         tabRow.appendChild(b);
       });
       m.appendChild(tabRow);
+
+      // BORÇ ÖDEMELERİ TAB'I
+      if (currentTab === 'billing') {
+        if (billingPendingCount === 0) {
+          var emp = document.createElement('div');
+          emp.className = 'empty';
+          emp.innerHTML = '<div class="empty-icon">💳</div>Bekleyen borç ödeme talebi yok.';
+          m.appendChild(emp);
+          return;
+        }
+        var billList = document.createElement('div');
+        billList.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+        for (const vendorId in billingByVendor) {
+          const vCharges = billingByVendor[vendorId];
+          var vTotal = vCharges.reduce(function(s,c){ return s + (c.amount || 0); }, 0);
+          // Vendor adı
+          var vName = vendorId;
+          try {
+            const uSnap = await getDoc(doc(db,'users',vendorId));
+            if (uSnap.exists()) vName = uSnap.data().company || uSnap.data().displayName || vendorId;
+          } catch(e) {}
+
+          var dt = vCharges[0].paymentRequestedAt?.toDate ? vCharges[0].paymentRequestedAt.toDate().toLocaleString('tr-TR') : '—';
+          var card = document.createElement('div');
+          card.style.cssText = 'background:var(--bg-surface);border:1px solid rgba(125,180,255,.3);border-radius:8px;padding:14px';
+          card.innerHTML =
+            '<div class="flx-bw-s-mb10">'
+            +   '<div>'
+            +     '<div style="font-size:13px;font-weight:700">'+vName+'</div>'
+            +     '<div class="txt-muted-12-mt2">'+vCharges.length+' borçlu PoC için ödeme talebi · '+dt+'</div>'
+            +   '</div>'
+            +   '<div style="text-align:right">'
+            +     '<div style="font-size:18px;font-weight:800;color:#7db4ff">₺'+vTotal.toLocaleString('tr-TR')+'</div>'
+            +   '</div>'
+            + '</div>'
+            + '<div style="font-size:11.5px;color:var(--text-muted);background:rgba(125,180,255,.05);padding:8px 10px;border-radius:6px;margin-top:8px">'
+            +   vCharges.map(function(c){ return '• ₺'+(c.amount||0).toLocaleString('tr-TR'); }).join(' · ')
+            + '</div>'
+            + '<div style="margin-top:10px;display:flex;gap:6px"><button class="bill-approve btn-p btn-sm" data-vendor="'+vendorId+'">✅ Borçları Kapat</button><button class="bill-reject btn-red btn-sm" data-vendor="'+vendorId+'">❌ Reddet</button></div>';
+          billList.appendChild(card);
+        }
+        m.appendChild(billList);
+
+        // Borç onayla
+        billList.querySelectorAll('.bill-approve').forEach(function(b){
+          b.addEventListener('click', async function(){
+            var vendorId = b.dataset.vendor;
+            const vCharges = billingByVendor[vendorId];
+            var vTotal = vCharges.reduce(function(s,c){ return s + (c.amount || 0); }, 0);
+            if (!confirm('Bu vendor\'ın '+vCharges.length+' borcunu kapatmak istiyor musun?\n\nToplam: ₺'+vTotal.toLocaleString('tr-TR')+'\nVendor borçları silinecek, hesap askıdaysa açılacak.')) return;
+            try {
+              // Tüm charge'ları paid yap
+              for (const c of vCharges) {
+                await updateDoc(doc(db,'poc_charges',c.id), {
+                  status: 'paid',
+                  paidAt: serverTimestamp(),
+                  paymentApprovedBy: CUR_PROFILE?.displayName || CUR_USER.email,
+                });
+              }
+              // vendor_billing güncelle (tümünü kapat)
+              await updateVendorBilling(vendorId, -vTotal, -vCharges.length);
+              // Vendor bildirimi
+              await addDoc(collection(db,'notifications'), {
+                userId: vendorId,
+                type: 'payment_approved',
+                title: '✅ Borçların Kapatıldı',
+                message: vCharges.length + ' adet borcun (₺' + vTotal.toLocaleString('tr-TR') + ') admin tarafından kapatıldı.',
+                read: false,
+                createdAt: serverTimestamp(),
+              });
+              showToast('✅ Borçlar kapatıldı.');
+              await admPayments(m);
+            } catch(e) { showToast('Hata: '+e.message,'err'); }
+          });
+        });
+        billList.querySelectorAll('.bill-reject').forEach(function(b){
+          b.addEventListener('click', async function(){
+            var vendorId = b.dataset.vendor;
+            const vCharges = billingByVendor[vendorId];
+            var reason = prompt('Red sebebi (vendor\'a gösterilecek):', 'Havale alınmadı.');
+            if (reason === null) return;
+            try {
+              for (const c of vCharges) {
+                await updateDoc(doc(db,'poc_charges',c.id), {
+                  status: 'pending_invoice', // tekrar borç durumuna dön
+                  rejectionReason: reason,
+                  paymentRequestedAt: null,
+                });
+              }
+              await addDoc(collection(db,'notifications'), {
+                userId: vendorId,
+                type: 'payment_rejected',
+                title: '❌ Borç Ödeme Talebin Reddedildi',
+                message: 'Sebep: ' + reason + ' — Lütfen havale durumunu kontrol et ve tekrar talep gönder.',
+                read: false,
+                createdAt: serverTimestamp(),
+              });
+              showToast('Talep reddedildi.');
+              await admPayments(m);
+            } catch(e) { showToast('Hata: '+e.message,'err'); }
+          });
+        });
+        return;
+      }
 
       // Liste
       var items = currentTab === 'pending' ? pending
@@ -17979,6 +18452,226 @@ async function admPayments(m) {
           } catch(e) {
             showToast('Hata: '+e.message,'err');
           }
+        });
+      });
+    }
+
+    render();
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.67: ADMIN — OVERRIDE TALEPLERİ
+// ════════════════════════════════════════════════════════════════════
+async function admOverrides(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Override talepleri yükleniyor...</div>';
+  try {
+    const snap = await getDocs(collection(db,'admin_overrides'));
+    var all = snap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    all.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+
+    var pending = all.filter(function(h){ return h.status === 'pending'; });
+    var approved = all.filter(function(h){ return h.status === 'approved'; });
+    var rejected = all.filter(function(h){ return h.status === 'rejected'; });
+
+    var currentTab = 'pending';
+
+    async function render() {
+      m.innerHTML = '';
+
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'margin-bottom:14px';
+      hdr.innerHTML =
+        '<h2 style="font-size:18px;font-weight:700">⚡ Override Talepleri</h2>'
+        + '<div class="txt-muted-12-mt3">Vendor\'ların acil PoC kabul talepleri (sonradan faturalandırma)</div>';
+      m.appendChild(hdr);
+
+      var stats = document.createElement('div');
+      stats.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px';
+      var statCards = [
+        ['Bekleyen', pending.length, '#f0a429'],
+        ['Onaylı', approved.length, '#22d078'],
+        ['Reddedilmiş', rejected.length, '#ff7070'],
+        ['Toplam Borç (Onaylı)', '₺' + approved.reduce(function(s,h){return s+(h.overrideAmount||0);},0).toLocaleString('tr-TR'), '#7db4ff'],
+      ];
+      statCards.forEach(function(s){
+        var card = document.createElement('div');
+        card.style.cssText = 'background:'+s[2]+'15;border:1px solid '+s[2]+'30;border-radius:8px;padding:10px;text-align:center';
+        card.innerHTML =
+          '<div style="font-size:'+(typeof s[1]==='string'?'16px':'20px')+';font-weight:800;color:'+s[2]+'">'+s[1]+'</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">'+s[0]+'</div>';
+        stats.appendChild(card);
+      });
+      m.appendChild(stats);
+
+      var tabRow = document.createElement('div');
+      tabRow.style.cssText = 'display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap';
+      [['pending','⏳ Bekleyen ('+pending.length+')'],['approved','✅ Onaylı'],['rejected','❌ Reddedilmiş'],['all','📋 Tümü']].forEach(function(t){
+        var b = document.createElement('button');
+        b.className = 'btn-' + (currentTab===t[0]?'p':'g') + ' btn-sm';
+        b.textContent = t[1];
+        b.addEventListener('click', function(){ currentTab = t[0]; render(); });
+        tabRow.appendChild(b);
+      });
+      m.appendChild(tabRow);
+
+      var items = currentTab === 'pending' ? pending
+        : currentTab === 'approved' ? approved
+        : currentTab === 'rejected' ? rejected
+        : all;
+
+      if (items.length === 0) {
+        m.innerHTML += '<div class="empty"><div class="empty-icon">⚡</div>Bu kategoride talep yok.</div>';
+        return;
+      }
+
+      var list = document.createElement('div');
+      list.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+
+      for (const o of items) {
+        // Vendor'un mevcut override geçmişi (suistimal kontrolü)
+        var prevCount = all.filter(function(x){ return x.vendorId === o.vendorId && x.status === 'approved'; }).length;
+        var dt = o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString('tr-TR') : '—';
+        var statusColors = {pending:'#f0a429', approved:'#22d078', rejected:'#ff7070'};
+        var statusLabels = {pending:'Bekliyor', approved:'Onaylandı', rejected:'Reddedildi'};
+        var sc = statusColors[o.status] || '#5a6278';
+        var tierLabels = {free:'Free', starter:'Starter', professional:'Professional', business:'Business', enterprise:'Enterprise'};
+
+        var card = document.createElement('div');
+        card.style.cssText = 'background:var(--bg-surface);border:1px solid '+(o.status==='pending'?'rgba(240,164,41,.3)':'var(--border)')+';border-radius:8px;padding:14px';
+        card.innerHTML =
+          '<div class="flx-bw-s-mb10">'
+          +   '<div style="flex:1">'
+          +     '<div style="font-size:13px;font-weight:700">'+(o.pocTitle||'PoC')+'</div>'
+          +     '<div class="txt-muted-12-mt2">🏢 '+o.vendorName+'<span style="background:rgba(125,180,255,.1);color:#7db4ff;font-size:10px;padding:1px 6px;border-radius:6px;margin-left:6px">'+(tierLabels[o.tier]||o.tier)+'</span></div>'
+          +     (o.customerName ? '<div class="txt-muted-12-mt2">👤 Müşteri: '+o.customerName+'</div>' : '')
+          +     '<div class="txt-muted-12-mt2">📅 '+dt+(prevCount>0&&o.status!=='approved'?' · <span style="color:#f0a429">⚠️ Bu vendor\'ın daha önce '+prevCount+' onaylı override\'ı var</span>':'')+'</div>'
+          +   '</div>'
+          +   '<div style="text-align:right">'
+          +     '<div style="font-size:16px;font-weight:800;color:#ff7070">₺'+(o.overrideAmount||0).toLocaleString('tr-TR')+'</div>'
+          +     '<div style="font-size:10.5px;color:var(--text-muted)">Standart: ₺'+(o.baseAmount||0).toLocaleString('tr-TR')+'</div>'
+          +     '<div style="font-size:11px;font-weight:700;color:'+sc+';margin-top:4px">'+(statusLabels[o.status]||o.status)+'</div>'
+          +   '</div>'
+          + '</div>'
+          + '<div style="background:rgba(125,180,255,.05);border-left:3px solid rgba(125,180,255,.3);padding:8px 10px;font-size:12px;color:var(--text-secondary);margin-top:8px">'
+          +   '<strong>Sebep:</strong> '+o.reason
+          + '</div>'
+          + (o.status === 'pending' ? '<div style="margin-top:10px;display:flex;gap:6px"><button class="ov-approve btn-p btn-sm" data-id="'+o.id+'">✅ Onayla & Faturalandır</button><button class="ov-reject btn-red btn-sm" data-id="'+o.id+'">❌ Reddet</button></div>' : '')
+          + (o.adminNote ? '<div style="margin-top:8px;font-size:11.5px;color:var(--text-muted);background:rgba(255,255,255,.03);padding:6px 8px;border-radius:6px"><strong>Admin notu:</strong> '+o.adminNote+'</div>' : '')
+          + (o.approvedBy ? '<div style="margin-top:6px;font-size:10.5px;color:var(--text-muted);font-style:italic">'+(o.status==='approved'?'✅ Onaylayan: ':'❌ Reddeden: ')+o.approvedBy+'</div>' : '');
+        list.appendChild(card);
+      }
+      m.appendChild(list);
+
+      // Onayla
+      list.querySelectorAll('.ov-approve').forEach(function(b){
+        b.addEventListener('click', async function(){
+          var item = items.find(function(x){ return x.id === b.dataset.id; });
+          if (!item) return;
+          var note = prompt('Admin notu (opsiyonel, vendor\'a gösterilir):', '');
+          if (note === null) return;
+
+          if (!confirm('Bu override\'ı onaylamak istiyor musun?\n\nVendor: '+item.vendorName+'\nPoC: '+item.pocTitle+'\nTutar: ₺'+(item.overrideAmount||0).toLocaleString('tr-TR')+'\n\nVendor cari hesabına bu tutar borçlanacak ve PoC aktif olacak.')) return;
+
+          try {
+            // 1. PoC'yi aktif yap
+            await updateDoc(doc(db,'poc_requests',item.pocId), {
+              status: 'active',
+              vendorId: item.vendorId,
+              vendorName: item.vendorName,
+              acceptedAt: serverTimestamp(),
+              acceptedSource: 'admin_override',
+            });
+
+            // 2. poc_charges kayıt
+            const chargeRef = await addDoc(collection(db,'poc_charges'), {
+              pocId: item.pocId,
+              vendorId: item.vendorId,
+              customerId: item.customerId,
+              amount: item.overrideAmount,
+              source: 'admin_override',
+              status: 'pending_invoice',
+              packageId: item.packageId,
+              packageTier: item.tier,
+              overrideBy: CUR_USER.uid,
+              overrideReason: item.reason,
+              overrideAt: serverTimestamp(),
+              createdAt: serverTimestamp(),
+            });
+
+            // 3. PoC'ye chargeId ekle
+            await updateDoc(doc(db,'poc_requests',item.pocId), { chargeId: chargeRef.id });
+
+            // 4. vendor_billing güncelle (borçlandır)
+            await updateVendorBilling(item.vendorId, item.overrideAmount, 1);
+
+            // 5. admin_overrides güncelle
+            await updateDoc(doc(db,'admin_overrides',item.id), {
+              status: 'approved',
+              chargeId: chargeRef.id,
+              adminNote: note || '',
+              approvedBy: CUR_PROFILE?.displayName || CUR_USER.email,
+              approvedAt: serverTimestamp(),
+            });
+
+            // 6. Vendor bildirimi
+            await addDoc(collection(db,'notifications'), {
+              userId: item.vendorId,
+              type: 'admin_override_approved',
+              title: '✅ Acil Onayın Kabul Edildi',
+              message: '"'+item.pocTitle+'" PoC kabul edildi. ₺' + item.overrideAmount.toLocaleString('tr-TR') + ' cari hesabına işlendi.' + (note ? ' Admin notu: '+note : ''),
+              relatedId: item.pocId,
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+
+            // 7. Müşteri bildirimi
+            if (item.customerId) {
+              await addDoc(collection(db,'notifications'), {
+                userId: item.customerId,
+                type: 'poc_accepted',
+                title: 'PoC Talebiniz Kabul Edildi',
+                message: item.vendorName + ' "' + item.pocTitle + '" talebinizi kabul etti.',
+                relatedId: item.pocId,
+                read: false,
+                createdAt: serverTimestamp(),
+              });
+            }
+
+            showToast('✅ Override onaylandı. Vendor borçlandırıldı.');
+            await admOverrides(m);
+          } catch(e) { showToast('Hata: '+e.message,'err'); }
+        });
+      });
+
+      // Reddet
+      list.querySelectorAll('.ov-reject').forEach(function(b){
+        b.addEventListener('click', async function(){
+          var item = items.find(function(x){ return x.id === b.dataset.id; });
+          if (!item) return;
+          var reason = prompt('Red sebebi (vendor\'a gösterilecek):', 'Override talebi uygun bulunmadı. Paket alarak devam edebilirsin.');
+          if (reason === null) return;
+          try {
+            await updateDoc(doc(db,'admin_overrides',item.id), {
+              status: 'rejected',
+              adminNote: reason,
+              approvedBy: CUR_PROFILE?.displayName || CUR_USER.email,
+              approvedAt: serverTimestamp(),
+            });
+            await addDoc(collection(db,'notifications'), {
+              userId: item.vendorId,
+              type: 'admin_override_rejected',
+              title: '❌ Acil Onay Reddedildi',
+              message: '"'+item.pocTitle+'" için acil onay reddedildi. Sebep: ' + reason,
+              relatedId: item.pocId,
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+            showToast('Override reddedildi.');
+            await admOverrides(m);
+          } catch(e) { showToast('Hata: '+e.message,'err'); }
         });
       });
     }
