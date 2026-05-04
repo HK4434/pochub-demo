@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.67 | pochub.co -->
+<!-- PoCHub v4.68 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.67</title>
+<title>PoCHub.co — v4.68</title>
 <style>
 /* ── CSS DESIGN TOKENS ── */
 :root {
@@ -462,7 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.67';
+const VERSION = 'v4.68';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -697,6 +697,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.68':  ['MAJOR: Premium Phase 1.5 — iyzico kart ödeme akışı (UI + simülasyon). Vendor kart ekleme/silme, 3D Secure modal stub, anında abonelik aktivasyonu, otomatik yenileme toggle. NOT: Gerçek iyzico API server-side gerektirir (Firebase Functions); şu an mock akış.'],
   'v4.67':  ['MAJOR: Premium Phase 1.4 — Admin Override + Cari Hesap sistemi. Vendor Acil Onay Talep Et akışı, admin Override Talepleri sekmesi, Cari Hesap sayfası, ödenmemiş PoC takibi, otomatik suspend (3+ borç), borç ödeme akışı.'],
   'v4.66':  ['MAJOR: Premium Phase 1.3 — Kontenjan kontrolü PoC kabul akışına entegre edildi. Free tier paket alın modal\'ı, quota dolu modal (aşan öde/yükselt), pocUsedThisCycle artırma, poc_charges kayıt, admin Manuel Havale Onayları sekmesi.'],
   'v4.65':  ['MAJOR: Premium Phase 1.2 — Vendor Aboneliğim sayfası, Paketler karşılaştırma sayfası, manuel havale ödeme akışı, vendor tipi default önerisi, free tier banner, yıllık/aylık fatura toggle (%X indirim).'],
@@ -14382,11 +14383,13 @@ async function vendSubscription(m) {
       actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px';
       actions.innerHTML =
         '<button class="btn-g btn-sm" id="sub-upgrade">⬆️ Paket Yükselt/Düşür</button>'
+        + '<button class="btn-g btn-sm" id="sub-payment-methods">💳 Ödeme Yöntemlerim</button>'
         + '<button class="btn-g btn-sm" id="sub-history">📜 Ödeme Geçmişi</button>'
         + '<button class="btn-red btn-sm" id="sub-cancel">İptal Et</button>';
       m.appendChild(actions);
 
       el('sub-upgrade')?.addEventListener('click', function(){ openPackageBrowser(allPackages, cfg, subscription); });
+      el('sub-payment-methods')?.addEventListener('click', function(){ openPaymentMethodsModal(); });
       el('sub-history')?.addEventListener('click', function(){ openPaymentHistory(); });
       el('sub-cancel')?.addEventListener('click', async function(){
         if (!confirm('Aboneliğinizi iptal etmek istediğinize emin misiniz?\n\nMevcut paket bitiş tarihinde sona erer, sonra Free Plan\'a düşersiniz.')) return;
@@ -14515,7 +14518,7 @@ function openPackageBrowser(allPackages, cfg, currentSub, highlightPkgId) {
       + pkgsHtml
       + '</div>'
       + '<div style="margin-top:18px;padding:12px;background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.2);border-radius:8px;font-size:11.5px;color:var(--text-secondary)">'
-      +   '💡 <strong>Not:</strong> Tüm paketler manuel havale ile satın alınabilir. iyzico entegrasyonu yakında eklenecek (v4.68).'
+      +   '💡 <strong>Not:</strong> Kredi kartı (iyzico, anında aktif) veya manuel havale (24 saat onay) ile ödeme yapabilirsin. <strong>Test modu:</strong> Kart 5528 7900 0000 0008 / 12/30 / CVV 123.'
       + '</div>'
       + '</div>';
   }
@@ -14544,75 +14547,403 @@ function openPackageBrowser(allPackages, cfg, currentSub, highlightPkgId) {
 // ════════════════════════════════════════════════════════════════════
 // ÖDEME TALEP MODAL (manuel havale)
 // ════════════════════════════════════════════════════════════════════
-function openPaymentRequestModal(pkg, billingMode, cfg) {
+async function openPaymentRequestModal(pkg, billingMode, cfg) {
   var amount = billingMode === 'yearly' && pkg.yearlyPrice ? pkg.yearlyPrice : pkg.price;
   var label = billingMode === 'yearly' ? 'Yıllık' : 'Aylık';
   var period = billingMode === 'yearly' ? 365 : (pkg.duration || 30);
 
+  // Vendor'ın kayıtlı kartını çek
+  const pmSnap = await getDoc(doc(db,'payment_methods',CUR_USER.uid));
+  var paymentMethod = pmSnap.exists() ? pmSnap.data() : null;
+  var hasSavedCard = paymentMethod?.iyzico?.last4 ? true : false;
+
+  // Config'den ödeme yöntemleri
+  var iyzicoEnabled = cfg.paymentMethods?.iyzico?.enabled !== false;
+  var manualEnabled = cfg.paymentMethods?.manualTransfer?.enabled !== false;
+  var defaultMethod = hasSavedCard && iyzicoEnabled ? 'iyzico' : (iyzicoEnabled ? 'iyzico_new' : 'manual');
+
+  var selectedMethod = defaultMethod;
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+
+  function render() {
+    modal.innerHTML =
+      '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:520px;width:100%">'
+      + '<div class="flx-bw-c" style="margin-bottom:16px">'
+      +   '<h3 style="font-size:16px;font-weight:700">💳 Paket Satın Al</h3>'
+      +   '<button id="pr-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+      + '</div>'
+      + '<div style="background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.2);border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+      +   '<div style="font-size:11px;color:#22d078;font-weight:700;text-transform:uppercase;letter-spacing:1px">Sipariş Özeti</div>'
+      +   '<div style="font-size:14px;font-weight:700;margin-top:4px">'+pkg.name+' · '+label+'</div>'
+      +   '<div class="flx-bw-c" style="margin-top:8px;font-size:13px"><span>Tutar</span><strong>₺'+amount.toLocaleString('tr-TR')+'</strong></div>'
+      +   '<div class="flx-bw-c" style="font-size:11.5px;color:var(--text-muted);margin-top:4px"><span>Süre</span><span>'+period+' gün</span></div>'
+      + '</div>'
+      + '<div style="margin-bottom:14px">'
+      +   '<label class="lbl-mini">Ödeme Yöntemi Seç</label>'
+      +   '<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">'
+      // iyzico saved card
+      +   (iyzicoEnabled && hasSavedCard
+        ? '<label style="display:flex;gap:8px;padding:10px;border:1px solid '+(selectedMethod==='iyzico'?'#22d078':'var(--border)')+';border-radius:8px;cursor:pointer;background:'+(selectedMethod==='iyzico'?'rgba(34,208,120,.08)':'rgba(125,180,255,.04)')+'"><input type="radio" name="pm-r" value="iyzico" '+(selectedMethod==='iyzico'?'checked':'')+'><div style="flex:1"><strong>💳 Kayıtlı Kart</strong><div class="txt-muted-12-mt2">'+paymentMethod.iyzico.cardBrand+' **** '+paymentMethod.iyzico.last4+' · Anında aktif</div></div></label>'
+        : '')
+      // iyzico new card
+      +   (iyzicoEnabled
+        ? '<label style="display:flex;gap:8px;padding:10px;border:1px solid '+(selectedMethod==='iyzico_new'?'#22d078':'var(--border)')+';border-radius:8px;cursor:pointer;background:'+(selectedMethod==='iyzico_new'?'rgba(34,208,120,.08)':'rgba(125,180,255,.04)')+'"><input type="radio" name="pm-r" value="iyzico_new" '+(selectedMethod==='iyzico_new'?'checked':'')+'><div style="flex:1"><strong>💳 '+(hasSavedCard?'Yeni Kart Kullan':'Kredi Kartı (iyzico)')+'</strong><div class="txt-muted-12-mt2">3D Secure ile güvenli ödeme · Anında aktif</div></div></label>'
+        : '')
+      // manual
+      +   (manualEnabled
+        ? '<label style="display:flex;gap:8px;padding:10px;border:1px solid '+(selectedMethod==='manual'?'#f0a429':'var(--border)')+';border-radius:8px;cursor:pointer;background:'+(selectedMethod==='manual'?'rgba(240,164,41,.08)':'transparent')+'"><input type="radio" name="pm-r" value="manual" '+(selectedMethod==='manual'?'checked':'')+'><div style="flex:1"><strong>🏦 Manuel Havale</strong><div class="txt-muted-12-mt2">Banka havalesi yap, admin onayından sonra aktif olur (24 sa)</div></div></label>'
+        : '')
+      +   '</div>'
+      + '</div>'
+      // Manuel ise IBAN
+      + (selectedMethod === 'manual' ? (
+        '<div style="background:rgba(240,164,41,.06);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
+        +   '<div style="font-weight:700;color:#f0a429;margin-bottom:6px">🏦 Havale Bilgileri</div>'
+        +   '<div style="line-height:1.7"><strong>Hesap Sahibi:</strong> PoCHub Teknoloji A.Ş.<br><strong>IBAN:</strong> TR00 0000 0000 0000 0000 0000 00<br><strong>Açıklama:</strong> '+CUR_USER.uid.substring(0,8)+' / '+pkg.tier+'</div>'
+        +   '<div style="margin-top:6px;font-size:11px;color:var(--text-muted)">Havale sonrası "Talep Oluştur" tıkla. Admin 24 saat içinde onaylar.</div>'
+        + '</div>'
+      ) : '')
+      // Otomatik yenileme toggle (sadece iyzico)
+      + (selectedMethod === 'iyzico' || selectedMethod === 'iyzico_new'
+        ? '<div style="background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px"><label class="flx-bw-c" style="cursor:pointer;font-size:12.5px"><span><strong>🔄 Otomatik Yenileme</strong><div class="txt-muted-12-mt2">'+period+' gün sonra otomatik yenilenir, kart üzerinden tahsilat yapılır</div></span><input type="checkbox" id="pr-autorenew" checked style="width:18px;height:18px;cursor:pointer"></label></div>'
+        : '')
+      + '<div style="display:flex;gap:8px">'
+      +   '<button class="btn-p" id="pr-submit" style="flex:1">'+(selectedMethod==='manual'?'📝 Ödeme Talebi Oluştur':'💳 ₺'+amount.toLocaleString('tr-TR')+' Öde')+'</button>'
+      +   '<button class="btn-g" id="pr-cancel">Vazgeç</button>'
+      + '</div>'
+      + '</div>';
+  }
+  render();
+  document.body.appendChild(modal);
+
+  function rebind() {
+    modal.querySelector('#pr-close').addEventListener('click', function(){ modal.remove(); });
+    modal.querySelector('#pr-cancel').addEventListener('click', function(){ modal.remove(); });
+    modal.querySelectorAll('input[name="pm-r"]').forEach(function(r){
+      r.addEventListener('change', function(){ selectedMethod = this.value; render(); rebind(); });
+    });
+    modal.querySelector('#pr-submit').addEventListener('click', async function(){
+      if (selectedMethod === 'manual') {
+        // Manuel havale akışı (eski)
+        try {
+          await addDoc(collection(db,'subscription_history'), {
+            vendorId: CUR_USER.uid,
+            vendorName: CUR_PROFILE?.company || CUR_USER.email,
+            packageId: pkg.id,
+            packageName: pkg.name,
+            action: 'purchase',
+            fromPackageId: null,
+            toPackageId: pkg.id,
+            amount: amount,
+            currency: 'TRY',
+            billingMode: billingMode,
+            durationDays: period,
+            paymentMethod: 'bank_transfer',
+            status: 'pending',
+            createdAt: serverTimestamp(),
+          });
+          showToast('✅ Ödeme talebin oluşturuldu. Admin onayından sonra paketin aktif olacak.');
+          modal.remove();
+          loadVendTab();
+        } catch(e) { showToast('Hata: '+e.message,'err'); }
+      } else if (selectedMethod === 'iyzico') {
+        // Saved card ile direkt ödeme (3D Secure simülasyonu)
+        var autoRenew = modal.querySelector('#pr-autorenew')?.checked ?? true;
+        modal.remove();
+        await processIyzicoPayment(pkg, billingMode, amount, period, paymentMethod, autoRenew, false);
+      } else if (selectedMethod === 'iyzico_new') {
+        // Yeni kart girişi
+        var autoRenew = modal.querySelector('#pr-autorenew')?.checked ?? true;
+        modal.remove();
+        openCardEntryModal(pkg, billingMode, amount, period, autoRenew);
+      }
+    });
+  }
+  rebind();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.68: KART GİRİŞ MODAL (yeni kart ekleme + ödeme)
+// ════════════════════════════════════════════════════════════════════
+function openCardEntryModal(pkg, billingMode, amount, period, autoRenew) {
   var modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
   modal.innerHTML =
-    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:500px;width:100%">'
-    + '<div class="flx-bw-c" style="margin-bottom:16px">'
-    +   '<h3 style="font-size:16px;font-weight:700">💳 Paket Satın Al</h3>'
-    +   '<button id="pr-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:480px;width:100%">'
+    + '<div class="flx-bw-c" style="margin-bottom:14px">'
+    +   '<h3 style="font-size:16px;font-weight:700">💳 Kart Bilgileri</h3>'
+    +   '<button id="ce-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
     + '</div>'
-    + '<div style="background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.2);border-radius:8px;padding:12px 14px;margin-bottom:14px">'
-    +   '<div style="font-size:11px;color:#22d078;font-weight:700;text-transform:uppercase;letter-spacing:1px">Sipariş Özeti</div>'
-    +   '<div style="font-size:14px;font-weight:700;margin-top:4px">'+pkg.name+' · '+label+'</div>'
-    +   '<div class="flx-bw-c" style="margin-top:8px;font-size:13px">'
-    +     '<span>Tutar</span><strong>₺'+amount.toLocaleString('tr-TR')+'</strong>'
-    +   '</div>'
-    +   '<div class="flx-bw-c" style="font-size:11.5px;color:var(--text-muted);margin-top:4px">'
-    +     '<span>Süre</span><span>'+period+' gün</span>'
-    +   '</div>'
+    + '<div style="background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11.5px;color:var(--text-muted)">'
+    +   '🔒 Tüm kart bilgileri iyzico üzerinden 3D Secure ile şifrelenir. PoCHub kart numaranızı saklamaz.'
     + '</div>'
-    + '<div style="margin-bottom:14px">'
-    +   '<label class="lbl-mini">Ödeme Yöntemi</label>'
-    +   '<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">'
-    +     '<label style="display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:rgba(125,180,255,.06)"><input type="radio" name="pm" value="manual" checked><div><strong>🏦 Manuel Havale</strong><div class="txt-muted-12-mt2">Banka havalesi yaparsın, admin onaylar, paket aktif olur</div></div></label>'
-    +     '<label style="display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;cursor:not-allowed;opacity:.5"><input type="radio" name="pm" value="iyzico" disabled><div><strong>💳 Kredi Kartı (iyzico)</strong><div class="txt-muted-12-mt2">Yakında — v4.68\'de aktif olacak</div></div></label>'
-    +   '</div>'
+    + '<div style="background:rgba(255,193,7,.08);border:1px solid rgba(255,193,7,.25);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11.5px">'
+    +   '<strong style="color:#f0a429">⚠️ Test Modu</strong><div class="txt-muted-12-mt2">Bu bir simülasyondur. Gerçek kart ödemesi alınmaz. <strong>Test kartı:</strong> 5528 7900 0000 0008, son kul. 12/30, CVV 123</div>'
     + '</div>'
-    + '<div id="manual-info" style="background:rgba(240,164,41,.06);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
-    +   '<div style="font-weight:700;color:#f0a429;margin-bottom:6px">🏦 Havale Bilgileri</div>'
-    +   '<div style="line-height:1.7">'
-    +   '<strong>Hesap Sahibi:</strong> PoCHub Teknoloji A.Ş.<br>'
-    +   '<strong>IBAN:</strong> TR00 0000 0000 0000 0000 0000 00<br>'
-    +   '<strong>Açıklama:</strong> '+CUR_USER.uid.substring(0,8)+' / '+pkg.tier
+    + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">'
+    +   '<div><label class="lbl-mini">Kart Üzerindeki İsim</label><input class="inp" id="ce-name" placeholder="ALİ VELİ" style="text-transform:uppercase"></div>'
+    +   '<div><label class="lbl-mini">Kart Numarası</label><input class="inp" id="ce-num" placeholder="5528 7900 0000 0008" maxlength="19" inputmode="numeric"></div>'
+    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +     '<div><label class="lbl-mini">Son Kullanma (AA/YY)</label><input class="inp" id="ce-exp" placeholder="12/30" maxlength="5" inputmode="numeric"></div>'
+    +     '<div><label class="lbl-mini">CVV</label><input class="inp" id="ce-cvv" placeholder="123" maxlength="4" inputmode="numeric"></div>'
     +   '</div>'
-    +   '<div style="margin-top:6px;font-size:11px;color:var(--text-muted)">Havale yaptıktan sonra "Talep Oluştur" tuşuna bas. Admin 24 saat içinde onaylar.</div>'
+    +   '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"><input type="checkbox" id="ce-save" checked> Kartı kaydet (sonraki ödemeler için)</label>'
     + '</div>'
-    + '<div style="display:flex;gap:8px"><button class="btn-p" id="pr-create" style="flex:1">📝 Ödeme Talebi Oluştur</button><button class="btn-g" id="pr-cancel">Vazgeç</button></div>'
+    + '<div style="display:flex;gap:8px">'
+    +   '<button class="btn-p" id="ce-pay" style="flex:1">🔒 ₺'+amount.toLocaleString('tr-TR')+' Öde (3D Secure)</button>'
+    +   '<button class="btn-g" id="ce-cancel">Vazgeç</button>'
+    + '</div>'
     + '</div>';
   document.body.appendChild(modal);
 
-  modal.querySelector('#pr-close').addEventListener('click', function(){ modal.remove(); });
-  modal.querySelector('#pr-cancel').addEventListener('click', function(){ modal.remove(); });
-  modal.querySelector('#pr-create').addEventListener('click', async function(){
-    try {
-      // subscription_history'ye pending kayıt ekle
-      await addDoc(collection(db,'subscription_history'), {
-        vendorId: CUR_USER.uid,
-        vendorName: CUR_PROFILE?.company || CUR_USER.email,
-        packageId: pkg.id,
-        packageName: pkg.name,
-        action: 'purchase',
-        fromPackageId: null,
-        toPackageId: pkg.id,
-        amount: amount,
-        currency: 'TRY',
-        billingMode: billingMode,
-        durationDays: period,
-        paymentMethod: 'bank_transfer',
-        status: 'pending', // admin onayı bekliyor
-        createdAt: serverTimestamp(),
-      });
-      showToast('✅ Ödeme talebin oluşturuldu. Admin onayından sonra paketin aktif olacak.');
-      modal.remove();
-      loadVendTab();
-    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  // Auto-format kart numarası
+  modal.querySelector('#ce-num').addEventListener('input', function(){
+    var v = this.value.replace(/\s/g, '').replace(/[^0-9]/g, '');
+    var formatted = v.replace(/(.{4})/g, '$1 ').trim();
+    this.value = formatted;
   });
+  // Auto-format expiry
+  modal.querySelector('#ce-exp').addEventListener('input', function(){
+    var v = this.value.replace(/[^0-9]/g, '');
+    if (v.length >= 3) v = v.substring(0,2) + '/' + v.substring(2,4);
+    this.value = v;
+  });
+
+  modal.querySelector('#ce-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ce-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ce-pay').addEventListener('click', async function(){
+    var name = modal.querySelector('#ce-name').value.trim().toUpperCase();
+    var numRaw = modal.querySelector('#ce-num').value.replace(/\s/g,'');
+    var exp = modal.querySelector('#ce-exp').value;
+    var cvv = modal.querySelector('#ce-cvv').value.trim();
+    var save = modal.querySelector('#ce-save').checked;
+
+    // Validasyon
+    if (!name || name.length < 3) { showToast('Kart üzerindeki isim eksik','err'); return; }
+    if (numRaw.length < 13 || numRaw.length > 19) { showToast('Geçersiz kart numarası','err'); return; }
+    if (!/^\d{2}\/\d{2}$/.test(exp)) { showToast('Son kullanma tarihi geçersiz (AA/YY formatında)','err'); return; }
+    if (cvv.length < 3 || cvv.length > 4) { showToast('CVV geçersiz','err'); return; }
+
+    // Kart marka tespiti (basit)
+    var brand = 'Unknown';
+    if (numRaw.startsWith('4')) brand = 'Visa';
+    else if (numRaw.startsWith('5')) brand = 'MasterCard';
+    else if (numRaw.startsWith('3')) brand = 'Amex';
+    else if (numRaw.startsWith('9') || numRaw.startsWith('6')) brand = 'Troy';
+
+    var last4 = numRaw.substring(numRaw.length - 4);
+    var expMonth = parseInt(exp.split('/')[0]);
+    var expYear = parseInt('20' + exp.split('/')[1]);
+
+    var savedCardData = save ? {
+      cardToken: 'mock_tok_' + Math.random().toString(36).substring(2, 18),
+      last4: last4,
+      cardBrand: brand,
+      expMonth: expMonth,
+      expYear: expYear,
+      cardHolderName: name,
+    } : null;
+
+    modal.remove();
+    await processIyzicoPayment(pkg, billingMode, amount, period, savedCardData ? {iyzico: savedCardData} : null, autoRenew, save);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.68: 3D SECURE SİMÜLASYONU + ÖDEME İŞLEME
+// ════════════════════════════════════════════════════════════════════
+async function processIyzicoPayment(pkg, billingMode, amount, period, paymentMethod, autoRenew, saveNewCard) {
+  // 3D Secure modal (mock)
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:420px;width:100%;text-align:center">'
+    + '<div style="font-size:48px;margin-bottom:12px">🔒</div>'
+    + '<h3 style="font-size:16px;font-weight:700;margin-bottom:6px">3D Secure Doğrulama</h3>'
+    + '<div class="txt-muted-12">Bankanız tarafından SMS gönderilecek</div>'
+    + '<div style="margin:18px 0;padding:12px;background:rgba(125,180,255,.06);border-radius:8px;font-size:12px">'
+    +   '<div style="color:var(--text-muted);margin-bottom:6px">Bu bir simülasyondur. SMS kodu yerine:</div>'
+    +   '<input class="inp" id="td-sms" placeholder="123456 yaz veya boş bırak (test)" maxlength="6" inputmode="numeric" style="text-align:center;font-size:18px;letter-spacing:4px">'
+    + '</div>'
+    + '<div style="display:flex;gap:8px"><button class="btn-p" id="td-confirm" style="flex:1">✅ Onayla</button><button class="btn-red" id="td-fail">❌ İptal</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  return new Promise(function(resolve){
+    modal.querySelector('#td-fail').addEventListener('click', function(){
+      modal.remove();
+      showToast('Ödeme iptal edildi.','warn');
+      resolve(false);
+    });
+    modal.querySelector('#td-confirm').addEventListener('click', async function(){
+      var sms = modal.querySelector('#td-sms').value.trim();
+      // Mock validasyon
+      if (sms === '000000') {
+        showToast('SMS kodu hatalı (mock).','err');
+        return;
+      }
+
+      modal.querySelector('#td-confirm').disabled = true;
+      modal.querySelector('#td-confirm').textContent = 'İşleniyor...';
+
+      try {
+        // 1. Kart kaydet (saveNewCard ise)
+        if (saveNewCard && paymentMethod?.iyzico) {
+          await setDoc(doc(db,'payment_methods',CUR_USER.uid), {
+            vendorId: CUR_USER.uid,
+            preferredMethod: 'iyzico',
+            iyzico: paymentMethod.iyzico,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        }
+
+        // 2. subscription_history kaydı (DOĞRUDAN PAID)
+        const histRef = await addDoc(collection(db,'subscription_history'), {
+          vendorId: CUR_USER.uid,
+          vendorName: CUR_PROFILE?.company || CUR_USER.email,
+          packageId: pkg.id,
+          packageName: pkg.name,
+          action: 'purchase',
+          fromPackageId: null,
+          toPackageId: pkg.id,
+          amount: amount,
+          currency: 'TRY',
+          billingMode: billingMode,
+          durationDays: period,
+          paymentMethod: 'credit_card',
+          paymentProvider: 'iyzico',
+          cardLast4: paymentMethod?.iyzico?.last4 || '****',
+          cardBrand: paymentMethod?.iyzico?.cardBrand || 'Unknown',
+          status: 'paid', // direkt aktif
+          createdAt: serverTimestamp(),
+          paidAt: serverTimestamp(),
+          mock3DSecureSms: sms || 'auto-pass',
+        });
+
+        // 3. vendor_subscriptions oluştur/güncelle
+        const subRef = doc(db,'vendor_subscriptions',CUR_USER.uid);
+        const subSnap = await getDoc(subRef);
+        var endTs = Date.now() + period * 86400000;
+
+        await setDoc(subRef, {
+          vendorId: CUR_USER.uid,
+          currentPackageId: pkg.id,
+          currentTier: pkg.tier,
+          status: 'active',
+          startDate: serverTimestamp(),
+          endDate: { seconds: Math.floor(endTs/1000), nanoseconds: 0 },
+          autoRenew: autoRenew,
+          isTrial: false,
+          pocUsedThisCycle: 0,
+          inviteUsedThisCycle: 0,
+          totalPocAccepted: subSnap.exists() ? (subSnap.data().totalPocAccepted || 0) : 0,
+          totalPaidAmount: (subSnap.exists() ? (subSnap.data().totalPaidAmount || 0) : 0) + amount,
+          consecutiveUnpaidMonths: 0,
+          billingMode: billingMode,
+          updatedAt: serverTimestamp(),
+          createdAt: subSnap.exists() ? subSnap.data().createdAt : serverTimestamp(),
+          lastBilledAt: serverTimestamp(),
+        }, { merge: true });
+
+        // 4. user.subscriptionTier
+        await updateDoc(doc(db,'users',CUR_USER.uid), {
+          subscriptionTier: pkg.tier,
+          hasActiveSubscription: true,
+        });
+
+        // 5. Bildirim
+        await addDoc(collection(db,'notifications'), {
+          userId: CUR_USER.uid,
+          type: 'subscription_purchased',
+          title: '🎉 Paketin Aktive Edildi',
+          message: pkg.name + ' paketin başarıyla satın alındı. ' + (pkg.pocQuota === -1 ? 'Sınırsız' : pkg.pocQuota) + ' PoC kontenjanın hazır.',
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+
+        modal.remove();
+        showToast('🎉 Ödeme başarılı! Paketin aktif edildi.');
+        loadVendTab();
+        resolve(true);
+      } catch(e) {
+        modal.remove();
+        showToast('Ödeme hatası: '+e.message,'err');
+        resolve(false);
+      }
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.68: VENDOR ÖDEME YÖNTEMLERİ MODAL (kayıtlı kart yönetimi)
+// ════════════════════════════════════════════════════════════════════
+async function openPaymentMethodsModal() {
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:12px;padding:20px;max-width:500px;width:100%"><div class="loading"><div class="spinner"></div>Yükleniyor...</div></div>';
+  document.body.appendChild(modal);
+
+  try {
+    const pmSnap = await getDoc(doc(db,'payment_methods',CUR_USER.uid));
+    var pm = pmSnap.exists() ? pmSnap.data() : null;
+
+    modal.innerHTML =
+      '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:500px;width:100%">'
+      + '<div class="flx-bw-c" style="margin-bottom:14px">'
+      +   '<h3 style="font-size:16px;font-weight:700">💳 Ödeme Yöntemlerim</h3>'
+      +   '<button id="pm-close" style="background:transparent;border:0;font-size:22px;cursor:pointer">×</button>'
+      + '</div>'
+      + (pm?.iyzico?.last4
+        ? '<div style="background:linear-gradient(135deg,#1a1f2e,#2d3748);border-radius:12px;padding:18px;color:#fff;margin-bottom:14px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:24px">'
+          +   '<div>'
+          +     '<div style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:1px">Kayıtlı Kart</div>'
+          +     '<div style="font-size:14px;font-weight:600;margin-top:2px">'+pm.iyzico.cardBrand+'</div>'
+          +   '</div>'
+          +   '<div style="font-size:24px;opacity:.7">💳</div>'
+          + '</div>'
+          + '<div style="font-size:18px;font-family:monospace;letter-spacing:3px;margin-bottom:8px">**** **** **** '+pm.iyzico.last4+'</div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:11px;opacity:.7">'
+          +   '<span>'+(pm.iyzico.cardHolderName||'KART SAHİBİ')+'</span>'
+          +   '<span>'+(pm.iyzico.expMonth<10?'0':'')+pm.iyzico.expMonth+'/'+(pm.iyzico.expYear%100)+'</span>'
+          + '</div>'
+          + '</div>'
+          + '<div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn-red btn-sm" id="pm-remove" style="flex:1">🗑 Kartı Sil</button></div>'
+        : '<div style="background:rgba(125,180,255,.05);border:1px dashed rgba(125,180,255,.3);border-radius:12px;padding:30px;text-align:center;margin-bottom:14px"><div style="font-size:36px;margin-bottom:8px">💳</div><div style="font-size:13px;color:var(--text-muted)">Kayıtlı kartın yok</div></div>'
+      )
+      + '<div style="background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.2);border-radius:8px;padding:10px 12px;font-size:11.5px;color:var(--text-muted)">'
+      +   '🔒 Kart bilgileri iyzico üzerinde token olarak saklanır. PoCHub kart numaranızı doğrudan görmez.'
+      + '</div>'
+      + '</div>';
+
+    modal.querySelector('#pm-close').addEventListener('click', function(){ modal.remove(); });
+
+    if (pm?.iyzico?.last4) {
+      modal.querySelector('#pm-remove').addEventListener('click', async function(){
+        if (!confirm('Kayıtlı kartı silmek istiyor musun?\n\nOtomatik yenileme kapalı olacak; bir sonraki yenilemede manuel ödeme yapman gerekecek.')) return;
+        try {
+          // Sadece iyzico alanını temizle
+          await updateDoc(doc(db,'payment_methods',CUR_USER.uid), {
+            iyzico: null,
+            preferredMethod: 'manual_transfer',
+            updatedAt: serverTimestamp(),
+          });
+          // Eğer aktif sub varsa autoRenew'i kapat
+          const subRef = doc(db,'vendor_subscriptions',CUR_USER.uid);
+          const subSnap = await getDoc(subRef);
+          if (subSnap.exists() && subSnap.data().autoRenew) {
+            await updateDoc(subRef, { autoRenew: false });
+          }
+          showToast('Kart silindi.');
+          modal.remove();
+          loadVendTab();
+        } catch(e) { showToast('Hata: '+e.message,'err'); }
+      });
+    }
+  } catch(e) {
+    modal.innerHTML = '<div class="alert alert-err">'+e.message+'</div>';
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
