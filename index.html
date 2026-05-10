@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.70 | pochub.co -->
+<!-- PoCHub v4.71 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.70</title>
+<title>PoCHub.co — v4.71</title>
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
 body.role-customer{--color-primary:var(--role-customer-accent);--color-primary-dim:var(--role-customer-dim);--color-primary-hover:#1a9e5a;}
@@ -318,7 +318,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.70';
+const VERSION = 'v4.71';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -16993,7 +16993,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -17024,6 +17024,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'requests')   { await admRequests(m);   return; }
     if (CUR_ADM_TAB === 'events')     { await admEvents(m);     return; }
     if (CUR_ADM_TAB === 'offers')     { await admOffers(m);     return; }
+    if (CUR_ADM_TAB === 'revenue')    { await admRevenue(m);    return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
@@ -18121,6 +18122,420 @@ async function admDataHealth(m) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+// v4.71: ADMIN GELİR DASHBOARD
+// ════════════════════════════════════════════════════════════════════
+async function admRevenue(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Gelir verileri hesaplanıyor...</div>';
+  try {
+    // Tüm verileri paralel çek
+    const [subsSnap, histSnap, pkgsSnap, usersSnap, billingSnap] = await Promise.all([
+      getDocs(collection(db, 'vendor_subscriptions')),
+      getDocs(collection(db, 'subscription_history')),
+      getDocs(collection(db, 'pochub_packages')),
+      getDocs(query(collection(db, 'users'), where('role','==','vendor'))),
+      getDocs(collection(db, 'vendor_billing')),
+    ]);
+
+    var subs = subsSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    var history = histSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    var packages = pkgsSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    var vendors = usersSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    var billings = billingSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+
+    // Paket sözlüğü (id → paket)
+    var pkgById = {};
+    packages.forEach(function(p){ pkgById[p.id] = p; });
+
+    // ═════ HESAPLAMALAR ═════
+
+    var now = new Date();
+    var thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    var lastMonthStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    var lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // 1. MRR (Monthly Recurring Revenue) — aktif aboneliklerin aylık karşılığı
+    var mrr = 0;
+    var activeSubs = subs.filter(function(s){ return s.status === 'active' || s.status === 'grace_period'; });
+    activeSubs.forEach(function(s){
+      var pkg = pkgById[s.currentPackageId];
+      if (pkg && pkg.price > 0) {
+        // Yıllık ise /12, aylıksa olduğu gibi
+        var monthlyValue = s.billingMode === 'yearly' && pkg.yearlyPrice
+          ? pkg.yearlyPrice / 12
+          : pkg.price;
+        mrr += monthlyValue;
+      }
+    });
+
+    // 2. Bu ay gelir — bu ay paid olan history kayıtları
+    var thisMonthRevenue = 0;
+    var thisMonthPaymentCount = 0;
+    history.forEach(function(h){
+      if (h.status !== 'paid' || !h.amount || !h.paidAt) return;
+      var dt = h.paidAt.toDate ? h.paidAt.toDate() : new Date(h.paidAt.seconds*1000);
+      if (dt >= thisMonthStart) {
+        thisMonthRevenue += h.amount;
+        thisMonthPaymentCount++;
+      }
+    });
+
+    // Geçen ay gelir (karşılaştırma için)
+    var lastMonthRevenue = 0;
+    history.forEach(function(h){
+      if (h.status !== 'paid' || !h.amount || !h.paidAt) return;
+      var dt = h.paidAt.toDate ? h.paidAt.toDate() : new Date(h.paidAt.seconds*1000);
+      if (dt >= lastMonthStart && dt < lastMonthEnd) {
+        lastMonthRevenue += h.amount;
+      }
+    });
+    var revenueChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue * 100) : 0;
+
+    // 3. Aktif abonelik sayısı
+    var activeCount = activeSubs.length;
+    var paidActive = activeSubs.filter(function(s){
+      var pkg = pkgById[s.currentPackageId];
+      return pkg && pkg.price > 0;
+    }).length;
+
+    // 4. Churn rate (son 30 gün)
+    // Bu ay başında aktif olan / şu an expired veya cancelled olan
+    var thirtyDaysAgo = new Date(now.getTime() - 30*86400000);
+    var churnedCount = subs.filter(function(s){
+      if (s.status !== 'expired' && s.status !== 'cancelled') return false;
+      var endDt = s.endDate?.toDate ? s.endDate.toDate() : null;
+      return endDt && endDt >= thirtyDaysAgo;
+    }).length;
+    var churnRate = (paidActive + churnedCount) > 0 ? (churnedCount / (paidActive + churnedCount) * 100) : 0;
+
+    // 5. MRR Trend — son 6 ay
+    var mrrTrend = [];
+    for (var i = 5; i >= 0; i--) {
+      var monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      var monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      var monthRevenue = 0;
+      history.forEach(function(h){
+        if (h.status !== 'paid' || !h.amount || !h.paidAt) return;
+        var dt = h.paidAt.toDate ? h.paidAt.toDate() : new Date(h.paidAt.seconds*1000);
+        if (dt >= monthStart && dt < monthEnd) monthRevenue += h.amount;
+      });
+      var monthLabel = monthStart.toLocaleDateString('tr-TR', { month:'short' });
+      mrrTrend.push({ label: monthLabel, value: monthRevenue });
+    }
+
+    // 6. Paket Dağılımı
+    var pkgDistribution = {};
+    activeSubs.forEach(function(s){
+      var pkg = pkgById[s.currentPackageId];
+      if (!pkg) return;
+      var tier = pkg.tier;
+      if (!pkgDistribution[tier]) {
+        pkgDistribution[tier] = { count: 0, monthlyRevenue: 0, name: pkg.name };
+      }
+      pkgDistribution[tier].count++;
+      var mv = s.billingMode === 'yearly' && pkg.yearlyPrice ? pkg.yearlyPrice/12 : pkg.price;
+      pkgDistribution[tier].monthlyRevenue += mv;
+    });
+
+    // 7. Tier hareketleri (bu ay)
+    var thisMonthHistory = history.filter(function(h){
+      if (!h.paidAt) return false;
+      var dt = h.paidAt.toDate ? h.paidAt.toDate() : new Date(h.paidAt.seconds*1000);
+      return dt >= thisMonthStart && h.status === 'paid';
+    });
+    var upgrades = thisMonthHistory.filter(function(h){ return h.action === 'upgrade'; }).length;
+    var downgrades = thisMonthHistory.filter(function(h){ return h.action === 'downgrade'; }).length;
+    var newPurchases = thisMonthHistory.filter(function(h){ return h.action === 'purchase'; }).length;
+    var renewals = thisMonthHistory.filter(function(h){ return h.action === 'renew'; }).length;
+
+    // 8. Top 5 LTV vendor
+    var vendorLTV = {};
+    history.forEach(function(h){
+      if (h.status !== 'paid' || !h.amount) return;
+      if (!vendorLTV[h.vendorId]) vendorLTV[h.vendorId] = { vendorId: h.vendorId, vendorName: h.vendorName, total: 0, lastPackage: '', tier: '' };
+      vendorLTV[h.vendorId].total += h.amount;
+      vendorLTV[h.vendorId].lastPackage = h.packageName || '';
+    });
+    // Aktif tier bilgisi ekle
+    activeSubs.forEach(function(s){
+      if (vendorLTV[s.vendorId]) {
+        var pkg = pkgById[s.currentPackageId];
+        vendorLTV[s.vendorId].tier = pkg?.tier || 'free';
+        vendorLTV[s.vendorId].billingMode = s.billingMode || 'monthly';
+      }
+    });
+    var top5 = Object.values(vendorLTV).sort(function(a,b){ return b.total - a.total; }).slice(0, 5);
+
+    // 9. Borç metrikleri
+    var totalUnpaidDebt = 0;
+    var suspendedCount = 0;
+    billings.forEach(function(b){
+      totalUnpaidDebt += (b.unpaidBalance || 0);
+      if (b.isSuspended) suspendedCount++;
+    });
+
+    // ═════ RENDER ═════
+
+    m.innerHTML = '';
+
+    // Header
+    var hdr = document.createElement('div');
+    hdr.className = 'mb14';
+    hdr.innerHTML =
+      '<h2 class="fs18-fw7">📈 Gelir Dashboard</h2>'
+      + '<div class="txt-muted-12-mt3">PoCHub abonelik geliri ve paket performansı analizi</div>';
+    m.appendChild(hdr);
+
+    // ─── Üst Stat Kartları ───
+    var stats = document.createElement('div');
+    stats.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px';
+
+    var arrowIcon = function(val) {
+      if (val > 0.5) return '<span style="color:#22d078;font-size:11px">↑</span>';
+      if (val < -0.5) return '<span style="color:#ff7070;font-size:11px">↓</span>';
+      return '<span class="t-muted fs11">−</span>';
+    };
+
+    var statCards = [
+      {
+        label: 'MRR',
+        sub: 'Aylık Yinelenen Gelir',
+        value: '₺' + Math.round(mrr).toLocaleString('tr-TR'),
+        color: '#22d078',
+        bg: 'rgba(34,208,120,.08)',
+        change: paidActive + ' aktif paket',
+      },
+      {
+        label: 'Bu Ay Gelir',
+        sub: thisMonthPaymentCount + ' ödeme',
+        value: '₺' + Math.round(thisMonthRevenue).toLocaleString('tr-TR'),
+        color: '#7db4ff',
+        bg: 'rgba(125,180,255,.08)',
+        change: arrowIcon(revenueChange) + ' ' + (revenueChange === 0 ? '—' : (revenueChange > 0 ? '+' : '') + revenueChange.toFixed(1) + '%'),
+      },
+      {
+        label: 'Aktif Abonelik',
+        sub: activeCount + ' toplam (' + paidActive + ' ücretli)',
+        value: paidActive + '',
+        color: '#c4a8ff',
+        bg: 'rgba(196,168,255,.08)',
+        change: vendors.length + ' vendor kayıtlı',
+      },
+      {
+        label: 'Churn Rate (30g)',
+        sub: churnedCount + ' aboneden çıkış',
+        value: churnRate.toFixed(1) + '%',
+        color: churnRate > 5 ? '#ff7070' : '#f0a429',
+        bg: churnRate > 5 ? 'rgba(255,112,112,.08)' : 'rgba(240,164,41,.08)',
+        change: '',
+      },
+    ];
+    statCards.forEach(function(c){
+      var card = document.createElement('div');
+      card.style.cssText = 'background:'+c.bg+';border:1px solid '+c.color+'30;border-radius:10px;padding:14px';
+      card.innerHTML =
+        '<div class="eyebrow-text" style="color:'+c.color+'">'+c.label+'</div>'
+        + '<div class="fs11-mt2-muted">'+c.sub+'</div>'
+        + '<div style="font-size:24px;font-weight:800;color:'+c.color+';margin:8px 0 4px">'+c.value+'</div>'
+        + (c.change ? '<div class="fs11-muted">'+c.change+'</div>' : '');
+      stats.appendChild(card);
+    });
+    m.appendChild(stats);
+
+    // ─── Borç & Suspend Uyarısı (varsa) ───
+    if (totalUnpaidDebt > 0 || suspendedCount > 0) {
+      var alert = document.createElement('div');
+      alert.style.cssText = 'background:rgba(255,112,112,.06);border:1px solid rgba(255,112,112,.25);border-radius:8px;padding:12px;margin-bottom:14px';
+      alert.innerHTML =
+        '<div class="fs125-red-fw7" style="margin-bottom:6px">⚠️ Tahsilat Riski</div>'
+        + '<div class="fs12 t-muted">Vendor cari hesaplarında <strong style="color:#ff7070">₺'+totalUnpaidDebt.toLocaleString('tr-TR')+'</strong> ödenmemiş borç var. <strong>'+suspendedCount+'</strong> vendor askıya alındı.</div>';
+      m.appendChild(alert);
+    }
+
+    // ─── MRR Trend Grafiği (SVG) ───
+    var trendCard = document.createElement('div');
+    trendCard.className = 'card mb14';
+    trendCard.style.padding = '18px';
+
+    var maxVal = Math.max.apply(null, mrrTrend.map(function(p){ return p.value; }).concat([1]));
+    var chartW = 600, chartH = 180, padL = 50, padR = 20, padT = 20, padB = 30;
+    var plotW = chartW - padL - padR, plotH = chartH - padT - padB;
+    var stepX = mrrTrend.length > 1 ? plotW / (mrrTrend.length - 1) : plotW;
+
+    var pathD = '';
+    var areaD = '';
+    var points = [];
+    mrrTrend.forEach(function(p, i){
+      var x = padL + (i * stepX);
+      var y = padT + plotH - (maxVal > 0 ? (p.value / maxVal * plotH) : 0);
+      points.push({ x: x, y: y, val: p.value, label: p.label });
+      pathD += (i === 0 ? 'M' : 'L') + ' ' + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      if (i === 0) areaD = 'M ' + x.toFixed(1) + ' ' + (padT + plotH) + ' L ' + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      else areaD += 'L ' + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+    });
+    if (points.length > 0) areaD += 'L ' + points[points.length-1].x.toFixed(1) + ' ' + (padT + plotH) + ' Z';
+
+    // Y axis ticks
+    var yTicks = '';
+    [0, 0.25, 0.5, 0.75, 1].forEach(function(p){
+      var y = padT + plotH - (p * plotH);
+      var v = Math.round(maxVal * p);
+      yTicks +=
+        '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+plotW)+'" y2="'+y+'" stroke="rgba(255,255,255,.05)" stroke-width="1" />'
+        + '<text x="'+(padL-8)+'" y="'+(y+4)+'" fill="rgba(255,255,255,.4)" font-size="10" text-anchor="end">'+(v >= 1000 ? Math.round(v/1000)+'K' : v)+'</text>';
+    });
+
+    // X axis labels
+    var xLabels = '';
+    points.forEach(function(p){
+      xLabels += '<text x="'+p.x+'" y="'+(padT+plotH+18)+'" fill="rgba(255,255,255,.5)" font-size="10" text-anchor="middle">'+p.label+'</text>';
+    });
+
+    // Data points (circles)
+    var circles = '';
+    points.forEach(function(p){
+      circles +=
+        '<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="#22d078" stroke="var(--bg-surface)" stroke-width="2" />'
+        + '<title>'+p.label+': ₺'+Math.round(p.val).toLocaleString('tr-TR')+'</title>';
+    });
+
+    trendCard.innerHTML =
+      '<div class="flx-bw-c-mb14">'
+      +   '<div>'
+      +     '<div class="fs14-fw7">📊 MRR Trend (Son 6 Ay)</div>'
+      +     '<div class="fs11-mt2-muted">Aylık ödemelerin toplam değişimi</div>'
+      +   '</div>'
+      + '</div>'
+      + '<svg viewBox="0 0 '+chartW+' '+chartH+'" style="width:100%;height:auto;max-height:240px">'
+      +   yTicks
+      +   '<path d="'+areaD+'" fill="rgba(34,208,120,.1)" />'
+      +   '<path d="'+pathD+'" stroke="#22d078" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />'
+      +   circles
+      +   xLabels
+      + '</svg>';
+    m.appendChild(trendCard);
+
+    // ─── Paket Dağılımı + Tier Hareketleri (yan yana) ───
+    var twoCol = document.createElement('div');
+    twoCol.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px';
+
+    // Paket dağılımı kartı
+    var pkgCard = document.createElement('div');
+    pkgCard.className = 'card';
+    pkgCard.style.padding = '18px';
+
+    var totalActiveCount = activeSubs.length || 1;
+    var tierOrder = ['free','starter','professional','business','enterprise'];
+    var distHtml = '<div class="fs14-fw7 mb14" style="display:flex;align-items:center;gap:6px"><span>🥧</span><span>Paket Dağılımı</span></div>';
+
+    // Pie chart SVG (basit donut)
+    var pieR = 60, pieCx = 80, pieCy = 80, strokeW = 24;
+    var circumference = 2 * Math.PI * pieR;
+    var offset = 0;
+    var pieSegments = '';
+    var legend = '<div style="display:flex;flex-direction:column;gap:6px;flex:1">';
+
+    tierOrder.forEach(function(tier){
+      var d = pkgDistribution[tier];
+      if (!d || d.count === 0) return;
+      var pct = d.count / totalActiveCount * 100;
+      var dashLen = (pct/100) * circumference;
+      var color = TIER_COLORS[tier] || '#5a6278';
+      pieSegments +=
+        '<circle cx="'+pieCx+'" cy="'+pieCy+'" r="'+pieR+'" fill="none" stroke="'+color+'" stroke-width="'+strokeW+'" '
+        + 'stroke-dasharray="'+dashLen.toFixed(1)+' '+circumference.toFixed(1)+'" '
+        + 'stroke-dashoffset="'+(-offset).toFixed(1)+'" '
+        + 'transform="rotate(-90 '+pieCx+' '+pieCy+')" />';
+      offset += dashLen;
+      legend +=
+        '<div class="flx-bw-c" style="font-size:12px">'
+        +   '<div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:'+color+';border-radius:2px;display:inline-block"></span><span>'+(d.name || tier)+'</span></div>'
+        +   '<span class="fw7-blu">'+d.count+' (%'+pct.toFixed(0)+')</span>'
+        + '</div>';
+    });
+    legend += '</div>';
+
+    pkgCard.innerHTML = distHtml +
+      '<div style="display:flex;gap:14px;align-items:center">'
+      + '<svg viewBox="0 0 160 160" style="width:160px;height:160px;flex-shrink:0">'
+      +   pieSegments
+      +   '<text x="80" y="78" fill="var(--text-primary)" font-size="20" font-weight="800" text-anchor="middle">'+totalActiveCount+'</text>'
+      +   '<text x="80" y="94" fill="var(--text-muted)" font-size="10" text-anchor="middle">vendor</text>'
+      + '</svg>'
+      + legend
+      + '</div>';
+    twoCol.appendChild(pkgCard);
+
+    // Tier Hareketleri kartı
+    var moveCard = document.createElement('div');
+    moveCard.className = 'card';
+    moveCard.style.padding = '18px';
+    moveCard.innerHTML =
+      '<div class="fs14-fw7 mb14" style="display:flex;align-items:center;gap:6px"><span>🔄</span><span>Bu Ay Hareketler</span></div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px">'
+      +   '<div class="flx-bw-c" style="padding:10px 12px;background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.2);border-radius:8px">'
+      +     '<div><div class="fs13-fw7 t-grn">⬆ Yükseltme</div><div class="fs11-muted">Üst pakete geçen vendor</div></div>'
+      +     '<div style="font-size:24px;font-weight:800;color:#22d078">'+upgrades+'</div>'
+      +   '</div>'
+      +   '<div class="flx-bw-c" style="padding:10px 12px;background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.2);border-radius:8px">'
+      +     '<div><div class="fs13-fw7 t-blu">🆕 Yeni Satın Alma</div><div class="fs11-muted">İlk kez paket alan vendor</div></div>'
+      +     '<div style="font-size:24px;font-weight:800;color:#7db4ff">'+newPurchases+'</div>'
+      +   '</div>'
+      +   '<div class="flx-bw-c" style="padding:10px 12px;background:rgba(196,168,255,.06);border:1px solid rgba(196,168,255,.2);border-radius:8px">'
+      +     '<div><div class="fs13-fw7 t-prp">🔄 Yenileme</div><div class="fs11-muted">Aboneliğini yenileyen</div></div>'
+      +     '<div style="font-size:24px;font-weight:800;color:#c4a8ff">'+renewals+'</div>'
+      +   '</div>'
+      +   '<div class="flx-bw-c" style="padding:10px 12px;background:rgba(255,112,112,.06);border:1px solid rgba(255,112,112,.2);border-radius:8px">'
+      +     '<div><div class="fs13-fw7 t-red">⬇ Düşürme</div><div class="fs11-muted">Alt pakete geçen vendor</div></div>'
+      +     '<div style="font-size:24px;font-weight:800;color:#ff7070">'+downgrades+'</div>'
+      +   '</div>'
+      + '</div>';
+    twoCol.appendChild(moveCard);
+
+    m.appendChild(twoCol);
+
+    // ─── Top 5 LTV ───
+    var topCard = document.createElement('div');
+    topCard.className = 'card';
+    topCard.style.padding = '18px';
+    topCard.innerHTML = '<div class="fs14-fw7 mb14" style="display:flex;align-items:center;gap:6px"><span>🏆</span><span>En Çok Para Getiren 5 Vendor (LTV)</span></div>';
+
+    if (top5.length === 0) {
+      topCard.innerHTML += '<div class="empty"><div class="empty-icon">💸</div>Henüz ödeme yapan vendor yok.</div>';
+    } else {
+      var topList = document.createElement('div');
+      topList.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+      top5.forEach(function(v, i){
+        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1);
+        var color = TIER_COLORS[v.tier] || '#5a6278';
+        var tierLabel = TIER_LABELS[v.tier] || '—';
+        var item = document.createElement('div');
+        item.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid '+color+';border-radius:8px';
+        item.innerHTML =
+          '<div style="font-size:20px;width:32px;text-align:center">'+medal+'</div>'
+          + '<div class="flx1-mw200">'
+          +   '<div class="fs13-fw7">🏢 '+(v.vendorName || 'Bilinmeyen')+'</div>'
+          +   '<div class="fs11-muted">'
+          +     '<span class="tier-badge" style="background:'+color+'15;color:'+color+'">'+tierLabel+'</span>'
+          +     (v.billingMode === 'yearly' ? ' · Yıllık' : '')
+          +   '</div>'
+          + '</div>'
+          + '<div class="t-rgt">'
+          +   '<div class="fs15-fw7" style="color:'+color+'">₺'+Math.round(v.total).toLocaleString('tr-TR')+'</div>'
+          +   '<div class="fs11-muted">toplam</div>'
+          + '</div>';
+        topList.appendChild(item);
+      });
+      topCard.appendChild(topList);
+    }
+    m.appendChild(topCard);
+
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Gelir dashboard hatası: '+e.message+'</div>';
+    console.error(e);
+  }
+}
+
 // v4.64: PREMIUM İŞ MODELİ — Paket Tanımları + Sistem Ayarları
 // ════════════════════════════════════════════════════════════════════
 
