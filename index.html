@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.72 | pochub.co -->
+<!-- PoCHub v4.73 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.72</title>
+<title>PoCHub.co — v4.73</title>
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
 body.role-customer{--color-primary:var(--role-customer-accent);--color-primary-dim:var(--role-customer-dim);--color-primary-hover:#1a9e5a;}
@@ -270,6 +270,13 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 .bg-red-pad-mt4{background:rgba(255,112,112,.15);color:#ff7070;margin-top:4px}
 .bg-amb-pad-mt4{background:rgba(240,164,41,.15);color:#f0a429;margin-top:4px}
 .t-w8{color:rgba(255,255,255,.8);font-size:12px}
+/* v4.73 vendor badges - müşteri tarafı */
+.vbadge{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:6px;letter-spacing:.3px;line-height:1.3;text-transform:uppercase;vertical-align:middle}
+.vbadge-pro{background:linear-gradient(135deg,rgba(34,208,120,.18),rgba(34,208,120,.08));color:#22d078;border:1px solid rgba(34,208,120,.35)}
+.vbadge-biz{background:linear-gradient(135deg,rgba(240,164,41,.2),rgba(240,164,41,.08));color:#f0a429;border:1px solid rgba(240,164,41,.4)}
+.vbadge-ent{background:linear-gradient(135deg,rgba(196,168,255,.22),rgba(196,168,255,.08));color:#c4a8ff;border:1px solid rgba(196,168,255,.4)}
+.vbadge-verified{background:rgba(125,180,255,.15);color:#7db4ff;border:1px solid rgba(125,180,255,.35)}
+.vbadge-row{display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -318,7 +325,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.72';
+const VERSION = 'v4.73';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -2161,6 +2168,14 @@ async function loadMessagesTab(m, role) {
       const list = document.createElement('div');
       list.style.cssText = 'display:flex;flex-direction:column;gap:6px';
 
+      // v4.73: Müşteri rolünde vendor badge'lerini preload
+      if (role === 'customer') {
+        try {
+          var msgVendorIds = [...new Set(filtered.map(p => p.vendorId).filter(Boolean))];
+          await preloadVendorBadges(msgVendorIds);
+        } catch(e) { console.error('Msg badge preload:', e); }
+      }
+
       filtered.forEach(poc => {
         const meta   = metaMap[poc.id] || {};
         const msgInfo = msgMap[poc.id] || {last:null, unread:0, total:0};
@@ -2192,7 +2207,7 @@ async function loadMessagesTab(m, role) {
           <div style="width:40px;height:40px;border-radius:50%;background:rgba(59,124,255,.15);border:1px solid rgba(59,124,255,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💬</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-              <div style="font-size:13.5px;font-weight:${msgInfo.unread > 0 ? '700' : '600'};color:var(--text-primary)">${otherName}</div>
+              <div style="font-size:13.5px;font-weight:${msgInfo.unread > 0 ? '700' : '600'};color:var(--text-primary);display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>${otherName}</span>${role === 'customer' ? getVendorBadgeRow(poc.vendorId) : ''}</div>
               <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:8px">${lastTime}</div>
             </div>
             <div style="font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${lastText}</div>
@@ -4831,6 +4846,12 @@ async function loadCatalog() {
       if (sortBy === 'name') return (a.name||'').localeCompare(b.name||'', 'tr');
       return 0;
     });
+
+    // v4.73: Vendor badge'lerini preload (ekrandaki vendor'lar için)
+    try {
+      var uniqueVendorIds = [...new Set(prods.map(p => p.vendorId).filter(Boolean))];
+      await preloadVendorBadges(uniqueVendorIds);
+    } catch(e) { console.error('Badge preload error:', e); }
     if (trFirst) prods.sort((a,b) => a.country==='TR'?-1:b.country==='TR'?1:0);
 
     if (!prods.length) {
@@ -4864,7 +4885,7 @@ async function loadCatalog() {
       </div>
       <div style="font-size:14.5px;font-weight:700;margin-bottom:3px">${p.name}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:12px;color:#7c87a0">${p.vendorName||'—'}</div>
+        <div style="font-size:12px;color:#7c87a0;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>${p.vendorName||'—'}</span>${getVendorBadgeRow(p.vendorId)}</div>
         ${p.avgRating ? '<div style="font-size:11.5px;color:#f59e0b;font-weight:600">&#11088; ' + p.avgRating.toFixed(1) + ' <span style="color:var(--text-muted);font-weight:400">(' + (p.ratingCount||0) + ')</span></div>' : ''}
       </div>
       <p style="font-size:12px;color:#9ca3af;line-height:1.5;flex:1;margin-bottom:12px">${p.description||''}</p>
@@ -6363,7 +6384,11 @@ function openPocCancelModal(pocId, pocTitle, vendorEmail, vendorName, onSuccess)
   });
 }
 
-function openPocTimeline(poc) {
+async function openPocTimeline(poc) {
+  // v4.73: Vendor badge preload
+  if (poc.vendorId) {
+    try { await preloadVendorBadges([poc.vendorId]); } catch(e) {}
+  }
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
 
@@ -6427,7 +6452,7 @@ function openPocTimeline(poc) {
     // Vendor bilgisi
     (poc.vendorName ? '<div style="background:var(--bg-elevated);border-radius:8px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;gap:12px">' +
     '<div style="width:36px;height:36px;border-radius:50%;background:rgba(59,124,255,.15);display:flex;align-items:center;justify-content:center;font-size:16px">🏢</div>' +
-    '<div><div style="font-size:12px;color:#5a6278">Vendor</div><div class="fs13-fw7">'+(poc.vendorName)+'</div></div>' +
+    '<div style="flex:1"><div style="font-size:12px;color:#5a6278">Vendor</div><div class="fs13-fw7" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>'+(poc.vendorName)+'</span>'+getVendorBadgeRow(poc.vendorId)+'</div></div>' +
     (poc.vendorType ? '<span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff;margin-left:auto">'+({ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'}[poc.vendorType]||poc.vendorType)+'</span>' : '') +
     '</div>' : '') +
 
@@ -15041,10 +15066,15 @@ async function loadFeaturedCarousels() {
       html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
       data.featuredProducts.slice(0, 6).forEach(function(p){
         var color = TIER_COLORS[p.tier] || '#5a6278';
+        // Tier badge HTML (Pro/Business/Enterprise için)
+        var tierBadge = '';
+        if (p.tier === 'professional') tierBadge = '<span class="vbadge vbadge-pro" style="margin-left:6px">⚡ Pro</span>';
+        else if (p.tier === 'business') tierBadge = '<span class="vbadge vbadge-biz" style="margin-left:6px">💎 Business</span>';
+        else if (p.tier === 'enterprise') tierBadge = '<span class="vbadge vbadge-ent" style="margin-left:6px">👑 Enterprise</span>';
         html += '<div class="ftd-product-card" data-product="'+p.productId+'" style="background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid '+color+';border-radius:8px;padding:12px;cursor:pointer;transition:.15s">';
         html += '<div style="font-size:10.5px;color:var(--text-muted);margin-bottom:4px">'+(p.category||'—')+(p.brand?' · '+p.brand:'')+'</div>';
         html += '<div style="font-size:13px;font-weight:700;margin-bottom:4px;line-height:1.3">'+(p.productName||'Ürün')+'</div>';
-        html += '<div class="fs11-muted">🏢 '+(p.vendorName||'')+'</div>';
+        html += '<div class="fs11-muted" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>🏢 '+(p.vendorName||'')+'</span>'+tierBadge+'</div>';
         if (p.unitPrice) html += '<div style="font-size:13px;font-weight:700;color:'+color+';margin-top:6px">₺'+p.unitPrice.toLocaleString('tr-TR')+'</div>';
         html += '</div>';
       });
@@ -19182,6 +19212,106 @@ function openBulkNotifyModal(vendorIds, allRows, onSent) {
 const TIER_COLORS = {free:'#5a6278', starter:'#7db4ff', professional:'#22d078', business:'#f0a429', enterprise:'#c4a8ff'};
 const TIER_LABELS = {free:'Free', starter:'Starter', professional:'Professional', business:'Business', enterprise:'Enterprise'};
 
+// ════════════════════════════════════════════════════════════════════
+// v4.73: VENDOR BADGE SİSTEMİ (müşteri tarafı görünürlük)
+// ════════════════════════════════════════════════════════════════════
+
+// Cache: vendorId → badge metadata (TTL 5 dakika, oturum içi)
+window._vendorBadgeCache = window._vendorBadgeCache || {};
+const VENDOR_BADGE_TTL = 5 * 60 * 1000; // 5 dakika
+
+// Toplu vendor badge'lerini önceden yükle (cache'e doldurur)
+async function preloadVendorBadges(vendorIds) {
+  if (!Array.isArray(vendorIds) || vendorIds.length === 0) return;
+  // Cache'de olmayan, expired olanları belirle
+  var now = Date.now();
+  var toFetch = [];
+  vendorIds.forEach(function(id){
+    if (!id) return;
+    var cached = window._vendorBadgeCache[id];
+    if (!cached || (now - cached.fetchedAt) > VENDOR_BADGE_TTL) {
+      if (!toFetch.includes(id)) toFetch.push(id);
+    }
+  });
+  if (toFetch.length === 0) return;
+
+  // Firestore'dan paralel çek
+  await Promise.all(toFetch.map(async function(id){
+    try {
+      const subSnap = await getDoc(doc(db, 'vendor_subscriptions', id));
+      if (subSnap.exists()) {
+        var s = subSnap.data();
+        window._vendorBadgeCache[id] = {
+          tier: s.currentTier || 'free',
+          status: s.status || 'unknown',
+          isTrial: s.isTrial || false,
+          fetchedAt: now,
+        };
+      } else {
+        window._vendorBadgeCache[id] = { tier: 'free', status: 'no_subscription', isTrial: false, fetchedAt: now };
+      }
+    } catch(e) {
+      window._vendorBadgeCache[id] = { tier: 'free', status: 'error', isTrial: false, fetchedAt: now };
+    }
+  }));
+}
+
+// Vendor badge HTML'i üret — getVendorBadgeHtml(vendorId) string döner
+function getVendorBadgeHtml(vendorId) {
+  if (!vendorId) return '';
+  var cached = window._vendorBadgeCache[vendorId];
+  if (!cached) return ''; // henüz cache'te yok (preload edilmemişse)
+
+  // Sadece aktif paket sahibi vendor'lar badge'lenir
+  if (cached.status !== 'active' && cached.status !== 'grace_period') return '';
+
+  var tier = cached.tier;
+  if (tier === 'free' || tier === 'starter') return ''; // Free ve Starter badge görünmez
+
+  var html = '';
+  if (tier === 'professional') {
+    html = '<span class="vbadge vbadge-pro" title="Professional Plan">⚡ Pro Vendor</span>';
+  } else if (tier === 'business') {
+    html = '<span class="vbadge vbadge-biz" title="Business Plan">💎 Business</span>';
+  } else if (tier === 'enterprise') {
+    html = '<span class="vbadge vbadge-ent" title="Enterprise Plan">👑 Enterprise</span>';
+  }
+  return html;
+}
+
+// Vendor için tam rozet satırı (paket + trial varsa)
+function getVendorBadgeRow(vendorId) {
+  if (!vendorId) return '';
+  var cached = window._vendorBadgeCache[vendorId];
+  if (!cached) return '';
+  if (cached.status !== 'active' && cached.status !== 'grace_period') return '';
+
+  var badges = [];
+  var mainBadge = getVendorBadgeHtml(vendorId);
+  if (mainBadge) badges.push(mainBadge);
+  // Trial badge (sadece trial olan paid vendor'lar için extra etiket)
+  if (cached.isTrial && cached.tier !== 'free') {
+    badges.push('<span class="vbadge vbadge-verified" title="Bu vendor şu an deneme dönemindeydi">🎁 Trial</span>');
+  }
+  if (badges.length === 0) return '';
+  return '<span class="vbadge-row">' + badges.join('') + '</span>';
+}
+
+// Config'den badge'lerin gösterilip gösterilmeyeceğini kontrol et
+async function shouldShowVendorBadges() {
+  try {
+    const cfgSnap = await getDoc(doc(db, 'pochub_config', 'system'));
+    if (!cfgSnap.exists()) return true; // default açık
+    var cfg = cfgSnap.data();
+    return cfg.vendorBadges?.enabled !== false; // default açık
+  } catch(e) { return true; }
+}
+
+// Önbellek temizleyici (test/debug için)
+window.clearVendorBadgeCache = function() {
+  window._vendorBadgeCache = {};
+};
+
 // Default paketler (sistem ilk açıldığında otomatik seed edilir)
 const DEFAULT_PACKAGES = [
   {
@@ -19342,6 +19472,12 @@ const DEFAULT_CONFIG = {
   paymentMethods: {
     iyzico: { enabled: true, autoRenew: true },
     manualTransfer: { enabled: true, requiresAdminApproval: true },
+  },
+  vendorBadges: {
+    enabled: true,
+    showOnCatalog: true,
+    showOnDashboard: true,
+    showOnFeatured: true,
   },
 };
 
@@ -19730,6 +19866,14 @@ async function admSettings(m) {
     s10.appendChild(field('Uyarı 2 (% kullanım)', 'cfg-qw-2', 'number', (cfg.quotaWarnings?.warningPercents||[75,100])[1] || 100));
     m.appendChild(s10);
 
+    // v4.73: Vendor Badge ayarları
+    var s11 = section('🏷️ Müşteri Tarafı Vendor Badge\'leri', '#22d078');
+    s11.appendChild(field('Vendor badge\'lerini göster', 'cfg-vb-enabled', 'toggle', cfg.vendorBadges?.enabled ?? true, 'Müşteri tarafında Pro/Business/Enterprise rozetleri'));
+    s11.appendChild(field('Catalog\'da göster', 'cfg-vb-catalog', 'toggle', cfg.vendorBadges?.showOnCatalog ?? true));
+    s11.appendChild(field('Mesaj listesinde göster', 'cfg-vb-dashboard', 'toggle', cfg.vendorBadges?.showOnDashboard ?? true));
+    s11.appendChild(field('Featured carousel\'de göster', 'cfg-vb-featured', 'toggle', cfg.vendorBadges?.showOnFeatured ?? true));
+    m.appendChild(s11);
+
     // Save
     el('cfg-save').addEventListener('click', async function(){
       try {
@@ -19783,6 +19927,12 @@ async function admSettings(m) {
           paymentMethods: {
             iyzico: { enabled: el('cfg-pay-iyzico').value === 'true', autoRenew: el('cfg-pay-auto').value === 'true' },
             manualTransfer: { enabled: el('cfg-pay-manual').value === 'true', requiresAdminApproval: true },
+          },
+          vendorBadges: {
+            enabled: el('cfg-vb-enabled').value === 'true',
+            showOnCatalog: el('cfg-vb-catalog').value === 'true',
+            showOnDashboard: el('cfg-vb-dashboard').value === 'true',
+            showOnFeatured: el('cfg-vb-featured').value === 'true',
           },
           updatedAt: serverTimestamp(),
           updatedBy: CUR_USER?.uid || null,
