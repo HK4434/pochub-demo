@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.71 | pochub.co -->
+<!-- PoCHub v4.72 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.71</title>
+<title>PoCHub.co — v4.72</title>
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
 body.role-customer{--color-primary:var(--role-customer-accent);--color-primary-dim:var(--role-customer-dim);--color-primary-hover:#1a9e5a;}
@@ -318,7 +318,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.71';
+const VERSION = 'v4.72';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -16993,7 +16993,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -17025,6 +17025,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'events')     { await admEvents(m);     return; }
     if (CUR_ADM_TAB === 'offers')     { await admOffers(m);     return; }
     if (CUR_ADM_TAB === 'revenue')    { await admRevenue(m);    return; }
+    if (CUR_ADM_TAB === 'vendorsubs') { await admVendorSubs(m); return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
@@ -18534,6 +18535,644 @@ async function admRevenue(m) {
     m.innerHTML = '<div class="alert alert-err">Gelir dashboard hatası: '+e.message+'</div>';
     console.error(e);
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.72: ADMIN VENDOR ABONELİKLER TABLOSU
+// ════════════════════════════════════════════════════════════════════
+async function admVendorSubs(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Vendor abonelikleri yükleniyor...</div>';
+  try {
+    // Tüm verileri paralel çek
+    const [vendorsSnap, subsSnap, billingsSnap, pkgsSnap, histSnap] = await Promise.all([
+      getDocs(query(collection(db, 'users'), where('role','==','vendor'))),
+      getDocs(collection(db, 'vendor_subscriptions')),
+      getDocs(collection(db, 'vendor_billing')),
+      getDocs(collection(db, 'pochub_packages')),
+      getDocs(collection(db, 'subscription_history')),
+    ]);
+
+    var vendors = vendorsSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    var subs = subsSnap.docs.map(function(d){ return {...d.data()}; });
+    var billings = billingsSnap.docs.map(function(d){ return {...d.data()}; });
+    var packages = pkgsSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    var history = histSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+
+    // Sözlükler
+    var subByVendor = {}; subs.forEach(function(s){ subByVendor[s.vendorId] = s; });
+    var billByVendor = {}; billings.forEach(function(b){ billByVendor[b.vendorId] = b; });
+    var pkgById = {}; packages.forEach(function(p){ pkgById[p.id] = p; });
+
+    // Her vendor için zenginleştirilmiş veri
+    var rows = vendors.map(function(v){
+      var sub = subByVendor[v.id];
+      var bill = billByVendor[v.id];
+      var pkg = sub ? pkgById[sub.currentPackageId] : null;
+      var ltv = history
+        .filter(function(h){ return h.vendorId === v.id && h.status === 'paid'; })
+        .reduce(function(acc, h){ return acc + (h.amount || 0); }, 0);
+      var endDt = sub?.endDate?.toDate ? sub.endDate.toDate() : null;
+      var daysLeft = endDt ? Math.ceil((endDt.getTime() - Date.now())/86400000) : null;
+      var tier = sub?.currentTier || v.subscriptionTier || 'free';
+      var status = sub?.status || (sub ? 'unknown' : 'no_subscription');
+      var hasDebt = (bill?.unpaidPocCount || 0) > 0;
+
+      return {
+        vendor: v,
+        sub: sub,
+        bill: bill,
+        pkg: pkg,
+        tier: tier,
+        status: status,
+        endDate: endDt,
+        daysLeft: daysLeft,
+        ltv: ltv,
+        unpaidBalance: bill?.unpaidBalance || 0,
+        unpaidPocCount: bill?.unpaidPocCount || 0,
+        isSuspended: bill?.isSuspended || false,
+        hasDebt: hasDebt,
+        pocUsed: sub?.pocUsedThisCycle || 0,
+        pocQuota: pkg?.pocQuota,
+      };
+    });
+
+    // Filtreler — closure
+    var filterTier = 'all';
+    var filterStatus = 'all';
+    var filterDebt = 'all'; // all | yes | no
+    var searchQuery = '';
+    var selectedVendorIds = new Set();
+
+    function applyFilters() {
+      return rows.filter(function(r){
+        if (filterTier !== 'all' && r.tier !== filterTier) return false;
+        if (filterStatus === 'active' && r.status !== 'active') return false;
+        if (filterStatus === 'grace' && r.status !== 'grace_period') return false;
+        if (filterStatus === 'suspended' && !r.isSuspended) return false;
+        if (filterStatus === 'expired' && r.status !== 'expired' && r.status !== 'cancelled') return false;
+        if (filterStatus === 'no_sub' && r.status !== 'no_subscription') return false;
+        if (filterDebt === 'yes' && !r.hasDebt) return false;
+        if (filterDebt === 'no' && r.hasDebt) return false;
+        if (searchQuery) {
+          var q = searchQuery.toLowerCase();
+          var name = (r.vendor.company || r.vendor.displayName || '').toLowerCase();
+          var email = (r.vendor.email || '').toLowerCase();
+          if (!name.includes(q) && !email.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function render() {
+      m.innerHTML = '';
+
+      // Header
+      var hdr = document.createElement('div');
+      hdr.className = 'mb14';
+      hdr.innerHTML =
+        '<h2 class="fs18-fw7">💼 Vendor Abonelikler</h2>'
+        + '<div class="txt-muted-12-mt3">'+rows.length+' vendor — '+rows.filter(function(r){return r.status==='active';}).length+' aktif aboneli, '+rows.filter(function(r){return r.hasDebt;}).length+' borçlu</div>';
+      m.appendChild(hdr);
+
+      // ─── Filtreler ───
+      var filters = document.createElement('div');
+      filters.className = 'card mb14';
+      filters.style.padding = '14px';
+
+      var tiers = ['all','free','starter','professional','business','enterprise'];
+      var statuses = [['all','Tümü'],['active','Aktif'],['grace','Grace'],['suspended','Suspend'],['expired','Bitmiş'],['no_sub','Aboneliksiz']];
+
+      filters.innerHTML =
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">'
+        + '<div>'
+        +   '<label class="lbl-mini">Tier</label>'
+        +   '<div class="flx-g8-wrap" id="vs-tier-filter" style="margin-top:4px">'
+        +     tiers.map(function(t){
+                var active = filterTier === t;
+                return '<button class="btn-'+(active?'p':'g')+' btn-sm vs-tier-btn" data-val="'+t+'">'+(t==='all'?'Tümü':TIER_LABELS[t]||t)+'</button>';
+              }).join('')
+        +   '</div>'
+        + '</div>'
+        + '<div>'
+        +   '<label class="lbl-mini">Durum</label>'
+        +   '<select class="inp" id="vs-status-filter" style="width:100%;margin-top:4px">'
+        +     statuses.map(function(s){ return '<option value="'+s[0]+'"'+(filterStatus===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('')
+        +   '</select>'
+        + '</div>'
+        + '<div>'
+        +   '<label class="lbl-mini">Borç Durumu</label>'
+        +   '<select class="inp" id="vs-debt-filter" style="width:100%;margin-top:4px">'
+        +     '<option value="all"'+(filterDebt==='all'?' selected':'')+'>Tümü</option>'
+        +     '<option value="yes"'+(filterDebt==='yes'?' selected':'')+'>Borçlu</option>'
+        +     '<option value="no"'+(filterDebt==='no'?' selected':'')+'>Borçsuz</option>'
+        +   '</select>'
+        + '</div>'
+        + '<div>'
+        +   '<label class="lbl-mini">Ara (isim/email)</label>'
+        +   '<input class="inp" id="vs-search" placeholder="Acme..." value="'+searchQuery.replace(/"/g,'&quot;')+'" style="width:100%;margin-top:4px">'
+        + '</div>'
+        + '</div>';
+      m.appendChild(filters);
+
+      // Filtrelenmiş rows
+      var filtered = applyFilters();
+
+      // ─── Aksiyon barı (sayım + toplu işlemler + CSV) ───
+      var actionBar = document.createElement('div');
+      actionBar.className = 'flx-bw-c-mb14';
+      actionBar.style.flexWrap = 'wrap';
+      actionBar.style.gap = '8px';
+      actionBar.innerHTML =
+        '<div class="fs12-muted">'+filtered.length+' / '+rows.length+' vendor gösteriliyor'+(selectedVendorIds.size>0?' · <strong style="color:#7db4ff">'+selectedVendorIds.size+' seçili</strong>':'')+'</div>'
+        + '<div class="flx-g8-wrap">'
+        +   (selectedVendorIds.size > 0 ? '<button class="btn-p btn-sm" id="vs-bulk-notify">📨 Toplu Bildirim ('+selectedVendorIds.size+')</button>' : '')
+        +   '<button class="btn-g btn-sm" id="vs-csv">⬇ CSV Dışa Aktar</button>'
+        + '</div>';
+      m.appendChild(actionBar);
+
+      // ─── Tablo ───
+      if (filtered.length === 0) {
+        var emp = document.createElement('div');
+        emp.className = 'empty';
+        emp.innerHTML = '<div class="empty-icon">🔍</div>Bu filtrelere uyan vendor yok.';
+        m.appendChild(emp);
+      } else {
+        var tableWrap = document.createElement('div');
+        tableWrap.className = 'card';
+        tableWrap.style.cssText = 'padding:0;overflow-x:auto';
+
+        var table = document.createElement('table');
+        table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12.5px';
+        table.innerHTML =
+          '<thead>'
+          + '<tr style="background:rgba(125,180,255,.05);border-bottom:1px solid var(--border)">'
+          +   '<th style="padding:10px 8px;text-align:left;width:30px"><input type="checkbox" id="vs-sel-all"></th>'
+          +   '<th style="padding:10px 8px;text-align:left">Vendor</th>'
+          +   '<th style="padding:10px 8px;text-align:left">Tier</th>'
+          +   '<th style="padding:10px 8px;text-align:left">Durum</th>'
+          +   '<th style="padding:10px 8px;text-align:left">Bitiş</th>'
+          +   '<th style="padding:10px 8px;text-align:left">PoC</th>'
+          +   '<th style="padding:10px 8px;text-align:right">Borç</th>'
+          +   '<th style="padding:10px 8px;text-align:right">LTV</th>'
+          +   '<th style="padding:10px 8px;text-align:center">Aksiyon</th>'
+          + '</tr>'
+          + '</thead>';
+        var tbody = document.createElement('tbody');
+
+        var statusBadges = {
+          active: { color:'#22d078', label:'Aktif' },
+          grace_period: { color:'#f0a429', label:'Grace' },
+          expired: { color:'#ff7070', label:'Bitti' },
+          cancelled: { color:'#5a6278', label:'İptal' },
+          suspended: { color:'#ff7070', label:'Suspend' },
+          no_subscription: { color:'#5a6278', label:'Yok' },
+          unknown: { color:'#5a6278', label:'?' },
+        };
+
+        filtered.forEach(function(r){
+          var sel = selectedVendorIds.has(r.vendor.id);
+          var statusKey = r.isSuspended ? 'suspended' : r.status;
+          var sb = statusBadges[statusKey] || statusBadges.unknown;
+          var tierColor = TIER_COLORS[r.tier] || '#5a6278';
+          var tierLabel = TIER_LABELS[r.tier] || r.tier;
+          var quotaText = r.pkg ? (r.pocQuota === -1 ? '∞' : r.pocUsed + '/' + r.pocQuota) : '—';
+          var dateText = r.endDate ? r.endDate.toLocaleDateString('tr-TR') : '—';
+          var daysText = r.daysLeft !== null ? (r.daysLeft >= 0 ? '('+r.daysLeft+'g)' : '(geçti)') : '';
+
+          var tr = document.createElement('tr');
+          tr.style.cssText = 'border-bottom:1px solid rgba(255,255,255,.04);transition:.15s;cursor:default';
+          tr.innerHTML =
+            '<td style="padding:10px 8px"><input type="checkbox" class="vs-sel" data-id="'+r.vendor.id+'"'+(sel?' checked':'')+'></td>'
+            + '<td style="padding:10px 8px"><div class="fs13-fw6">🏢 '+(r.vendor.company || r.vendor.displayName || 'Bilinmeyen')+'</div><div class="fs11-muted">'+(r.vendor.email||'')+'</div></td>'
+            + '<td style="padding:10px 8px"><span class="tier-badge" style="background:'+tierColor+'20;color:'+tierColor+'">'+tierLabel+'</span>'+(r.sub?.isTrial?'<div class="fs10-muted" style="margin-top:2px">Trial</div>':'')+'</td>'
+            + '<td style="padding:10px 8px"><span class="tier-badge" style="background:'+sb.color+'15;color:'+sb.color+'">'+sb.label+'</span></td>'
+            + '<td style="padding:10px 8px">'+(r.endDate?'<div class="fs12">'+dateText+'</div><div class="fs11-muted">'+daysText+'</div>':'<span class="t-muted">—</span>')+'</td>'
+            + '<td style="padding:10px 8px"><span class="fs12">'+quotaText+'</span></td>'
+            + '<td style="padding:10px 8px;text-align:right">'+(r.unpaidBalance>0?'<div class="t-red fw7">₺'+r.unpaidBalance.toLocaleString('tr-TR')+'</div><div class="fs11-muted">'+r.unpaidPocCount+' PoC</div>':'<span class="t-muted">—</span>')+'</td>'
+            + '<td style="padding:10px 8px;text-align:right"><div class="fs13-fw6 t-grn">₺'+Math.round(r.ltv).toLocaleString('tr-TR')+'</div></td>'
+            + '<td style="padding:10px 8px;text-align:center"><button class="btn-g btn-sm vs-detail" data-id="'+r.vendor.id+'">👁 Detay</button></td>';
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        tableWrap.appendChild(table);
+        m.appendChild(tableWrap);
+      }
+
+      // ─── Event handlers ───
+      // Tier filter
+      m.querySelectorAll('.vs-tier-btn').forEach(function(b){
+        b.addEventListener('click', function(){ filterTier = b.dataset.val; render(); });
+      });
+      // Status filter
+      el('vs-status-filter')?.addEventListener('change', function(){ filterStatus = this.value; render(); });
+      // Debt filter
+      el('vs-debt-filter')?.addEventListener('change', function(){ filterDebt = this.value; render(); });
+      // Search (debounced)
+      el('vs-search')?.addEventListener('input', function(){
+        clearTimeout(window._vsSearchTimer);
+        window._vsSearchTimer = setTimeout(function(){
+          searchQuery = el('vs-search').value;
+          render();
+        }, 300);
+      });
+
+      // Select all
+      el('vs-sel-all')?.addEventListener('change', function(){
+        if (this.checked) {
+          filtered.forEach(function(r){ selectedVendorIds.add(r.vendor.id); });
+        } else {
+          filtered.forEach(function(r){ selectedVendorIds.delete(r.vendor.id); });
+        }
+        render();
+      });
+
+      // Per-row select
+      m.querySelectorAll('.vs-sel').forEach(function(cb){
+        cb.addEventListener('change', function(){
+          if (this.checked) selectedVendorIds.add(this.dataset.id);
+          else selectedVendorIds.delete(this.dataset.id);
+          // Sayıyı güncelle (full re-render gereksiz)
+          render();
+        });
+      });
+
+      // Detay
+      m.querySelectorAll('.vs-detail').forEach(function(b){
+        b.addEventListener('click', function(){
+          var r = rows.find(function(x){ return x.vendor.id === b.dataset.id; });
+          if (r) openVendorSubDetailModal(r, history, function(){ admVendorSubs(m); });
+        });
+      });
+
+      // CSV export
+      el('vs-csv')?.addEventListener('click', function(){ exportVendorSubsCSV(filtered); });
+
+      // Toplu bildirim
+      el('vs-bulk-notify')?.addEventListener('click', function(){
+        openBulkNotifyModal(Array.from(selectedVendorIds), rows, function(){
+          selectedVendorIds.clear();
+          render();
+        });
+      });
+    }
+
+    render();
+
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Vendor abonelikler yükleme hatası: '+e.message+'</div>';
+    console.error(e);
+  }
+}
+
+// CSV export helper
+function exportVendorSubsCSV(rows) {
+  var headers = ['Vendor','Email','Tier','Durum','BitisTarihi','GunKaldi','PoCKullanim','PoCKontenjan','Borc','BorcluPoC','Suspend','LTV','BillingMode'];
+  var lines = [headers.join(',')];
+  rows.forEach(function(r){
+    var line = [
+      '"'+(r.vendor.company || r.vendor.displayName || '').replace(/"/g,'""')+'"',
+      '"'+(r.vendor.email || '')+'"',
+      r.tier,
+      r.status,
+      r.endDate ? r.endDate.toISOString().split('T')[0] : '',
+      r.daysLeft !== null ? r.daysLeft : '',
+      r.pocUsed,
+      r.pocQuota === -1 ? 'Sinirsiz' : (r.pocQuota || 0),
+      r.unpaidBalance,
+      r.unpaidPocCount,
+      r.isSuspended ? 'Evet' : 'Hayir',
+      Math.round(r.ltv),
+      r.sub?.billingMode || '',
+    ];
+    lines.push(line.join(','));
+  });
+  var csv = '\uFEFF' + lines.join('\n'); // BOM for Excel TR
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'vendor-abonelikler-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV indirildi.');
+}
+
+// Vendor detay modal'ı
+function openVendorSubDetailModal(r, allHistory, onUpdate) {
+  var v = r.vendor;
+  var vendorHistory = allHistory.filter(function(h){ return h.vendorId === v.id; });
+  vendorHistory.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay-top';
+
+  var tierColor = TIER_COLORS[r.tier] || '#5a6278';
+  var tierLabel = TIER_LABELS[r.tier] || r.tier;
+  var statusLabels = {active:'Aktif', grace_period:'Grace', expired:'Bitmiş', cancelled:'İptal', no_subscription:'Aboneliksiz'};
+  var statusLabel = r.isSuspended ? 'Suspend' : (statusLabels[r.status] || r.status);
+
+  var historyHtml = vendorHistory.length === 0
+    ? '<div class="t-muted fs12" style="padding:14px;text-align:center">Geçmiş kayıt yok</div>'
+    : vendorHistory.slice(0, 10).map(function(h){
+        var actionLabels = {purchase:'Satın Alma',renew:'Yenileme',upgrade:'Yükseltme',downgrade:'Düşürme',cancel:'İptal',trial_started:'Trial'};
+        var statusColors = {paid:'#22d078',pending:'#f0a429',failed:'#ff7070',rejected:'#ff7070',refunded:'#7db4ff'};
+        var sc = statusColors[h.status] || '#5a6278';
+        var dt = h.createdAt?.toDate ? h.createdAt.toDate().toLocaleDateString('tr-TR') : '—';
+        return '<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:11.5px">'
+          + '<div><div class="fs12 fw6">'+(actionLabels[h.action]||h.action)+' · '+(h.packageName||'-')+'</div><div class="fs10-muted">'+dt+'</div></div>'
+          + '<div class="t-rgt"><div class="fs12 fw7">'+(h.amount>0?'₺'+h.amount.toLocaleString('tr-TR'):'Ücretsiz')+'</div><div class="fs10" style="color:'+sc+';font-weight:700">'+h.status+'</div></div>'
+          + '</div>';
+      }).join('');
+
+  modal.innerHTML =
+    '<div class="modal-card" style="max-width:680px">'
+    + '<div class="flx-bw-c mb14">'
+    +   '<h3 class="fs16-fw7">👁 Vendor Detayı</h3>'
+    +   '<button id="vd-close" class="btn-trans-x">×</button>'
+    + '</div>'
+    // Vendor bilgi kartı
+    + '<div style="background:linear-gradient(135deg,'+tierColor+'15,'+tierColor+'05);border:1px solid '+tierColor+'40;border-radius:10px;padding:14px;margin-bottom:14px">'
+    +   '<div class="flx-bw-c-mb14" style="margin-bottom:8px">'
+    +     '<div>'
+    +       '<div class="eyebrow-text" style="color:'+tierColor+'">'+tierLabel+(r.sub?.isTrial?' · Trial':'')+'</div>'
+    +       '<div class="fs15-fw7">🏢 '+(v.company || v.displayName || 'Bilinmeyen')+'</div>'
+    +       '<div class="fs11-muted">'+(v.email||'')+' · '+(v.vendorType==='ureticid'?'Üretici':v.vendorType==='distributor'?'Distribütör':v.vendorType==='integrator'?'Entegratör':v.vendorType||'—')+'</div>'
+    +     '</div>'
+    +     '<div class="t-rgt">'
+    +       '<div class="fs18-fw7" style="color:'+tierColor+'">₺'+Math.round(r.ltv).toLocaleString('tr-TR')+'</div>'
+    +       '<div class="fs11-muted">Toplam LTV</div>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>'
+    // Stat'lar
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px">'
+    +   '<div class="card" style="padding:10px"><div class="fs11-muted">Durum</div><div class="fs13-fw7" style="color:'+tierColor+';margin-top:2px">'+statusLabel+'</div></div>'
+    +   '<div class="card" style="padding:10px"><div class="fs11-muted">Bitiş</div><div class="fs13-fw7" style="margin-top:2px">'+(r.endDate?r.endDate.toLocaleDateString('tr-TR'):'—')+'</div>'+(r.daysLeft!==null?'<div class="fs10-muted">'+r.daysLeft+' gün</div>':'')+'</div>'
+    +   '<div class="card" style="padding:10px"><div class="fs11-muted">PoC Kullanım</div><div class="fs13-fw7" style="margin-top:2px">'+(r.pkg?(r.pocQuota===-1?r.pocUsed+' (∞)':r.pocUsed+' / '+r.pocQuota):'—')+'</div></div>'
+    +   '<div class="card" style="padding:10px"><div class="fs11-muted">Cari Hesap</div><div class="fs13-fw7" style="margin-top:2px;color:'+(r.unpaidBalance>0?'#ff7070':'#22d078')+'">'+(r.unpaidBalance>0?'₺'+r.unpaidBalance.toLocaleString('tr-TR'):'Temiz')+'</div>'+(r.unpaidPocCount>0?'<div class="fs10-muted">'+r.unpaidPocCount+' borç</div>':'')+'</div>'
+    + '</div>'
+    // Manuel müdahale
+    + '<div class="fs13-fw7 mb10">⚙️ Manuel Müdahale</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:14px">'
+    +   '<button class="btn-g btn-sm" id="vd-extend">📅 Süre Uzat</button>'
+    +   '<button class="btn-g btn-sm" id="vd-gift">🎁 Hediye Paket</button>'
+    +   (r.unpaidBalance > 0 ? '<button class="btn-g btn-sm" id="vd-clear-debt">💸 Borçları Sil</button>' : '')
+    +   (r.isSuspended
+      ? '<button class="btn-p btn-sm" id="vd-unsuspend">✅ Suspend Kaldır</button>'
+      : (r.sub ? '<button class="btn-red btn-sm" id="vd-suspend">⛔ Manuel Suspend</button>' : ''))
+    + '</div>'
+    // Geçmiş
+    + '<div class="fs13-fw7 mb10">📜 Son 10 İşlem</div>'
+    + '<div class="card" style="padding:0;max-height:240px;overflow-y:auto">'+historyHtml+'</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#vd-close').addEventListener('click', function(){ modal.remove(); });
+
+  // Süre uzat
+  modal.querySelector('#vd-extend')?.addEventListener('click', async function(){
+    if (!r.sub) { showToast('Bu vendor\'ın aboneliği yok','warn'); return; }
+    var days = prompt('Kaç gün uzatılacak?', '30');
+    if (!days) return;
+    var d = parseInt(days);
+    if (isNaN(d) || d < 1 || d > 365) { showToast('Geçersiz süre (1-365)','err'); return; }
+    if (!confirm(d+' gün uzatma onaylanıyor mu?')) return;
+    try {
+      var currentEnd = r.endDate ? r.endDate.getTime() : Date.now();
+      var newEnd = currentEnd + d*86400000;
+      await updateDoc(doc(db,'vendor_subscriptions',v.id), {
+        endDate: { seconds: Math.floor(newEnd/1000), nanoseconds: 0 },
+        updatedAt: serverTimestamp(),
+      });
+      await addDoc(collection(db,'notifications'), {
+        userId: v.id,
+        type: 'subscription_extended',
+        title: '📅 Aboneliğin Uzatıldı',
+        message: 'Admin tarafından aboneliğin '+d+' gün uzatıldı. Yeni bitiş: '+new Date(newEnd).toLocaleDateString('tr-TR'),
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      showToast('Süre uzatıldı.');
+      modal.remove();
+      onUpdate();
+    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  });
+
+  // Hediye paket
+  modal.querySelector('#vd-gift')?.addEventListener('click', async function(){
+    var pkgsSnap = await getDocs(collection(db,'pochub_packages'));
+    var availPkgs = pkgsSnap.docs.map(function(d){ return {...d.data(), id:d.id}; }).filter(function(p){ return p.tier !== 'free'; });
+    var pkgList = availPkgs.map(function(p,i){ return (i+1)+'. '+p.name; }).join('\n');
+    var idx = prompt('Hangi paketi hediye edeceksin?\n\n'+pkgList+'\n\nNumara gir:', '1');
+    if (!idx) return;
+    var pkg = availPkgs[parseInt(idx)-1];
+    if (!pkg) { showToast('Geçersiz seçim','err'); return; }
+    var days = prompt('Kaç gün geçerli? (varsayılan: '+pkg.duration+')', pkg.duration||30);
+    if (!days) return;
+    var d = parseInt(days);
+    if (!confirm(pkg.name+' paketi '+d+' gün için hediye edilecek. Onayla?')) return;
+    try {
+      var endTs = Date.now() + d*86400000;
+      await setDoc(doc(db,'vendor_subscriptions',v.id), {
+        vendorId: v.id,
+        currentPackageId: pkg.id,
+        currentTier: pkg.tier,
+        status: 'active',
+        startDate: serverTimestamp(),
+        endDate: { seconds: Math.floor(endTs/1000), nanoseconds: 0 },
+        autoRenew: false,
+        isTrial: false,
+        isGift: true,
+        pocUsedThisCycle: 0,
+        inviteUsedThisCycle: 0,
+        consecutiveUnpaidMonths: 0,
+        billingMode: 'monthly',
+        updatedAt: serverTimestamp(),
+        createdAt: r.sub?.createdAt || serverTimestamp(),
+      }, { merge: true });
+      await updateDoc(doc(db,'users',v.id), {
+        subscriptionTier: pkg.tier,
+        hasActiveSubscription: true,
+      });
+      await addDoc(collection(db,'subscription_history'), {
+        vendorId: v.id,
+        vendorName: v.company || v.displayName || v.email,
+        packageId: pkg.id,
+        packageName: pkg.name,
+        action: 'gift',
+        toPackageId: pkg.id,
+        amount: 0,
+        currency: 'TRY',
+        billingMode: 'monthly',
+        durationDays: d,
+        paymentMethod: 'admin_gift',
+        status: 'paid',
+        createdAt: serverTimestamp(),
+        paidAt: serverTimestamp(),
+        adminGifted: CUR_PROFILE?.displayName || CUR_USER.email,
+      });
+      await addDoc(collection(db,'notifications'), {
+        userId: v.id,
+        type: 'subscription_gifted',
+        title: '🎁 Sana Bir Paket Hediye Edildi',
+        message: pkg.name + ' paketin '+d+' gün için hediye olarak aktive edildi.',
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      showToast('Hediye verildi.');
+      modal.remove();
+      onUpdate();
+    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  });
+
+  // Borçları sil
+  modal.querySelector('#vd-clear-debt')?.addEventListener('click', async function(){
+    if (!confirm('Bu vendor\'ın TÜM borçları silinecek (₺'+r.unpaidBalance.toLocaleString('tr-TR')+'). Emin misin?\n\nBu işlem geri alınamaz.')) return;
+    try {
+      // Bekleyen poc_charges'leri paid yap
+      const chSnap = await getDocs(query(collection(db,'poc_charges'), where('vendorId','==',v.id), where('status','in',['pending_invoice','invoiced'])));
+      for (const ch of chSnap.docs) {
+        await updateDoc(ch.ref, { status: 'paid', paidAt: serverTimestamp(), adminCleared: CUR_PROFILE?.displayName || CUR_USER.email });
+      }
+      // Billing temizle
+      await setDoc(doc(db,'vendor_billing',v.id), {
+        vendorId: v.id,
+        unpaidBalance: 0,
+        unpaidPocCount: 0,
+        isSuspended: false,
+        suspendedAt: null,
+        suspendReason: null,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      await updateDoc(doc(db,'users',v.id), {
+        isSuspendedDueToBilling: false,
+      });
+      await addDoc(collection(db,'notifications'), {
+        userId: v.id,
+        type: 'debt_cleared',
+        title: '✅ Borçların Admin Tarafından Silindi',
+        message: '₺'+r.unpaidBalance.toLocaleString('tr-TR')+' borcun admin tarafından temizlendi. Hesabın tekrar aktif.',
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      showToast('Borçlar silindi.');
+      modal.remove();
+      onUpdate();
+    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  });
+
+  // Manual suspend
+  modal.querySelector('#vd-suspend')?.addEventListener('click', async function(){
+    var reason = prompt('Suspend sebebi (vendor\'a gösterilecek):', 'Manuel admin müdahalesi');
+    if (reason === null) return;
+    if (!confirm('Vendor manuel olarak askıya alınacak. Onayla?')) return;
+    try {
+      await setDoc(doc(db,'vendor_billing',v.id), {
+        vendorId: v.id,
+        isSuspended: true,
+        suspendedAt: serverTimestamp(),
+        suspendReason: 'manual_admin: '+reason,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      await updateDoc(doc(db,'users',v.id), {
+        isSuspendedDueToBilling: true,
+      });
+      await addDoc(collection(db,'notifications'), {
+        userId: v.id,
+        type: 'account_suspended',
+        title: '⛔ Hesabın Askıya Alındı',
+        message: 'Admin tarafından manuel olarak askıya alındın. Sebep: '+reason,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      showToast('Vendor suspend edildi.');
+      modal.remove();
+      onUpdate();
+    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  });
+
+  // Manual unsuspend
+  modal.querySelector('#vd-unsuspend')?.addEventListener('click', async function(){
+    if (!confirm('Vendor suspend\'i kaldırılacak. Onayla?')) return;
+    try {
+      await setDoc(doc(db,'vendor_billing',v.id), {
+        vendorId: v.id,
+        isSuspended: false,
+        suspendedAt: null,
+        suspendReason: null,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      await updateDoc(doc(db,'users',v.id), {
+        isSuspendedDueToBilling: false,
+      });
+      await addDoc(collection(db,'notifications'), {
+        userId: v.id,
+        type: 'account_reactivated',
+        title: '✅ Hesabın Aktif',
+        message: 'Admin tarafından suspend\'in kaldırıldı. Yeni PoC kabul edebilirsin.',
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      showToast('Suspend kaldırıldı.');
+      modal.remove();
+      onUpdate();
+    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  });
+}
+
+// Toplu bildirim modal'ı
+function openBulkNotifyModal(vendorIds, allRows, onSent) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML =
+    '<div class="modal-card" style="max-width:520px">'
+    + '<div class="flx-bw-c mb14">'
+    +   '<h3 class="fs16-fw7">📨 Toplu Bildirim Gönder</h3>'
+    +   '<button id="bn-close" class="btn-trans-x">×</button>'
+    + '</div>'
+    + '<div style="background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
+    +   '<strong>'+vendorIds.length+' vendor</strong> seçildi. Aşağıdaki bildirim hepsine gönderilecek.'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">'
+    +   '<div><label class="lbl-mini">Bildirim Başlığı</label><input class="inp" id="bn-title" placeholder="Önemli Duyuru" style="width:100%"></div>'
+    +   '<div><label class="lbl-mini">Mesaj İçeriği</label><textarea class="inp" id="bn-msg" rows="5" placeholder="..." style="width:100%;resize:none"></textarea></div>'
+    + '</div>'
+    + '<div class="flx-g8"><button class="btn-p flx1" id="bn-send">📨 '+vendorIds.length+' Vendor\'a Gönder</button><button class="btn-g" id="bn-cancel">Vazgeç</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#bn-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#bn-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#bn-send').addEventListener('click', async function(){
+    var title = (modal.querySelector('#bn-title').value || '').trim();
+    var msg = (modal.querySelector('#bn-msg').value || '').trim();
+    if (!title || title.length < 3) { showToast('Başlık eksik','warn'); return; }
+    if (!msg || msg.length < 10) { showToast('Mesaj çok kısa (en az 10 karakter)','warn'); return; }
+    modal.querySelector('#bn-send').disabled = true;
+    modal.querySelector('#bn-send').textContent = 'Gönderiliyor...';
+    try {
+      var sent = 0;
+      for (const vId of vendorIds) {
+        await addDoc(collection(db,'notifications'), {
+          userId: vId,
+          type: 'admin_announcement',
+          title: title,
+          message: msg,
+          fromAdmin: CUR_PROFILE?.displayName || CUR_USER.email,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+        sent++;
+      }
+      showToast('✅ '+sent+' bildirim gönderildi.');
+      modal.remove();
+      if (onSent) onSent();
+    } catch(e) {
+      showToast('Hata: '+e.message,'err');
+      modal.querySelector('#bn-send').disabled = false;
+      modal.querySelector('#bn-send').textContent = '📨 '+vendorIds.length+' Vendor\'a Gönder';
+    }
+  });
 }
 
 // v4.64: PREMIUM İŞ MODELİ — Paket Tanımları + Sistem Ayarları
