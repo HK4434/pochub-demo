@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.73 | pochub.co -->
+<!-- PoCHub v4.74 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.73</title>
+<title>PoCHub.co — v4.74</title>
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
 body.role-customer{--color-primary:var(--role-customer-accent);--color-primary-dim:var(--role-customer-dim);--color-primary-hover:#1a9e5a;}
@@ -278,6 +278,8 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 .vbadge-verified{background:rgba(125,180,255,.15);color:#7db4ff;border:1px solid rgba(125,180,255,.35)}
 .vbadge-row{display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap}
 </style>
+<!-- v4.74: jsPDF for invoice/receipt generation (lazy loaded when needed) -->
+<script>window._jsPDFLoaded=false;function loadJsPDF(){return new Promise(function(res,rej){if(window._jsPDFLoaded){res();return;}var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=function(){window._jsPDFLoaded=true;res();};s.onerror=rej;document.head.appendChild(s);});}</script>
 </head>
 <body>
 
@@ -325,7 +327,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-const VERSION = 'v4.73';
+const VERSION = 'v4.74';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -14226,12 +14228,14 @@ async function vendSubscription(m) {
       actions.innerHTML =
         '<button class="btn-g btn-sm" id="sub-upgrade">⬆️ Paket Yükselt/Düşür</button>'
         + '<button class="btn-g btn-sm" id="sub-payment-methods">💳 Ödeme Yöntemlerim</button>'
+        + '<button class="btn-g btn-sm" id="sub-invoice-info">📋 Fatura Bilgilerim</button>'
         + '<button class="btn-g btn-sm" id="sub-history">📜 Ödeme Geçmişi</button>'
         + '<button class="btn-red btn-sm" id="sub-cancel">İptal Et</button>';
       m.appendChild(actions);
 
       el('sub-upgrade')?.addEventListener('click', function(){ openPackageBrowser(allPackages, cfg, subscription); });
       el('sub-payment-methods')?.addEventListener('click', function(){ openPaymentMethodsModal(); });
+      el('sub-invoice-info')?.addEventListener('click', function(){ openInvoiceInfoModal(); });
       el('sub-history')?.addEventListener('click', function(){ openPaymentHistory(); });
       el('sub-cancel')?.addEventListener('click', async function(){
         if (!confirm('Aboneliğinizi iptal etmek istediğinize emin misiniz?\n\nMevcut paket bitiş tarihinde sona erer, sonra Free Plan\'a düşersiniz.')) return;
@@ -14788,6 +14792,65 @@ async function openPaymentMethodsModal() {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// v4.74: VENDOR FATURA BİLGİLERİ MODAL (PDF için)
+// ════════════════════════════════════════════════════════════════════
+async function openInvoiceInfoModal() {
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML =
+    '<div class="modal-card" style="max-width:520px">'
+    + '<div class="flx-bw-c mb14">'
+    +   '<h3 class="fs16-fw7">📋 Fatura Bilgilerim</h3>'
+    +   '<button id="ii-close" class="btn-trans-x">×</button>'
+    + '</div>'
+    + '<div style="background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11.5px;color:var(--text-muted)">'
+    +   '💡 Bu bilgiler indirilecek makbuzlarda gösterilecektir. Doğru ve güncel girmen önemli.'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">'
+    +   '<div><label class="lbl-mini">Şirket Unvanı (Resmi)</label><input class="inp" id="ii-name" placeholder="Acme Bilişim Teknolojileri A.Ş." value="'+(CUR_PROFILE?.invoiceCompanyName||CUR_PROFILE?.company||'').replace(/"/g,'&quot;')+'" style="width:100%"></div>'
+    +   '<div><label class="lbl-mini">Adres</label><textarea class="inp" id="ii-address" rows="2" placeholder="Mahalle, Cadde, No, İlçe/İl" style="width:100%;resize:none">'+(CUR_PROFILE?.invoiceAddress||'')+'</textarea></div>'
+    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +     '<div><label class="lbl-mini">Vergi Dairesi</label><input class="inp" id="ii-tax-office" placeholder="Beşiktaş V.D." value="'+(CUR_PROFILE?.invoiceTaxOffice||'').replace(/"/g,'&quot;')+'" style="width:100%"></div>'
+    +     '<div><label class="lbl-mini">Vergi/TC Numarası</label><input class="inp" id="ii-tax-no" placeholder="1234567890" value="'+(CUR_PROFILE?.invoiceTaxNumber||'').replace(/"/g,'&quot;')+'" maxlength="11" style="width:100%"></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="flx-g8"><button class="btn-p flx1" id="ii-save">💾 Kaydet</button><button class="btn-g" id="ii-cancel">Vazgeç</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#ii-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ii-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ii-save').addEventListener('click', async function(){
+    var name = (modal.querySelector('#ii-name').value || '').trim();
+    var address = (modal.querySelector('#ii-address').value || '').trim();
+    var taxOffice = (modal.querySelector('#ii-tax-office').value || '').trim();
+    var taxNo = (modal.querySelector('#ii-tax-no').value || '').trim();
+
+    if (name && name.length < 3) { showToast('Şirket unvanı çok kısa', 'warn'); return; }
+    if (taxNo && !/^[0-9]{10,11}$/.test(taxNo)) { showToast('Vergi/TC numarası 10 veya 11 hane olmalı', 'warn'); return; }
+
+    try {
+      await updateDoc(doc(db,'users',CUR_USER.uid), {
+        invoiceCompanyName: name,
+        invoiceAddress: address,
+        invoiceTaxOffice: taxOffice,
+        invoiceTaxNumber: taxNo,
+        invoiceInfoUpdatedAt: serverTimestamp(),
+      });
+      // CUR_PROFILE'ı güncelle
+      if (CUR_PROFILE) {
+        CUR_PROFILE.invoiceCompanyName = name;
+        CUR_PROFILE.invoiceAddress = address;
+        CUR_PROFILE.invoiceTaxOffice = taxOffice;
+        CUR_PROFILE.invoiceTaxNumber = taxNo;
+      }
+      showToast('✅ Fatura bilgilerin kaydedildi.');
+      modal.remove();
+    } catch(e) { showToast('Hata: '+e.message,'err'); }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
 // ÖDEME GEÇMİŞİ MODAL
 // ════════════════════════════════════════════════════════════════════
 async function openPaymentHistory() {
@@ -14801,7 +14864,7 @@ async function openPaymentHistory() {
     var items = snap.docs.map(function(d){ return {...d.data(), id:d.id}; });
     items.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
-    var actionLabels = {purchase:'Satın alma',renew:'Yenileme',upgrade:'Yükseltme',downgrade:'Düşürme',cancel:'İptal',trial_started:'Trial Başlangıç'};
+    var actionLabels = {purchase:'Satın alma',renew:'Yenileme',upgrade:'Yükseltme',downgrade:'Düşürme',cancel:'İptal',trial_started:'Trial Başlangıç',gift:'Hediye'};
     var statusColors = {paid:'#22d078',pending:'#f0a429',failed:'#ff7070',refunded:'#7db4ff'};
     var statusLabels = {paid:'Ödendi',pending:'Beklemede',failed:'Başarısız',refunded:'İade'};
 
@@ -14809,14 +14872,16 @@ async function openPaymentHistory() {
       ? '<div style="text-align:center;color:var(--text-muted);padding:30px">Henüz ödeme geçmişin yok.</div>'
       : items.map(function(h){
           var d = h.createdAt?.toDate ? h.createdAt.toDate().toLocaleString('tr-TR') : '—';
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)">'
-            + '<div>'
+          var showPdfBtn = h.status === 'paid' && h.amount > 0;
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border);gap:10px">'
+            + '<div style="flex:1;min-width:0">'
             +   '<div class="fs13-fw6">'+(actionLabels[h.action]||h.action)+' · '+(h.packageName||h.toPackageId||'-')+'</div>'
-            +   '<div class="txt-muted-12-mt2">'+d+' · '+(h.paymentMethod==='bank_transfer'?'Havale':h.paymentMethod==='free'?'Ücretsiz':h.paymentMethod)+'</div>'
+            +   '<div class="txt-muted-12-mt2">'+d+' · '+(h.paymentMethod==='bank_transfer'?'Havale':h.paymentMethod==='credit_card'?'Kart':h.paymentMethod==='admin_gift'?'Admin Hediye':h.paymentMethod==='free'?'Ücretsiz':(h.paymentMethod||'-'))+'</div>'
             + '</div>'
-            + '<div class="t-rgt">'
+            + '<div class="t-rgt" style="flex-shrink:0">'
             +   (h.amount > 0 ? '<div class="fs14-fw7">₺'+(h.amount||0).toLocaleString('tr-TR')+'</div>' : '<div style="font-size:14px;font-weight:700;color:var(--text-muted)">Ücretsiz</div>')
             +   '<div style="font-size:11px;font-weight:700;color:'+(statusColors[h.status]||'#5a6278')+'">'+(statusLabels[h.status]||h.status)+'</div>'
+            +   (showPdfBtn ? '<button class="btn-g btn-sm ph-pdf" data-id="'+h.id+'" style="margin-top:6px;padding:4px 10px;font-size:11px">📄 Makbuz İndir</button>' : '')
             + '</div>'
             + '</div>';
         }).join('');
@@ -14827,9 +14892,39 @@ async function openPaymentHistory() {
       +   '<h3 class="fs16-fw7">📜 Ödeme Geçmişi</h3>'
       +   '<button id="ph-close" class="btn-trans-x">×</button>'
       + '</div>'
+      + '<div style="background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.15);border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:var(--text-muted)">'
+      +   '💡 Makbuzlar bilgilendirme amaçlıdır. Resmi e-Fatura için <strong>Aboneliğim → Fatura Bilgilerim</strong>\'de şirket bilgilerinizi güncelleyin.'
+      + '</div>'
       + listHtml
       + '</div>';
     modal.querySelector('#ph-close').addEventListener('click', function(){ modal.remove(); });
+
+    // Makbuz İndir butonları
+    modal.querySelectorAll('.ph-pdf').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        var hId = btn.dataset.id;
+        var h = items.find(function(x){ return x.id === hId; });
+        if (!h) return;
+        btn.disabled = true;
+        btn.textContent = 'Hazırlanıyor...';
+        try {
+          // Vendor (kendi) bilgisi — fatura bilgileri kullanıcı profili veya custom alanlar
+          var vendorInfo = {
+            company: CUR_PROFILE?.company || '',
+            displayName: CUR_PROFILE?.displayName || '',
+            email: CUR_USER?.email || '',
+            invoiceCompanyName: CUR_PROFILE?.invoiceCompanyName,
+            invoiceAddress: CUR_PROFILE?.invoiceAddress,
+            invoiceTaxOffice: CUR_PROFILE?.invoiceTaxOffice,
+            invoiceTaxNumber: CUR_PROFILE?.invoiceTaxNumber,
+          };
+          await generateReceiptPDF(h, vendorInfo);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = '📄 Makbuz İndir';
+        }
+      });
+    });
   } catch(e) {
     modal.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
   }
@@ -19312,6 +19407,241 @@ window.clearVendorBadgeCache = function() {
   window._vendorBadgeCache = {};
 };
 
+// ════════════════════════════════════════════════════════════════════
+// v4.74: FATURA / MAKBUZ PDF ÜRETİMİ
+// ════════════════════════════════════════════════════════════════════
+// NOT: Bu resmi e-Fatura DEĞİL — bilgilendirme makbuzu/proforma fatura.
+// Resmi fatura için GİB onaylı e-Fatura entegratörü gerek (Phase 3).
+
+// Makbuz numarası üret (deterministik)
+function generateReceiptNo(historyId, createdAt) {
+  var dt = createdAt?.toDate ? createdAt.toDate() : new Date();
+  var year = dt.getFullYear();
+  // historyId'nin son 6 karakteri
+  var shortId = (historyId || '').slice(-6).toUpperCase();
+  return 'PCH-' + year + '-' + shortId;
+}
+
+// Latin-Turkish karakter güvenli (jsPDF default font Latin-1 ascii only)
+// Turkish ı, ğ, ü, ş, ö, ç → latin eşleniği
+function _sanitizeForPdf(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/ı/g,'i').replace(/İ/g,'I')
+    .replace(/ğ/g,'g').replace(/Ğ/g,'G')
+    .replace(/ü/g,'u').replace(/Ü/g,'U')
+    .replace(/ş/g,'s').replace(/Ş/g,'S')
+    .replace(/ö/g,'o').replace(/Ö/g,'O')
+    .replace(/ç/g,'c').replace(/Ç/g,'C');
+}
+
+// Tek bir history kaydı için PDF makbuz oluştur ve indir
+async function generateReceiptPDF(historyItem, vendorInfo) {
+  try {
+    await loadJsPDF();
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error('PDF kutuphanesi yuklenemedi');
+    }
+    // Config'ten şirket bilgilerini çek
+    const cfgSnap = await getDoc(doc(db, 'pochub_config', 'system'));
+    const cfg = cfgSnap.exists() ? cfgSnap.data() : {};
+    var company = cfg.companyInfo || {
+      name: 'PoCHub Teknoloji A.S.',
+      address: 'Istanbul, Turkiye',
+      taxOffice: 'Besiktas V.D.',
+      taxNumber: '0000000000',
+      iban: 'TR00 0000 0000 0000 0000 0000 00',
+      email: 'info@pochub.co',
+      phone: '',
+      website: 'pochub.co',
+      vatRate: 20,
+    };
+
+    var vatRate = company.vatRate || 20;
+    var totalAmount = historyItem.amount || 0;
+    var subtotal = Math.round(totalAmount / (1 + vatRate/100) * 100) / 100;
+    var vatAmount = Math.round((totalAmount - subtotal) * 100) / 100;
+
+    var dt = historyItem.paidAt?.toDate ? historyItem.paidAt.toDate() : (historyItem.createdAt?.toDate ? historyItem.createdAt.toDate() : new Date());
+    var receiptNo = generateReceiptNo(historyItem.id, historyItem.paidAt || historyItem.createdAt);
+
+    var pdf = new window.jspdf.jsPDF({ unit:'mm', format:'a4' });
+
+    // ─── HEADER ───
+    pdf.setFontSize(22);
+    pdf.setFont('helvetica','bold');
+    pdf.setTextColor(34, 208, 120);
+    pdf.text(_sanitizeForPdf(company.name || 'PoCHub'), 15, 22);
+
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica','normal');
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(_sanitizeForPdf(company.address || ''), 15, 28);
+    pdf.text('Vergi Dairesi: ' + _sanitizeForPdf(company.taxOffice || '') + '  |  VKN: ' + _sanitizeForPdf(company.taxNumber || ''), 15, 33);
+    pdf.text((company.email||'') + (company.phone ? '  |  ' + company.phone : '') + '  |  ' + (company.website||''), 15, 38);
+
+    // Sağ üst — makbuz kutusu
+    pdf.setDrawColor(34, 208, 120);
+    pdf.setLineWidth(0.5);
+    pdf.rect(140, 18, 55, 25);
+    pdf.setFontSize(8);
+    pdf.setTextColor(120, 120, 120);
+    pdf.text('MAKBUZ NO', 143, 24);
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica','bold');
+    pdf.setTextColor(40, 40, 40);
+    pdf.text(receiptNo, 143, 30);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica','normal');
+    pdf.setTextColor(120, 120, 120);
+    pdf.text('TARIH', 143, 36);
+    pdf.setFontSize(10);
+    pdf.setTextColor(40, 40, 40);
+    pdf.text(dt.toLocaleDateString('tr-TR'), 143, 42);
+
+    // ─── Başlık ───
+    pdf.setDrawColor(220, 220, 220);
+    pdf.line(15, 48, 195, 48);
+
+    pdf.setFontSize(15);
+    pdf.setFont('helvetica','bold');
+    pdf.setTextColor(34, 208, 120);
+    pdf.text('SIPARIS / TAHSILAT MAKBUZU', 105, 56, { align: 'center' });
+
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica','italic');
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('Bu belge resmi e-Fatura DEGILDIR. Bilgilendirme amacli makbuzdur.', 105, 61, { align: 'center' });
+
+    // ─── Vendor bilgileri ───
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica','bold');
+    pdf.setTextColor(80, 80, 80);
+    pdf.text('MUSTERI BILGILERI', 15, 73);
+    pdf.setDrawColor(34, 208, 120);
+    pdf.setLineWidth(0.3);
+    pdf.line(15, 75, 65, 75);
+
+    pdf.setFont('helvetica','normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(40, 40, 40);
+    var vY = 81;
+    var custName = vendorInfo?.invoiceCompanyName || vendorInfo?.company || vendorInfo?.displayName || historyItem.vendorName || '-';
+    pdf.text('Firma: ' + _sanitizeForPdf(custName), 15, vY); vY += 5;
+    if (vendorInfo?.invoiceAddress) {
+      pdf.text('Adres: ' + _sanitizeForPdf(vendorInfo.invoiceAddress).substring(0,80), 15, vY); vY += 5;
+    }
+    if (vendorInfo?.invoiceTaxOffice || vendorInfo?.invoiceTaxNumber) {
+      pdf.text('VD: ' + _sanitizeForPdf(vendorInfo?.invoiceTaxOffice||'-') + '  |  VKN: ' + _sanitizeForPdf(vendorInfo?.invoiceTaxNumber||'-'), 15, vY); vY += 5;
+    }
+    if (vendorInfo?.email) {
+      pdf.text('E-posta: ' + (vendorInfo.email||'-'), 15, vY); vY += 5;
+    }
+
+    // ─── Tablo başlığı ───
+    var tY = Math.max(vY + 6, 110);
+    pdf.setFillColor(245, 248, 250);
+    pdf.rect(15, tY, 180, 9, 'F');
+    pdf.setFont('helvetica','bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(60, 60, 60);
+    pdf.text('ACIKLAMA', 17, tY + 6);
+    pdf.text('SURE', 110, tY + 6);
+    pdf.text('YONTEM', 130, tY + 6);
+    pdf.text('TUTAR', 193, tY + 6, { align: 'right' });
+
+    pdf.setDrawColor(220, 220, 220);
+    pdf.line(15, tY + 9, 195, tY + 9);
+
+    // ─── Tablo satırı ───
+    var rY = tY + 17;
+    pdf.setFont('helvetica','normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(40, 40, 40);
+    var actionLabels = { purchase:'Paket Satin Alma', renew:'Paket Yenileme', upgrade:'Paket Yukseltme', downgrade:'Paket Dusurme', gift:'Hediye Paket', trial_started:'Deneme Baslangici' };
+    var actionLabel = actionLabels[historyItem.action] || historyItem.action || '-';
+    var pkgName = historyItem.packageName || historyItem.toPackageId || '-';
+    pdf.text(_sanitizeForPdf(actionLabel + ' - ' + pkgName), 17, rY);
+    pdf.text((historyItem.durationDays || 30) + ' gun', 110, rY);
+    var methodLabels = { credit_card:'Kredi Karti', bank_transfer:'Havale', free:'Ucretsiz', admin_gift:'Admin Hediye' };
+    pdf.text(_sanitizeForPdf(methodLabels[historyItem.paymentMethod] || historyItem.paymentMethod || '-'), 130, rY);
+    pdf.text((totalAmount > 0 ? subtotal.toFixed(2) + ' TL' : 'Ucretsiz'), 193, rY, { align: 'right' });
+
+    pdf.setDrawColor(230, 230, 230);
+    pdf.line(15, rY + 5, 195, rY + 5);
+
+    // ─── Toplam kutusu ───
+    var sY = rY + 14;
+    pdf.setFont('helvetica','normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(80, 80, 80);
+
+    if (totalAmount > 0) {
+      pdf.text('Ara Toplam:', 145, sY);
+      pdf.text(subtotal.toFixed(2) + ' TL', 193, sY, { align: 'right' });
+      sY += 6;
+
+      pdf.text('KDV (%' + vatRate + '):', 145, sY);
+      pdf.text(vatAmount.toFixed(2) + ' TL', 193, sY, { align: 'right' });
+      sY += 8;
+
+      pdf.setFillColor(34, 208, 120, 0.1);
+      pdf.setDrawColor(34, 208, 120);
+      pdf.rect(140, sY - 4, 55, 10);
+      pdf.setFont('helvetica','bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(34, 100, 70);
+      pdf.text('TOPLAM:', 145, sY + 3);
+      pdf.text(totalAmount.toFixed(2) + ' TL', 193, sY + 3, { align: 'right' });
+    } else {
+      pdf.setFont('helvetica','bold');
+      pdf.setFontSize(11);
+      pdf.text('Ucretsiz / Promosyon', 145, sY);
+    }
+
+    // ─── Kart bilgisi (varsa) ───
+    if (historyItem.cardLast4) {
+      pdf.setFont('helvetica','italic');
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text('Odeme Karti: ' + (historyItem.cardBrand||'') + ' **** ' + historyItem.cardLast4, 15, sY + 14);
+    }
+
+    // ─── Banka bilgileri (havale ise) ───
+    if (historyItem.paymentMethod === 'bank_transfer') {
+      var bY = sY + 22;
+      pdf.setFillColor(248, 248, 248);
+      pdf.rect(15, bY, 180, 18, 'F');
+      pdf.setFont('helvetica','bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text('BANKA HAVALE BILGILERI', 18, bY + 6);
+      pdf.setFont('helvetica','normal');
+      pdf.setFontSize(8);
+      pdf.text('Alici: ' + _sanitizeForPdf(company.name || ''), 18, bY + 11);
+      pdf.text('IBAN: ' + (company.iban || '-'), 18, bY + 15);
+    }
+
+    // ─── Footer ───
+    pdf.setDrawColor(220, 220, 220);
+    pdf.line(15, 275, 195, 275);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica','italic');
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('Bu makbuz ' + _sanitizeForPdf(company.name || 'PoCHub') + ' tarafindan dijital olarak olusturulmustur.', 105, 281, { align: 'center' });
+    pdf.text('Sorulariniz icin: ' + (company.email || 'info@pochub.co'), 105, 286, { align: 'center' });
+
+    // İndir
+    var fileName = 'makbuz-' + receiptNo + '.pdf';
+    pdf.save(fileName);
+
+    showToast('Makbuz indirildi.');
+  } catch(e) {
+    console.error('PDF generation error:', e);
+    showToast('PDF olusturma hatasi: ' + e.message, 'err');
+  }
+}
+
 // Default paketler (sistem ilk açıldığında otomatik seed edilir)
 const DEFAULT_PACKAGES = [
   {
@@ -19478,6 +19808,17 @@ const DEFAULT_CONFIG = {
     showOnCatalog: true,
     showOnDashboard: true,
     showOnFeatured: true,
+  },
+  companyInfo: {
+    name: 'PoCHub Teknoloji A.Ş.',
+    address: 'İstanbul, Türkiye',
+    taxOffice: 'Beşiktaş V.D.',
+    taxNumber: '0000000000',
+    iban: 'TR00 0000 0000 0000 0000 0000 00',
+    email: 'info@pochub.co',
+    phone: '+90 ___ ___ __ __',
+    website: 'pochub.co',
+    vatRate: 20, // %20 KDV
   },
 };
 
@@ -19874,6 +20215,19 @@ async function admSettings(m) {
     s11.appendChild(field('Featured carousel\'de göster', 'cfg-vb-featured', 'toggle', cfg.vendorBadges?.showOnFeatured ?? true));
     m.appendChild(s11);
 
+    // v4.74: Şirket Bilgileri (PDF makbuz için)
+    var s12 = section('🏢 PoCHub Şirket Bilgileri (Makbuz PDF için)', '#7db4ff');
+    s12.appendChild(field('Şirket Unvanı', 'cfg-ci-name', 'text', cfg.companyInfo?.name || 'PoCHub Teknoloji A.Ş.'));
+    s12.appendChild(field('Adres', 'cfg-ci-address', 'text', cfg.companyInfo?.address || 'İstanbul, Türkiye'));
+    s12.appendChild(field('Vergi Dairesi', 'cfg-ci-tax-office', 'text', cfg.companyInfo?.taxOffice || ''));
+    s12.appendChild(field('VKN', 'cfg-ci-tax-no', 'text', cfg.companyInfo?.taxNumber || ''));
+    s12.appendChild(field('IBAN', 'cfg-ci-iban', 'text', cfg.companyInfo?.iban || ''));
+    s12.appendChild(field('E-posta', 'cfg-ci-email', 'text', cfg.companyInfo?.email || 'info@pochub.co'));
+    s12.appendChild(field('Telefon', 'cfg-ci-phone', 'text', cfg.companyInfo?.phone || ''));
+    s12.appendChild(field('Web Sitesi', 'cfg-ci-website', 'text', cfg.companyInfo?.website || 'pochub.co'));
+    s12.appendChild(field('KDV Oranı (%)', 'cfg-ci-vat', 'number', cfg.companyInfo?.vatRate ?? 20));
+    m.appendChild(s12);
+
     // Save
     el('cfg-save').addEventListener('click', async function(){
       try {
@@ -19933,6 +20287,17 @@ async function admSettings(m) {
             showOnCatalog: el('cfg-vb-catalog').value === 'true',
             showOnDashboard: el('cfg-vb-dashboard').value === 'true',
             showOnFeatured: el('cfg-vb-featured').value === 'true',
+          },
+          companyInfo: {
+            name: el('cfg-ci-name').value || 'PoCHub Teknoloji A.Ş.',
+            address: el('cfg-ci-address').value || '',
+            taxOffice: el('cfg-ci-tax-office').value || '',
+            taxNumber: el('cfg-ci-tax-no').value || '',
+            iban: el('cfg-ci-iban').value || '',
+            email: el('cfg-ci-email').value || '',
+            phone: el('cfg-ci-phone').value || '',
+            website: el('cfg-ci-website').value || '',
+            vatRate: parseInt(el('cfg-ci-vat').value) || 20,
           },
           updatedAt: serverTimestamp(),
           updatedBy: CUR_USER?.uid || null,
@@ -20165,8 +20530,9 @@ async function admPayments(m) {
           +     '<div style="font-size:11px;font-weight:700;color:'+sc+';margin-top:2px">'+(statusLabels[h.status]||h.status)+'</div>'
           +   '</div>'
           + '</div>'
-          + '<div style="font-size:11.5px;color:var(--text-muted)">Yöntem: '+(h.paymentMethod==='bank_transfer'?'🏦 Manuel Havale':h.paymentMethod==='free'?'🆓 Ücretsiz':h.paymentMethod==='credit_card'?'💳 Kredi Kartı':h.paymentMethod)+'</div>'
+          + '<div style="font-size:11.5px;color:var(--text-muted)">Yöntem: '+(h.paymentMethod==='bank_transfer'?'🏦 Manuel Havale':h.paymentMethod==='free'?'🆓 Ücretsiz':h.paymentMethod==='credit_card'?'💳 Kredi Kartı':h.paymentMethod==='admin_gift'?'🎁 Admin Hediye':h.paymentMethod)+'</div>'
           + (h.status === 'pending' && h.action !== 'trial_started' ? '<div style="margin-top:10px;display:flex;gap:6px"><button class="pay-approve btn-p btn-sm" data-id="'+h.id+'">✅ Onayla & Aktive Et</button><button class="pay-reject btn-red btn-sm" data-id="'+h.id+'">❌ Reddet</button></div>' : '')
+          + (h.status === 'paid' && h.amount > 0 ? '<div style="margin-top:10px"><button class="pay-pdf btn-g btn-sm" data-id="'+h.id+'">📄 Makbuz PDF</button></div>' : '')
           + (h.rejectionReason ? '<div style="margin-top:8px;font-size:11.5px;color:#ff7070;background:rgba(255,112,112,.06);padding:6px 8px;border-radius:6px"><strong>Red sebebi:</strong> '+h.rejectionReason+'</div>' : '')
           + (h.approvedBy ? '<div style="margin-top:6px;font-size:10.5px;color:var(--text-muted);font-style:italic">'+(h.status==='paid'?'✅ Onaylayan: ':'❌ Reddeden: ')+h.approvedBy+'</div>' : '');
         list.appendChild(card);
@@ -20272,6 +20638,24 @@ async function admPayments(m) {
             await admPayments(m);
           } catch(e) {
             showToast('Hata: '+e.message,'err');
+          }
+        });
+      });
+
+      // v4.74: Makbuz PDF butonları
+      list.querySelectorAll('.pay-pdf').forEach(function(b){
+        b.addEventListener('click', async function(){
+          var h = items.find(function(x){ return x.id === b.dataset.id; });
+          if (!h) return;
+          b.disabled = true;
+          b.textContent = 'Hazırlanıyor...';
+          try {
+            var vendorSnap = await getDoc(doc(db,'users',h.vendorId));
+            var vendorData = vendorSnap.exists() ? vendorSnap.data() : {};
+            await generateReceiptPDF(h, vendorData);
+          } finally {
+            b.disabled = false;
+            b.textContent = '📄 Makbuz PDF';
           }
         });
       });
