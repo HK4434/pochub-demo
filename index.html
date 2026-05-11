@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.74 | pochub.co -->
+<!-- PoCHub v4.75 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.74</title>
+<title>PoCHub.co — v4.75</title>
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
 body.role-customer{--color-primary:var(--role-customer-accent);--color-primary-dim:var(--role-customer-dim);--color-primary-hover:#1a9e5a;}
@@ -326,8 +326,10 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+// v4.75: Firebase Functions client SDK
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.74';
+const VERSION = 'v4.75';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -1482,6 +1484,22 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+// v4.75: Firebase Functions client (europe-west1 region)
+const fns = getFunctions(app, 'europe-west1');
+
+// v4.75: Functions çağırma helper'ı
+// Kullanım: const result = await callFunction('helloWorld', { foo: 'bar' });
+// Hata durumunda exception fırlatır.
+window.callFunction = async function(name, data) {
+  try {
+    const callable = httpsCallable(fns, name);
+    const result = await callable(data || {});
+    return result.data; // { ok: true, data: ... } şeklinde döner
+  } catch (e) {
+    console.error('callFunction(' + name + ') error:', e);
+    throw e;
+  }
+};
 
 // EmailJS
 const EJS_PUBLIC = 'cPhdfmFCSt85X3dDb';
@@ -20227,6 +20245,72 @@ async function admSettings(m) {
     s12.appendChild(field('Web Sitesi', 'cfg-ci-website', 'text', cfg.companyInfo?.website || 'pochub.co'));
     s12.appendChild(field('KDV Oranı (%)', 'cfg-ci-vat', 'number', cfg.companyInfo?.vatRate ?? 20));
     m.appendChild(s12);
+
+    // v4.75: Firebase Functions Sağlık Kontrolü
+    var s13 = section('☁️ Firebase Functions Sağlık Kontrolü', '#c4a8ff');
+    var fnInfo = document.createElement('div');
+    fnInfo.style.cssText = 'background:rgba(196,168,255,.05);border:1px solid rgba(196,168,255,.2);border-radius:8px;padding:12px;margin-bottom:10px;font-size:11.5px;color:var(--text-muted);line-height:1.6';
+    fnInfo.innerHTML =
+      '⚠️ Functions deploy yapılmamışsa testler başarısız olur.<br>'
+      + 'Region: <code>europe-west1</code><br>'
+      + 'Deploy: <code>cd functions && npm run deploy</code><br>'
+      + 'Logları görmek: <code>firebase functions:log</code>';
+    s13.appendChild(fnInfo);
+
+    var fnTestRow = document.createElement('div');
+    fnTestRow.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-bottom:10px';
+    fnTestRow.innerHTML =
+      '<button class="btn-g btn-sm" id="fn-test-hello">🔵 helloWorld testi</button>'
+      + '<button class="btn-g btn-sm" id="fn-test-time">⏰ getServerTime testi</button>'
+      + '<button class="btn-g btn-sm" id="fn-test-user">👤 getCurrentUser testi</button>'
+      + '<div id="fn-test-result" style="font-size:11px;font-family:monospace;background:var(--bg-elevated);border-radius:6px;padding:10px;min-height:60px;max-height:200px;overflow-y:auto;color:var(--text-secondary);white-space:pre-wrap;display:none"></div>';
+    s13.appendChild(fnTestRow);
+    m.appendChild(s13);
+
+    // Test handlers
+    function showFnResult(label, result, isError) {
+      var resEl = el('fn-test-result');
+      resEl.style.display = 'block';
+      resEl.style.color = isError ? '#ff7070' : '#22d078';
+      var ts = new Date().toLocaleTimeString('tr-TR');
+      resEl.textContent = '[' + ts + '] ' + label + ':\n' + JSON.stringify(result, null, 2);
+    }
+
+    setTimeout(function(){
+      el('fn-test-hello')?.addEventListener('click', async function(){
+        var btn = this; btn.disabled = true; btn.textContent = '⏳ Test ediliyor...';
+        try {
+          var res = await window.callFunction('helloWorld', { test: 'admin-ping', time: Date.now() });
+          showFnResult('✅ helloWorld', res, false);
+        } catch(e) {
+          showFnResult('❌ helloWorld HATA', { code: e.code, message: e.message }, true);
+        }
+        btn.disabled = false; btn.textContent = '🔵 helloWorld testi';
+      });
+      el('fn-test-time')?.addEventListener('click', async function(){
+        var btn = this; btn.disabled = true; btn.textContent = '⏳ Test ediliyor...';
+        try {
+          var res = await window.callFunction('getServerTime');
+          var clientTime = Date.now();
+          var skew = clientTime - res.data.serverTimestamp;
+          res.clientSkewMs = skew;
+          showFnResult('✅ getServerTime (skew=' + skew + 'ms)', res, false);
+        } catch(e) {
+          showFnResult('❌ getServerTime HATA', { code: e.code, message: e.message }, true);
+        }
+        btn.disabled = false; btn.textContent = '⏰ getServerTime testi';
+      });
+      el('fn-test-user')?.addEventListener('click', async function(){
+        var btn = this; btn.disabled = true; btn.textContent = '⏳ Test ediliyor...';
+        try {
+          var res = await window.callFunction('getCurrentUser');
+          showFnResult('✅ getCurrentUser', res, false);
+        } catch(e) {
+          showFnResult('❌ getCurrentUser HATA', { code: e.code, message: e.message }, true);
+        }
+        btn.disabled = false; btn.textContent = '👤 getCurrentUser testi';
+      });
+    }, 100);
 
     // Save
     el('cfg-save').addEventListener('click', async function(){
