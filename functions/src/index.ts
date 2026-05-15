@@ -1,9 +1,9 @@
 /**
  * PoCHub Firebase Functions - Entry Point
- * v4.75 - Phase 2.5
+ * v4.76 - Phase 2.6
  *
  * Region: europe-west1 (Türkiye'ye en yakın)
- * Runtime: Node.js 20
+ * Runtime: Node.js 22
  */
 
 import * as admin from "firebase-admin";
@@ -29,10 +29,16 @@ export {helloWorld} from "./hello";
 export {getServerTime} from "./hello";
 export {getCurrentUser} from "./hello";
 
-// ─── v4.76: iyzico ödeme entegrasyonu (PLACEHOLDER) ──────────────────
-// export {iyzicoCheckoutInit} from "./iyzico";
-// export {iyzicoCallback} from "./iyzico";
-// export {iyzicoTokenizeCard} from "./iyzico";
+// ─── v4.76: iyzico ödeme entegrasyonu (AKTİF) ────────────────────────
+// Bu function'ları kullanmak için:
+//   1. Blaze plan aktif olmalı
+//   2. firebase functions:secrets:set IYZICO_API_KEY
+//   3. firebase functions:secrets:set IYZICO_SECRET_KEY
+//   4. firebase functions:secrets:set IYZICO_BASE_URL
+//   5. firebase deploy --only functions:iyzicoCheckoutInit,functions:iyzicoCallback
+//   6. HTML'de USE_PRODUCTION_PAYMENTS = true yap
+export {iyzicoCheckoutInit} from "./iyzico";
+export {iyzicoCallback} from "./iyzico";
 
 // ─── v4.77: EmailJS bildirimler (PLACEHOLDER) ────────────────────────
 // export {sendNotificationEmail} from "./email";
