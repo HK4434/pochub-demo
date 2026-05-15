@@ -51,8 +51,15 @@ export {iyzicoCallback} from "./iyzico";
 export {sendNotificationEmail} from "./email";
 export {sendInvoiceEmail} from "./email";
 
-// ─── v4.78: Scheduled cron jobs (PLACEHOLDER) ────────────────────────
-// export {dailyMaintenanceCron} from "./cron";
+// ─── v4.78: Scheduled cron jobs (AKTİF) ──────────────────────────────
+// Cloud Scheduler ile tetiklenir, Blaze plan gerekir.
+// Deploy:
+//   firebase deploy --only functions:dailyMaintenanceCron,functions:hourlyBillingCheckCron,functions:weeklyDigestCron
+// Manual tetikleme (test):
+//   gcloud scheduler jobs run firebase-schedule-dailyMaintenanceCron-europe-west1 --location=europe-west1
+export {dailyMaintenanceCron} from "./cron";
+export {hourlyBillingCheckCron} from "./cron";
+export {weeklyDigestCron} from "./cron";
 
 // ─── v4.79+: Production fonksiyonları (PLACEHOLDER) ──────────────────
 // export {createPocCharge} from "./charges";
