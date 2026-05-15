@@ -1,0 +1,433 @@
+// PoCHub Firestore Security Rules
+// v4.79 - Phase 2.9
+//
+// Strategy: Role-based access control + owner-based writes
+// Roles: admin | vendor | customer (from users/{uid}.role)
+//
+// Deploy: firebase deploy --only firestore:rules
+// Test:   firebase emulators:start --only firestore (lokal)
+//
+// ROLLBACK: If anything breaks, revert to previous rules in Firebase Console
+// → Firestore Database → Rules → Version history → "Restore"
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ═══════════════════════════════════════════════════════════════
+    // HELPER FUNCTIONS — DRY
+    // ═══════════════════════════════════════════════════════════════
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function getUser(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function userExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function myRole() {
+      return userExists(uid()) ? getUser(uid()).role : null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && myRole() == 'admin';
+    }
+
+    function isVendor() {
+      return isSignedIn() && myRole() == 'vendor';
+    }
+
+    function isCustomer() {
+      return isSignedIn() && myRole() == 'customer';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && uid() == userId;
+    }
+
+    function isApprovedVendor() {
+      return isVendor() && getUser(uid()).vendorStatus == 'approved';
+    }
+
+    // Yeni belge oluşturulurken zorunlu alanlar var mı?
+    function hasFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Sadece belirtilen alanlar değişiyor mu? (immutable alanların korunması)
+    function onlyChanging(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function notChanging(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // users/{userId} — kullanıcı profilleri
+    // ═══════════════════════════════════════════════════════════════
+    match /users/{userId} {
+      // Read: herkes herkesin profilini okuyabilir (vendor isimleri, catalog için lazım)
+      // ÖNEMLİ: Hassas alanlar (email vs.) frontend'de görüntülenmiyorsa OK
+      allow read: if isSignedIn();
+
+      // Create: kullanıcı kendi belgesini oluşturabilir (signup akışı)
+      allow create: if isOwner(userId)
+                    && hasFields(['email', 'role'])
+                    && request.resource.data.role in ['vendor', 'customer'];
+                    // Note: admin role'ü Firebase Console'dan elle verilir
+
+      // Update: sahibi kendi alanlarını güncelleyebilir
+      // Admin tüm alanları değiştirebilir (vendor approval vs.)
+      allow update: if isAdmin()
+                    || (isOwner(userId)
+                        && notChanging(['role', 'vendorStatus', 'isSuspendedDueToBilling', 'hasActiveSubscription', 'subscriptionTier']));
+                        // role/vendorStatus/billing alanları sadece admin (veya Functions) değiştirebilir
+
+      // Delete: sadece admin
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // pochub_packages/{packageId} — paket tanımları
+    // ═══════════════════════════════════════════════════════════════
+    match /pochub_packages/{packageId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // pochub_config/{docId} — sistem ayarları (system, daily_featured, vs.)
+    // ═══════════════════════════════════════════════════════════════
+    match /pochub_config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // vendor_subscriptions/{vendorId} — abonelik durumları
+    // ═══════════════════════════════════════════════════════════════
+    match /vendor_subscriptions/{vendorId} {
+      // Sadece sahibi ve admin okuyabilir
+      // (Vendor badge sistemi için catalog'da customer'ın okumasına izin verilebilir
+      //  ama o zaman daha kısıtlı write kuralı lazım. Şimdilik sadece owner+admin.)
+      allow read: if isOwner(vendorId) || isAdmin();
+
+      // Write: sadece admin (veya Functions admin-auth ile) -- frontend'den asla
+      // Functions admin SDK olarak yazıyor, bu rules'u atlatır.
+      // Frontend'den write isteği gelirse RED.
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // subscription_history/{historyId} — ödeme/aksiyon geçmişi
+    // ═══════════════════════════════════════════════════════════════
+    match /subscription_history/{historyId} {
+      // Read: sadece kayıt sahibi veya admin
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.vendorId == uid());
+
+      // Create: vendor kendi kaydını oluşturabilir (trial, ücretsiz paket, manual havale request vs.)
+      //   - amount = 0 (trial/free) VEYA action = 'manual_transfer_request' olmalı
+      //   - status PENDING ile başlamalı (paid statusunu sadece admin/Functions yazabilir)
+      allow create: if isAdmin()
+                    || (isVendor()
+                        && request.resource.data.vendorId == uid()
+                        && request.resource.data.status in ['pending', 'pending_payment']
+                        && hasFields(['vendorId', 'packageId', 'action', 'status']));
+
+      // Update/Delete: sadece admin (Functions admin auth ile)
+      allow update, delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // poc_requests/{pocId} — PoC talepleri
+    // ═══════════════════════════════════════════════════════════════
+    match /poc_requests/{pocId} {
+      // Read: müşteri (PoC'un sahibi) + ilgili vendor + admin
+      allow read: if isAdmin()
+                  || (isSignedIn()
+                      && (resource.data.customerId == uid() || resource.data.vendorId == uid()));
+
+      // Create: customer kendi PoC'ını oluşturabilir
+      allow create: if isCustomer()
+                    && request.resource.data.customerId == uid()
+                    && hasFields(['customerId', 'vendorId', 'productId', 'status']);
+
+      // Update: customer (sadece kendi PoC, sınırlı alanlar)
+      //         vendor (sadece kendi PoC, durumu güncelleyebilir)
+      //         admin (her şey)
+      allow update: if isAdmin()
+                    || (isSignedIn()
+                        && resource.data.customerId == uid()
+                        && notChanging(['vendorId', 'productId', 'customerId', 'createdAt']))
+                    || (isSignedIn()
+                        && resource.data.vendorId == uid()
+                        && notChanging(['vendorId', 'customerId', 'productId', 'createdAt', 'customerName', 'customerEmail']));
+
+      // Delete: admin veya sahibi (PoC iptal)
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.customerId == uid());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // poc_messages/{messageId} — PoC içi mesajlar
+    // ═══════════════════════════════════════════════════════════════
+    match /poc_messages/{messageId} {
+      // Read: mesajın gönderildiği PoC'un katılımcıları
+      // ÖNEMLİ: get() ile PoC kontrolü read'i pahalı yapar. Onun yerine
+      // mesajın kendisinde participant ID'leri var olmalı (denormalized).
+      allow read: if isSignedIn()
+                  && (resource.data.senderId == uid()
+                      || resource.data.recipientId == uid()
+                      || isAdmin());
+
+      // Create: katılımcılardan biri yazabilir
+      allow create: if isSignedIn()
+                    && request.resource.data.senderId == uid()
+                    && hasFields(['pocId', 'senderId', 'recipientId', 'content']);
+
+      // Update: sadece okunma durumu güncellenebilir (read flag toggling)
+      // Diğer alanlar IMMUTABLE
+      allow update: if isSignedIn()
+                    && resource.data.recipientId == uid()
+                    && onlyChanging(['readAt', 'isRead']);
+
+      // Delete: admin veya gönderen
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.senderId == uid());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // poc_invites/{inviteId} — vendor'ın customer'a PoC daveti
+    // ═══════════════════════════════════════════════════════════════
+    match /poc_invites/{inviteId} {
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.vendorId == uid())
+                  || (isSignedIn() && resource.data.customerEmail == request.auth.token.email);
+
+      allow create: if isApprovedVendor()
+                    && request.resource.data.vendorId == uid();
+
+      allow update: if isAdmin()
+                    || (isSignedIn() && resource.data.vendorId == uid())
+                    || (isSignedIn() && resource.data.customerEmail == request.auth.token.email
+                        && onlyChanging(['status', 'acceptedAt', 'declinedAt']));
+
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.vendorId == uid());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // products/{productId} — vendor ürünleri
+    // ═══════════════════════════════════════════════════════════════
+    match /products/{productId} {
+      // Read: herkes (catalog public)
+      allow read: if isSignedIn();
+
+      // Create: approved vendor sadece kendi ürünü
+      allow create: if isApprovedVendor()
+                    && request.resource.data.vendorId == uid();
+
+      // Update: sahibi vendor (sınırlı alanlar) veya admin
+      allow update: if isAdmin()
+                    || (isApprovedVendor()
+                        && resource.data.vendorId == uid()
+                        && notChanging(['vendorId', 'createdAt']));
+
+      // Delete: sahibi veya admin
+      allow delete: if isAdmin()
+                    || (isApprovedVendor() && resource.data.vendorId == uid());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // categories/{categoryId} — kategori tanımları
+    // ═══════════════════════════════════════════════════════════════
+    match /categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // notifications/{notifId} — kullanıcı bildirimleri
+    // ═══════════════════════════════════════════════════════════════
+    match /notifications/{notifId} {
+      // Read: sadece alıcı veya admin
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.recipientId == uid());
+
+      // Create: sadece admin/Functions (frontend'den yazılamaz)
+      // Cron jobs Functions admin SDK ile yazar, bu kural geçilir.
+      allow create: if isAdmin();
+
+      // Update: alıcı sadece read durumunu değiştirebilir
+      allow update: if isAdmin()
+                    || (isSignedIn()
+                        && resource.data.recipientId == uid()
+                        && onlyChanging(['read', 'readAt']));
+
+      // Delete: alıcı kendi bildirimini silebilir
+      allow delete: if isAdmin()
+                    || (isSignedIn() && resource.data.recipientId == uid());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // poc_charges/{chargeId} — PoC bazlı kullanım ücreti kayıtları
+    // ═══════════════════════════════════════════════════════════════
+    match /poc_charges/{chargeId} {
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.vendorId == uid());
+
+      // Sadece Functions admin SDK yazabilir (frontend'den yazma yasak)
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // vendor_billing/{vendorId} — cari hesap özet
+    // ═══════════════════════════════════════════════════════════════
+    match /vendor_billing/{vendorId} {
+      allow read: if isOwner(vendorId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // admin_overrides/{overrideId} — admin manuel müdahaleler
+    // ═══════════════════════════════════════════════════════════════
+    match /admin_overrides/{overrideId} {
+      // Read: hedef vendor + admin
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.vendorId == uid());
+
+      // Create: vendor talep edebilir
+      allow create: if isVendor()
+                    && request.resource.data.vendorId == uid()
+                    && request.resource.data.status == 'pending';
+
+      // Update: sadece admin (approve/reject)
+      // Delete: sadece admin
+      allow update, delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // payment_methods/{vendorId} — kayıtlı kart bilgileri (token'lar)
+    // ═══════════════════════════════════════════════════════════════
+    match /payment_methods/{vendorId} {
+      allow read: if isOwner(vendorId) || isAdmin();
+
+      // Vendor kendi kartını kaydedebilir (iyzico token only, gerçek kart bilgisi yok)
+      allow write: if isOwner(vendorId) || isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // pochub_daily_featured/{dateKey} — günlük öne çıkanlar
+    // ═══════════════════════════════════════════════════════════════
+    match /pochub_daily_featured/{dateKey} {
+      allow read: if isSignedIn();
+      // Cron Function yazar (admin SDK), frontend'den yazılamaz
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // events/{eventId} — vendor etkinlikleri
+    // ═══════════════════════════════════════════════════════════════
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isApprovedVendor()
+                    && request.resource.data.vendorId == uid();
+      allow update: if isAdmin()
+                    || (isApprovedVendor()
+                        && resource.data.vendorId == uid()
+                        && notChanging(['vendorId', 'createdAt']));
+      allow delete: if isAdmin()
+                    || (isApprovedVendor() && resource.data.vendorId == uid());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // offers/{offerId} — vendor → customer teklifler
+    // ═══════════════════════════════════════════════════════════════
+    match /offers/{offerId} {
+      allow read: if isAdmin()
+                  || (isSignedIn()
+                      && (resource.data.vendorId == uid() || resource.data.customerId == uid()));
+
+      allow create: if isApprovedVendor()
+                    && request.resource.data.vendorId == uid();
+
+      allow update: if isAdmin()
+                    || (isSignedIn() && resource.data.vendorId == uid()
+                        && notChanging(['vendorId', 'customerId', 'createdAt']))
+                    || (isSignedIn() && resource.data.customerId == uid()
+                        && onlyChanging(['customerResponse', 'respondedAt', 'status']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // poc_conversations/{convId} — PoC konuşma metadata
+    // ═══════════════════════════════════════════════════════════════
+    match /poc_conversations/{convId} {
+      allow read: if isAdmin()
+                  || (isSignedIn()
+                      && (resource.data.customerId == uid() || resource.data.vendorId == uid()));
+
+      // Frontend bu metadata'yı yazabilir (poc create akışı)
+      allow create: if isSignedIn()
+                    && (request.resource.data.customerId == uid() || request.resource.data.vendorId == uid());
+
+      // Update: katılımcılar bazı alanları (pinned vs.) değiştirebilir
+      allow update: if isAdmin()
+                    || (isSignedIn()
+                        && (resource.data.customerId == uid() || resource.data.vendorId == uid())
+                        && notChanging(['customerId', 'vendorId', 'pocId', 'createdAt']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SERVER-WRITE-ONLY KOLEKSİYONLAR
+    // (Sadece Functions admin SDK yazabilir, frontend hiçbir şey yapamaz)
+    // ═══════════════════════════════════════════════════════════════
+
+    match /audit_log/{logId} {
+      // Sadece admin okuyabilir, hiç kimse yazamaz (Functions admin SDK rules'u bypass eder)
+      allow read: if isAdmin();
+      allow write: if false; // FRONTEND'DEN YAZMA YASAK
+    }
+
+    match /cron_runs/{runId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /email_log/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /weekly_digests/{digestId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /notification_dedup/{dedupId} {
+      // Hiçbir frontend okuyamaz/yazamaz, sadece Functions
+      allow read, write: if false;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FALLBACK — Bilinmeyen koleksiyonlar
+    // ═══════════════════════════════════════════════════════════════
+    // Default-deny: tanımlanmamış bir koleksiyona kimse erişemez.
+    // Yeni bir koleksiyon eklerken yukarıda kural tanımlanması gerek.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
