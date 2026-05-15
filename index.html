@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.75 | pochub.co -->
+<!-- PoCHub v4.76 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.75</title>
+<title>PoCHub.co — v4.76</title>
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
 body.role-customer{--color-primary:var(--role-customer-accent);--color-primary-dim:var(--role-customer-dim);--color-primary-hover:#1a9e5a;}
@@ -329,7 +329,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.75';
+const VERSION = 'v4.76';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -1486,6 +1486,16 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 // v4.75: Firebase Functions client (europe-west1 region)
 const fns = getFunctions(app, 'europe-west1');
+
+// ════════════════════════════════════════════════════════════════════
+// v4.76: PRODUCTION PAYMENT FEATURE FLAG
+// ════════════════════════════════════════════════════════════════════
+// false → MOCK akış (iyzico simülasyonu, gerçek para hareketi YOK)
+// true  → GERÇEK iyzico (Functions deploy edilmiş + Blaze plan + secrets ayarlanmış olmalı)
+// İlk müşteri için: Blaze geçişi sonrası bu değeri true yap, deploy et.
+const USE_PRODUCTION_PAYMENTS = false;
+// Mock'ta hangi senaryoyu test ediyoruz? (sadece USE_PRODUCTION_PAYMENTS=false iken anlamlı)
+const MOCK_PAYMENT_OUTCOME = 'success'; // 'success' | 'fail_3ds' | 'fail_charge' | 'fail_network'
 
 // v4.75: Functions çağırma helper'ı
 // Kullanım: const result = await callFunction('helloWorld', { foo: 'bar' });
@@ -14617,6 +14627,15 @@ function openCardEntryModal(pkg, billingMode, amount, period, autoRenew) {
 // v4.68: 3D SECURE SİMÜLASYONU + ÖDEME İŞLEME
 // ════════════════════════════════════════════════════════════════════
 async function processIyzicoPayment(pkg, billingMode, amount, period, paymentMethod, autoRenew, saveNewCard) {
+  // ─────────────────────────────────────────────────────────────────
+  // v4.76: PRODUCTION ROUTING
+  // ─────────────────────────────────────────────────────────────────
+  if (USE_PRODUCTION_PAYMENTS) {
+    return await processIyzicoPaymentProduction(pkg, billingMode, amount, period, paymentMethod, autoRenew, saveNewCard);
+  }
+  // ─────────────────────────────────────────────────────────────────
+  // MOCK AKIŞ (mevcut — değiştirilmedi)
+  // ─────────────────────────────────────────────────────────────────
   // 3D Secure modal (mock)
   var modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -14736,6 +14755,138 @@ async function processIyzicoPayment(pkg, billingMode, amount, period, paymentMet
       }
     });
   });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.76: PRODUCTION iyzico — Functions üzerinden gerçek ödeme
+// ════════════════════════════════════════════════════════════════════
+// Bu fonksiyon SADECE USE_PRODUCTION_PAYMENTS=true iken çağrılır.
+// Functions deploy edilmiş ve Blaze plan aktif olmalı.
+//
+// Akış:
+// 1. callFunction('iyzicoCheckoutInit', { packageId, billingMode, ... })
+// 2. Function → iyzico Checkout Form Initialize API
+// 3. iyzico → checkoutFormContent (HTML+JS snippet) döner
+// 4. PoCHub → o snippet'i bir iframe/popup içinde göster
+// 5. Müşteri iyzico tarafında kart bilgisi girer + 3D Secure onaylar
+// 6. iyzico → success URL'e redirect → /__/iyzico-callback (Function)
+// 7. Function → iyzicoCallback → token doğrula → subscription_history/paid yaz
+// 8. PoCHub → polling veya websocket ile sonucu öğrenir
+// 9. Aboneliğim sayfası yenilenir
+async function processIyzicoPaymentProduction(pkg, billingMode, amount, period, paymentMethod, autoRenew, saveNewCard) {
+  // Loading modal
+  var loading = document.createElement('div');
+  loading.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  loading.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:420px;width:100%;text-align:center">'
+    + '<div class="spinner" style="margin:0 auto 16px"></div>'
+    + '<h3 style="font-size:16px;font-weight:700;margin-bottom:6px">Ödeme Hazırlanıyor</h3>'
+    + '<div class="txt-muted-12">iyzico güvenli ödeme sayfasına yönlendiriliyorsunuz...</div>'
+    + '</div>';
+  document.body.appendChild(loading);
+
+  try {
+    // 1. Functions çağrısı
+    var result = await window.callFunction('iyzicoCheckoutInit', {
+      packageId: pkg.id,
+      billingMode: billingMode,
+      durationDays: period,
+      amount: amount,
+      autoRenew: autoRenew,
+      saveCard: saveNewCard,
+    });
+
+    if (!result?.ok || !result?.data?.checkoutFormContent) {
+      throw new Error(result?.error || 'iyzico checkout başlatılamadı');
+    }
+
+    var token = result.data.token;
+    var checkoutHtml = result.data.checkoutFormContent;
+
+    loading.remove();
+
+    // 2. iyzico Checkout Form'unu modal içinde göster
+    var checkoutModal = document.createElement('div');
+    checkoutModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    checkoutModal.innerHTML =
+      '<div style="background:#fff;border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:#f5f5f5;border-bottom:1px solid #ddd">'
+      +   '<div style="font-weight:700;color:#222">🔒 iyzico Güvenli Ödeme</div>'
+      +   '<button id="iyz-cancel" style="background:none;border:none;font-size:24px;cursor:pointer;color:#666">×</button>'
+      + '</div>'
+      + '<div id="iyzipay-checkout-form" class="responsive" style="flex:1;overflow-y:auto;padding:10px;background:#fff">' + checkoutHtml + '</div>'
+      + '</div>';
+    document.body.appendChild(checkoutModal);
+
+    // 3. iyzico'nun script'ini çalıştır (DOM'a eklenince otomatik tetiklenmez, manuel ele alalım)
+    checkoutModal.querySelectorAll('script').forEach(function(s){
+      var newScript = document.createElement('script');
+      if (s.src) newScript.src = s.src;
+      if (s.textContent) newScript.textContent = s.textContent;
+      document.body.appendChild(newScript);
+    });
+
+    checkoutModal.querySelector('#iyz-cancel').addEventListener('click', function(){
+      checkoutModal.remove();
+      showToast('Ödeme iptal edildi.','warn');
+    });
+
+    // 4. Polling — Function callback'i subscription_history'ye yazana kadar bekle
+    // (Webhook tabanlı, ama frontend için polling güvenli)
+    return new Promise(function(resolve){
+      var attempts = 0;
+      var maxAttempts = 60; // 60 * 3sn = 3dk
+
+      var pollTimer = setInterval(async function(){
+        attempts++;
+        if (attempts > maxAttempts) {
+          clearInterval(pollTimer);
+          checkoutModal.remove();
+          showToast('Ödeme zaman aşımı. Lütfen ödeme geçmişinizi kontrol edin.','warn');
+          resolve(false);
+          return;
+        }
+
+        try {
+          // Bu token'a sahip bir kayıt var mı?
+          var q = query(collection(db,'subscription_history'),
+            where('vendorId','==',CUR_USER.uid),
+            where('iyzicoToken','==',token));
+          var snap = await getDocs(q);
+          if (snap.docs.length === 0) return; // Henüz yok, bekle
+
+          var hist = {...snap.docs[0].data(), id: snap.docs[0].id};
+          if (hist.status === 'paid') {
+            clearInterval(pollTimer);
+            checkoutModal.remove();
+            showToast('✅ Ödeme başarılı! Paket aktifleştirildi.');
+            // Aboneliğim sayfasını yenile
+            if (CUR_VENDOR_TAB === 'subscription') {
+              setTimeout(loadVendorSubscription, 500);
+            }
+            resolve(true);
+          } else if (hist.status === 'failed') {
+            clearInterval(pollTimer);
+            checkoutModal.remove();
+            showToast('❌ Ödeme başarısız: ' + (hist.failReason || 'Bilinmeyen hata'),'err');
+            resolve(false);
+          }
+          // Status 'pending' ise polling devam
+        } catch(e) {
+          console.error('Iyzico polling error:', e);
+        }
+      }, 3000);
+
+      // Modal kapatılırsa polling durdur
+      checkoutModal.querySelector('#iyz-cancel').addEventListener('click', function(){
+        clearInterval(pollTimer);
+      });
+    });
+  } catch(e) {
+    loading.remove();
+    showToast('iyzico hatası: ' + e.message, 'err');
+    return false;
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
