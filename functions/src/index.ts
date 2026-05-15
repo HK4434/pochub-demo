@@ -40,9 +40,16 @@ export {getCurrentUser} from "./hello";
 export {iyzicoCheckoutInit} from "./iyzico";
 export {iyzicoCallback} from "./iyzico";
 
-// ─── v4.77: EmailJS bildirimler (PLACEHOLDER) ────────────────────────
-// export {sendNotificationEmail} from "./email";
-// export {sendInvoiceEmail} from "./email";
+// ─── v4.77: EmailJS bildirimler (AKTİF) ──────────────────────────────
+// Production'da çalışması için:
+//   1. EmailJS hesabı + 7 template oluştur (template_pkg_active, template_pay_received, vs.)
+//   2. firebase functions:secrets:set EMAILJS_SERVICE_ID
+//   3. firebase functions:secrets:set EMAILJS_USER_ID
+//   4. firebase functions:secrets:set EMAILJS_PRIVATE_KEY
+//   5. firebase deploy --only functions:sendNotificationEmail,functions:sendInvoiceEmail
+//   6. HTML'de USE_PRODUCTION_EMAIL = true yap
+export {sendNotificationEmail} from "./email";
+export {sendInvoiceEmail} from "./email";
 
 // ─── v4.78: Scheduled cron jobs (PLACEHOLDER) ────────────────────────
 // export {dailyMaintenanceCron} from "./cron";
