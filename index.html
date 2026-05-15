@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.76 | pochub.co -->
+<!-- PoCHub v4.77 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.76</title>
+<title>PoCHub.co — v4.77</title>
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
 body.role-customer{--color-primary:var(--role-customer-accent);--color-primary-dim:var(--role-customer-dim);--color-primary-hover:#1a9e5a;}
@@ -329,7 +329,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.76';
+const VERSION = 'v4.77';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -1497,6 +1497,14 @@ const USE_PRODUCTION_PAYMENTS = false;
 // Mock'ta hangi senaryoyu test ediyoruz? (sadece USE_PRODUCTION_PAYMENTS=false iken anlamlı)
 const MOCK_PAYMENT_OUTCOME = 'success'; // 'success' | 'fail_3ds' | 'fail_charge' | 'fail_network'
 
+// ════════════════════════════════════════════════════════════════════
+// v4.77: PRODUCTION EMAIL FEATURE FLAG
+// ════════════════════════════════════════════════════════════════════
+// false → Mevcut CLIENT-SIDE EmailJS çağrıları aktif (frontend'den direkt)
+// true  → Functions üzerinden server-side EmailJS (rate limit + log + retry)
+// Production'da true yapılır (deploy edildiğinde).
+const USE_PRODUCTION_EMAIL = false;
+
 // v4.75: Functions çağırma helper'ı
 // Kullanım: const result = await callFunction('helloWorld', { foo: 'bar' });
 // Hata durumunda exception fırlatır.
@@ -1508,6 +1516,57 @@ window.callFunction = async function(name, data) {
   } catch (e) {
     console.error('callFunction(' + name + ') error:', e);
     throw e;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════
+// v4.77: EMAIL GÖNDERME WRAPPER
+// ════════════════════════════════════════════════════════════════════
+// İki modda çalışır:
+//   USE_PRODUCTION_EMAIL=false → mevcut client-side emailjs.send (default)
+//   USE_PRODUCTION_EMAIL=true  → Functions sendNotificationEmail
+//
+// Kullanım:
+//   await sendEmailNotification('package_activated', { to: 'user@x.com', name: 'Hasan', package: 'Pro' });
+//
+// Tüm yeni email çağrıları bu helper'ı kullanmalı. Mevcut emailjs.send'ler korundu.
+window.sendEmailNotification = async function(templateType, vars) {
+  if (USE_PRODUCTION_EMAIL) {
+    // Functions üzerinden gönder
+    try {
+      return await window.callFunction('sendNotificationEmail', {
+        templateType: templateType,
+        vars: vars,
+      });
+    } catch(e) {
+      console.error('sendEmailNotification (production) error:', e);
+      return { ok: false, error: e.message };
+    }
+  } else {
+    // Client-side fallback — basic compatibility
+    try {
+      if (typeof emailjs === 'undefined') {
+        console.warn('EmailJS not loaded yet, skipping email:', templateType);
+        return { ok: false, error: 'emailjs_not_loaded' };
+      }
+      // Template type → EmailJS template ID mapping
+      var templateMap = {
+        'package_activated': 'template_bavhw8b',
+        'payment_received': 'template_bavhw8b',
+        'payment_failed': 'template_bavhw8b',
+        'invoice_ready': 'template_bavhw8b',
+        'suspension_warning': 'template_bavhw8b',
+        'override_granted': 'template_bavhw8b',
+        'vendor_approved': 'template_bavhw8b',
+        'generic': 'template_bavhw8b',
+      };
+      var templateId = templateMap[templateType] || 'template_bavhw8b';
+      await emailjs.send('service_k3gfuw2', templateId, vars);
+      return { ok: true, data: { mode: 'client_side', template: templateType } };
+    } catch(e) {
+      console.error('sendEmailNotification (client) error:', e);
+      return { ok: false, error: e.text || e.message };
+    }
   }
 };
 
