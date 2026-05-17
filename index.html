@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.80 | pochub.co -->
+<!-- PoCHub v4.81 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.80</title>
+<title>PoCHub.co — v4.81</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -330,7 +330,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.80';
+const VERSION = 'v4.81';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -565,6 +565,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.81':  ['MAJOR: Phase 3 başladı — Free paket yeniden tasarlandı. Network effect stratejisi: vendor ücretsiz kayıt + 3 PoC/ay + 5 davet/ay + 10 ürün. Migration: eski Free vendorlara otomatik upgrade. Paketler sayfasında Launch Promosyonu rozeti.'],
   'v4.80':  ['MAJOR: Phase 2 TAMAMLANDI. Konservatif temizlik + console hata duzeltmeleri. CHANGELOG eksik uyarisi cozuldu, Featured cache write hatasi giderildi, dead code temizligi.'],
   'v4.79':  ['MAJOR: Phase 2.9 — Firestore Rules. firestore.rules + firestore.indexes.json + firebase.json hazirlandi. Deploy edilebilir.'],
   'v4.78':  ['MAJOR: Phase 2.8 — Firebase Scheduler Cron Jobs. dailyMaintenanceCron, hourlyBillingCheckCron, weeklyDigestCron. USE_PRODUCTION_CRONS flag.'],
@@ -2725,6 +2726,47 @@ onAuthStateChanged(auth, async user => {
       if (b) b.remove();
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // v4.81: VENDOR SUBSCRIPTION MIGRATION
+    // Eski vendor'lar için (subscription kaydı yoksa) otomatik Free oluştur
+    // Tek seferlik, sessiz
+    // ═══════════════════════════════════════════════════════════════
+    if (CUR_PROFILE?.role === 'vendor') {
+      try {
+        const subSnap = await getDoc(doc(db, 'vendor_subscriptions', user.uid));
+        if (!subSnap.exists()) {
+          // Subscription yok — Free oluştur
+          await setDoc(doc(db, 'vendor_subscriptions', user.uid), {
+            vendorId: user.uid,
+            currentPackageId: 'free',
+            currentTier: 'free',
+            status: 'active',
+            startDate: serverTimestamp(),
+            endDate: null,
+            autoRenew: false,
+            isTrial: false,
+            pocUsedThisCycle: 0,
+            inviteUsedThisCycle: 0,
+            cycleStartedAt: serverTimestamp(),
+            isSuspendedDueToBilling: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            migratedFromLegacy: true,           // v4.81 işareti
+          });
+          // users.subscriptionTier de güncelle
+          try {
+            await updateDoc(doc(db, 'users', user.uid), {
+              subscriptionTier: 'free',
+              hasActiveSubscription: true,
+            });
+          } catch(e) {}
+        }
+      } catch(e) {
+        // Sessiz fail — kullanıcı akışı engellenmesin
+        console.warn('v4.81 vendor migration:', e.message);
+      }
+    }
+
     // Bildirim listener başlat
     startNotifListener();
     // Giriş yapınca role göre panele yönlendir
@@ -3387,8 +3429,37 @@ async function handleAuth() {
         distributors, integrators,
         role: AUTH_ROLE, vendorType: AUTH_VTYPE,
         emailVerified: false,
+        // v4.81: Yeni vendor için Free paket default
+        subscriptionTier: AUTH_ROLE === 'vendor' ? 'free' : null,
+        hasActiveSubscription: AUTH_ROLE === 'vendor' ? true : false,
+        // v4.82'de admin_verified eklenecek
         createdAt: serverTimestamp()
       });
+
+      // v4.81: Vendor için otomatik Free subscription oluştur
+      if (AUTH_ROLE === 'vendor') {
+        try {
+          await setDoc(doc(db, 'vendor_subscriptions', cred.user.uid), {
+            vendorId: cred.user.uid,
+            currentPackageId: 'free',
+            currentTier: 'free',
+            status: 'active',
+            startDate: serverTimestamp(),
+            endDate: null,                  // Free süresiz
+            autoRenew: false,
+            isTrial: false,
+            pocUsedThisCycle: 0,
+            inviteUsedThisCycle: 0,
+            cycleStartedAt: serverTimestamp(),
+            isSuspendedDueToBilling: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        } catch(e) {
+          console.error('Free subscription auto-create failed:', e);
+          // Signup başarılı olmaya devam, vendor sonra Aboneliğim'den manual yapabilir
+        }
+      }
 
       // Firebase email doğrulama maili gönder
       await sendEmailVerification(cred.user);
@@ -3443,6 +3514,7 @@ async function renderHome() {
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn-p" id="home-events-btn" style="padding:11px 24px;font-size:13.5px">PoC Etkinliklerini İncele →</button>
         <button class="btn-g" id="home-catalog-btn" style="padding:11px 24px;font-size:13.5px">Ürün Kataloğu</button>
+        ${!CUR_USER ? '<button class="btn-ok" id="home-vendor-signup-btn" style="padding:11px 24px;font-size:13.5px;background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(34,208,120,.25)">🎁 Vendor Olarak Ücretsiz Katıl</button>' : ''}
       </div>
       <div class="trust-bar">
         <div class="trust-item"><span>✓</span> Bağımsız PoC Değerlendirme</div>
@@ -3498,6 +3570,12 @@ async function renderHome() {
 
   el('home-events-btn').addEventListener('click', () => go('events'));
   el('home-catalog-btn').addEventListener('click', () => go('catalog'));
+  // v4.81: Vendor ücretsiz katıl CTA
+  el('home-vendor-signup-btn')?.addEventListener('click', () => {
+    // Vendor tipi seçim modal'ı açabiliriz, ama şimdilik üretici default
+    AUTH_MODE = 'register';
+    openAuthModal('vendor', 'ureticid');
+  });
   el('home-all-events').addEventListener('click', () => go('events'));
   el('cta-catalog').addEventListener('click', () => go('catalog'));
   el('cal-prev').addEventListener('click', () => { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(calYear,calMonth); });
@@ -14190,25 +14268,44 @@ async function vendSubscription(m) {
     mainCard.style.cssText = 'background:linear-gradient(135deg,'+color+'15,'+color+'05);border:2px solid '+color+'40;border-radius:12px;padding:18px;margin-bottom:16px';
 
     if (!subscription || currentTier === 'free') {
-      // FREE TIER GÖRÜNÜMÜ
+      // FREE TIER GÖRÜNÜMÜ (v4.81: PoC kabul edebilir, kotalı)
+      // Free paket bilgileri DEFAULT_PACKAGES'tan oku
+      var freePkg = (window.PACKAGES_CACHE || DEFAULT_PACKAGES).find(function(p){return p.id==='free';}) || DEFAULT_PACKAGES[0];
+      var freePocUsed = subscription?.pocUsedThisCycle || 0;
+      var freePocQuota = freePkg.pocQuota || 3;
+      var freeInviteUsed = subscription?.inviteUsedThisCycle || 0;
+      var freeInviteQuota = freePkg.inviteQuotaPerMonth || 5;
+      var freePocPercent = freePocQuota > 0 ? (freePocUsed / freePocQuota) * 100 : 0;
+      var freeInvitePercent = freeInviteQuota > 0 ? (freeInviteUsed / freeInviteQuota) * 100 : 0;
       mainCard.innerHTML =
         '<div class="flx-bw-s-mb10">'
         + '<div>'
         + '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">Mevcut Plan</div>'
-        + '<div style="font-size:24px;font-weight:800">Free Plan</div>'
+        + '<div style="font-size:24px;font-weight:800">Ücretsiz Plan <span style="background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;font-size:9px;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;font-weight:700">🎁 LAUNCH</span></div>'
         + '</div>'
         + '<div class="t-rgt">'
         + '<div style="font-size:24px;font-weight:800;color:'+color+'">₺0</div>'
         + '<div class="fs11-muted">/ay</div>'
         + '</div>'
         + '</div>'
-        + '<div style="background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.2);border-radius:8px;padding:10px 12px;margin-bottom:12px">'
-        + '<div style="font-size:13px;font-weight:600;color:#ff7070;margin-bottom:4px">⚠️ PoC Kabul Edemezsiniz</div>'
-        + '<div class="txt-muted-12">Free plan ile profil görüntüleyebilir, ürün ekleyebilir, müşteri davet edebilirsiniz, ancak <strong>PoC kabul</strong> için ücretli pakete ihtiyacınız var.</div>'
+        + '<div style="background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.2);border-radius:8px;padding:10px 12px;margin-bottom:12px">'
+        + '<div style="font-size:13px;font-weight:600;color:#22d078;margin-bottom:6px">✅ Hemen Müşteriyle Çalışmaya Başla</div>'
+        + '<div class="txt-muted-12">Launch promosyonu kapsamında <strong>'+freePocQuota+' PoC/ay</strong>, <strong>'+freeInviteQuota+' davet/ay</strong> ücretsiz!</div>'
+        + '</div>'
+        // Kullanım çubukları
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+        +   '<div>'
+        +     '<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px"><span class="txt-muted">PoC Kullanımı</span><span style="font-weight:700">'+freePocUsed+' / '+freePocQuota+'</span></div>'
+        +     '<div style="background:rgba(255,255,255,.06);height:6px;border-radius:3px;overflow:hidden"><div style="background:'+(freePocPercent>=100?'#ff7070':freePocPercent>=75?'#f0a429':'#22d078')+';height:100%;width:'+Math.min(freePocPercent,100)+'%;transition:width .3s"></div></div>'
+        +   '</div>'
+        +   '<div>'
+        +     '<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px"><span class="txt-muted">Davet Kullanımı</span><span style="font-weight:700">'+freeInviteUsed+' / '+freeInviteQuota+'</span></div>'
+        +     '<div style="background:rgba(255,255,255,.06);height:6px;border-radius:3px;overflow:hidden"><div style="background:'+(freeInvitePercent>=100?'#ff7070':freeInvitePercent>=75?'#f0a429':'#22d078')+';height:100%;width:'+Math.min(freeInvitePercent,100)+'%;transition:width .3s"></div></div>'
+        +   '</div>'
         + '</div>'
         + (recommendedPkg
           ? '<div style="background:rgba(125,180,255,.08);border:1px solid rgba(125,180,255,.25);border-radius:8px;padding:10px 12px">'
-            + '<div style="font-size:11px;color:#7db4ff;font-weight:700;margin-bottom:4px">💡 Sizin için önerilen</div>'
+            + '<div style="font-size:11px;color:#7db4ff;font-weight:700;margin-bottom:4px">💡 Daha Fazla İş İstiyorsan</div>'
             + '<div class="flx-bw-c">'
             +   '<div><strong>'+recommendedPkg.name+'</strong> · '+(vendorType==='ureticid'?'Üretici':vendorType==='distributor'?'Distribütör':'Entegratör')+' için ideal</div>'
             +   '<button class="btn-p btn-sm" id="sub-recommend-cta">İncele</button>'
@@ -19898,21 +19995,30 @@ async function generateReceiptPDF(historyItem, vendorInfo) {
 const DEFAULT_PACKAGES = [
   {
     id: 'free',
-    name: 'Free',
+    name: 'Ücretsiz',
     tier: 'free',
-    duration: 0,
+    duration: 0,                       // Süresiz
     price: 0,
     yearlyPrice: 0,
     currency: 'TRY',
-    pocQuota: 0,
-    pocOverflowPrice: 0,
-    productLimit: 3,
-    inviteQuotaPerMonth: 0,
+    pocQuota: 3,                       // v4.81: 0 → 3 (ayda 3 PoC kabul!)
+    pocOverflowPrice: 0,               // Aşan PoC için ücret yok
+    productLimit: 10,                  // v4.81: 3 → 10
+    inviteQuotaPerMonth: 5,            // v4.81: 0 → 5 (müşteri davet edebilir!)
     overrideLimit: 1,
     featuredDaysPerWeek: 0,
     continuousFeatured: false,
-    features: ['Profil görünür', 'Müşteri davet edebilir', 'PoC kabul edemez'],
-    recommendedFor: [],
+    features: [
+      '✓ Profil görünür (katalog + arama)',
+      '✓ Ayda 3 PoC kabul',
+      '✓ Ayda 5 müşteri daveti',
+      '✓ 10 ürün listeleme',
+      '✓ Mesajlaşma',
+      '✓ E-posta destek',
+      '🎁 Launch promosyonu — süresiz ücretsiz!',
+    ],
+    recommendedFor: ['ureticid', 'distributor', 'integrator'],
+    isLaunchPromo: true,               // v4.81: Launch rozeti için
     isActive: true,
     isVisible: true,
     displayOrder: 0,
@@ -20078,7 +20184,11 @@ const DEFAULT_CONFIG = {
 async function seedDefaultPackagesIfNeeded() {
   try {
     const snap = await getDocs(collection(db, 'pochub_packages'));
-    if (snap.docs.length > 0) return false; // zaten var
+    if (snap.docs.length > 0) {
+      // v4.81: Free paket migration
+      await migrateLegacyFreePackage();
+      return false;
+    }
     for (const pkg of DEFAULT_PACKAGES) {
       await setDoc(doc(db, 'pochub_packages', pkg.id), {
         ...pkg,
@@ -20090,6 +20200,31 @@ async function seedDefaultPackagesIfNeeded() {
   } catch(e) {
     console.error('Paket seed hatası:', e);
     return false;
+  }
+}
+
+// v4.81: Free paket DB'de eski tanımıyla varsa yeni tanıma upgrade et.
+// Tek seferlik, idempotent (versionlu: schemaVersion=2)
+async function migrateLegacyFreePackage() {
+  try {
+    const ref = doc(db, 'pochub_packages', 'free');
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const pkg = snap.data();
+    // Schema version 2 ise zaten yeni → skip
+    if (pkg.schemaVersion === 2) return;
+    // Eski tanım → yeni Launch Free paket ile değiştir
+    const newFree = DEFAULT_PACKAGES.find(function(p){ return p.id === 'free'; });
+    if (!newFree) return;
+    await setDoc(ref, {
+      ...newFree,
+      schemaVersion: 2,                          // Migration işareti
+      migratedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: false });                        // Tamamen replace
+    console.log('✅ Free paket v4.81 Launch Promosyonu tanımına upgrade edildi.');
+  } catch(e) {
+    console.warn('Free paket migration:', e.message);
   }
 }
 
@@ -20153,9 +20288,12 @@ async function admPackages(m) {
     packages.forEach(function(pkg) {
       var card = document.createElement('div');
         var color = TIER_COLORS[pkg.tier] || '#7db4ff';
-      card.style.cssText = 'background:var(--bg-surface);border:2px solid '+color+'40;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s';
+      card.style.cssText = 'background:var(--bg-surface);border:2px solid '+color+'40;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;position:relative';
       card.innerHTML =
-        '<div class="flx-bw-s-mb10">'
+        (pkg.isLaunchPromo
+          ? '<div style="position:absolute;top:10px;right:10px;background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;font-size:9px;padding:3px 8px;border-radius:10px;font-weight:700;letter-spacing:.5px">🎁 LAUNCH</div>'
+          : '')
+        + '<div class="flx-bw-s-mb10">'
         + '<div>'
         + '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+pkg.tier+'</div>'
         + '<div style="font-size:18px;font-weight:800">'+pkg.name+'</div>'
