@@ -1,14 +1,65 @@
-// PoCHub Firestore Rules — TEMPORARY OPEN MODE
+// PoCHub Firestore Rules — v4.85.1
 //
-// Bu rules eskisi gibi çalışmaya geri döner.
-// Authenticated kullanıcı her şeyi okur/yazar.
+// HEDEFLENEN AŞAMA: Sadece SERVER-WRITE-ONLY koleksiyonları sıkıştır.
+// Diğer her şey OPEN MODE'da kalır (eski güvenli durum).
 //
-// NOT: Bu geçici. Düzgün RBAC rules'u sonra yazılacak.
+// Koleksiyonlar:
+//   - audit_log (sadece admin okur, kimse yazamaz)
+//   - cron_runs (aynı)
+//   - email_log (aynı)
+//   - weekly_digests (aynı)
+//   - notification_dedup (hiç kimse okuyamaz/yazamaz)
+//
+// Bu koleksiyonlar şu an frontend tarafından KULLANILMIYOR. Sadece Functions
+// (admin SDK ile) yazıyor olacak (deploy edildiğinde). Dolayısıyla bu rules'ın
+// PoCHub UI'ına HİÇBİR ETKİSİ YOK.
+//
+// ROLLBACK: Firebase Console -> Firestore -> Rules -> Version history -> Restore
 
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Yardımcı: kullanıcı admin mi?
+    function isAdmin() {
+      return request.auth != null
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SERVER-WRITE-ONLY (Functions admin SDK rules bypass eder)
+    // ═══════════════════════════════════════════════════════════════
+
+    match /audit_log/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /cron_runs/{runId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /email_log/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /weekly_digests/{digestId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /notification_dedup/{dedupId} {
+      allow read, write: if false;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FALLBACK — Diğer her şey OPEN MODE (mevcut durum)
+    // v4.85.2'de bu fallback adım adım daraltılacak
+    // ═══════════════════════════════════════════════════════════════
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
