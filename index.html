@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.81 | pochub.co -->
+<!-- PoCHub v4.83 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.81</title>
+<title>PoCHub.co — v4.83</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -276,7 +276,8 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 .vbadge-pro{background:linear-gradient(135deg,rgba(34,208,120,.18),rgba(34,208,120,.08));color:#22d078;border:1px solid rgba(34,208,120,.35)}
 .vbadge-biz{background:linear-gradient(135deg,rgba(240,164,41,.2),rgba(240,164,41,.08));color:#f0a429;border:1px solid rgba(240,164,41,.4)}
 .vbadge-ent{background:linear-gradient(135deg,rgba(196,168,255,.22),rgba(196,168,255,.08));color:#c4a8ff;border:1px solid rgba(196,168,255,.4)}
-.vbadge-verified{background:rgba(125,180,255,.15);color:#7db4ff;border:1px solid rgba(125,180,255,.35)}
+.vbadge-verified{background:linear-gradient(135deg,rgba(125,180,255,.25),rgba(125,180,255,.1));color:#7db4ff;border:1px solid rgba(125,180,255,.5);font-weight:800}
+.vbadge-trial{background:rgba(255,164,29,.15);color:#f0a429;border:1px solid rgba(255,164,29,.35)}
 .vbadge-row{display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap}
 </style>
 <!-- v4.74: jsPDF for invoice/receipt generation (lazy loaded when needed) -->
@@ -330,7 +331,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.81';
+const VERSION = 'v4.83';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -565,6 +566,8 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.83':  ['MAJOR: Phase 3.3 — Welcome Wizard + Onboarding Checklist. Yeni vendor signup sonrasi 5 adimli sihirbaz (hosgeldin/profil/ilk urun/paylas/bitis). Dashboard onboarding checklist progress bar. Aktivasyon orani artirma stratejisi.'],
+  'v4.82':  ['MAJOR: Phase 3.2 — Vendor Self-Service Onboarding. Kayıt anında aktif (vendorStatus: auto_approved), admin onayı arkaplanda (admin_verified rozet). Yeni admin sekmesi Vendor Onayları. Doğrulanmış ✓ rozet katalog/profilde.'],
   'v4.81':  ['MAJOR: Phase 3 başladı — Free paket yeniden tasarlandı. Network effect stratejisi: vendor ücretsiz kayıt + 3 PoC/ay + 5 davet/ay + 10 ürün. Migration: eski Free vendorlara otomatik upgrade. Paketler sayfasında Launch Promosyonu rozeti.'],
   'v4.80':  ['MAJOR: Phase 2 TAMAMLANDI. Konservatif temizlik + console hata duzeltmeleri. CHANGELOG eksik uyarisi cozuldu, Featured cache write hatasi giderildi, dead code temizligi.'],
   'v4.79':  ['MAJOR: Phase 2.9 — Firestore Rules. firestore.rules + firestore.indexes.json + firebase.json hazirlandi. Deploy edilebilir.'],
@@ -2761,10 +2764,30 @@ onAuthStateChanged(auth, async user => {
             });
           } catch(e) {}
         }
+
+        // v4.82: vendorStatus migration
+        // Eski vendor'lar için vendorStatus alanı yoksa 'auto_approved' yap
+        if (!CUR_PROFILE.vendorStatus) {
+          try {
+            await updateDoc(doc(db, 'users', user.uid), {
+              vendorStatus: 'auto_approved',
+            });
+            CUR_PROFILE.vendorStatus = 'auto_approved';  // Local'i güncelle
+          } catch(e) {}
+        }
       } catch(e) {
         // Sessiz fail — kullanıcı akışı engellenmesin
-        console.warn('v4.81 vendor migration:', e.message);
+        console.warn('v4.81/v4.82 vendor migration:', e.message);
       }
+
+      // v4.83: Welcome wizard tetikleyici (pending flag varsa)
+      try {
+        const wizardFlag = localStorage.getItem('welcomeWizard_' + user.uid);
+        if (wizardFlag === 'pending') {
+          // 1.5 sn bekle (UI render bitsin), sonra aç
+          setTimeout(function(){ openWelcomeWizard(); }, 1500);
+        }
+      } catch(e){}
     }
 
     // Bildirim listener başlat
@@ -3432,7 +3455,10 @@ async function handleAuth() {
         // v4.81: Yeni vendor için Free paket default
         subscriptionTier: AUTH_ROLE === 'vendor' ? 'free' : null,
         hasActiveSubscription: AUTH_ROLE === 'vendor' ? true : false,
-        // v4.82'de admin_verified eklenecek
+        // v4.82: Self-service onboarding — anında aktif, admin moderasyonu arkaplanda
+        vendorStatus: AUTH_ROLE === 'vendor' ? 'auto_approved' : null,
+        verifiedAt: null,                  // Admin onayladığında dolacak
+        verifiedBy: null,                  // Admin UID'si
         createdAt: serverTimestamp()
       });
 
@@ -3463,6 +3489,13 @@ async function handleAuth() {
 
       // Firebase email doğrulama maili gönder
       await sendEmailVerification(cred.user);
+
+      // v4.83: Vendor signup sonrası welcome wizard tetikleyici
+      if (AUTH_ROLE === 'vendor') {
+        try {
+          localStorage.setItem('welcomeWizard_' + cred.user.uid, 'pending');
+        } catch(e){}
+      }
 
       closeModal();
       showVerificationBanner();
@@ -9193,6 +9226,132 @@ async function loadVendTab() {
       + welcomeRight;
     m.appendChild(welcome);
 
+    // ═══ v4.82: VENDOR STATUS BANNER ═══
+    var vStatus = CUR_PROFILE?.vendorStatus || 'auto_approved';
+    if (vStatus === 'auto_approved') {
+      var infoBanner = document.createElement('div');
+      infoBanner.style.cssText = 'background:linear-gradient(135deg,rgba(125,180,255,.08),rgba(125,180,255,.03));border:1px solid rgba(125,180,255,.2);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+      infoBanner.innerHTML =
+        '<div style="font-size:24px;flex-shrink:0">💎</div>'
+        + '<div style="flex:1;min-width:200px">'
+        +   '<div style="font-weight:700;font-size:13.5px;margin-bottom:2px">Profilin Hemen Aktif!</div>'
+        +   '<div style="font-size:12px;color:rgba(255,255,255,.7)">Müşterilerle hemen çalışmaya başlayabilirsin. PoCHub ekibi profilini inceledikten sonra "<strong>Doğrulanmış ✓</strong>" rozeti vereceğiz.</div>'
+        + '</div>'
+        + '<div style="background:rgba(240,164,41,.12);color:#f0a429;font-size:11px;padding:4px 10px;border-radius:14px;font-weight:700;letter-spacing:.3px">⏳ İNCELEMEDE</div>';
+      m.appendChild(infoBanner);
+    } else if (vStatus === 'rejected') {
+      var rejBanner = document.createElement('div');
+      rejBanner.style.cssText = 'background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.25);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+      rejBanner.innerHTML =
+        '<div style="font-size:24px;flex-shrink:0">⚠</div>'
+        + '<div style="flex:1;min-width:200px">'
+        +   '<div style="font-weight:700;font-size:13.5px;margin-bottom:2px;color:#ff7070">Doğrulama Reddedildi</div>'
+        +   '<div style="font-size:12px;color:rgba(255,255,255,.7)">Sebep: '+(CUR_PROFILE.rejectionReason || 'Belirtilmedi')+'. Profilini güncelleyerek tekrar başvurabilirsin.</div>'
+        + '</div>';
+      m.appendChild(rejBanner);
+    } else if (vStatus === 'admin_verified') {
+      var dismissedKey = 'verifiedBannerDismissed_' + CUR_USER.uid;
+      if (!localStorage.getItem(dismissedKey)) {
+        var verBanner = document.createElement('div');
+        verBanner.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.1),rgba(34,208,120,.03));border:1px solid rgba(34,208,120,.3);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+        verBanner.innerHTML =
+          '<div style="font-size:24px;flex-shrink:0">✓</div>'
+          + '<div style="flex:1;min-width:200px">'
+          +   '<div style="font-weight:700;font-size:13.5px;margin-bottom:2px;color:#22d078">Profilin Doğrulandı! 🎉</div>'
+          +   '<div style="font-size:12px;color:rgba(255,255,255,.7)">PoCHub tarafından onaylandın. Profilin artık "<strong>Doğrulanmış ✓</strong>" rozetiyle gösteriliyor.</div>'
+          + '</div>'
+          + '<button id="vb-dismiss" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:18px;cursor:pointer;padding:4px 8px">×</button>';
+        m.appendChild(verBanner);
+        verBanner.querySelector('#vb-dismiss').addEventListener('click', function(){
+          localStorage.setItem(dismissedKey, '1');
+          verBanner.remove();
+        });
+      }
+    }
+
+    // ═══ v4.83: ONBOARDING CHECKLIST ═══
+    // Bütün görevler tamamlandıysa kaybolur. localStorage'da dismiss edilebilir.
+    var checklistDismissed = false;
+    try {
+      checklistDismissed = localStorage.getItem('onboardingChecklistDismissed_' + CUR_USER.uid) === '1';
+    } catch(e){}
+
+    if (!checklistDismissed) {
+      var checks = [
+        { id: 'email_verified', label: 'E-postanı doğrula', done: !!(CUR_USER.emailVerified || CUR_PROFILE?.emailVerified), action: null, actionLabel: '' },
+        { id: 'profile_completed', label: 'Profilini tamamla (logo + açıklama)', done: !!(CUR_PROFILE?.logoUrl && CUR_PROFILE?.shortDescription), action: 'profile_edit', actionLabel: '→ Tamamla' },
+        { id: 'first_product', label: 'İlk ürününü ekle', done: prods.length > 0, action: 'products', actionLabel: '→ Ürün Ekle' },
+        { id: 'first_share', label: 'Profilini paylaş (bonus +1 PoC)', done: !!CUR_PROFILE?.firstShareBonusGranted, action: 'share', actionLabel: '→ Paylaş' },
+        { id: 'first_invite', label: 'İlk müşteri davetini gönder', done: invs.length > 0 || regs.length > 0, action: 'invites', actionLabel: '→ Davet Et' },
+      ];
+      var doneCount = checks.filter(function(c){ return c.done; }).length;
+      var totalCount = checks.length;
+      var progressPct = (doneCount / totalCount) * 100;
+
+      // Hepsi tamamlanmışsa otomatik dismiss et
+      if (doneCount === totalCount) {
+        try { localStorage.setItem('onboardingChecklistDismissed_' + CUR_USER.uid, '1'); } catch(e){}
+      } else {
+        var checklist = document.createElement('div');
+        checklist.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.06),rgba(34,208,120,.02));border:1px solid rgba(34,208,120,.25);border-radius:12px;padding:16px 18px;margin-bottom:18px';
+        checklist.innerHTML =
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">'
+          +   '<div>'
+          +     '<div style="font-size:14px;font-weight:700;color:#22d078;margin-bottom:2px">🎯 Onboarding İlerleme</div>'
+          +     '<div style="font-size:11.5px;color:rgba(255,255,255,.6)">'+doneCount+' / '+totalCount+' adım tamamlandı (%'+Math.round(progressPct)+')</div>'
+          +   '</div>'
+          +   '<button id="oc-dismiss" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:11px;cursor:pointer;padding:4px 8px">Gizle ✕</button>'
+          + '</div>'
+          + '<div style="background:rgba(255,255,255,.06);height:8px;border-radius:4px;overflow:hidden;margin-bottom:14px">'
+          +   '<div style="background:linear-gradient(90deg,#22d078,#1ab366);height:100%;width:'+progressPct+'%;border-radius:4px;transition:width .5s"></div>'
+          + '</div>'
+          + '<div style="display:grid;gap:6px">'
+          +   checks.map(function(c){
+                return '<div data-action="'+(c.action||'')+'" class="oc-item" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:6px;cursor:'+(c.action && !c.done ?'pointer':'default')+';transition:all .15s">'
+                + '<div style="display:flex;align-items:center;gap:10px;flex:1">'
+                +   '<span style="font-size:16px">'+(c.done?'✅':'⭕')+'</span>'
+                +   '<span style="font-size:13px;'+(c.done?'color:rgba(255,255,255,.5);text-decoration:line-through':'color:rgba(255,255,255,.85)')+'">'+c.label+'</span>'
+                + '</div>'
+                + (c.done ? '<span style="font-size:11px;color:#22d078;font-weight:700;letter-spacing:.3px">DONE</span>' : c.action ? '<span style="font-size:11.5px;color:#7db4ff;font-weight:600">'+c.actionLabel+'</span>' : '')
+                + '</div>';
+              }).join('')
+          + '</div>';
+        m.appendChild(checklist);
+
+        // Click handlers
+        checklist.querySelectorAll('.oc-item').forEach(function(it){
+          var action = it.dataset.action;
+          if (!action) return;
+          if (it.querySelector('span').textContent === '✅') return;
+          it.addEventListener('click', function(){
+            if (action === 'profile_edit') {
+              // Profil sayfasına git - mevcut akış? Dashboard'da yok ama vendor settings'e gitsin
+              openWelcomeWizard();  // En kolayı: wizard'ı tekrar aç (adım 2'den)
+              WIZ_STEP = 2;
+              setTimeout(function(){ renderWizardStep(document.getElementById('wiz-overlay').querySelector('div')); }, 100);
+            } else if (action === 'products') {
+              CUR_VEND_TAB = 'products';
+              if (typeof loadVendTab === 'function') loadVendTab();
+            } else if (action === 'share') {
+              // Wizard'ı adım 4'te aç (paylaş)
+              openWelcomeWizard();
+              WIZ_STEP = 4;
+              setTimeout(function(){ renderWizardStep(document.getElementById('wiz-overlay').querySelector('div')); }, 100);
+            } else if (action === 'invites') {
+              CUR_VEND_TAB = 'invites';
+              if (typeof loadVendTab === 'function') loadVendTab();
+            }
+          });
+          it.addEventListener('mouseenter', function(){ it.style.background = 'rgba(125,180,255,.06)'; it.style.borderColor = 'rgba(125,180,255,.2)'; });
+          it.addEventListener('mouseleave', function(){ it.style.background = 'rgba(255,255,255,.03)'; it.style.borderColor = 'rgba(255,255,255,.06)'; });
+        });
+        checklist.querySelector('#oc-dismiss').addEventListener('click', function(){
+          try { localStorage.setItem('onboardingChecklistDismissed_' + CUR_USER.uid, '1'); } catch(e){}
+          checklist.remove();
+        });
+      }
+    }
+
     // ═══ 8 STAT KARTLARI (tıklanabilir + trend ok'ları) ═══
     function makeVendStatCard(val, label, sub, trend, color, bg, border, tab) {
       var card = document.createElement('div');
@@ -14200,6 +14359,365 @@ async function updateVendorBilling(vendorId, deltaAmount, deltaCount) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// v4.83: WELCOME WIZARD — Yeni vendor için 5 adımlı sihirbaz
+// ════════════════════════════════════════════════════════════════════
+let WIZ_STEP = 1;
+let WIZ_DATA = {};
+
+async function openWelcomeWizard() {
+  if (!CUR_USER || !CUR_PROFILE || CUR_PROFILE.role !== 'vendor') return;
+  // Daha önce tamamlandı mı?
+  if (CUR_PROFILE.welcomeWizardCompleted) return;
+
+  WIZ_STEP = 1;
+  WIZ_DATA = {
+    company: CUR_PROFILE.company || '',
+    shortDescription: CUR_PROFILE.shortDescription || '',
+    logoUrl: CUR_PROFILE.logoUrl || '',
+  };
+
+  const overlay = document.createElement('div');
+  overlay.id = 'wiz-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;backdrop-filter:blur(4px)';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:linear-gradient(135deg,rgba(22,29,42,.98),rgba(15,20,30,.98));border:1px solid rgba(125,180,255,.2);border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.5)';
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  renderWizardStep(card);
+}
+
+function closeWelcomeWizard() {
+  const overlay = document.getElementById('wiz-overlay');
+  if (overlay) overlay.remove();
+  try {
+    localStorage.removeItem('welcomeWizard_' + CUR_USER.uid);
+  } catch(e){}
+}
+
+async function finishWelcomeWizard() {
+  // Firestore'da işaretle - bir daha açılmasın
+  try {
+    await updateDoc(doc(db, 'users', CUR_USER.uid), {
+      welcomeWizardCompleted: true,
+      welcomeWizardCompletedAt: serverTimestamp(),
+    });
+    if (CUR_PROFILE) CUR_PROFILE.welcomeWizardCompleted = true;
+  } catch(e){}
+  closeWelcomeWizard();
+  showToast('🎉 PoCHub\'a hoş geldin!');
+  // Dashboard'a git
+  if (CUR_SCREEN === 'vendor') {
+    CUR_VEND_TAB = 'dashboard';
+    if (typeof loadVendTab === 'function') loadVendTab();
+  }
+}
+
+function renderWizardStep(card) {
+  // Progress bar (5 adım)
+  const progressBar = '<div style="display:flex;gap:6px;padding:14px 24px 0">'
+    + [1,2,3,4,5].map(function(s){
+        var done = s < WIZ_STEP;
+        var active = s === WIZ_STEP;
+        return '<div style="flex:1;height:4px;background:'+(done || active ? 'linear-gradient(90deg,#22d078,#1ab366)' : 'rgba(255,255,255,.08)')+';border-radius:2px;transition:all .3s"></div>';
+      }).join('')
+    + '</div>'
+    + '<div style="text-align:center;padding:8px 24px 0;font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.5px;font-weight:600">ADIM '+WIZ_STEP+' / 5</div>';
+
+  let content = '';
+  if (WIZ_STEP === 1) {
+    content = wizStep1();
+  } else if (WIZ_STEP === 2) {
+    content = wizStep2();
+  } else if (WIZ_STEP === 3) {
+    content = wizStep3();
+  } else if (WIZ_STEP === 4) {
+    content = wizStep4();
+  } else if (WIZ_STEP === 5) {
+    content = wizStep5();
+  }
+
+  card.innerHTML = progressBar + content;
+  attachWizardHandlers(card);
+}
+
+function wizStep1() {
+  const typeLabel = CUR_PROFILE.vendorType === 'ureticid' ? 'Üretici' : CUR_PROFILE.vendorType === 'distributor' ? 'Distribütör' : CUR_PROFILE.vendorType === 'integrator' ? 'Entegratör' : 'Vendor';
+  const typeIcon = CUR_PROFILE.vendorType === 'ureticid' ? '🏭' : CUR_PROFILE.vendorType === 'distributor' ? '🚚' : CUR_PROFILE.vendorType === 'integrator' ? '🔧' : '💼';
+  return '<div style="padding:28px 28px 24px;text-align:center">'
+    + '<div style="font-size:56px;margin-bottom:12px">🎉</div>'
+    + '<h2 style="font-size:24px;font-weight:800;margin:0 0 8px;color:#fff">Hoş geldin, '+(CUR_PROFILE.displayName || CUR_PROFILE.company || 'Vendor')+'!</h2>'
+    + '<div style="font-size:14px;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:20px">PoCHub ailesine katıldığın için teşekkürler. <strong>'+typeIcon+' '+typeLabel+'</strong> olarak Türkiye\'nin en yeni IT pazaryerine ilk adımı attın.</div>'
+    + '<div style="background:linear-gradient(135deg,rgba(34,208,120,.1),rgba(34,208,120,.03));border:1px solid rgba(34,208,120,.3);border-radius:10px;padding:14px 18px;margin-bottom:14px;text-align:left">'
+    +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:18px">🎁</span><strong style="color:#22d078">Ücretsiz Launch Paketi Aktif!</strong></div>'
+    +   '<div style="font-size:13px;color:rgba(255,255,255,.75);line-height:1.6">'
+    +     '✓ 3 PoC kabul / ay · ✓ 5 müşteri daveti / ay · ✓ 10 ürün listeleme'
+    +   '</div>'
+    + '</div>'
+    + '<div style="text-align:left;font-size:13px;color:rgba(255,255,255,.65);line-height:1.7;margin-bottom:20px;padding:14px 16px;background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.15);border-radius:8px">'
+    +   '<strong style="color:#7db4ff;display:block;margin-bottom:6px;font-size:12px;letter-spacing:.5px">📋 SONRAKİ 4 ADIM</strong>'
+    +   '• Profilini tamamla<br>'
+    +   '• İlk ürününü ekle<br>'
+    +   '• Profilini sosyal medyada paylaş<br>'
+    +   '• İlk müşteri daveti gönder'
+    + '</div>'
+    + '<div style="display:flex;gap:10px">'
+    +   '<button id="wiz-skip" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.6);padding:11px;border-radius:8px;font-size:13px;cursor:pointer">Şimdilik Atla</button>'
+    +   '<button id="wiz-next" style="flex:2;background:linear-gradient(135deg,#22d078,#1ab366);border:none;color:#fff;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Başlayalım →</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function wizStep2() {
+  return '<div style="padding:24px 28px">'
+    + '<h2 style="font-size:20px;font-weight:800;margin:0 0 6px;color:#fff">📝 Profilini Tamamla</h2>'
+    + '<div style="font-size:13px;color:rgba(255,255,255,.65);margin-bottom:18px">Profil tamamlanma oranı yüksek vendor\'lar <strong style="color:#22d078">3x daha fazla</strong> müşteri ilgisi alır.</div>'
+    + '<div style="margin-bottom:14px">'
+    +   '<label style="display:block;font-size:11.5px;color:rgba(255,255,255,.55);margin-bottom:6px;font-weight:600;letter-spacing:.3px">FİRMA ADI</label>'
+    +   '<input id="wiz-company" type="text" value="'+(WIZ_DATA.company || '').replace(/"/g,'&quot;')+'" placeholder="Firmamın Adı A.Ş." style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:8px;font-size:13.5px;box-sizing:border-box">'
+    + '</div>'
+    + '<div style="margin-bottom:14px">'
+    +   '<label style="display:block;font-size:11.5px;color:rgba(255,255,255,.55);margin-bottom:6px;font-weight:600;letter-spacing:.3px">KISA TANITIM <span style="color:rgba(255,255,255,.35);font-weight:400">(1-2 cümle)</span></label>'
+    +   '<textarea id="wiz-desc" placeholder="Firmanızı 1-2 cümleyle tanıtın. Örn: 25 yıllık deneyimimizle siber güvenlik çözümleri sunuyoruz." style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:8px;font-size:13.5px;box-sizing:border-box;min-height:75px;resize:vertical;font-family:inherit">'+(WIZ_DATA.shortDescription || '')+'</textarea>'
+    + '</div>'
+    + '<div style="margin-bottom:18px">'
+    +   '<label style="display:block;font-size:11.5px;color:rgba(255,255,255,.55);margin-bottom:6px;font-weight:600;letter-spacing:.3px">LOGO URL <span style="color:rgba(255,255,255,.35);font-weight:400">(opsiyonel)</span></label>'
+    +   '<input id="wiz-logo" type="url" value="'+(WIZ_DATA.logoUrl || '').replace(/"/g,'&quot;')+'" placeholder="https://firmamz.com/logo.png" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:8px;font-size:13.5px;box-sizing:border-box">'
+    +   '<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:5px">💡 Yoksa boş bırakabilirsin, sonra ekleyebilirsin.</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px">'
+    +   '<button id="wiz-back" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);padding:11px;border-radius:8px;font-size:13px;cursor:pointer">← Geri</button>'
+    +   '<button id="wiz-next" style="flex:2;background:linear-gradient(135deg,#22d078,#1ab366);border:none;color:#fff;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Devam →</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function wizStep3() {
+  return '<div style="padding:24px 28px">'
+    + '<h2 style="font-size:20px;font-weight:800;margin:0 0 6px;color:#fff">📦 İlk Ürününü Ekle</h2>'
+    + '<div style="font-size:13px;color:rgba(255,255,255,.65);margin-bottom:18px">Şimdi ekleyeceğin ürün katalogda görünür. Müşteriler bu ürün üzerinden PoC açabilir.</div>'
+    + '<div style="margin-bottom:14px">'
+    +   '<label style="display:block;font-size:11.5px;color:rgba(255,255,255,.55);margin-bottom:6px;font-weight:600;letter-spacing:.3px">ÜRÜN ADI</label>'
+    +   '<input id="wiz-product-name" type="text" placeholder="Örn: Fortinet FortiGate 100F" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:8px;font-size:13.5px;box-sizing:border-box">'
+    + '</div>'
+    + '<div style="margin-bottom:14px">'
+    +   '<label style="display:block;font-size:11.5px;color:rgba(255,255,255,.55);margin-bottom:6px;font-weight:600;letter-spacing:.3px">MARKA</label>'
+    +   '<input id="wiz-product-brand" type="text" placeholder="Örn: Fortinet" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:8px;font-size:13.5px;box-sizing:border-box">'
+    + '</div>'
+    + '<div style="margin-bottom:14px">'
+    +   '<label style="display:block;font-size:11.5px;color:rgba(255,255,255,.55);margin-bottom:6px;font-weight:600;letter-spacing:.3px">KATEGORİ</label>'
+    +   '<select id="wiz-product-category" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:8px;font-size:13.5px;box-sizing:border-box">'
+    +     '<option value="">Kategori Seç</option>'
+    +     '<option value="Güvenlik">🔒 Güvenlik</option>'
+    +     '<option value="Networking">🌐 Networking</option>'
+    +     '<option value="Sunucu & Depolama">💾 Sunucu & Depolama</option>'
+    +     '<option value="Cloud & SaaS">☁️ Cloud & SaaS</option>'
+    +     '<option value="Yapay Zeka">🤖 Yapay Zeka</option>'
+    +     '<option value="ITSM">📊 ITSM</option>'
+    +     '<option value="Veri Tabanı">🗄 Veri Tabanı</option>'
+    +     '<option value="Diğer">📦 Diğer</option>'
+    +   '</select>'
+    + '</div>'
+    + '<div style="margin-bottom:18px">'
+    +   '<label style="display:block;font-size:11.5px;color:rgba(255,255,255,.55);margin-bottom:6px;font-weight:600;letter-spacing:.3px">KISA AÇIKLAMA</label>'
+    +   '<textarea id="wiz-product-desc" placeholder="Bu ürünün ne işe yaradığını 1-2 cümleyle anlat." style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:8px;font-size:13.5px;box-sizing:border-box;min-height:70px;resize:vertical;font-family:inherit"></textarea>'
+    + '</div>'
+    + '<div style="background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.15);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:11.5px;color:rgba(255,255,255,.6)">💡 Daha sonra Ürünlerim sayfasından detaylı bilgi (fiyat, tech specs, link) ekleyebilirsin.</div>'
+    + '<div style="display:flex;gap:10px">'
+    +   '<button id="wiz-back" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);padding:11px;border-radius:8px;font-size:13px;cursor:pointer">← Geri</button>'
+    +   '<button id="wiz-skip-prod" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.6);padding:11px;border-radius:8px;font-size:13px;cursor:pointer">Atla</button>'
+    +   '<button id="wiz-next" style="flex:2;background:linear-gradient(135deg,#22d078,#1ab366);border:none;color:#fff;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Ekle & Devam →</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function wizStep4() {
+  const profileUrl = window.location.origin + '/#vendor-profile/' + CUR_USER.uid;
+  const shareText = encodeURIComponent('PoCHub\'a katıldık! Türkiye\'nin yeni IT PoC pazaryerinde profilimizi inceleyin: ' + profileUrl);
+  const linkedinUrl = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(profileUrl);
+  const twitterUrl = 'https://twitter.com/intent/tweet?text=' + shareText;
+  const whatsappUrl = 'https://wa.me/?text=' + shareText;
+
+  return '<div style="padding:24px 28px;text-align:center">'
+    + '<div style="font-size:48px;margin-bottom:12px">🔗</div>'
+    + '<h2 style="font-size:20px;font-weight:800;margin:0 0 6px;color:#fff">Profilini Paylaş</h2>'
+    + '<div style="font-size:13px;color:rgba(255,255,255,.65);margin-bottom:20px;line-height:1.6">PoCHub network effect ile büyüyor. Profilini paylaşırsan ağına ulaşmamız çok kolay olur.</div>'
+    + '<div style="background:rgba(34,208,120,.06);border:1px solid rgba(34,208,120,.25);border-radius:8px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;gap:10px;text-align:left">'
+    +   '<span style="font-size:20px">🎁</span>'
+    +   '<div style="flex:1;font-size:12.5px;color:rgba(255,255,255,.75)">İlk paylaşımdan sonra <strong style="color:#22d078">+1 ücretsiz PoC kontenjanı</strong> bonus kazanırsın!</div>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:18px">'
+    +   '<a href="'+linkedinUrl+'" target="_blank" id="wiz-share-linkedin" style="background:rgba(10,102,194,.12);border:1px solid rgba(10,102,194,.3);color:#5a9ee0;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:20px">💼</span>LinkedIn</a>'
+    +   '<a href="'+twitterUrl+'" target="_blank" id="wiz-share-twitter" style="background:rgba(29,161,242,.12);border:1px solid rgba(29,161,242,.3);color:#7db8e8;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:20px">🐦</span>Twitter</a>'
+    +   '<a href="'+whatsappUrl+'" target="_blank" id="wiz-share-whatsapp" style="background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3);color:#5dd594;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:20px">📱</span>WhatsApp</a>'
+    + '</div>'
+    + '<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;margin-bottom:18px;display:flex;align-items:center;gap:8px">'
+    +   '<input id="wiz-profile-url" type="text" readonly value="'+profileUrl+'" style="flex:1;background:none;border:none;color:rgba(255,255,255,.7);font-size:11.5px;font-family:monospace;outline:none">'
+    +   '<button id="wiz-copy-url" style="background:rgba(125,180,255,.15);border:1px solid rgba(125,180,255,.3);color:#7db4ff;padding:6px 12px;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:600;white-space:nowrap">📋 Kopyala</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px">'
+    +   '<button id="wiz-back" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);padding:11px;border-radius:8px;font-size:13px;cursor:pointer">← Geri</button>'
+    +   '<button id="wiz-next" style="flex:2;background:linear-gradient(135deg,#22d078,#1ab366);border:none;color:#fff;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Devam →</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function wizStep5() {
+  return '<div style="padding:32px 28px 24px;text-align:center">'
+    + '<div style="font-size:64px;margin-bottom:12px">🚀</div>'
+    + '<h2 style="font-size:24px;font-weight:800;margin:0 0 10px;color:#fff">Hazırsın!</h2>'
+    + '<div style="font-size:14px;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:22px">Tüm temel adımları tamamladın. Şimdi dashboard\'una giderek müşterilerle çalışmaya başlayabilirsin.</div>'
+    + '<div style="background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.15);border-radius:10px;padding:14px 18px;margin-bottom:20px;text-align:left">'
+    +   '<strong style="color:#7db4ff;display:block;margin-bottom:8px;font-size:12px;letter-spacing:.5px">📌 BURADAN SONRA</strong>'
+    +   '<div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.7">'
+    +     '🎯 <strong>PoC Talepleri</strong> sekmesinden gelen davetleri yönet<br>'
+    +     '🛍️ <strong>Ürünlerim</strong>\'den daha fazla ürün ekle<br>'
+    +     '📅 <strong>Etkinliklerim</strong>\'den webinar/demo oluştur<br>'
+    +     '✉️ <strong>Davetlerim</strong>\'den müşteri davet et'
+    +   '</div>'
+    + '</div>'
+    + '<div style="background:rgba(240,164,41,.05);border:1px solid rgba(240,164,41,.2);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:rgba(255,255,255,.7);text-align:left">'
+    +   '<strong style="color:#f0a429">💡 İpucu:</strong> Admin ekibimiz profilini inceledikten sonra "<strong>Doğrulanmış ✓</strong>" rozeti vereceğiz. Bu rozet müşteri güvenini artırır.'
+    + '</div>'
+    + '<button id="wiz-finish" style="width:100%;background:linear-gradient(135deg,#22d078,#1ab366);border:none;color:#fff;padding:14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px">Dashboard\'a Git →</button>'
+    + '</div>';
+}
+
+function attachWizardHandlers(card) {
+  // Genel skip
+  const skipBtn = card.querySelector('#wiz-skip');
+  if (skipBtn) {
+    skipBtn.addEventListener('click', async function(){
+      if (!confirm('Sihirbazı atlamak istediğine emin misin? Daha sonra Ayarlar\'dan tekrar başlatabilirsin.')) return;
+      await finishWelcomeWizard();
+    });
+  }
+  // Geri
+  const backBtn = card.querySelector('#wiz-back');
+  if (backBtn) backBtn.addEventListener('click', function(){
+    if (WIZ_STEP > 1) { WIZ_STEP--; renderWizardStep(card); }
+  });
+
+  // Adım 2 → Adım 3: profili kaydet
+  if (WIZ_STEP === 2) {
+    card.querySelector('#wiz-next').addEventListener('click', async function(){
+      const company = card.querySelector('#wiz-company').value.trim();
+      const desc = card.querySelector('#wiz-desc').value.trim();
+      const logo = card.querySelector('#wiz-logo').value.trim();
+      if (!company) { showToast('Firma adı boş bırakılamaz', 'err'); return; }
+      WIZ_DATA.company = company;
+      WIZ_DATA.shortDescription = desc;
+      WIZ_DATA.logoUrl = logo;
+      try {
+        await updateDoc(doc(db, 'users', CUR_USER.uid), {
+          company: company,
+          shortDescription: desc,
+          logoUrl: logo,
+          profileCompletedInWizard: true,
+        });
+        CUR_PROFILE.company = company;
+        CUR_PROFILE.shortDescription = desc;
+        CUR_PROFILE.logoUrl = logo;
+        WIZ_STEP = 3;
+        renderWizardStep(card);
+      } catch(e) {
+        showToast('Kayıt hatası: ' + e.message, 'err');
+      }
+    });
+  }
+
+  // Adım 3 → Adım 4: ürün ekle (veya atla)
+  if (WIZ_STEP === 3) {
+    card.querySelector('#wiz-skip-prod')?.addEventListener('click', function(){
+      WIZ_STEP = 4; renderWizardStep(card);
+    });
+    card.querySelector('#wiz-next').addEventListener('click', async function(){
+      const name = card.querySelector('#wiz-product-name').value.trim();
+      const brand = card.querySelector('#wiz-product-brand').value.trim();
+      const category = card.querySelector('#wiz-product-category').value;
+      const desc = card.querySelector('#wiz-product-desc').value.trim();
+      if (!name) { showToast('Ürün adı boş bırakılamaz', 'err'); return; }
+      if (!category) { showToast('Kategori seç', 'err'); return; }
+      try {
+        await addDoc(collection(db, 'products'), {
+          vendorId: CUR_USER.uid,
+          vendorName: CUR_PROFILE.company || CUR_PROFILE.displayName,
+          name: name,
+          brand: brand,
+          category: category,
+          description: desc,
+          status: 'active',
+          publishStatus: 'awaiting_admin',
+          createdInWizard: true,
+          createdAt: serverTimestamp(),
+        });
+        showToast('✓ Ürün eklendi');
+        WIZ_STEP = 4;
+        renderWizardStep(card);
+      } catch(e) {
+        showToast('Ürün ekleme hatası: ' + e.message, 'err');
+      }
+    });
+  }
+
+  // Adım 1, 4: Sadece next
+  if (WIZ_STEP === 1 || WIZ_STEP === 4) {
+    card.querySelector('#wiz-next').addEventListener('click', function(){
+      WIZ_STEP++;
+      renderWizardStep(card);
+    });
+  }
+
+  // Adım 4 share button → bonus
+  if (WIZ_STEP === 4) {
+    ['#wiz-share-linkedin', '#wiz-share-twitter', '#wiz-share-whatsapp'].forEach(function(sel){
+      card.querySelector(sel)?.addEventListener('click', function(){
+        // Bonus işle (idempotent)
+        markFirstShareBonus();
+      });
+    });
+    card.querySelector('#wiz-copy-url').addEventListener('click', function(){
+      const input = card.querySelector('#wiz-profile-url');
+      input.select();
+      try {
+        navigator.clipboard.writeText(input.value);
+        showToast('🔗 URL kopyalandı');
+        markFirstShareBonus();
+      } catch(e) {
+        document.execCommand('copy');
+        showToast('🔗 URL kopyalandı');
+      }
+    });
+  }
+
+  // Adım 5 bitir
+  if (WIZ_STEP === 5) {
+    card.querySelector('#wiz-finish').addEventListener('click', async function(){
+      await finishWelcomeWizard();
+    });
+  }
+}
+
+// İlk paylaşım bonusu (idempotent, sessiz)
+async function markFirstShareBonus() {
+  try {
+    if (CUR_PROFILE.firstShareBonusGranted) return;
+    await updateDoc(doc(db, 'users', CUR_USER.uid), {
+      firstShareBonusGranted: true,
+      firstShareBonusAt: serverTimestamp(),
+    });
+    CUR_PROFILE.firstShareBonusGranted = true;
+    // Vendor subscription'a +1 PoC kontenjanı bonusu
+    try {
+      await updateDoc(doc(db, 'vendor_subscriptions', CUR_USER.uid), {
+        bonusPocs: increment(1),
+      });
+    } catch(e){}
+  } catch(e){}
+}
+
+// ════════════════════════════════════════════════════════════════════
 // v4.65: VENDOR ABONELİĞİM SAYFASI
 // ════════════════════════════════════════════════════════════════════
 async function vendSubscription(m) {
@@ -17467,7 +17985,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -17500,6 +18018,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'offers')     { await admOffers(m);     return; }
     if (CUR_ADM_TAB === 'revenue')    { await admRevenue(m);    return; }
     if (CUR_ADM_TAB === 'vendorsubs') { await admVendorSubs(m); return; }
+    if (CUR_ADM_TAB === 'vendorapprovals') { await admVendorApprovals(m); return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
@@ -19679,23 +20198,26 @@ async function preloadVendorBadges(vendorIds) {
   });
   if (toFetch.length === 0) return;
 
-  // Firestore'dan paralel çek
+  // Firestore'dan paralel çek (subscription + user vendorStatus)
   await Promise.all(toFetch.map(async function(id){
     try {
-      const subSnap = await getDoc(doc(db, 'vendor_subscriptions', id));
-      if (subSnap.exists()) {
-        var s = subSnap.data();
-        window._vendorBadgeCache[id] = {
-          tier: s.currentTier || 'free',
-          status: s.status || 'unknown',
-          isTrial: s.isTrial || false,
-          fetchedAt: now,
-        };
-      } else {
-        window._vendorBadgeCache[id] = { tier: 'free', status: 'no_subscription', isTrial: false, fetchedAt: now };
-      }
+      // İki paralel okuma
+      var [subSnap, userSnap] = await Promise.all([
+        getDoc(doc(db, 'vendor_subscriptions', id)),
+        getDoc(doc(db, 'users', id)),
+      ]);
+      var sub = subSnap.exists() ? subSnap.data() : null;
+      var user = userSnap.exists() ? userSnap.data() : null;
+      window._vendorBadgeCache[id] = {
+        tier: sub?.currentTier || 'free',
+        status: sub?.status || 'no_subscription',
+        isTrial: sub?.isTrial || false,
+        // v4.82: vendorStatus eklendi
+        vendorStatus: user?.vendorStatus || 'auto_approved',
+        fetchedAt: now,
+      };
     } catch(e) {
-      window._vendorBadgeCache[id] = { tier: 'free', status: 'error', isTrial: false, fetchedAt: now };
+      window._vendorBadgeCache[id] = { tier: 'free', status: 'error', isTrial: false, vendorStatus: 'auto_approved', fetchedAt: now };
     }
   }));
 }
@@ -19723,20 +20245,29 @@ function getVendorBadgeHtml(vendorId) {
   return html;
 }
 
-// Vendor için tam rozet satırı (paket + trial varsa)
+// Vendor için tam rozet satırı (paket + trial + doğrulama varsa)
 function getVendorBadgeRow(vendorId) {
   if (!vendorId) return '';
   var cached = window._vendorBadgeCache[vendorId];
   if (!cached) return '';
-  if (cached.status !== 'active' && cached.status !== 'grace_period') return '';
 
   var badges = [];
-  var mainBadge = getVendorBadgeHtml(vendorId);
-  if (mainBadge) badges.push(mainBadge);
-  // Trial badge (sadece trial olan paid vendor'lar için extra etiket)
-  if (cached.isTrial && cached.tier !== 'free') {
-    badges.push('<span class="vbadge vbadge-verified" title="Bu vendor şu an deneme dönemindeydi">🎁 Trial</span>');
+
+  // v4.82: Doğrulanmış rozeti — admin onaylamış vendor'lar (en başta gösterilir)
+  if (cached.vendorStatus === 'admin_verified') {
+    badges.push('<span class="vbadge vbadge-verified" title="PoCHub tarafından doğrulanmış vendor">✓ Doğrulanmış</span>');
   }
+
+  // Paket bazlı badge
+  if (cached.status === 'active' || cached.status === 'grace_period') {
+    var mainBadge = getVendorBadgeHtml(vendorId);
+    if (mainBadge) badges.push(mainBadge);
+    // Trial badge
+    if (cached.isTrial && cached.tier !== 'free') {
+      badges.push('<span class="vbadge vbadge-trial" title="Bu vendor şu an deneme dönemindeydi">🎁 Trial</span>');
+    }
+  }
+
   if (badges.length === 0) return '';
   return '<span class="vbadge-row">' + badges.join('') + '</span>';
 }
@@ -20245,6 +20776,219 @@ async function seedDefaultConfigIfNeeded() {
     console.error('Config seed hatası:', e);
     return false;
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.82: ADMIN VENDOR DOĞRULAMA SAYFASI
+// ════════════════════════════════════════════════════════════════════
+async function admVendorVerify(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Vendor\'lar yükleniyor...</div>';
+  try {
+    // Tüm vendor'ları çek
+    const usersSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
+    var vendors = usersSnap.docs.map(function(d){ return {...d.data(), id: d.id}; });
+
+    // Filtre state
+    var filterMode = 'unverified';
+    var searchQ = '';
+
+    function render() {
+      var filtered = vendors.filter(function(v){
+        if (filterMode === 'unverified' && v.isVerified === true) return false;
+        if (filterMode === 'verified' && v.isVerified !== true) return false;
+        if (searchQ) {
+          var q = searchQ.toLowerCase();
+          var hay = ((v.company||'') + ' ' + (v.displayName||'') + ' ' + (v.email||'')).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      filtered.sort(function(a,b){
+        var ta = a.createdAt?.seconds || 0;
+        var tb = b.createdAt?.seconds || 0;
+        return tb - ta;
+      });
+
+      var unverifiedCount = vendors.filter(function(v){ return v.isVerified !== true; }).length;
+      var verifiedCount = vendors.filter(function(v){ return v.isVerified === true; }).length;
+
+      m.innerHTML =
+        '<div style="margin-bottom:18px">'
+        + '<h2 class="fs18-fw7">✓ Vendor Doğrulama</h2>'
+        + '<div class="txt-muted-12-mt3">'+vendors.length+' vendor — '+verifiedCount+' doğrulanmış, '+unverifiedCount+' bekliyor</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+        + '<button class="btn-sm vv-filter '+(filterMode==='unverified'?'btn-p':'btn-g')+'" data-f="unverified">⏳ Bekleyenler ('+unverifiedCount+')</button>'
+        + '<button class="btn-sm vv-filter '+(filterMode==='verified'?'btn-p':'btn-g')+'" data-f="verified">✓ Doğrulanmış ('+verifiedCount+')</button>'
+        + '<button class="btn-sm vv-filter '+(filterMode==='all'?'btn-p':'btn-g')+'" data-f="all">Tümü ('+vendors.length+')</button>'
+        + '<input type="text" id="vv-search" placeholder="🔍 Şirket adı, email, isim ara..." value="'+searchQ+'" style="flex:1;min-width:200px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:6px;font-size:12.5px">'
+        + '</div>'
+        + '<div id="vv-list">'+(filtered.length===0
+          ? '<div class="empty"><div class="empty-icon">🎉</div>Bu filtrede vendor yok.</div>'
+          : '')
+        + '</div>';
+
+      var listEl = el('vv-list');
+      if (filtered.length > 0) {
+        filtered.forEach(function(v){
+          var card = document.createElement('div');
+          card.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px';
+          var dt = v.createdAt?.seconds ? new Date(v.createdAt.seconds*1000).toLocaleDateString('tr-TR') : '—';
+          var vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+          var vtypeLabel = vtypeLabels[v.vendorType] || 'Vendor';
+          var verifiedDt = v.verifiedAt?.seconds ? new Date(v.verifiedAt.seconds*1000).toLocaleDateString('tr-TR') : '';
+          var isVerified = v.isVerified === true;
+          card.innerHTML =
+            '<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">'
+            + '<div>'
+            +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'
+            +     '<strong style="font-size:14px">'+(v.company || v.displayName || v.email)+'</strong>'
+            +     (isVerified ? '<span class="vbadge vbadge-verified">✓ Doğrulanmış</span>' : '<span class="vbadge" style="background:rgba(240,164,41,.1);color:#f0a429;border:1px solid rgba(240,164,41,.3)">⏳ Bekliyor</span>')
+            +     '<span class="vbadge" style="background:rgba(125,180,255,.08);color:#7db4ff;border:1px solid rgba(125,180,255,.2)">'+vtypeLabel+'</span>'
+            +     (v.origin === 'foreign' ? '<span class="vbadge" style="background:rgba(196,168,255,.08);color:#c4a8ff">🌍 '+(v.country||'Yabancı')+'</span>' : '')
+            +   '</div>'
+            +   '<div class="txt-muted-12">📧 '+(v.email||'—')+' · 📞 '+(v.phone||'—')+'</div>'
+            +   '<div class="txt-muted-12" style="margin-top:3px">📅 Kayıt: '+dt+(isVerified&&verifiedDt?' · ✓ Onay: '+verifiedDt+(v.verifiedBy?' · '+v.verifiedBy:''):'')+'</div>'
+            +   (v.website ? '<div class="txt-muted-12" style="margin-top:3px">🌐 <a href="'+v.website+'" target="_blank" style="color:#7db4ff;text-decoration:none">'+v.website+'</a></div>' : '')
+            +   (v.taxNo ? '<div class="txt-muted-12" style="margin-top:3px">🆔 Vergi No: '+v.taxNo+'</div>' : '')
+            +   (Array.isArray(v.categories) && v.categories.length>0 ? '<div class="txt-muted-12" style="margin-top:3px">📂 '+v.categories.slice(0,3).join(', ')+(v.categories.length>3?' +'+(v.categories.length-3):'')+'</div>' : '')
+            + '</div>'
+            + '<div style="display:flex;flex-direction:column;gap:5px">'
+            +   (isVerified
+                  ? '<button class="btn-red btn-sm vv-unverify" data-id="'+v.id+'">✕ Onayı Kaldır</button>'
+                  : '<button class="btn-ok btn-sm vv-verify" data-id="'+v.id+'">✓ Doğrula</button>')
+            +   '<button class="btn-g btn-sm vv-detail" data-id="'+v.id+'">📄 Detay</button>'
+            + '</div>'
+            + '</div>';
+          listEl.appendChild(card);
+        });
+      }
+
+      m.querySelectorAll('.vv-filter').forEach(function(b){
+        b.addEventListener('click', function(){
+          filterMode = b.dataset.f;
+          render();
+        });
+      });
+      el('vv-search')?.addEventListener('input', function(e){
+        searchQ = e.target.value.trim();
+        render();
+        setTimeout(function(){
+          var inp = el('vv-search');
+          if (inp) { inp.focus(); inp.setSelectionRange(searchQ.length, searchQ.length); }
+        }, 0);
+      });
+
+      m.querySelectorAll('.vv-verify').forEach(function(b){
+        b.addEventListener('click', async function(){
+          b.disabled = true; b.textContent = 'İşleniyor...';
+          try {
+            await updateDoc(doc(db,'users',b.dataset.id), {
+              isVerified: true,
+              verifiedAt: serverTimestamp(),
+              verifiedBy: CUR_PROFILE?.displayName || CUR_USER?.email || 'admin',
+            });
+            if (window._vendorBadgeCache && window._vendorBadgeCache[b.dataset.id]) {
+              delete window._vendorBadgeCache[b.dataset.id];
+            }
+            try {
+              await addDoc(collection(db,'notifications'), {
+                userId: b.dataset.id,
+                type: 'vendor_verified',
+                title: '🎉 Profilin Doğrulandı!',
+                message: 'PoCHub ekibi profilini doğruladı. Artık ✓ Doğrulanmış rozetin var. Müşterilerin sana daha çok güvenecek!',
+                read: false,
+                createdAt: serverTimestamp(),
+              });
+            } catch(e) {}
+            var v = vendors.find(function(x){return x.id === b.dataset.id;});
+            if (v) { v.isVerified = true; v.verifiedAt = {seconds: Date.now()/1000}; v.verifiedBy = CUR_PROFILE?.displayName || 'admin'; }
+            showToast('✓ Vendor doğrulandı.');
+            render();
+          } catch(e) {
+            showToast('Hata: '+e.message,'err');
+            b.disabled = false; b.textContent = '✓ Doğrula';
+          }
+        });
+      });
+      m.querySelectorAll('.vv-unverify').forEach(function(b){
+        b.addEventListener('click', async function(){
+          if (!confirm('Bu vendor\'ın doğrulama rozeti kaldırılacak. Emin misin?')) return;
+          b.disabled = true;
+          try {
+            await updateDoc(doc(db,'users',b.dataset.id), {
+              isVerified: false,
+              verifiedAt: null,
+              verifiedBy: null,
+            });
+            if (window._vendorBadgeCache && window._vendorBadgeCache[b.dataset.id]) {
+              delete window._vendorBadgeCache[b.dataset.id];
+            }
+            var v = vendors.find(function(x){return x.id === b.dataset.id;});
+            if (v) { v.isVerified = false; v.verifiedAt = null; v.verifiedBy = null; }
+            showToast('Doğrulama kaldırıldı.','warn');
+            render();
+          } catch(e) {
+            showToast('Hata: '+e.message,'err');
+            b.disabled = false;
+          }
+        });
+      });
+      m.querySelectorAll('.vv-detail').forEach(function(b){
+        b.addEventListener('click', function(){
+          var v = vendors.find(function(x){return x.id === b.dataset.id;});
+          if (v) openVendorDetailModal(v);
+        });
+      });
+    }
+
+    render();
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Vendor\'lar yüklenemedi: '+e.message+'</div>';
+  }
+}
+
+// v4.82: Vendor detay modal (admVendorVerify'dan açılır)
+function openVendorDetailModal(v) {
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  var vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto">'
+    + '<div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'
+    +   '<h3 style="font-size:16px;font-weight:700">📄 Vendor Detayı</h3>'
+    +   '<button id="vvd-close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer">×</button>'
+    + '</div>'
+    + '<div style="padding:20px">'
+    +   '<div style="font-size:16px;font-weight:700;margin-bottom:4px">'+(v.company||v.displayName||v.email)+(v.isVerified?'  <span class="vbadge vbadge-verified" style="font-size:10px">✓ Doğrulanmış</span>':'')+'</div>'
+    +   '<div class="txt-muted-12">'+vtypeLabels[v.vendorType]+(v.origin==='foreign'?' · 🌍 '+(v.country||'Yabancı'):' · 🇹🇷 Yerli')+'</div>'
+    +   '<div style="margin-top:14px;display:grid;grid-template-columns:90px 1fr;gap:6px;font-size:12.5px">'
+    +     '<div class="t-muted">Email:</div><div>'+(v.email||'—')+'</div>'
+    +     '<div class="t-muted">Telefon:</div><div>'+(v.phone||'—')+'</div>'
+    +     '<div class="t-muted">Adres:</div><div>'+(v.address||'—')+'</div>'
+    +     '<div class="t-muted">Web:</div><div>'+(v.website?'<a href="'+v.website+'" target="_blank" style="color:#7db4ff;text-decoration:none">'+v.website+'</a>':'—')+'</div>'
+    +     '<div class="t-muted">Vergi No:</div><div>'+(v.taxNo||'—')+'</div>'
+    +     '<div class="t-muted">İsim:</div><div>'+(v.displayName||'—')+'</div>'
+    +   '</div>'
+    +   (Array.isArray(v.categories) && v.categories.length>0
+      ? '<div style="margin-top:14px"><div class="t-muted" style="font-size:11px;margin-bottom:4px">KATEGORİLER</div><div style="display:flex;flex-wrap:wrap;gap:5px">'+v.categories.map(function(c){return '<span class="vbadge" style="background:rgba(125,180,255,.08);color:#7db4ff">'+c+'</span>';}).join('')+'</div></div>'
+      : '')
+    +   (Array.isArray(v.specializations) && v.specializations.length>0
+      ? '<div style="margin-top:14px"><div class="t-muted" style="font-size:11px;margin-bottom:4px">UZMANLIKLAR</div><div style="display:flex;flex-wrap:wrap;gap:5px">'+v.specializations.map(function(c){return '<span class="vbadge" style="background:rgba(34,208,120,.08);color:#22d078">'+c+'</span>';}).join('')+'</div></div>'
+      : '')
+    +   (Array.isArray(v.regions) && v.regions.length>0
+      ? '<div style="margin-top:14px"><div class="t-muted" style="font-size:11px;margin-bottom:4px">BÖLGELER</div><div style="display:flex;flex-wrap:wrap;gap:5px">'+v.regions.map(function(c){return '<span class="vbadge" style="background:rgba(240,164,41,.08);color:#f0a429">'+c+'</span>';}).join('')+'</div></div>'
+      : '')
+    +   (Array.isArray(v.brands) && v.brands.length>0
+      ? '<div style="margin-top:14px"><div class="t-muted" style="font-size:11px;margin-bottom:4px">MARKALAR</div><div style="font-size:12.5px">'+v.brands.join(', ')+'</div></div>'
+      : '')
+    +   (v.refs ? '<div style="margin-top:14px"><div class="t-muted" style="font-size:11px;margin-bottom:4px">REFERANSLAR</div><div style="font-size:12.5px;white-space:pre-wrap">'+v.refs+'</div></div>' : '')
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#vvd-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
 }
 
 // Admin: Paket Tanımları Sayfası
@@ -21121,6 +21865,251 @@ async function admPayments(m) {
   } catch(e) {
     m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.82: ADMIN — VENDOR ONAYLARI (moderation queue)
+// Self-service onboarding ile gelen vendor'ları admin doğrular
+// vendorStatus: 'auto_approved' → 'admin_verified'
+// ════════════════════════════════════════════════════════════════════
+async function admVendorApprovals(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Vendor onayları yükleniyor...</div>';
+  try {
+    // Tüm vendor'ları çek
+    const snap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
+    var all = snap.docs.map(function(d){ return {...d.data(), uid:d.id}; });
+
+    // Sayıları hesapla
+    var pending = all.filter(function(u){ return !u.vendorStatus || u.vendorStatus === 'auto_approved'; });
+    var verified = all.filter(function(u){ return u.vendorStatus === 'admin_verified'; });
+    var rejected = all.filter(function(u){ return u.vendorStatus === 'rejected'; });
+
+    // Filtre state
+    if (!window._vendApprFilter) window._vendApprFilter = 'pending';
+
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:12px';
+    hdr.innerHTML =
+      '<div>'
+      + '<h2 class="fs18-fw7">✓ Vendor Onayları</h2>'
+      + '<div class="txt-muted-12-mt3">Yeni kaydolan vendor\'ları inceleyerek "Doğrulanmış" rozeti verin. Onay verilmemiş vendor\'lar zaten platformda çalışabilir.</div>'
+      + '</div>'
+      + '<div class="flx-g8">'
+      +   '<button class="btn-sm flt-btn'+(window._vendApprFilter==='pending'?' on':'')+'" data-flt="pending" style="background:'+(window._vendApprFilter==='pending'?'rgba(240,164,41,.18)':'rgba(255,255,255,.05)')+';border:1px solid '+(window._vendApprFilter==='pending'?'rgba(240,164,41,.45)':'rgba(255,255,255,.12)')+';color:'+(window._vendApprFilter==='pending'?'#f0a429':'inherit')+';padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">⏳ Bekleyen ('+pending.length+')</button>'
+      +   '<button class="btn-sm flt-btn'+(window._vendApprFilter==='verified'?' on':'')+'" data-flt="verified" style="background:'+(window._vendApprFilter==='verified'?'rgba(34,208,120,.18)':'rgba(255,255,255,.05)')+';border:1px solid '+(window._vendApprFilter==='verified'?'rgba(34,208,120,.45)':'rgba(255,255,255,.12)')+';color:'+(window._vendApprFilter==='verified'?'#22d078':'inherit')+';padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">✓ Doğrulanmış ('+verified.length+')</button>'
+      +   '<button class="btn-sm flt-btn'+(window._vendApprFilter==='rejected'?' on':'')+'" data-flt="rejected" style="background:'+(window._vendApprFilter==='rejected'?'rgba(255,112,112,.18)':'rgba(255,255,255,.05)')+';border:1px solid '+(window._vendApprFilter==='rejected'?'rgba(255,112,112,.45)':'rgba(255,255,255,.12)')+';color:'+(window._vendApprFilter==='rejected'?'#ff7070':'inherit')+';padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">✗ Reddedilen ('+rejected.length+')</button>'
+      + '</div>';
+    m.innerHTML = '';
+    m.appendChild(hdr);
+
+    var list = window._vendApprFilter === 'verified' ? verified : window._vendApprFilter === 'rejected' ? rejected : pending;
+
+    if (list.length === 0) {
+      var empty = document.createElement('div');
+      empty.style.cssText = 'text-align:center;padding:40px;color:rgba(255,255,255,.45)';
+      empty.innerHTML = '<div style="font-size:48px;margin-bottom:8px">'+(window._vendApprFilter==='pending'?'🎉':window._vendApprFilter==='verified'?'✓':'—')+'</div>'
+        + '<div>'+(window._vendApprFilter==='pending'?'Bekleyen vendor onayı yok':window._vendApprFilter==='verified'?'Henüz doğrulanmış vendor yok':'Reddedilen vendor yok')+'</div>';
+      m.appendChild(empty);
+    } else {
+      var grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;gap:10px';
+      list.sort(function(a,b){ return (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0); });
+      list.forEach(function(v){
+        var card = document.createElement('div');
+        card.style.cssText = 'background:var(--bg-surface);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center';
+
+        var typeLabel = v.vendorType === 'ureticid' ? 'Üretici' : v.vendorType === 'distributor' ? 'Distribütör' : v.vendorType === 'integrator' ? 'Entegratör' : (v.vendorType || '—');
+        var createdStr = v.createdAt?.toDate ? v.createdAt.toDate().toLocaleDateString('tr-TR', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+        var emailVerifiedBadge = v.emailVerified
+          ? '<span style="font-size:10px;background:rgba(34,208,120,.12);color:#22d078;padding:2px 6px;border-radius:4px;margin-left:6px">✓ Email</span>'
+          : '<span style="font-size:10px;background:rgba(255,112,112,.12);color:#ff7070;padding:2px 6px;border-radius:4px;margin-left:6px">✗ Email</span>';
+
+        card.innerHTML =
+          '<div>'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'
+          +   '<strong style="font-size:14px">'+(v.company || v.displayName || '—')+'</strong>'
+          +   '<span style="font-size:11px;background:rgba(125,180,255,.12);color:#7db4ff;padding:2px 7px;border-radius:4px;font-weight:600">'+typeLabel+'</span>'
+          +   emailVerifiedBadge
+          + '</div>'
+          + '<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:4px">'+v.email+' · '+(v.phone || 'Telefon yok')+'</div>'
+          + '<div style="font-size:11px;color:rgba(255,255,255,.45)">'
+          +   'Kayıt: '+createdStr
+          +   (v.website ? ' · <a href="'+v.website+'" target="_blank" style="color:#7db4ff;text-decoration:none">'+v.website+' ↗</a>' : '')
+          +   (v.categories?.length ? ' · '+v.categories.length+' kategori' : '')
+          +   (v.brands?.length ? ' · '+v.brands.length+' marka' : '')
+          + '</div>'
+          + '</div>'
+          + '<div class="flx-g8" style="flex-shrink:0">'
+          +   '<button class="va-detail btn-sm" data-uid="'+v.uid+'" style="background:rgba(125,180,255,.08);border:1px solid rgba(125,180,255,.25);color:#7db4ff;padding:6px 10px;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:600">👁 Detay</button>'
+          + (window._vendApprFilter === 'pending'
+              ? '<button class="va-approve btn-sm" data-uid="'+v.uid+'" style="background:#22d078;border:none;color:#fff;padding:6px 14px;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:700">✓ Onayla</button>'
+                +'<button class="va-reject btn-sm" data-uid="'+v.uid+'" style="background:rgba(255,112,112,.1);border:1px solid rgba(255,112,112,.3);color:#ff7070;padding:6px 12px;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:600">✗ Reddet</button>'
+              : '')
+          + (window._vendApprFilter === 'verified'
+              ? '<button class="va-revoke btn-sm" data-uid="'+v.uid+'" style="background:rgba(255,164,29,.1);border:1px solid rgba(255,164,29,.3);color:#f0a429;padding:6px 12px;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:600">⤴ Doğrulamayı Kaldır</button>'
+              : '')
+          + (window._vendApprFilter === 'rejected'
+              ? '<button class="va-restore btn-sm" data-uid="'+v.uid+'" style="background:rgba(125,180,255,.08);border:1px solid rgba(125,180,255,.25);color:#7db4ff;padding:6px 12px;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:600">↩ Geri Al</button>'
+              : '')
+          + '</div>';
+        grid.appendChild(card);
+      });
+      m.appendChild(grid);
+    }
+
+    // Filtre buton event'leri
+    hdr.querySelectorAll('.flt-btn').forEach(function(b){
+      b.addEventListener('click', function(){
+        window._vendApprFilter = b.dataset.flt;
+        admVendorApprovals(m);
+      });
+    });
+
+    // Aksiyon butonları
+    m.querySelectorAll('.va-approve').forEach(function(b){
+      b.addEventListener('click', async function(){
+        if (!confirm('Bu vendor "Doğrulanmış" olarak işaretlenecek. Onaylıyor musun?')) return;
+        b.disabled = true;
+        try {
+          await updateDoc(doc(db,'users',b.dataset.uid), {
+            vendorStatus: 'admin_verified',
+            verifiedAt: serverTimestamp(),
+            verifiedBy: CUR_USER.uid,
+          });
+          // Bildirim gönder vendor'a
+          try {
+            await addDoc(collection(db,'notifications'), {
+              userId: b.dataset.uid,
+              type: 'vendor_verified',
+              title: '✓ Profilin Doğrulandı',
+              message: 'Tebrikler! PoCHub tarafından doğrulandın. Profilin artık "Doğrulanmış ✓" rozetiyle gösterilecek.',
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+          } catch(e){}
+          // Badge cache temizle
+          if (window._vendorBadgeCache) delete window._vendorBadgeCache[b.dataset.uid];
+          showToast('✓ Vendor doğrulandı');
+          admVendorApprovals(m);
+        } catch(e) {
+          showToast('Hata: '+e.message,'err');
+          b.disabled = false;
+        }
+      });
+    });
+    m.querySelectorAll('.va-reject').forEach(function(b){
+      b.addEventListener('click', async function(){
+        var reason = prompt('Reddetme sebebi (vendor görür):', '');
+        if (reason === null) return;
+        b.disabled = true;
+        try {
+          await updateDoc(doc(db,'users',b.dataset.uid), {
+            vendorStatus: 'rejected',
+            rejectedAt: serverTimestamp(),
+            rejectedBy: CUR_USER.uid,
+            rejectionReason: reason || 'Belirtilmedi',
+          });
+          try {
+            await addDoc(collection(db,'notifications'), {
+              userId: b.dataset.uid,
+              type: 'vendor_rejected',
+              title: '⚠ Doğrulama Reddedildi',
+              message: 'Vendor doğrulaman reddedildi. Sebep: '+(reason||'Belirtilmedi')+'. Profilini güncelleyip tekrar başvurabilirsin.',
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+          } catch(e){}
+          if (window._vendorBadgeCache) delete window._vendorBadgeCache[b.dataset.uid];
+          showToast('Vendor reddedildi');
+          admVendorApprovals(m);
+        } catch(e) {
+          showToast('Hata: '+e.message,'err');
+          b.disabled = false;
+        }
+      });
+    });
+    m.querySelectorAll('.va-revoke').forEach(function(b){
+      b.addEventListener('click', async function(){
+        if (!confirm('Doğrulama rozeti kaldırılacak. Vendor "Bekleyen" listesine geri taşınacak. Devam?')) return;
+        try {
+          await updateDoc(doc(db,'users',b.dataset.uid), {
+            vendorStatus: 'auto_approved',
+            verifiedAt: null,
+            verifiedBy: null,
+          });
+          if (window._vendorBadgeCache) delete window._vendorBadgeCache[b.dataset.uid];
+          showToast('Doğrulama kaldırıldı');
+          admVendorApprovals(m);
+        } catch(e) { showToast('Hata: '+e.message,'err'); }
+      });
+    });
+    m.querySelectorAll('.va-restore').forEach(function(b){
+      b.addEventListener('click', async function(){
+        try {
+          await updateDoc(doc(db,'users',b.dataset.uid), {
+            vendorStatus: 'auto_approved',
+            rejectionReason: null,
+          });
+          if (window._vendorBadgeCache) delete window._vendorBadgeCache[b.dataset.uid];
+          showToast('Vendor "Bekleyen" listesine alındı');
+          admVendorApprovals(m);
+        } catch(e) { showToast('Hata: '+e.message,'err'); }
+      });
+    });
+    m.querySelectorAll('.va-detail').forEach(function(b){
+      b.addEventListener('click', function(){ openVendorApprovalDetail(b.dataset.uid); });
+    });
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Hata: '+e.message+'</div>';
+  }
+}
+
+// Vendor detay modal — başvuru bilgileri tam görünür
+async function openVendorApprovalDetail(uid) {
+  try {
+    const snap = await getDoc(doc(db,'users',uid));
+    if (!snap.exists()) { showToast('Vendor bulunamadı','err'); return; }
+    var v = snap.data();
+    var typeLabel = v.vendorType === 'ureticid' ? 'Üretici' : v.vendorType === 'distributor' ? 'Distribütör' : v.vendorType === 'integrator' ? 'Entegratör' : '—';
+
+    // Vendor'ın ürün sayısı
+    var prodCount = 0;
+    try {
+      var ps = await getDocs(query(collection(db,'products'), where('vendorId','==',uid)));
+      prodCount = ps.size;
+    } catch(e){}
+
+    var modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+    modal.innerHTML =
+      '<div style="background:var(--bg-surface);border:1px solid rgba(255,255,255,.1);border-radius:12px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto">'
+      + '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center">'
+      +   '<h3 style="font-size:16px;font-weight:700;margin:0">'+v.company+'</h3>'
+      +   '<button id="vad-close" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">×</button>'
+      + '</div>'
+      + '<div style="padding:18px 20px;display:grid;gap:10px;font-size:13px">'
+      +   '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Yetkili Kişi</div><div>'+(v.displayName||'—')+'</div></div>'
+      +   '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">E-posta</div><div>'+v.email+' '+(v.emailVerified?'<span style="color:#22d078;font-size:11px">✓ Doğrulandı</span>':'<span style="color:#ff7070;font-size:11px">✗ Doğrulanmadı</span>')+'</div></div>'
+      +   '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Telefon</div><div>'+(v.phone||'—')+'</div></div>'
+      +   '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Vendor Tipi</div><div>'+typeLabel+'</div></div>'
+      +   '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Vergi No</div><div>'+(v.taxNo||'—')+'</div></div>'
+      +   '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Adres</div><div>'+(v.address||'—')+'</div></div>'
+      +   (v.website ? '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Web Sitesi</div><div><a href="'+v.website+'" target="_blank" style="color:#7db4ff">'+v.website+' ↗</a></div></div>' : '')
+      +   (v.origin ? '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Menşei</div><div>'+(v.origin==='foreign'?'Yabancı ('+v.country+')':'Yerli')+'</div></div>' : '')
+      +   (v.categories?.length ? '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Kategoriler</div><div>'+v.categories.join(', ')+'</div></div>' : '')
+      +   (v.specializations?.length ? '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Uzmanlık</div><div>'+v.specializations.join(', ')+'</div></div>' : '')
+      +   (v.brands?.length ? '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Markalar</div><div>'+v.brands.join(', ')+'</div></div>' : '')
+      +   (v.regions?.length ? '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Bölgeler</div><div>'+v.regions.join(', ')+'</div></div>' : '')
+      +   (v.refs ? '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Referanslar</div><div style="white-space:pre-line;font-size:12px">'+v.refs+'</div></div>' : '')
+      +   '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Ürün Sayısı</div><div>'+prodCount+'</div></div>'
+      +   '<div style="display:grid;grid-template-columns:140px 1fr;gap:8px"><div class="txt-muted">Kayıt Tarihi</div><div>'+(v.createdAt?.toDate ? v.createdAt.toDate().toLocaleString('tr-TR') : '—')+'</div></div>'
+      +   (v.rejectionReason ? '<div style="background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.25);border-radius:6px;padding:10px;margin-top:6px"><div style="color:#ff7070;font-weight:700;font-size:12px;margin-bottom:4px">Önceki Red Sebebi</div><div style="font-size:12px">'+v.rejectionReason+'</div></div>' : '')
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+    modal.querySelector('#vad-close').addEventListener('click', function(){ modal.remove(); });
+  } catch(e) { showToast('Hata: '+e.message,'err'); }
 }
 
 // ════════════════════════════════════════════════════════════════════
