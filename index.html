@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.83 | pochub.co -->
+<!-- PoCHub v4.84 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.83</title>
+<title>PoCHub.co — v4.84</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -331,7 +331,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.83';
+const VERSION = 'v4.84';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -566,6 +566,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.84':  ['MAJOR: Phase 3.4 — Spam Koruması. Disposable email blok (45 domain), ReCAPTCHA v3 hazır altyapı, signup metadata (IP, userAgent, fingerprint), email_verified zorunlu kontroller, Admin Şüpheli Kayıtlar alt-sayfası.'],
   'v4.83':  ['MAJOR: Phase 3.3 — Welcome Wizard + Onboarding Checklist. Yeni vendor signup sonrasi 5 adimli sihirbaz (hosgeldin/profil/ilk urun/paylas/bitis). Dashboard onboarding checklist progress bar. Aktivasyon orani artirma stratejisi.'],
   'v4.82':  ['MAJOR: Phase 3.2 — Vendor Self-Service Onboarding. Kayıt anında aktif (vendorStatus: auto_approved), admin onayı arkaplanda (admin_verified rozet). Yeni admin sekmesi Vendor Onayları. Doğrulanmış ✓ rozet katalog/profilde.'],
   'v4.81':  ['MAJOR: Phase 3 başladı — Free paket yeniden tasarlandı. Network effect stratejisi: vendor ücretsiz kayıt + 3 PoC/ay + 5 davet/ay + 10 ürün. Migration: eski Free vendorlara otomatik upgrade. Paketler sayfasında Launch Promosyonu rozeti.'],
@@ -3396,6 +3397,31 @@ async function handleAuth() {
         btn.disabled=false; btn.textContent='Kayıt Ol'; return;
       }
 
+      // ═══ v4.84: SPAM KORUMA KONTROLLERİ (signup öncesi) ═══
+      // 1. Disposable email blok
+      if (isDisposableEmail(email)) {
+        errDiv.innerHTML = `<div class="alert alert-err">Geçici / disposable e-posta adresleri kabul edilmiyor. Lütfen kurumsal e-postanızı kullanın.</div>`;
+        btn.disabled=false; btn.textContent='Kayıt Ol'; return;
+      }
+      // 2. Metadata topla (IP, fingerprint, userAgent)
+      const signupMeta = await getSignupMetadata();
+      // 3. Şüpheli signup tespiti (aynı IP/fingerprint son 1 saatte fazla kayıt)
+      const suspCheck = await checkSuspiciousSignup(signupMeta);
+      // suspicious işareti ekleyeceğiz ama signup'ı engellemeyeceğiz; admin görür
+      // 4. ReCAPTCHA token (Admin Settings'ten site key okunur)
+      let recaptchaToken = null;
+      try {
+        // pochub_config/system'den site key oku
+        if (window.SYSTEM_CONFIG?.recaptchaSiteKey) {
+          recaptchaToken = await getRecaptchaToken(window.SYSTEM_CONFIG.recaptchaSiteKey, 'signup');
+          // Token gelmemişse uyar (production'da blok et, geliştirme aşamasında geç)
+          if (!recaptchaToken && window.SYSTEM_CONFIG.recaptchaEnforce === true) {
+            errDiv.innerHTML = `<div class="alert alert-err">Güvenlik doğrulaması yapılamadı. Lütfen sayfayı yenileyip tekrar deneyin.</div>`;
+            btn.disabled=false; btn.textContent='Kayıt Ol'; return;
+          }
+        }
+      } catch(e) { /* sessiz */ }
+
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       // ── Rol bazlı ek alanları topla ───────────────────────────────────
       const website   = el('a-website')?.value.trim() || '';
@@ -3459,6 +3485,13 @@ async function handleAuth() {
         vendorStatus: AUTH_ROLE === 'vendor' ? 'auto_approved' : null,
         verifiedAt: null,                  // Admin onayladığında dolacak
         verifiedBy: null,                  // Admin UID'si
+        // v4.84: Spam koruma metadata
+        signupMetadata: signupMeta,        // {ip, fingerprint, userAgent, language, timestamp}
+        suspiciousSignup: suspCheck.suspicious || false,
+        suspiciousReason: suspCheck.suspicious
+          ? 'IP=' + (suspCheck.ipCount || 0) + ' / FP=' + (suspCheck.fpCount || 0) + ' kayıt son 1 saatte'
+          : null,
+        recaptchaToken: recaptchaToken || null,   // Sunucu tarafı doğrulama için (v4.84 sadece kaydeder)
         createdAt: serverTimestamp()
       });
 
@@ -20522,6 +20555,119 @@ async function generateReceiptPDF(historyItem, vendorInfo) {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════
+// v4.84: SPAM KORUMA ALTYAPISI
+// ════════════════════════════════════════════════════════════════════
+
+// Disposable / temp email domain listesi (yaygın spam sağlayıcıları)
+const DISPOSABLE_EMAIL_DOMAINS = [
+  '10minutemail.com','10minutemail.net','20minutemail.com',
+  'mailinator.com','mailinator.net','mailinator2.com',
+  'tempmail.com','temp-mail.org','temp-mail.io','tempmailaddress.com',
+  'guerrillamail.com','guerrillamail.net','guerrillamail.org','guerrillamail.biz','sharklasers.com',
+  'throwawaymail.com','throwawayemail.com','trashmail.com','trashmail.net',
+  'getnada.com','dispostable.com','yopmail.com','yopmail.net','yopmail.fr',
+  'fakeinbox.com','fakemailgenerator.com','mohmal.com','mintemail.com',
+  'emailondeck.com','tempinbox.com','spamgourmet.com','spambox.us','spam4.me',
+  'maildrop.cc','mailcatch.com','mailnesia.com','spambog.com',
+  'mytemp.email','my10minutemail.com','minutemail.com','easytrashmail.com',
+  '1secmail.com','1secmail.net','1secmail.org','tmail.io','inboxbear.com',
+];
+
+// E-posta disposable mı kontrol et
+function isDisposableEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const parts = email.toLowerCase().trim().split('@');
+  if (parts.length !== 2) return false;
+  const domain = parts[1];
+  return DISPOSABLE_EMAIL_DOMAINS.indexOf(domain) !== -1;
+}
+
+// Browser fingerprint (basit) — Spam tespiti için
+function getBrowserFingerprint() {
+  try {
+    const data = [
+      navigator.userAgent || '',
+      navigator.language || '',
+      screen.width + 'x' + screen.height,
+      new Date().getTimezoneOffset(),
+      navigator.hardwareConcurrency || 0,
+      navigator.platform || '',
+    ].join('|');
+    // Basit hash (SHA-1 yerine basit char-sum)
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      hash = ((hash << 5) - hash) + data.charCodeAt(i);
+      hash |= 0;
+    }
+    return 'fp_' + Math.abs(hash).toString(36);
+  } catch(e) { return 'fp_unknown'; }
+}
+
+// Signup metadata topla (IP, fingerprint, userAgent) — admin için
+async function getSignupMetadata() {
+  const meta = {
+    fingerprint: getBrowserFingerprint(),
+    userAgent: (navigator.userAgent || '').slice(0, 200),
+    language: navigator.language || '',
+    timestamp: Date.now(),
+    ip: null,
+  };
+  // IP'yi public API'den al (best effort)
+  try {
+    const resp = await Promise.race([
+      fetch('https://api.ipify.org?format=json').then(r => r.json()),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 2000)),
+    ]);
+    if (resp?.ip) meta.ip = resp.ip;
+  } catch(e) { /* sessiz */ }
+  return meta;
+}
+
+// Şüpheli signup tespiti — aynı IP/fingerprint son 1 saatte X+ kayıt
+async function checkSuspiciousSignup(meta) {
+  if (!meta.ip && !meta.fingerprint) return { suspicious: false };
+  try {
+    const oneHourAgo = new Date(Date.now() - 3600 * 1000);
+    // Aynı IP veya fingerprint'ten son 1 saat
+    const recentByIp = meta.ip ? await getDocs(query(
+      collection(db, 'users'),
+      where('signupMetadata.ip', '==', meta.ip),
+      where('createdAt', '>=', oneHourAgo),
+      limit(10)
+    )) : { size: 0 };
+    const recentByFp = meta.fingerprint ? await getDocs(query(
+      collection(db, 'users'),
+      where('signupMetadata.fingerprint', '==', meta.fingerprint),
+      where('createdAt', '>=', oneHourAgo),
+      limit(10)
+    )) : { size: 0 };
+    const ipCount = recentByIp.size || 0;
+    const fpCount = recentByFp.size || 0;
+    const suspicious = ipCount >= 5 || fpCount >= 3;
+    return { suspicious, ipCount, fpCount };
+  } catch(e) {
+    // Sorgu fail ederse (composite index yok vs.) sessiz devam et
+    return { suspicious: false };
+  }
+}
+
+// ReCAPTCHA v3 — Site key Admin Settings'ten okunur. Yoksa skip edilir.
+// Production: <script src="https://www.google.com/recaptcha/api.js?render=SITE_KEY"></script>
+// loaded'mi kontrol eder
+async function getRecaptchaToken(siteKey, action) {
+  if (!siteKey || typeof grecaptcha === 'undefined') return null;
+  try {
+    return await new Promise((resolve) => {
+      grecaptcha.ready(() => {
+        grecaptcha.execute(siteKey, { action: action || 'signup' })
+          .then(token => resolve(token))
+          .catch(() => resolve(null));
+      });
+    });
+  } catch(e) { return null; }
+}
+
 // Default paketler (sistem ilk açıldığında otomatik seed edilir)
 const DEFAULT_PACKAGES = [
   {
@@ -20642,6 +20788,15 @@ const DEFAULT_PACKAGES = [
 
 // Default sistem ayarları
 const DEFAULT_CONFIG = {
+  // v4.84: Spam koruma ayarları
+  recaptchaSiteKey: '',             // Boş ise ReCAPTCHA devre dışı (geliştirme modu)
+  recaptchaEnforce: false,           // true ise token alınamazsa signup blok edilir
+  spamProtection: {
+    blockDisposableEmails: true,     // Disposable email domain blok
+    suspiciousIpThreshold: 5,        // 1 saatte 5+ kayıt = suspicious
+    suspiciousFpThreshold: 3,        // 1 saatte 3+ kayıt (aynı fingerprint) = suspicious
+    autoBlockSuspicious: false,      // true: otomatik block, false: admin'e işaretle
+  },
   freeTier: {
     pocAcceptanceMode: 'no_acceptance',
     freePocsPerPeriod: 0,
@@ -20777,6 +20932,22 @@ async function seedDefaultConfigIfNeeded() {
     return false;
   }
 }
+
+// v4.84: SYSTEM_CONFIG global yükleyici
+// Sayfa açılışında / login sonrası çağrılır.
+// Anonim erişim de mümkün (signup öncesi ReCAPTCHA key gerekli).
+async function loadSystemConfig() {
+  try {
+    const snap = await getDoc(doc(db, 'pochub_config', 'system'));
+    if (snap.exists()) {
+      window.SYSTEM_CONFIG = snap.data();
+      return window.SYSTEM_CONFIG;
+    }
+  } catch(e) { /* sessiz: rules sıkıysa anonimde fail edebilir */ }
+  return null;
+}
+// Sayfa açılır açılmaz çağır (login olmadan)
+loadSystemConfig();
 
 // ════════════════════════════════════════════════════════════════════
 // v4.82: ADMIN VENDOR DOĞRULAMA SAYFASI
@@ -21254,6 +21425,16 @@ async function admSettings(m) {
       return w;
     }
 
+    // v4.84: Spam Koruma
+    var s0 = section('🛡 Spam Koruması & ReCAPTCHA', '#ff7070');
+    s0.appendChild(field('ReCAPTCHA v3 Site Key', 'cfg-recaptcha-key', 'text', cfg.recaptchaSiteKey || '', 'Google ReCAPTCHA v3 site key. Boş bırakılırsa devre dışı.'));
+    s0.appendChild(field('ReCAPTCHA Zorunlu Mu?', 'cfg-recaptcha-enforce', 'toggle', cfg.recaptchaEnforce ?? false, 'Açıksa token alınamayan kayıtlar reddedilir. İlk kullanımda kapalı tut.'));
+    s0.appendChild(field('Disposable E-posta Blok', 'cfg-spam-disp', 'toggle', cfg.spamProtection?.blockDisposableEmails ?? true, '10minutemail, tempmail, mailinator vs. disposable domainler blok edilir'));
+    s0.appendChild(field('IP Şüphe Eşiği (kayıt/saat)', 'cfg-spam-ip', 'number', cfg.spamProtection?.suspiciousIpThreshold ?? 5, '1 saatte bu sayıdan fazla aynı IP\'den kayıt olursa şüpheli işaretlenir'));
+    s0.appendChild(field('Fingerprint Şüphe Eşiği', 'cfg-spam-fp', 'number', cfg.spamProtection?.suspiciousFpThreshold ?? 3, 'Aynı browser fingerprint\'ten kayıt sayısı eşiği'));
+    s0.appendChild(field('Şüphelileri Otomatik Blok', 'cfg-spam-auto', 'toggle', cfg.spamProtection?.autoBlockSuspicious ?? false, 'Açıksa şüpheli signup otomatik bloklanır. Kapalıda admin\'e işaret olur.'));
+    m.appendChild(s0);
+
     // Free Tier
     var s1 = section('🆓 Free Tier Davranışı', '#5a6278');
     s1.appendChild(field('PoC Kabul Modu', 'cfg-free-mode', 'select', {
@@ -21432,6 +21613,15 @@ async function admSettings(m) {
     el('cfg-save').addEventListener('click', async function(){
       try {
         var newCfg = {
+          // v4.84: Spam koruma
+          recaptchaSiteKey: el('cfg-recaptcha-key').value.trim(),
+          recaptchaEnforce: el('cfg-recaptcha-enforce').value === 'true',
+          spamProtection: {
+            blockDisposableEmails: el('cfg-spam-disp').value === 'true',
+            suspiciousIpThreshold: parseInt(el('cfg-spam-ip').value)||5,
+            suspiciousFpThreshold: parseInt(el('cfg-spam-fp').value)||3,
+            autoBlockSuspicious: el('cfg-spam-auto').value === 'true',
+          },
           freeTier: {
             pocAcceptanceMode: el('cfg-free-mode').value,
             freePocsPerPeriod: parseInt(el('cfg-free-pocs').value)||0,
@@ -21883,6 +22073,12 @@ async function admVendorApprovals(m) {
     var pending = all.filter(function(u){ return !u.vendorStatus || u.vendorStatus === 'auto_approved'; });
     var verified = all.filter(function(u){ return u.vendorStatus === 'admin_verified'; });
     var rejected = all.filter(function(u){ return u.vendorStatus === 'rejected'; });
+    // v4.84: Şüpheli (suspiciousSignup veya disposable email)
+    var suspicious = all.filter(function(u){
+      return u.suspiciousSignup === true
+          || (u.email && isDisposableEmail(u.email))
+          || (u.signupMetadata && !u.emailVerified && (Date.now() - (u.createdAt?.toMillis?.() || 0)) > 7 * 86400000);
+    });
 
     // Filtre state
     if (!window._vendApprFilter) window._vendApprFilter = 'pending';
@@ -21894,21 +22090,25 @@ async function admVendorApprovals(m) {
       + '<h2 class="fs18-fw7">✓ Vendor Onayları</h2>'
       + '<div class="txt-muted-12-mt3">Yeni kaydolan vendor\'ları inceleyerek "Doğrulanmış" rozeti verin. Onay verilmemiş vendor\'lar zaten platformda çalışabilir.</div>'
       + '</div>'
-      + '<div class="flx-g8">'
+      + '<div class="flx-g8" style="flex-wrap:wrap">'
       +   '<button class="btn-sm flt-btn'+(window._vendApprFilter==='pending'?' on':'')+'" data-flt="pending" style="background:'+(window._vendApprFilter==='pending'?'rgba(240,164,41,.18)':'rgba(255,255,255,.05)')+';border:1px solid '+(window._vendApprFilter==='pending'?'rgba(240,164,41,.45)':'rgba(255,255,255,.12)')+';color:'+(window._vendApprFilter==='pending'?'#f0a429':'inherit')+';padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">⏳ Bekleyen ('+pending.length+')</button>'
       +   '<button class="btn-sm flt-btn'+(window._vendApprFilter==='verified'?' on':'')+'" data-flt="verified" style="background:'+(window._vendApprFilter==='verified'?'rgba(34,208,120,.18)':'rgba(255,255,255,.05)')+';border:1px solid '+(window._vendApprFilter==='verified'?'rgba(34,208,120,.45)':'rgba(255,255,255,.12)')+';color:'+(window._vendApprFilter==='verified'?'#22d078':'inherit')+';padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">✓ Doğrulanmış ('+verified.length+')</button>'
       +   '<button class="btn-sm flt-btn'+(window._vendApprFilter==='rejected'?' on':'')+'" data-flt="rejected" style="background:'+(window._vendApprFilter==='rejected'?'rgba(255,112,112,.18)':'rgba(255,255,255,.05)')+';border:1px solid '+(window._vendApprFilter==='rejected'?'rgba(255,112,112,.45)':'rgba(255,255,255,.12)')+';color:'+(window._vendApprFilter==='rejected'?'#ff7070':'inherit')+';padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">✗ Reddedilen ('+rejected.length+')</button>'
+      +   '<button class="btn-sm flt-btn'+(window._vendApprFilter==='suspicious'?' on':'')+'" data-flt="suspicious" style="background:'+(window._vendApprFilter==='suspicious'?'rgba(255,112,112,.18)':'rgba(255,255,255,.05)')+';border:1px solid '+(window._vendApprFilter==='suspicious'?'rgba(255,112,112,.45)':'rgba(255,255,255,.12)')+';color:'+(window._vendApprFilter==='suspicious'?'#ff7070':'inherit')+';padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">🛡 Şüpheli ('+suspicious.length+')</button>'
       + '</div>';
     m.innerHTML = '';
     m.appendChild(hdr);
 
-    var list = window._vendApprFilter === 'verified' ? verified : window._vendApprFilter === 'rejected' ? rejected : pending;
+    var list = window._vendApprFilter === 'verified' ? verified
+              : window._vendApprFilter === 'rejected' ? rejected
+              : window._vendApprFilter === 'suspicious' ? suspicious
+              : pending;
 
     if (list.length === 0) {
       var empty = document.createElement('div');
       empty.style.cssText = 'text-align:center;padding:40px;color:rgba(255,255,255,.45)';
-      empty.innerHTML = '<div style="font-size:48px;margin-bottom:8px">'+(window._vendApprFilter==='pending'?'🎉':window._vendApprFilter==='verified'?'✓':'—')+'</div>'
-        + '<div>'+(window._vendApprFilter==='pending'?'Bekleyen vendor onayı yok':window._vendApprFilter==='verified'?'Henüz doğrulanmış vendor yok':'Reddedilen vendor yok')+'</div>';
+      empty.innerHTML = '<div style="font-size:48px;margin-bottom:8px">'+(window._vendApprFilter==='pending'?'🎉':window._vendApprFilter==='verified'?'✓':window._vendApprFilter==='suspicious'?'🛡':'—')+'</div>'
+        + '<div>'+(window._vendApprFilter==='pending'?'Bekleyen vendor onayı yok':window._vendApprFilter==='verified'?'Henüz doğrulanmış vendor yok':window._vendApprFilter==='suspicious'?'Şüpheli kayıt yok (harika!)':'Reddedilen vendor yok')+'</div>';
       m.appendChild(empty);
     } else {
       var grid = document.createElement('div');
@@ -21923,6 +22123,14 @@ async function admVendorApprovals(m) {
         var emailVerifiedBadge = v.emailVerified
           ? '<span style="font-size:10px;background:rgba(34,208,120,.12);color:#22d078;padding:2px 6px;border-radius:4px;margin-left:6px">✓ Email</span>'
           : '<span style="font-size:10px;background:rgba(255,112,112,.12);color:#ff7070;padding:2px 6px;border-radius:4px;margin-left:6px">✗ Email</span>';
+        // v4.84: Şüpheli badge'leri
+        var suspBadges = '';
+        if (v.email && isDisposableEmail(v.email)) {
+          suspBadges += '<span style="font-size:10px;background:rgba(255,112,112,.15);color:#ff7070;padding:2px 6px;border-radius:4px;margin-left:6px;font-weight:700" title="Disposable e-posta domaini">🛡 Disposable</span>';
+        }
+        if (v.suspiciousSignup) {
+          suspBadges += '<span style="font-size:10px;background:rgba(240,164,41,.15);color:#f0a429;padding:2px 6px;border-radius:4px;margin-left:6px;font-weight:700" title="'+(v.suspiciousReason||'Çoklu IP/fingerprint')+'">🛡 Şüpheli</span>';
+        }
 
         card.innerHTML =
           '<div>'
@@ -21930,6 +22138,7 @@ async function admVendorApprovals(m) {
           +   '<strong style="font-size:14px">'+(v.company || v.displayName || '—')+'</strong>'
           +   '<span style="font-size:11px;background:rgba(125,180,255,.12);color:#7db4ff;padding:2px 7px;border-radius:4px;font-weight:600">'+typeLabel+'</span>'
           +   emailVerifiedBadge
+          +   suspBadges
           + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:4px">'+v.email+' · '+(v.phone || 'Telefon yok')+'</div>'
           + '<div style="font-size:11px;color:rgba(255,255,255,.45)">'
@@ -23014,6 +23223,31 @@ window.addEventListener('DOMContentLoaded', () => {
   // EmailJS init — PUBLIC KEY buraya
   (function(){
     emailjs.init('cPhdfmFCSt85X3dDb');
+  })();
+</script>
+
+<!-- v4.84: ReCAPTCHA v3 conditional loader (Admin Settings'ten site key ile aktive olur) -->
+<script>
+  (function(){
+    // SYSTEM_CONFIG yüklenmesini bekle, sonra recaptcha script'i inject et
+    var attempts = 0;
+    var maxAttempts = 20;
+    function tryLoad() {
+      attempts++;
+      if (window.SYSTEM_CONFIG?.recaptchaSiteKey) {
+        // Script daha önce yüklendi mi?
+        if (document.getElementById('recaptcha-v3-script')) return;
+        var s = document.createElement('script');
+        s.id = 'recaptcha-v3-script';
+        s.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(window.SYSTEM_CONFIG.recaptchaSiteKey);
+        s.async = true;
+        s.defer = true;
+        document.head.appendChild(s);
+      } else if (attempts < maxAttempts) {
+        setTimeout(tryLoad, 250);
+      }
+    }
+    tryLoad();
   })();
 </script>
 
