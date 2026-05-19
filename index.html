@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.85.3 | pochub.co -->
+<!-- PoCHub v4.85.4 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.85.3</title>
+<title>PoCHub.co — v4.85.4</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -327,11 +327,11 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getFirestore, initializeFirestore, memoryLocalCache, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.85.3';
+const VERSION = 'v4.85.4';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -566,6 +566,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.85.4': ['CRITICAL FIX: Açık tema (beyaz arka plan) üzerinde beyaz yazı kullanılıyordu (color rgba(255,255,255,.x)) - tüm vendor banner + onboarding checklist + status banner yazıları görünmüyordu. Açık temaya uygun koyu yazı renklerine çevrildi. Cache corruption recovery hala aktif.'],
   'v4.85.3': ['FIX: v4.85.2 patch - Onboarding checklist tum gorev tamamlandiginda otomatik gizlenmiyordu (dismiss flag set ediliyordu ama ayni render dongusunde gosteriliyordu). Cache corruption recovery handler daha agresif (her Firestore hatasini yakalar). Done gorev gorsel okunabilirlik iyilestirildi (gri yazi yerine yesil + check icon).'],
   'v4.85.2': ['FIX: v4.85.1 patch — evPeriod is not defined bug (renderHomeEventList global CUR_EV_PERIOD fallback), arkaplan cron error loglar sessizleştirildi (checkExpired, checkExpiring, checkQuotaResets, tryAutoRenewals), Firestore IndexedDB cache corruption otomatik recovery (block checksum mismatch -> auto clear + reload).'],
   'v4.85.1': ['MAJOR: Phase 3.5 — Production Firestore Rules ADIM 1/4. Server-write-only koleksiyonlar sıkıştırıldı (audit_log, cron_runs, email_log, weekly_digests, notification_dedup). Diğer her şey hala OPEN MODE. Sıfır risk - frontend bu koleksiyonları zaten kullanmıyor.'],
@@ -1502,14 +1503,41 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+// v4.85.4: Memory-only cache - IndexedDB corruption sorununu önler
+// IndexedDB cache'i tamamen bypass eder. Performans biraz düşer ama kararlılık öncelikli.
+const db = initializeFirestore(app, {
+  localCache: memoryLocalCache(),
+});
+
+// v4.85.4: Eski IndexedDB cache'lerini temizle (sadece bir kez, version flag ile)
+(function cleanupLegacyIndexedDB(){
+  try {
+    if (localStorage.getItem('idbCleanedV485') === '1') return;
+    if (!indexedDB.databases) {
+      localStorage.setItem('idbCleanedV485', '1');
+      return;
+    }
+    indexedDB.databases().then(function(dbs){
+      dbs.forEach(function(d){
+        if (d.name && (d.name.indexOf('firestore') !== -1 || d.name.indexOf('firebase') !== -1)) {
+          try { indexedDB.deleteDatabase(d.name); } catch(e){}
+        }
+      });
+      localStorage.setItem('idbCleanedV485', '1');
+    }).catch(function(){
+      localStorage.setItem('idbCleanedV485', '1');
+    });
+  } catch(e){
+    try { localStorage.setItem('idbCleanedV485', '1'); } catch(e2){}
+  }
+})();
 // v4.75: Firebase Functions client (europe-west1 region)
 const fns = getFunctions(app, 'europe-west1');
 
 // ════════════════════════════════════════════════════════════════════
 // v4.85.1: FIRESTORE CACHE CORRUPTION AUTO-RECOVERY
 // v4.85.3: Hem unhandledrejection hem error event yakalanır
-// IndexedDB cache "block checksum mismatch" verirse otomatik temizle
+// v4.85.4: Cooldown azaltıldı (30sn -> 5sn), Firestore-spesifik DB sil
 // ════════════════════════════════════════════════════════════════════
 (function setupFirestoreCacheRecovery(){
   let recoveryAttempted = false;
@@ -1519,50 +1547,66 @@ const fns = getFunctions(app, 'europe-west1');
     var s = String(msg).toLowerCase();
     return s.indexOf('checksum mismatch') !== -1
         || s.indexOf('corruption') !== -1
-        || s.indexOf('invalid_argument') !== -1
-        || s.indexOf('failed to fetch') !== -1 && s.indexOf('indexeddb') !== -1;
+        || (s.indexOf('failed to fetch') !== -1 && s.indexOf('indexeddb') !== -1);
+  }
+
+  function clearFirestoreCacheAndReload() {
+    function reload() { location.reload(); }
+
+    // Firestore IndexedDB ad şablonu: firestore/[DEFAULT]/<projectId>/main
+    // Ek olarak generic database listesi de silinir
+    function deleteOne(name) {
+      return new Promise(function(resolve){
+        try {
+          var req = indexedDB.deleteDatabase(name);
+          req.onsuccess = req.onerror = req.onblocked = function(){ resolve(); };
+          setTimeout(resolve, 2000);  // 2sn'de bitmezse devam
+        } catch(e){ resolve(); }
+      });
+    }
+
+    var deletions = [];
+    // Bilinen Firestore cache adları
+    deletions.push(deleteOne('firestore/[DEFAULT]/pochub-co/main'));
+    deletions.push(deleteOne('firestore/[DEFAULT]/pochub-co/main-secondary'));
+    deletions.push(deleteOne('firebaseLocalStorageDb'));
+
+    // Tüm db'leri listele ve sil (modern tarayıcılarda)
+    if (indexedDB.databases) {
+      indexedDB.databases().then(function(dbs){
+        dbs.forEach(function(d){
+          deletions.push(deleteOne(d.name));
+        });
+        Promise.all(deletions).then(reload).catch(reload);
+      }).catch(function(){
+        Promise.all(deletions).then(reload).catch(reload);
+      });
+    } else {
+      Promise.all(deletions).then(reload).catch(reload);
+    }
   }
 
   function attemptRecovery(reason) {
     if (recoveryAttempted) return;
-    // Bir defadır deniyoruz işareti localStorage'a
     try {
       var lastTry = parseInt(localStorage.getItem('lastCacheRecovery') || '0');
-      if (Date.now() - lastTry < 30000) {
-        // Son 30 saniye içinde denedik, sonsuz döngüyü kır
-        console.warn('Cache recovery son 30sn icinde denenmis, atla.');
+      if (Date.now() - lastTry < 5000) {
+        // Son 5 saniyede denedik, sonsuz döngü olmasın
+        console.warn('Cache recovery 5sn icinde denenmis, atla');
         return;
       }
       localStorage.setItem('lastCacheRecovery', String(Date.now()));
     } catch(e){}
 
     recoveryAttempted = true;
-    console.warn('Firestore IndexedDB cache bozuldu (' + reason + '), otomatik temizleniyor...');
-
-    function reload() { location.reload(); }
-    try {
-      if (indexedDB.databases) {
-        indexedDB.databases().then(function(dbs){
-          Promise.all(dbs.map(function(d){
-            return new Promise(function(resolve){
-              var req = indexedDB.deleteDatabase(d.name);
-              req.onsuccess = req.onerror = req.onblocked = function(){ resolve(); };
-            });
-          })).then(reload).catch(reload);
-        }).catch(reload);
-      } else {
-        // Firestore default DB adı: firestore/[project]/(default)
-        try { indexedDB.deleteDatabase('firestore/[DEFAULT]/pochub-co/main'); } catch(e){}
-        try { indexedDB.deleteDatabase('firebaseLocalStorageDb'); } catch(e){}
-        setTimeout(reload, 500);
-      }
-    } catch(e){ reload(); }
+    console.warn('Firestore cache bozuk (' + reason + '), temizleniyor + reload...');
+    clearFirestoreCacheAndReload();
   }
 
   window.addEventListener('unhandledrejection', function(event){
     var msg = event.reason?.message || event.reason || '';
     if (looksLikeCacheCorruption(msg)) {
-      event.preventDefault();  // Console'a yazmasın
+      event.preventDefault();
       attemptRecovery('unhandledrejection');
     }
   });
@@ -1574,6 +1618,9 @@ const fns = getFunctions(app, 'europe-west1');
       attemptRecovery('error');
     }
   });
+
+  // v4.85.4: Manuel temizleme - global olarak çağrılabilir
+  window.__pochubClearCache = clearFirestoreCacheAndReload;
 })();
 
 // ════════════════════════════════════════════════════════════════════
@@ -9342,8 +9389,8 @@ async function loadVendTab() {
       infoBanner.innerHTML =
         '<div style="font-size:24px;flex-shrink:0">💎</div>'
         + '<div style="flex:1;min-width:200px">'
-        +   '<div style="font-weight:700;font-size:14.5px;margin-bottom:4px;color:#fff">Profilin Hemen Aktif!</div>'
-        +   '<div style="font-size:12.5px;color:rgba(255,255,255,.88);line-height:1.5">Müşterilerle hemen çalışmaya başlayabilirsin. PoCHub ekibi profilini inceledikten sonra "<strong>Doğrulanmış ✓</strong>" rozeti vereceğiz.</div>'
+        +   '<div style="font-weight:800;font-size:15px;margin-bottom:4px;color:var(--text-primary)">Profilin Hemen Aktif!</div>'
+        +   '<div style="font-size:13px;color:var(--text-secondary);line-height:1.5">Müşterilerle hemen çalışmaya başlayabilirsin. PoCHub ekibi profilini inceledikten sonra "<strong>Doğrulanmış ✓</strong>" rozeti vereceğiz.</div>'
         + '</div>'
         + '<div style="background:rgba(240,164,41,.12);color:#f0a429;font-size:11px;padding:4px 10px;border-radius:14px;font-weight:700;letter-spacing:.3px">⏳ İNCELEMEDE</div>';
       m.appendChild(infoBanner);
@@ -9354,7 +9401,7 @@ async function loadVendTab() {
         '<div style="font-size:24px;flex-shrink:0">⚠</div>'
         + '<div style="flex:1;min-width:200px">'
         +   '<div style="font-weight:700;font-size:13.5px;margin-bottom:2px;color:#ff7070">Doğrulama Reddedildi</div>'
-        +   '<div style="font-size:12.5px;color:rgba(255,255,255,.88);line-height:1.5">Sebep: '+(CUR_PROFILE.rejectionReason || 'Belirtilmedi')+'. Profilini güncelleyerek tekrar başvurabilirsin.</div>'
+        +   '<div style="font-size:13px;color:var(--text-secondary);line-height:1.5">Sebep: '+(CUR_PROFILE.rejectionReason || 'Belirtilmedi')+'. Profilini güncelleyerek tekrar başvurabilirsin.</div>'
         + '</div>';
       m.appendChild(rejBanner);
     } else if (vStatus === 'admin_verified') {
@@ -9366,9 +9413,9 @@ async function loadVendTab() {
           '<div style="font-size:24px;flex-shrink:0">✓</div>'
           + '<div style="flex:1;min-width:200px">'
           +   '<div style="font-weight:700;font-size:13.5px;margin-bottom:2px;color:#22d078">Profilin Doğrulandı! 🎉</div>'
-          +   '<div style="font-size:12.5px;color:rgba(255,255,255,.88);line-height:1.5">PoCHub tarafından onaylandın. Profilin artık "<strong>Doğrulanmış ✓</strong>" rozetiyle gösteriliyor.</div>'
+          +   '<div style="font-size:13px;color:var(--text-secondary);line-height:1.5">PoCHub tarafından onaylandın. Profilin artık "<strong>Doğrulanmış ✓</strong>" rozetiyle gösteriliyor.</div>'
           + '</div>'
-          + '<button id="vb-dismiss" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:18px;cursor:pointer;padding:4px 8px">×</button>';
+          + '<button id="vb-dismiss" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:4px 8px">×</button>';
         m.appendChild(verBanner);
         verBanner.querySelector('#vb-dismiss').addEventListener('click', function(){
           localStorage.setItem(dismissedKey, '1');
@@ -9406,21 +9453,21 @@ async function loadVendTab() {
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">'
           +   '<div>'
           +     '<div style="font-size:14px;font-weight:700;color:#22d078;margin-bottom:2px">🎯 Onboarding İlerleme</div>'
-          +     '<div style="font-size:12px;color:rgba(255,255,255,.75)">'+doneCount+' / '+totalCount+' adım tamamlandı (%'+Math.round(progressPct)+')</div>'
+          +     '<div style="font-size:12.5px;color:var(--text-secondary)">'+doneCount+' / '+totalCount+' adım tamamlandı (%'+Math.round(progressPct)+')</div>'
           +   '</div>'
-          +   '<button id="oc-dismiss" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);font-size:11px;cursor:pointer;padding:5px 10px;border-radius:5px">Gizle ✕</button>'
+          +   '<button id="oc-dismiss" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-muted);font-size:11px;cursor:pointer;padding:5px 10px;border-radius:5px;font-weight:600">Gizle ✕</button>'
           + '</div>'
-          + '<div style="background:rgba(255,255,255,.08);height:8px;border-radius:4px;overflow:hidden;margin-bottom:14px">'
+          + '<div style="background:var(--bg-elevated);height:8px;border-radius:4px;overflow:hidden;margin-bottom:14px">'
           +   '<div style="background:linear-gradient(90deg,#22d078,#1ab366);height:100%;width:'+progressPct+'%;border-radius:4px;transition:width .5s"></div>'
           + '</div>'
           + '<div style="display:grid;gap:6px">'
           +   checks.map(function(c){
                 // v4.85.3: Done gorevler artik OKUNAMAYAN gri degil, daha belirgin yesil
                 var labelStyle = c.done
-                  ? 'color:rgba(255,255,255,.55);text-decoration:line-through;text-decoration-color:rgba(34,208,120,.5)'
-                  : 'color:rgba(255,255,255,.95);font-weight:500';
-                var rowBg = c.done ? 'rgba(34,208,120,.04)' : 'rgba(255,255,255,.04)';
-                var rowBorder = c.done ? 'rgba(34,208,120,.15)' : 'rgba(255,255,255,.08)';
+                  ? 'color:var(--text-muted);text-decoration:line-through;text-decoration-color:rgba(34,208,120,.5)'
+                  : 'color:var(--text-primary);font-weight:600';
+                var rowBg = c.done ? 'rgba(34,208,120,.06)' : 'var(--bg-elevated)';
+                var rowBorder = c.done ? 'rgba(34,208,120,.25)' : 'var(--border)';
                 return '<div data-action="'+(c.action||'')+'" class="oc-item" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:'+rowBg+';border:1px solid '+rowBorder+';border-radius:6px;cursor:'+(c.action && !c.done ?'pointer':'default')+';transition:all .15s">'
                 + '<div style="display:flex;align-items:center;gap:10px;flex:1">'
                 +   '<span style="font-size:16px">'+(c.done?'✅':'⭕')+'</span>'
@@ -9456,8 +9503,13 @@ async function loadVendTab() {
               if (typeof loadVendTab === 'function') loadVendTab();
             }
           });
-          it.addEventListener('mouseenter', function(){ it.style.background = 'rgba(125,180,255,.06)'; it.style.borderColor = 'rgba(125,180,255,.2)'; });
-          it.addEventListener('mouseleave', function(){ it.style.background = 'rgba(255,255,255,.03)'; it.style.borderColor = 'rgba(255,255,255,.06)'; });
+          it.addEventListener('mouseenter', function(){ it.style.background = 'rgba(125,180,255,.08)'; it.style.borderColor = 'rgba(125,180,255,.3)'; });
+          it.addEventListener('mouseleave', function(){
+            // v4.85.4: done görev kontrolü
+            var isDone = it.querySelector('span')?.textContent === '✅';
+            it.style.background = isDone ? 'rgba(34,208,120,.06)' : 'var(--bg-elevated)';
+            it.style.borderColor = isDone ? 'rgba(34,208,120,.25)' : 'var(--border)';
+          });
         });
         checklist.querySelector('#oc-dismiss').addEventListener('click', function(){
           try { localStorage.setItem('onboardingChecklistDismissed_' + CUR_USER.uid, '1'); } catch(e){}
