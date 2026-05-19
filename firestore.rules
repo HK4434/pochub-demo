@@ -1,18 +1,14 @@
-// PoCHub Firestore Rules — v4.85.1
+// PoCHub Firestore Rules — v4.85.1 (patch)
 //
-// HEDEFLENEN AŞAMA: Sadece SERVER-WRITE-ONLY koleksiyonları sıkıştır.
-// Diğer her şey OPEN MODE'da kalır (eski güvenli durum).
+// DÜZELTME: Önceki versiyon "request.auth != null" zorunlu yapıyordu, ama logout
+// kullanıcıları (anonim ziyaretçi) ana sayfada featured carousel ve etkinlikleri
+// göremiyordu. Bu network effect stratejine ters.
 //
-// Koleksiyonlar:
-//   - audit_log (sadece admin okur, kimse yazamaz)
-//   - cron_runs (aynı)
-//   - email_log (aynı)
-//   - weekly_digests (aynı)
-//   - notification_dedup (hiç kimse okuyamaz/yazamaz)
-//
-// Bu koleksiyonlar şu an frontend tarafından KULLANILMIYOR. Sadece Functions
-// (admin SDK ile) yazıyor olacak (deploy edildiğinde). Dolayısıyla bu rules'ın
-// PoCHub UI'ına HİÇBİR ETKİSİ YOK.
+// YENİ MANTIK:
+//   - Public okuma (events, products, vendors profili, packages, config, featured)
+//   - Logout iken bunlar görünebilir
+//   - Yazma sadece login isteyecek
+//   - Server-write-only koleksiyonlar (audit_log vs.) sadece admin okur
 //
 // ROLLBACK: Firebase Console -> Firestore -> Rules -> Version history -> Restore
 
@@ -57,11 +53,14 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // FALLBACK — Diğer her şey OPEN MODE (mevcut durum)
-    // v4.85.2'de bu fallback adım adım daraltılacak
+    // FALLBACK — Public read, authenticated write
+    //
+    // Public okuma: anonim ziyaretçi de ana sayfa/katalog görebilir
+    // Yazma: sadece login olmuş kullanıcı
     // ═══════════════════════════════════════════════════════════════
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read: if true;                        // Public read (logout dahil)
+      allow write: if request.auth != null;       // Yazma için login zorunlu
     }
   }
 }
