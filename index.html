@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.88 | pochub.co -->
+<!-- PoCHub v4.88.1 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.88</title>
+<title>PoCHub.co — v4.88.1</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -332,7 +332,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.88';
+const VERSION = 'v4.88.1';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -567,6 +567,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.88.1': ['FIX: Davet Et sayfasi composite index hatasi - orderBy kaldirildi, client-side siralama yapildi. referrals koleksiyonu where + orderBy kombinasyonu Firebase index gerektiriyor, gereksiz karmaşa - vendor başına davet sayısı az, client-side sıralama performans icin yeterli.'],
   'v4.88': ['MAJOR: Phase 3.8 - Referral Sistemi. Vendor benzersiz davet linki (pochub.co/?ref=slug), bonus PoC kotasi (kalici +1/ay), Davet Et tab (vendor paneli), signup ekraninda davet eden banner. Network effect ivmesi.'],
   'v4.87': ['MAJOR: Phase 3.7 - Landing Page Social Proof. Vendor logo bar (Verified + Pro tier oncelikli), 3 adimli nasil calisir infografigi (Musteri/Vendor tab), FAQ bolumu (8 soru), Hero CTA mobil uyumlu grid. Network effect icin guven gostergeleri.'],
   'v4.86': ['MAJOR: Phase 3.6 - Public Vendor Profilleri + SEO URL. pochub.co/#v/firma-adi linkler ile public vendor profil sayfalari. LinkedIn/Twitter paylasilabilir. Slug otomatik uretilir (firma adından), eski vendorlara migration. Open Graph + Twitter Card + JSON-LD schema.org. Network effect ivmesini baslatan ozellik.'],
@@ -14608,8 +14609,15 @@ async function vendReferrals(m) {
     var referralUrl = window.location.origin + '/?ref=' + vendorSlug;
 
     // Bu vendor'ın davet ettiklerini çek
-    var rSnap = await getDocs(query(collection(db,'referrals'), where('referrerId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    // v4.88.1: orderBy kaldirildi (composite index gerekiyor) - client-side sırala
+    var rSnap = await getDocs(query(collection(db,'referrals'), where('referrerId','==',CUR_USER.uid)));
     var referrals = rSnap.docs.map(function(d){ return { ...d.data(), id:d.id }; });
+    // Client-side sıralama (en yeni üstte)
+    referrals.sort(function(a, b){
+      var aT = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+      var bT = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+      return bT - aT;
+    });
 
     // Subscription'dan bonus PoC sayısı
     var bonusPocs = 0;
