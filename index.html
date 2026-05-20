@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.87 | pochub.co -->
+<!-- PoCHub v4.88 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.87</title>
+<title>PoCHub.co — v4.88</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -332,7 +332,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.87';
+const VERSION = 'v4.88';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -567,6 +567,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.88': ['MAJOR: Phase 3.8 - Referral Sistemi. Vendor benzersiz davet linki (pochub.co/?ref=slug), bonus PoC kotasi (kalici +1/ay), Davet Et tab (vendor paneli), signup ekraninda davet eden banner. Network effect ivmesi.'],
   'v4.87': ['MAJOR: Phase 3.7 - Landing Page Social Proof. Vendor logo bar (Verified + Pro tier oncelikli), 3 adimli nasil calisir infografigi (Musteri/Vendor tab), FAQ bolumu (8 soru), Hero CTA mobil uyumlu grid. Network effect icin guven gostergeleri.'],
   'v4.86': ['MAJOR: Phase 3.6 - Public Vendor Profilleri + SEO URL. pochub.co/#v/firma-adi linkler ile public vendor profil sayfalari. LinkedIn/Twitter paylasilabilir. Slug otomatik uretilir (firma adından), eski vendorlara migration. Open Graph + Twitter Card + JSON-LD schema.org. Network effect ivmesini baslatan ozellik.'],
   'v4.84.1': ['PATCH: v4.84 üzerine küçük düzeltme - arkaplan cron fonksiyonlarının console error logları susturuldu (checkExpired, checkExpiring, checkQuotaResets, tryAutoRenewals, featured_today, featured_stats, loadFeaturedCarousels). Bu fonksiyonlar sayfa çalışmasını etkilemiyor, sadece konsolda gürültü yapıyordu. v4.85.x denemeleri sonrası geri dönüş yapılan stabil baz.'],
@@ -1506,6 +1507,45 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 // v4.75: Firebase Functions client (europe-west1 region)
 const fns = getFunctions(app, 'europe-west1');
+
+// ════════════════════════════════════════════════════════════════════
+// v4.88: REFERRAL CAPTURE - URL'den ?ref=... yakala
+// Kullanıcı bir vendor'ın davet linkinden geliyorsa kaydet
+// 30 gün geçerli (kayıt olana kadar bekler)
+// ════════════════════════════════════════════════════════════════════
+(function captureReferral(){
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var ref = params.get('ref');
+    if (ref) {
+      var refData = {
+        slug: ref,
+        capturedAt: Date.now(),
+        source: 'url'
+      };
+      localStorage.setItem('pochub_referral', JSON.stringify(refData));
+      // URL'den ref parametresini temizle (URL süslemesi için)
+      params.delete('ref');
+      var newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      history.replaceState(null, '', newUrl);
+    }
+  } catch(e) {}
+})();
+
+// Referral kaydedilmiş mi kontrol et (30 gün geçerli)
+function getActiveReferral() {
+  try {
+    var raw = localStorage.getItem('pochub_referral');
+    if (!raw) return null;
+    var data = JSON.parse(raw);
+    var ageDays = (Date.now() - data.capturedAt) / (1000*60*60*24);
+    if (ageDays > 30) {
+      localStorage.removeItem('pochub_referral');
+      return null;
+    }
+    return data;
+  } catch(e) { return null; }
+}
 
 // ════════════════════════════════════════════════════════════════════
 // v4.76: PRODUCTION PAYMENT FEATURE FLAG
@@ -3211,6 +3251,15 @@ function renderAuthForm() {
   el('auth-title').textContent = (AUTH_MODE==='login'?'Giriş Yap':'Kayıt Ol') + ' — ' + (roleLabels[AUTH_ROLE]||AUTH_ROLE);
 
   let html = '';
+
+  // v4.88: Referral banner (sadece register modunda + ref varsa)
+  if (AUTH_MODE === 'register') {
+    var refData = getActiveReferral();
+    if (refData && refData.slug) {
+      html += '<div id="auth-ref-banner" style="background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(34,208,120,.03));border:1px solid rgba(34,208,120,.3);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px"><div style="font-size:22px">🎁</div><div style="flex:1;font-size:12.5px;color:var(--text-primary);line-height:1.5"><strong style="color:#22d078">Davet edilmiş kullanıcısın!</strong><br><span style="color:var(--text-secondary)">PoCHub\'a hoş geldin. Bu kayıttan davet eden firmamız bonus kazanacak.</span></div></div>';
+    }
+  }
+
   if (AUTH_MODE === 'register') {
     // ── Ortak temel alanlar ──────────────────────────────────────────
     html += `<label class="lbl">Ad Soyad <span class="t-red">*</span></label><input class="inp" id="a-name" placeholder="Ad Soyad (zorunlu)"><br>`;
@@ -3500,31 +3549,93 @@ async function handleAuth() {
         vendorSlug = await ensureUniqueSlug(baseSlug, cred.user.uid);
       }
 
+      // v4.88: Referral bilgisi - kim davet etti
+      var referralData = getActiveReferral();
+      var referredByUid = null;
+      var referredBySlug = null;
+      if (referralData && referralData.slug) {
+        try {
+          var rq = query(collection(db,'users'), where('slug','==',referralData.slug), where('role','==','vendor'), limit(1));
+          var rSnap = await getDocs(rq);
+          if (!rSnap.empty) {
+            referredByUid = rSnap.docs[0].id;
+            referredBySlug = referralData.slug;
+          }
+        } catch(e) {}
+      }
+
       await setDoc(doc(db, 'users', cred.user.uid), {
         email, displayName: name, company, phone, address, taxNo: taxno,
         website, origin, country, categories, specializations, regions, brands, refs,
         distributors, integrators,
         role: AUTH_ROLE, vendorType: AUTH_VTYPE,
         emailVerified: false,
-        // v4.81: Yeni vendor için Free paket default
         subscriptionTier: AUTH_ROLE === 'vendor' ? 'free' : null,
         hasActiveSubscription: AUTH_ROLE === 'vendor' ? true : false,
-        // v4.82: Self-service onboarding — anında aktif, admin moderasyonu arkaplanda
         vendorStatus: AUTH_ROLE === 'vendor' ? 'auto_approved' : null,
         verifiedAt: null,
         verifiedBy: null,
-        // v4.84: Spam koruma metadata
         signupMetadata: signupMeta,
         suspiciousSignup: suspCheck.suspicious || false,
         suspiciousReason: suspCheck.suspicious
           ? 'IP=' + (suspCheck.ipCount || 0) + ' / FP=' + (suspCheck.fpCount || 0) + ' kayıt son 1 saatte'
           : null,
         recaptchaToken: recaptchaToken || null,
-        // v4.86: Public profil slug (vendor için)
         slug: vendorSlug,
         publicProfileEnabled: AUTH_ROLE === 'vendor' ? true : false,
+        // v4.88: Referral
+        referredBy: referredByUid,
+        referredBySlug: referredBySlug,
         createdAt: serverTimestamp()
       });
+
+      // v4.88: Referral bonus ver - davet edene +1 PoC kotası
+      if (referredByUid && AUTH_ROLE === 'vendor') {
+        try {
+          // Referrals koleksiyonuna kayıt
+          await addDoc(collection(db,'referrals'), {
+            referrerId: referredByUid,
+            referrerSlug: referredBySlug,
+            referredId: cred.user.uid,
+            referredCompany: company,
+            referredRole: AUTH_ROLE,
+            status: 'active',  // 'active' | 'suspicious' | 'bonus_granted'
+            bonusGranted: false,
+            createdAt: serverTimestamp()
+          });
+
+          // Suspicious değilse anında bonus ver (kalıcı +1 PoC kotası/ay)
+          if (!suspCheck.suspicious) {
+            var subRef = doc(db,'vendor_subscriptions',referredByUid);
+            var subSnap = await getDoc(subRef);
+            if (subSnap.exists()) {
+              var curBonus = subSnap.data().referralBonusPocs || 0;
+              await updateDoc(subRef, {
+                referralBonusPocs: curBonus + 1,
+                lastReferralBonusAt: serverTimestamp()
+              });
+            }
+          }
+
+          // Davet eden vendor'a bildirim
+          try {
+            await addDoc(collection(db,'notifications'), {
+              userId: referredByUid,
+              type: 'referral_success',
+              title: 'Davet ettiğin firma kayıt oldu!',
+              message: company + ' aramıza katıldı. +1 PoC kotası bonusu kazandın.',
+              data: { referredId: cred.user.uid, referredCompany: company },
+              read: false,
+              createdAt: serverTimestamp()
+            });
+          } catch(e) {}
+        } catch(e) {
+          console.warn('Referral bonus error:', e.message);
+        }
+
+        // Referral kullanıldı, localStorage'dan temizle
+        try { localStorage.removeItem('pochub_referral'); } catch(e){}
+      }
 
       // v4.81: Vendor için otomatik Free subscription oluştur
       if (AUTH_ROLE === 'vendor') {
@@ -9305,6 +9416,7 @@ function renderVendor() {
     ['dashboard','Dashboard'],['requests','PoC Talepleri'],['calendar','Takvim'],
     ['products','Ürünlerim'],['portfolio','Portföyüm'],
     ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','💰 Tekliflerim'],['messages','💬 Mesajlar'],
+    ['referrals','🎁 Davet Et'],
     ['subscription','💎 Aboneliğim'],['billing','💳 Cari Hesap'],
   ];
   el('scr-vendor').innerHTML = `<div class="dash">
@@ -9342,6 +9454,7 @@ async function loadVendTab() {
   if (CUR_VEND_TAB === 'requests')  { await vendRequests(m);  return; }
   if (CUR_VEND_TAB === 'subscription') { await vendSubscription(m); return; }
   if (CUR_VEND_TAB === 'billing') { await vendBilling(m); return; }
+  if (CUR_VEND_TAB === 'referrals') { await vendReferrals(m); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     m.innerHTML = '<div class="loading"><div class="spinner"></div>Dashboard yükleniyor...</div>';
 
@@ -9586,6 +9699,49 @@ async function loadVendTab() {
           showToast('🔗 Public profil URL kopyalandı');
         } catch(e) { showToast('Kopyalama başarısız', 'err'); }
       });
+    }
+
+    // ═══ v4.88: DAVET ET PROMOSYON KARTI ═══
+    // Bonus PoC kotası bilgisi (varsa) + Davet Et sayfasına yönlendirme
+    var refBonusCount = 0;
+    try {
+      var subRefSnap = await getDoc(doc(db,'vendor_subscriptions',CUR_USER.uid));
+      if (subRefSnap.exists()) refBonusCount = subRefSnap.data().referralBonusPocs || 0;
+    } catch(e){}
+
+    var refPromoDismissed = false;
+    try { refPromoDismissed = localStorage.getItem('refPromoDismissed_' + CUR_USER.uid) === '1'; } catch(e){}
+
+    if (!refPromoDismissed || refBonusCount > 0) {
+      var refPromo = document.createElement('div');
+      refPromo.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(34,208,120,.02));border:1px solid rgba(34,208,120,.3);border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+      refPromo.innerHTML =
+        '<div style="font-size:28px">🎁</div>'
+        + '<div style="flex:1;min-width:200px">'
+        +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:3px">'
+        +     (refBonusCount > 0 ? '+'+refBonusCount+' PoC Bonusu Kazandın!' : 'Vendor Davet Et, +1 PoC Kotası Kazan')
+        +   '</div>'
+        +   '<div style="font-size:12px;color:var(--text-secondary);line-height:1.4">'
+        +     (refBonusCount > 0 ? 'Her ay paket kotanın üstüne ' + refBonusCount + ' ekstra PoC kabul hakkın var. Davet etmeye devam et!' : 'Her başarılı davet için kalıcı +1 PoC kotası/ay. Network effect başlatalım.')
+        +   '</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px">'
+        +   '<button id="ref-promo-go" class="btn-ok btn-sm" style="background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">🎁 Davet Et →</button>'
+        +   (refBonusCount === 0 ? '<button id="ref-promo-dismiss" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:4px 8px">×</button>' : '')
+        + '</div>';
+      m.appendChild(refPromo);
+      refPromo.querySelector('#ref-promo-go').addEventListener('click', function(){
+        CUR_VEND_TAB = 'referrals';
+        loadVendTab();
+        el('scr-vendor').querySelectorAll('.si').forEach(function(b){ b.classList.toggle('on', b.dataset.t === 'referrals'); });
+      });
+      var dismissBtn = refPromo.querySelector('#ref-promo-dismiss');
+      if (dismissBtn) {
+        dismissBtn.addEventListener('click', function(){
+          try { localStorage.setItem('refPromoDismissed_' + CUR_USER.uid, '1'); } catch(e){}
+          refPromo.remove();
+        });
+      }
     }
 
     // ═══ v4.83: ONBOARDING CHECKLIST ═══
@@ -14437,6 +14593,141 @@ async function openOverrideRequestModal(pocId, pocData, check, onAccepted) {
         modal.remove();
       } catch(e) { showToast('Hata: '+e.message,'err'); }
     });
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.88: VENDOR REFERRALS - Davet Et sayfası
+// Benzersiz davet linki + kopyala/paylaş + davet ettiklerinin listesi
+// ════════════════════════════════════════════════════════════════════
+async function vendReferrals(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Davet bilgileri yükleniyor...</div>';
+
+  try {
+    var vendorSlug = CUR_PROFILE?.slug || generateSlug(CUR_PROFILE?.company || CUR_PROFILE?.displayName || 'vendor');
+    var referralUrl = window.location.origin + '/?ref=' + vendorSlug;
+
+    // Bu vendor'ın davet ettiklerini çek
+    var rSnap = await getDocs(query(collection(db,'referrals'), where('referrerId','==',CUR_USER.uid), orderBy('createdAt','desc')));
+    var referrals = rSnap.docs.map(function(d){ return { ...d.data(), id:d.id }; });
+
+    // Subscription'dan bonus PoC sayısı
+    var bonusPocs = 0;
+    try {
+      var subSnap = await getDoc(doc(db,'vendor_subscriptions',CUR_USER.uid));
+      if (subSnap.exists()) bonusPocs = subSnap.data().referralBonusPocs || 0;
+    } catch(e){}
+
+    // İstatistik
+    var totalReferrals = referrals.length;
+    var activeReferrals = referrals.filter(function(r){ return r.status === 'active'; }).length;
+    var suspiciousReferrals = referrals.filter(function(r){ return r.status === 'suspicious'; }).length;
+
+    // Paylaşım linkleri
+    var shareText = encodeURIComponent('PoCHub - Türkiye IT PoC Pazaryeri. Ücretsiz vendor kayıt: ' + referralUrl);
+    var linkedinShare = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(referralUrl);
+    var twitterShare = 'https://twitter.com/intent/tweet?text=' + shareText;
+    var whatsappShare = 'https://wa.me/?text=' + shareText;
+    var mailtoShare = 'mailto:?subject=' + encodeURIComponent('PoCHub - IT PoC Pazaryeri') + '&body=' + shareText;
+
+    m.innerHTML =
+      '<div style="max-width:980px">'
+
+      // HERO + EXPLAIN
+      + '<div style="background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(34,208,120,.02));border:1px solid rgba(34,208,120,.3);border-radius:14px;padding:24px;margin-bottom:18px">'
+      +   '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">'
+      +     '<div style="font-size:38px">🎁</div>'
+      +     '<div>'
+      +       '<h2 style="margin:0;font-size:20px;font-weight:800;color:var(--text-primary)">Davet Et, Birlikte Kazanın</h2>'
+      +       '<div style="font-size:13px;color:var(--text-secondary);margin-top:2px">Vendor davet et, ayda <strong style="color:#22d078">+1 PoC kabul kotası</strong> kazan (her başarılı kayıt için, kalıcı bonus)</div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;text-align:center">'
+      +     '<div><div style="font-size:24px;font-weight:800;color:#22d078">'+totalReferrals+'</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:3px">Toplam Davet</div></div>'
+      +     '<div><div style="font-size:24px;font-weight:800;color:#7db4ff">'+activeReferrals+'</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:3px">Aktif</div></div>'
+      +     '<div><div style="font-size:24px;font-weight:800;color:#f0a429">+'+bonusPocs+'</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:3px">PoC Bonusu/Ay</div></div>'
+      +     (suspiciousReferrals > 0 ? '<div><div style="font-size:24px;font-weight:800;color:#ff7070">'+suspiciousReferrals+'</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:3px">Şüpheli</div></div>' : '')
+      +   '</div>'
+      + '</div>'
+
+      // LINK + COPY
+      + '<div class="card" style="padding:20px;margin-bottom:18px">'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:10px">📋 Davet Linkin</div>'
+      +   '<div style="display:flex;gap:8px;align-items:center;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:14px">'
+      +     '<input id="ref-url-input" type="text" readonly value="'+referralUrl+'" style="flex:1;background:none;border:none;color:var(--text-primary);font-size:13px;font-family:monospace;outline:none">'
+      +     '<button id="ref-copy-btn" class="btn-p btn-sm" style="white-space:nowrap;padding:7px 14px;font-size:12px;font-weight:700">📋 Kopyala</button>'
+      +   '</div>'
+      +   '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:14px">Bu linki vendor olabilecek firmalarla paylaş. Linkten gelen ve <strong>onaylı kayıt</strong> olan her vendor için sana <strong>+1 PoC kotası/ay</strong> kalıcı bonus eklenir.</div>'
+      +   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">'
+      +     '<a href="'+linkedinShare+'" target="_blank" rel="noopener" style="background:rgba(10,102,194,.1);border:1px solid rgba(10,102,194,.3);color:#0a66c2;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font-size:18px">💼</span>LinkedIn</a>'
+      +     '<a href="'+twitterShare+'" target="_blank" rel="noopener" style="background:rgba(29,161,242,.1);border:1px solid rgba(29,161,242,.3);color:#1da1f2;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font-size:18px">🐦</span>Twitter</a>'
+      +     '<a href="'+whatsappShare+'" target="_blank" rel="noopener" style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);color:#25d366;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font-size:18px">📱</span>WhatsApp</a>'
+      +     '<a href="'+mailtoShare+'" style="background:rgba(125,180,255,.1);border:1px solid rgba(125,180,255,.3);color:#7db4ff;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font-size:18px">📧</span>E-posta</a>'
+      +   '</div>'
+      + '</div>'
+
+      // ÖRNEK MESAJ
+      + '<div class="card" style="padding:18px;margin-bottom:18px">'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:10px">💬 Hazır Davet Mesajı</div>'
+      +   '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;color:var(--text-secondary);line-height:1.6;font-family:Georgia, serif">'
+      +     '<div>Merhaba,</div>'
+      +     '<div style="margin-top:8px">Türkiye\'nin yeni IT PoC pazaryeri <strong style="color:var(--text-primary)">PoCHub</strong>\'a katılmanızı öneririm. ' + (CUR_PROFILE.company || 'Biz') + ' olarak burada aktifiz.</div>'
+      +     '<div style="margin-top:8px">Vendor olarak ücretsiz kayıt olabilirsiniz: <span style="color:#22d078;font-family:monospace">' + referralUrl + '</span></div>'
+      +     '<div style="margin-top:8px">PoC süreçleri çok daha hızlı işliyor. Müşteri talepleri direkt size geliyor.</div>'
+      +     '<div style="margin-top:10px;color:var(--text-muted);font-size:12px">— ' + (CUR_PROFILE.displayName || 'Vendor') + '</div>'
+      +   '</div>'
+      +   '<button id="ref-msg-copy" class="btn-g btn-sm" style="margin-top:10px;font-size:12px;padding:7px 14px">📋 Mesajı Kopyala</button>'
+      + '</div>'
+
+      // DAVET ETTİKLERİN LİSTESİ
+      + '<div class="card" style="padding:20px">'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:14px">👥 Davet Ettiklerin ('+totalReferrals+')</div>'
+      +   (totalReferrals === 0
+        ? '<div style="text-align:center;padding:30px;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:8px">📨</div>Henüz kimseyi davet etmedin. Yukarıdaki linkini paylaşmaya başla!</div>'
+        : '<div style="display:grid;gap:10px">'
+          + referrals.map(function(r){
+              var statusBdg = r.status === 'active'
+                ? '<span style="background:rgba(34,208,120,.15);color:#22d078;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">✓ AKTİF</span>'
+                : r.status === 'suspicious'
+                ? '<span style="background:rgba(255,112,112,.15);color:#ff7070;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">⚠ ŞÜPHELİ</span>'
+                : '<span style="background:var(--bg-elevated);color:var(--text-muted);padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">'+(r.status||'?').toUpperCase()+'</span>';
+              var dStr = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('tr-TR', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+              return '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+                + '<div><div style="font-size:13.5px;font-weight:700;color:var(--text-primary)">'+(r.referredCompany||'—')+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">'+(r.referredRole==='vendor'?'🏢 Vendor':r.referredRole==='customer'?'👤 Müşteri':r.referredRole||'?')+' • '+dStr+'</div></div>'
+                + statusBdg
+                + '</div>';
+            }).join('')
+          + '</div>')
+      + '</div>'
+
+      // FOOTER NOT
+      + '<div style="margin-top:18px;padding:14px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--text-muted);line-height:1.5">'
+      +   '<strong style="color:var(--text-secondary)">ℹ Nasıl Çalışır?</strong> Davet linkini paylaş → Birisi tıklayıp <strong>vendor olarak kayıt</strong> ol → Spam kontrolünden geçerse anında bonus PoC kotası kazanırsın → Bu bonus paketin süresince kalır.'
+      + '</div>'
+      + '</div>';
+
+    // Event handlers
+    el('ref-copy-btn').addEventListener('click', function(){
+      var inp = el('ref-url-input');
+      inp.select();
+      try {
+        navigator.clipboard.writeText(inp.value);
+        showToast('🔗 Davet linki kopyalandı');
+      } catch(e) {
+        document.execCommand('copy');
+        showToast('🔗 Davet linki kopyalandı');
+      }
+    });
+
+    el('ref-msg-copy').addEventListener('click', function(){
+      var msg = 'Merhaba,\n\nTürkiye\'nin yeni IT PoC pazaryeri PoCHub\'a katılmanızı öneririm. ' + (CUR_PROFILE.company || 'Biz') + ' olarak burada aktifiz.\n\nVendor olarak ücretsiz kayıt olabilirsiniz: ' + referralUrl + '\n\nPoC süreçleri çok daha hızlı işliyor. Müşteri talepleri direkt size geliyor.\n\n— ' + (CUR_PROFILE.displayName || 'Vendor');
+      try {
+        navigator.clipboard.writeText(msg);
+        showToast('💬 Mesaj kopyalandı');
+      } catch(e) { showToast('Kopyalama başarısız', 'err'); }
+    });
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Davet sayfası yüklenirken hata: ' + e.message + '</div>';
   }
 }
 
