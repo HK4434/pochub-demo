@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.84.1 | pochub.co -->
+<!-- PoCHub v4.86 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.84.1</title>
+<title>PoCHub.co — v4.86</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -299,6 +299,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <div class="scr" id="scr-customer"></div>
 <div class="scr" id="scr-vendor"></div>
 <div class="scr" id="scr-admin"></div>
+<div class="scr" id="scr-vendor-public"></div>
 
 <!-- AUTH MODAL -->
 <div class="modal-bg" id="auth-modal">
@@ -327,11 +328,11 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.84.1';
+const VERSION = 'v4.86';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -566,6 +567,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.86': ['MAJOR: Phase 3.6 - Public Vendor Profilleri + SEO URL. pochub.co/#v/firma-adi linkler ile public vendor profil sayfalari. LinkedIn/Twitter paylasilabilir. Slug otomatik uretilir (firma adından), eski vendorlara migration. Open Graph + Twitter Card + JSON-LD schema.org. Network effect ivmesini baslatan ozellik.'],
   'v4.84.1': ['PATCH: v4.84 üzerine küçük düzeltme - arkaplan cron fonksiyonlarının console error logları susturuldu (checkExpired, checkExpiring, checkQuotaResets, tryAutoRenewals, featured_today, featured_stats, loadFeaturedCarousels). Bu fonksiyonlar sayfa çalışmasını etkilemiyor, sadece konsolda gürültü yapıyordu. v4.85.x denemeleri sonrası geri dönüş yapılan stabil baz.'],
   'v4.84':  ['MAJOR: Phase 3.4 — Spam Koruması. Disposable email blok (45 domain), ReCAPTCHA v3 hazır altyapı, signup metadata (IP, userAgent, fingerprint), email_verified zorunlu kontroller, Admin Şüpheli Kayıtlar alt-sayfası.'],
   'v4.83':  ['MAJOR: Phase 3.3 — Welcome Wizard + Onboarding Checklist. Yeni vendor signup sonrasi 5 adimli sihirbaz (hosgeldin/profil/ilk urun/paylas/bitis). Dashboard onboarding checklist progress bar. Aktivasyon orani artirma stratejisi.'],
@@ -2774,12 +2776,25 @@ onAuthStateChanged(auth, async user => {
             await updateDoc(doc(db, 'users', user.uid), {
               vendorStatus: 'auto_approved',
             });
-            CUR_PROFILE.vendorStatus = 'auto_approved';  // Local'i güncelle
+            CUR_PROFILE.vendorStatus = 'auto_approved';
+          } catch(e) {}
+        }
+
+        // v4.86: Slug migration — vendor public profil URL'i için
+        if (!CUR_PROFILE.slug) {
+          try {
+            var baseSlug = generateSlug(CUR_PROFILE.company || CUR_PROFILE.displayName);
+            var newSlug = await ensureUniqueSlug(baseSlug, user.uid);
+            await updateDoc(doc(db, 'users', user.uid), {
+              slug: newSlug,
+              publicProfileEnabled: true,
+            });
+            CUR_PROFILE.slug = newSlug;
+            CUR_PROFILE.publicProfileEnabled = true;
           } catch(e) {}
         }
       } catch(e) {
-        // Sessiz fail — kullanıcı akışı engellenmesin
-        console.warn('v4.81/v4.82 vendor migration:', e.message);
+        console.warn('v4.81/v4.82/v4.86 vendor migration:', e.message);
       }
 
       // v4.83: Welcome wizard tetikleyici (pending flag varsa)
@@ -3164,6 +3179,10 @@ function renderScreen(s) {
   else if (s==='customer') renderCustomer();
   else if (s==='vendor') renderVendor();
   else if (s==='admin') renderAdmin();
+  else if (s==='vendor-public') {
+    // v4.86: renderVendorPublic() ayrı çağrılır (slug parametresi parseAndNavigate'ten gelir)
+    // Burada sadece ekranı aktif et
+  }
 }
 
 /* ══════════════════════════════════════
@@ -3473,6 +3492,13 @@ async function handleAuth() {
         }
       }
 
+      // v4.86: Slug üret (vendor için, public profil URL'i)
+      var vendorSlug = null;
+      if (AUTH_ROLE === 'vendor') {
+        var baseSlug = generateSlug(company || name);
+        vendorSlug = await ensureUniqueSlug(baseSlug, cred.user.uid);
+      }
+
       await setDoc(doc(db, 'users', cred.user.uid), {
         email, displayName: name, company, phone, address, taxNo: taxno,
         website, origin, country, categories, specializations, regions, brands, refs,
@@ -3484,15 +3510,18 @@ async function handleAuth() {
         hasActiveSubscription: AUTH_ROLE === 'vendor' ? true : false,
         // v4.82: Self-service onboarding — anında aktif, admin moderasyonu arkaplanda
         vendorStatus: AUTH_ROLE === 'vendor' ? 'auto_approved' : null,
-        verifiedAt: null,                  // Admin onayladığında dolacak
-        verifiedBy: null,                  // Admin UID'si
+        verifiedAt: null,
+        verifiedBy: null,
         // v4.84: Spam koruma metadata
-        signupMetadata: signupMeta,        // {ip, fingerprint, userAgent, language, timestamp}
+        signupMetadata: signupMeta,
         suspiciousSignup: suspCheck.suspicious || false,
         suspiciousReason: suspCheck.suspicious
           ? 'IP=' + (suspCheck.ipCount || 0) + ' / FP=' + (suspCheck.fpCount || 0) + ' kayıt son 1 saatte'
           : null,
-        recaptchaToken: recaptchaToken || null,   // Sunucu tarafı doğrulama için (v4.84 sadece kaydeder)
+        recaptchaToken: recaptchaToken || null,
+        // v4.86: Public profil slug (vendor için)
+        slug: vendorSlug,
+        publicProfileEnabled: AUTH_ROLE === 'vendor' ? true : false,
         createdAt: serverTimestamp()
       });
 
@@ -9303,6 +9332,33 @@ async function loadVendTab() {
       }
     }
 
+    // ═══ v4.86: PUBLIC PROFIL LINK KARTI ═══
+    if (CUR_PROFILE?.slug) {
+      var publicUrl = window.location.origin + '/#v/' + CUR_PROFILE.slug;
+      var publicCard = document.createElement('div');
+      publicCard.style.cssText = 'background:linear-gradient(135deg,rgba(125,180,255,.06),rgba(125,180,255,.02));border:1px solid rgba(125,180,255,.25);border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+      publicCard.innerHTML =
+        '<div style="font-size:24px">🔗</div>'
+        + '<div style="flex:1;min-width:200px">'
+        +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:3px">Public Profilin Hazır!</div>'
+        +   '<div style="font-size:11.5px;color:var(--text-secondary);font-family:monospace;word-break:break-all">' + publicUrl + '</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px">'
+        +   '<button id="vp-view" class="btn-g btn-sm" style="padding:7px 12px;font-size:11.5px">👁 Görüntüle</button>'
+        +   '<button id="vp-copy" class="btn-p btn-sm" style="padding:7px 12px;font-size:11.5px">📋 Kopyala</button>'
+        + '</div>';
+      m.appendChild(publicCard);
+      publicCard.querySelector('#vp-view').addEventListener('click', function(){
+        window.location.hash = '#v/' + CUR_PROFILE.slug;
+      });
+      publicCard.querySelector('#vp-copy').addEventListener('click', function(){
+        try {
+          navigator.clipboard.writeText(publicUrl);
+          showToast('🔗 Public profil URL kopyalandı');
+        } catch(e) { showToast('Kopyalama başarısız', 'err'); }
+      });
+    }
+
     // ═══ v4.83: ONBOARDING CHECKLIST ═══
     // Bütün görevler tamamlandıysa kaybolur. localStorage'da dismiss edilebilir.
     var checklistDismissed = false;
@@ -14567,7 +14623,9 @@ function wizStep3() {
 }
 
 function wizStep4() {
-  const profileUrl = window.location.origin + '/#vendor-profile/' + CUR_USER.uid;
+  // v4.86: Public profil URL'i (slug bazlı)
+  const vendorSlug = CUR_PROFILE?.slug || generateSlug(CUR_PROFILE?.company || CUR_PROFILE?.displayName || 'vendor');
+  const profileUrl = window.location.origin + '/#v/' + vendorSlug;
   const shareText = encodeURIComponent('PoCHub\'a katıldık! Türkiye\'nin yeni IT PoC pazaryerinde profilimizi inceleyin: ' + profileUrl);
   const linkedinUrl = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(profileUrl);
   const twitterUrl = 'https://twitter.com/intent/tweet?text=' + shareText;
@@ -20670,6 +20728,50 @@ async function getRecaptchaToken(siteKey, action) {
 }
 
 // Default paketler (sistem ilk açıldığında otomatik seed edilir)
+// ════════════════════════════════════════════════════════════════════
+// v4.86: SLUG HELPER - Public Vendor URL'leri için
+// ════════════════════════════════════════════════════════════════════
+function generateSlug(text) {
+  if (!text) return '';
+  var s = String(text).toLowerCase();
+  // Türkçe karakterleri çevir
+  var tr = { 'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u','â':'a','î':'i','û':'u' };
+  s = s.replace(/[çğıöşüâîû]/g, function(ch){ return tr[ch] || ch; });
+  // Diğer non-ASCII karakterleri kaldır
+  s = s.replace(/[^a-z0-9\s-]/g, '');
+  // Boşluk ve - birden fazlayı tek - ile değiştir
+  s = s.replace(/\s+/g, '-').replace(/-+/g, '-');
+  // Baştaki/sondaki - sil
+  s = s.replace(/^-+|-+$/g, '');
+  // Çok uzunsa kısalt (60 karakter)
+  if (s.length > 60) s = s.substring(0, 60).replace(/-[^-]*$/, '');
+  return s || 'vendor';
+}
+
+// Slug çakışma kontrolü - kullanılırsa -2, -3 vs.
+async function ensureUniqueSlug(baseSlug, currentUid) {
+  if (!baseSlug) baseSlug = 'vendor';
+  var slug = baseSlug;
+  var n = 1;
+  while (true) {
+    try {
+      var q = query(collection(db,'users'), where('slug','==',slug), limit(2));
+      var snap = await getDocs(q);
+      var conflict = snap.docs.find(function(d){ return d.id !== currentUid; });
+      if (!conflict) return slug;
+      n++;
+      slug = baseSlug + '-' + n;
+      if (n > 50) return baseSlug + '-' + Date.now().toString(36);
+    } catch(e) {
+      // Hata olursa slug'a timestamp ekle (güvenli fallback)
+      return baseSlug + '-' + Date.now().toString(36);
+    }
+  }
+}
+
+// limit fonksiyonu Firebase'den import edilmiş mi kontrol et — eğer yoksa workaround
+// (zaten import edilmiştir, ama emin olalım)
+
 const DEFAULT_PACKAGES = [
   {
     id: 'free',
@@ -23188,12 +23290,336 @@ function openOfferDetailModal(o, viewerRole) {
 }
 window.openOfferDetailModal = openOfferDetailModal;
 
+// ════════════════════════════════════════════════════════════════════
+// v4.86: PUBLIC VENDOR PROFIL SAYFASI
+// URL: pochub.co/#v/firma-slug
+// SEO-friendly, paylaşılabilir, logout için signup CTA'lı
+// ════════════════════════════════════════════════════════════════════
+async function renderVendorPublic(slug) {
+  var scr = el('scr-vendor-public');
+  if (!scr) return;
+
+  scr.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div><div style="margin-top:10px;color:var(--text-muted)">Profil yükleniyor...</div></div>';
+
+  if (!slug) {
+    scr.innerHTML = '<div style="padding:60px;text-align:center"><h2 style="color:var(--text-primary)">Vendor bulunamadı</h2><div style="margin-top:14px"><button class="btn-p" onclick="window.location.hash=\'#catalog\'">Kataloga Git</button></div></div>';
+    return;
+  }
+
+  try {
+    // Slug ile vendor'ı bul
+    var q = query(collection(db,'users'), where('slug','==',slug), where('role','==','vendor'), limit(1));
+    var snap = await getDocs(q);
+    if (snap.empty) {
+      scr.innerHTML =
+        '<div style="max-width:600px;margin:60px auto;padding:40px;text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:14px">'
+        + '<div style="font-size:48px;margin-bottom:14px">🔍</div>'
+        + '<h2 style="color:var(--text-primary);margin:0 0 10px">Vendor bulunamadı</h2>'
+        + '<div style="color:var(--text-secondary);margin-bottom:20px">"' + slug + '" adında bir vendor profili bulunamadı. Belki yanlış URL veya vendor profilini henüz açmamış olabilir.</div>'
+        + '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+        +   '<button class="btn-p" onclick="window.location.hash=\'#catalog\'">Kataloga Git</button>'
+        +   '<button class="btn-g" onclick="window.location.hash=\'#home\'">Ana Sayfa</button>'
+        + '</div>'
+        + '</div>';
+      // SEO için title güncelle
+      document.title = 'Vendor bulunamadı | PoCHub';
+      return;
+    }
+
+    var vendor = { ...snap.docs[0].data(), uid: snap.docs[0].id };
+
+    // Vendor type label
+    var typeLabel = vendor.vendorType === 'ureticid' ? 'Üretici'
+                  : vendor.vendorType === 'distributor' ? 'Distribütör'
+                  : vendor.vendorType === 'integrator' ? 'Entegratör' : 'Vendor';
+    var typeIcon = vendor.vendorType === 'ureticid' ? '🏭'
+                  : vendor.vendorType === 'distributor' ? '🚚'
+                  : vendor.vendorType === 'integrator' ? '🔧' : '💼';
+
+    // Doğrulanmış rozeti
+    var verifiedBadge = vendor.vendorStatus === 'admin_verified'
+      ? '<span style="background:linear-gradient(135deg,#7db4ff,#5a9ee0);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:8px;letter-spacing:.3px">✓ DOĞRULANMIŞ</span>'
+      : '';
+
+    // Subscription tier (Pro/Business/Enterprise rozet)
+    var subSnap = null;
+    try {
+      var sSnap = await getDoc(doc(db,'vendor_subscriptions',vendor.uid));
+      if (sSnap.exists()) subSnap = sSnap.data();
+    } catch(e) {}
+    var tier = subSnap?.currentTier || 'free';
+    var tierBadge = '';
+    if (tier === 'professional') tierBadge = '<span style="background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px">PRO</span>';
+    else if (tier === 'business') tierBadge = '<span style="background:linear-gradient(135deg,#f0a429,#d18420);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px">BUSINESS</span>';
+    else if (tier === 'enterprise') tierBadge = '<span style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px">ENTERPRISE</span>';
+
+    // SEO: Document title + meta
+    document.title = vendor.company + ' | PoCHub';
+    setMetaTag('description', (vendor.shortDescription || 'PoCHub üzerinde ' + typeLabel + ' olarak hizmet veren ' + vendor.company + ' firması.').substring(0, 160));
+    // Open Graph
+    setMetaTag('og:title', vendor.company + ' | PoCHub', 'property');
+    setMetaTag('og:description', (vendor.shortDescription || vendor.company + ' - ' + typeLabel).substring(0, 200), 'property');
+    setMetaTag('og:type', 'profile', 'property');
+    setMetaTag('og:url', window.location.href, 'property');
+    if (vendor.logoUrl) setMetaTag('og:image', vendor.logoUrl, 'property');
+    setMetaTag('twitter:card', 'summary_large_image', 'name');
+    setMetaTag('twitter:title', vendor.company + ' | PoCHub', 'name');
+    setMetaTag('twitter:description', (vendor.shortDescription || vendor.company).substring(0, 200), 'name');
+
+    // Vendor'ın ürünleri çek
+    var products = [];
+    try {
+      var pSnap = await getDocs(query(collection(db,'products'), where('vendorId','==',vendor.uid), limit(12)));
+      products = pSnap.docs.map(function(d){ return { ...d.data(), id:d.id }; });
+    } catch(e) {}
+    // Sadece active veya admin onaylı ürünleri göster
+    var visibleProducts = products.filter(function(p){
+      return (p.status === 'active' || p.publishStatus === 'approved');
+    });
+
+    // Yaklaşan etkinlikler
+    var events = [];
+    try {
+      var now = new Date();
+      var eSnap = await getDocs(query(collection(db,'events'), where('vendorId','==',vendor.uid), limit(5)));
+      events = eSnap.docs.map(function(d){ return { ...d.data(), id:d.id }; });
+      events = events.filter(function(ev){
+        var d = ev.date?.toDate ? ev.date.toDate() : new Date(ev.date);
+        return d >= now;
+      });
+    } catch(e) {}
+
+    // Tamamlanan PoC sayısı
+    var completedPocs = 0;
+    try {
+      var pocSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',vendor.uid), where('status','==','completed'), limit(50)));
+      completedPocs = pocSnap.size;
+    } catch(e) {}
+
+    // Logo veya placeholder
+    var logoHtml = vendor.logoUrl
+      ? '<img src="'+vendor.logoUrl+'" alt="'+vendor.company+' logo" style="max-width:120px;max-height:120px;object-fit:contain;border-radius:14px;background:#fff;padding:10px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">'
+      : '<div style="width:120px;height:120px;background:linear-gradient(135deg,#7db4ff,#5a9ee0);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:48px;color:#fff;font-weight:800">'+(vendor.company||'V').substring(0,1).toUpperCase()+'</div>';
+
+    // CTA — logged-in için "PoC Aç", logout için "Vendor olarak katıl"
+    var ctaHtml = CUR_USER
+      ? '<button class="btn-p" id="vp-poc-cta" style="padding:12px 24px;font-size:14px;font-weight:700">📋 PoC Talebi Aç</button>'
+      : '<button class="btn-ok" id="vp-signup-cta" style="background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;border:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer">🎁 Müşteri Olarak Kayıt Ol — PoC Aç</button>';
+
+    // Paylaşım URL'i
+    var shareUrl = window.location.origin + '/#v/' + vendor.slug;
+    var shareText = encodeURIComponent(vendor.company + ' - PoCHub\'da! ' + (vendor.shortDescription||'').substring(0,80) + ' ' + shareUrl);
+    var linkedinShare = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(shareUrl);
+    var twitterShare = 'https://twitter.com/intent/tweet?text=' + shareText;
+    var whatsappShare = 'https://wa.me/?text=' + shareText;
+
+    var html =
+      '<div style="max-width:1100px;margin:0 auto;padding:24px 20px">'
+
+      // HERO
+      + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:18px;box-shadow:var(--shadow-sm)">'
+      +   '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">'
+      +     '<div style="flex-shrink:0">' + logoHtml + '</div>'
+      +     '<div style="flex:1;min-width:240px">'
+      +       '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
+      +         '<span style="font-size:13px;color:var(--text-muted);font-weight:600">'+typeIcon+' '+typeLabel+'</span>'
+      +         verifiedBadge + tierBadge
+      +       '</div>'
+      +       '<h1 style="font-size:30px;font-weight:800;color:var(--text-primary);margin:0 0 8px;line-height:1.2">'+vendor.company+'</h1>'
+      +       (vendor.shortDescription ? '<div style="font-size:14.5px;color:var(--text-secondary);margin-bottom:14px;line-height:1.5">'+vendor.shortDescription+'</div>' : '')
+      +       '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +         ctaHtml
+      +         '<button class="btn-g" id="vp-share-btn" style="padding:12px 18px;font-size:13.5px">🔗 Paylaş</button>'
+      +       '</div>'
+      +     '</div>'
+      +   '</div>'
+      + '</div>'
+
+      // İSTATİSTİKLER + İLETİŞİM
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px">'
+      +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#22d078">'+visibleProducts.length+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">Aktif Ürün</div></div>'
+      +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#7db4ff">'+completedPocs+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">Tamamlanan PoC</div></div>'
+      +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#f0a429">'+events.length+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">Yaklaşan Etkinlik</div></div>'
+      + '</div>'
+
+      // İletişim & Detaylar
+      + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px">'
+      +   '<h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0 0 12px">📇 İletişim & Detaylar</h3>'
+      +   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;font-size:13.5px;color:var(--text-secondary)">'
+      +     (vendor.website ? '<div><strong style="color:var(--text-primary)">🌐 Web Sitesi:</strong><br><a href="'+vendor.website+'" target="_blank" rel="noopener" style="color:#7db4ff;text-decoration:none">'+vendor.website+' ↗</a></div>' : '')
+      +     (vendor.phone ? '<div><strong style="color:var(--text-primary)">📞 Telefon:</strong><br>'+vendor.phone+'</div>' : '')
+      +     (vendor.address ? '<div><strong style="color:var(--text-primary)">📍 Adres:</strong><br>'+vendor.address+'</div>' : '')
+      +     (vendor.origin ? '<div><strong style="color:var(--text-primary)">🌍 Menşei:</strong><br>'+(vendor.origin==='foreign'?'Yabancı'+(vendor.country?' ('+vendor.country+')':''):'Yerli')+'</div>' : '')
+      +     (vendor.categories?.length ? '<div><strong style="color:var(--text-primary)">📂 Kategoriler:</strong><br>'+vendor.categories.slice(0,5).join(', ')+(vendor.categories.length>5?'...':'')+'</div>' : '')
+      +     (vendor.brands?.length ? '<div><strong style="color:var(--text-primary)">🏷 Markalar:</strong><br>'+vendor.brands.slice(0,5).join(', ')+(vendor.brands.length>5?'...':'')+'</div>' : '')
+      +   '</div>'
+      + '</div>'
+
+      // ÜRÜNLER
+      + (visibleProducts.length > 0
+        ? '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px">'
+          + '<h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0 0 14px">📦 Ürünler ('+visibleProducts.length+')</h3>'
+          + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">'
+          + visibleProducts.slice(0,12).map(function(p){
+              return '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px">'
+                + '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px">'+(p.name||'—')+'</div>'
+                + (p.brand ? '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">'+p.brand+'</div>' : '')
+                + (p.category ? '<span style="display:inline-block;font-size:10px;background:rgba(125,180,255,.15);color:#5a9ee0;padding:2px 7px;border-radius:4px;font-weight:600">'+p.category+'</span>' : '')
+                + (p.description ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+p.description+'</div>' : '')
+                + '</div>';
+            }).join('')
+          + '</div>'
+          + '</div>'
+        : '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:30px;margin-bottom:18px;text-align:center;color:var(--text-muted)"><div style="font-size:32px;margin-bottom:8px">📦</div>Henüz ürün eklenmemiş</div>')
+
+      // ETKİNLİKLER (varsa)
+      + (events.length > 0
+        ? '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px">'
+          + '<h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0 0 14px">📅 Yaklaşan Etkinlikler</h3>'
+          + '<div style="display:grid;gap:10px">'
+          + events.slice(0,5).map(function(ev){
+              var d = ev.date?.toDate ? ev.date.toDate() : new Date(ev.date);
+              var dStr = d.toLocaleDateString('tr-TR', {day:'2-digit', month:'short', year:'numeric'});
+              return '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+                + '<div><div style="font-size:13.5px;font-weight:700;color:var(--text-primary)">'+(ev.title||ev.name||'Etkinlik')+'</div>' + (ev.location ? '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">📍 '+ev.location+'</div>' : '') + '</div>'
+                + '<div style="font-size:12px;color:#7db4ff;font-weight:600">'+dStr+'</div>'
+                + '</div>';
+            }).join('')
+          + '</div>'
+          + '</div>'
+        : '')
+
+      // FOOTER
+      + '<div style="background:linear-gradient(135deg,rgba(125,180,255,.06),rgba(125,180,255,.02));border:1px solid rgba(125,180,255,.2);border-radius:12px;padding:24px;text-align:center;margin-bottom:24px">'
+      +   '<h3 style="margin:0 0 8px;color:var(--text-primary);font-size:18px;font-weight:700">PoCHub ile Çalışmaya Başlayın</h3>'
+      +   '<div style="font-size:13.5px;color:var(--text-secondary);margin-bottom:14px">Türkiye\'nin yeni IT pazaryeri. ' + (CUR_USER ? 'PoC açın, vendor\'la doğrudan iletişim kurun.' : 'Ücretsiz kayıt olun, dakikalar içinde PoC açın.') + '</div>'
+      +   (CUR_USER ? '<button class="btn-p" id="vp-poc-cta-2">📋 PoC Talebi Aç</button>' : '<button class="btn-ok" id="vp-signup-cta-2" style="background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer">🎁 Müşteri Olarak Ücretsiz Kayıt</button>')
+      + '</div>'
+
+      + '</div>';
+
+    scr.innerHTML = html;
+
+    // Schema.org JSON-LD
+    addJsonLdSchema({
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": vendor.company,
+      "description": vendor.shortDescription || '',
+      "url": shareUrl,
+      "logo": vendor.logoUrl || '',
+      "telephone": vendor.phone || '',
+      "address": vendor.address || '',
+    });
+
+    // Event listeners
+    var shareBtn = el('vp-share-btn');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', function(){
+        openSharePopup(vendor, shareUrl, linkedinShare, twitterShare, whatsappShare);
+      });
+    }
+    ['vp-poc-cta', 'vp-poc-cta-2'].forEach(function(id){
+      var btn = el(id);
+      if (btn) btn.addEventListener('click', function(){
+        if (!CUR_USER) {
+          openAuthModal('customer', '');
+          return;
+        }
+        if (CUR_PROFILE?.role !== 'customer') {
+          showToast('PoC açmak için müşteri hesabıyla giriş yapmalısınız', 'err');
+          return;
+        }
+        window.location.hash = '#catalog';
+      });
+    });
+    ['vp-signup-cta', 'vp-signup-cta-2'].forEach(function(id){
+      var btn = el(id);
+      if (btn) btn.addEventListener('click', function(){
+        AUTH_MODE = 'register';
+        openAuthModal('customer', '');
+      });
+    });
+  } catch(e) {
+    console.error('renderVendorPublic error:', e);
+    scr.innerHTML = '<div style="max-width:600px;margin:60px auto;padding:40px;text-align:center"><h2 style="color:#ff7070">Hata</h2><div style="color:var(--text-secondary);margin-top:8px">' + e.message + '</div></div>';
+  }
+}
+
+// SEO meta tag helper - varsa update, yoksa create
+function setMetaTag(name, content, attr) {
+  attr = attr || 'name';
+  var tag = document.querySelector('meta[' + attr + '="' + name + '"]');
+  if (!tag) {
+    tag = document.createElement('meta');
+    tag.setAttribute(attr, name);
+    document.head.appendChild(tag);
+  }
+  tag.setAttribute('content', content || '');
+}
+
+// JSON-LD schema ekle (varsa replace)
+function addJsonLdSchema(data) {
+  var old = document.getElementById('vp-jsonld');
+  if (old) old.remove();
+  var s = document.createElement('script');
+  s.id = 'vp-jsonld';
+  s.type = 'application/ld+json';
+  s.text = JSON.stringify(data);
+  document.head.appendChild(s);
+}
+
+// Paylaşım popup'ı
+function openSharePopup(vendor, shareUrl, linkedinUrl, twitterUrl, whatsappUrl) {
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border-radius:14px;max-width:440px;width:100%;padding:24px">'
+    + '<h3 style="margin:0 0 16px;color:var(--text-primary);font-size:17px;font-weight:700">🔗 Profili Paylaş</h3>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'
+    +   '<a href="'+linkedinUrl+'" target="_blank" rel="noopener" style="background:rgba(10,102,194,.1);border:1px solid rgba(10,102,194,.3);color:#0a66c2;text-decoration:none;padding:14px 8px;border-radius:8px;font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:22px">💼</span>LinkedIn</a>'
+    +   '<a href="'+twitterUrl+'" target="_blank" rel="noopener" style="background:rgba(29,161,242,.1);border:1px solid rgba(29,161,242,.3);color:#1da1f2;text-decoration:none;padding:14px 8px;border-radius:8px;font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:22px">🐦</span>Twitter</a>'
+    +   '<a href="'+whatsappUrl+'" target="_blank" rel="noopener" style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);color:#25d366;text-decoration:none;padding:14px 8px;border-radius:8px;font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:22px">📱</span>WhatsApp</a>'
+    + '</div>'
+    + '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;margin-bottom:14px">'
+    +   '<input id="vp-url-input" type="text" readonly value="'+shareUrl+'" style="flex:1;background:none;border:none;color:var(--text-primary);font-size:12px;font-family:monospace;outline:none">'
+    +   '<button id="vp-url-copy" class="btn-p btn-sm" style="white-space:nowrap;padding:6px 12px;font-size:11.5px">📋 Kopyala</button>'
+    + '</div>'
+    + '<button id="vp-share-close" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-secondary);padding:9px;border-radius:6px;font-size:12.5px;cursor:pointer;font-weight:600">Kapat</button>'
+    + '</div>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+  el('vp-share-close').addEventListener('click', function(){ modal.remove(); });
+  el('vp-url-copy').addEventListener('click', function(){
+    var inp = el('vp-url-input');
+    inp.select();
+    try {
+      navigator.clipboard.writeText(inp.value);
+      showToast('🔗 URL kopyalandı');
+    } catch(e) {
+      document.execCommand('copy');
+      showToast('🔗 URL kopyalandı');
+    }
+  });
+}
+
+window.renderVendorPublic = renderVendorPublic;
+
 // ── URL Hash Router ─────────────────────────────────────────────
 function parseAndNavigate(hash) {
   if (!hash || hash === '#') return;
   var parts = hash.replace('#','').split('/');
   var screen = parts[0];
   var tab    = parts[1] || 'dashboard';
+
+  // v4.86: Public vendor profil routing — #v/firma-slug
+  if (screen === 'v' && parts[1]) {
+    if (CUR_SCREEN !== 'vendor-public') { CUR_SCREEN = 'vendor-public'; buildNav(); }
+    renderScreen('vendor-public');
+    renderVendorPublic(parts[1]);
+    return;
+  }
+
   if (!['home','events','catalog','customer','vendor','admin'].includes(screen)) return;
   if (screen !== CUR_SCREEN) { CUR_SCREEN = screen; buildNav(); renderScreen(screen); }
   setTimeout(function() {
