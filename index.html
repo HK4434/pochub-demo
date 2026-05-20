@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.85.5 | pochub.co -->
+<!-- PoCHub v4.85.6 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.85.5</title>
+<title>PoCHub.co — v4.85.6</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -281,50 +281,69 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 .vbadge-row{display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap}
 </style>
 <!-- v4.74: jsPDF for invoice/receipt generation (lazy loaded when needed) -->
-<!-- v4.85.5: Firebase yüklenmeden ÖNCE eski IndexedDB cache'lerini sync olarak sil -->
-<!-- Bu script Firebase init'inden önce çalışır, race condition önlenir -->
+<!-- v4.85.6: Cleanup global PROMISE - Firebase init bunu bekleyecek -->
+<!-- Sync olmuyor ama Firebase module ona kadar bekler -->
 <script>
-(function cleanupOldFirestoreCache(){
+window.__cacheReady = new Promise(function(resolve){
   try {
-    // Versiyon flag kontrolü - bir kez temizle
-    if (localStorage.getItem('idbCleanedV4855') === '1') return;
-    if (typeof indexedDB === 'undefined') {
-      localStorage.setItem('idbCleanedV4855', '1');
-      return;
+    if (localStorage.getItem('idbCleanedV4856') === '1') {
+      resolve(); return;
     }
-    // indexedDB.databases() destekleniyor mu? (modern tarayıcılar)
-    if (typeof indexedDB.databases === 'function') {
-      indexedDB.databases().then(function(dbs){
-        var promises = [];
-        dbs.forEach(function(d){
-          if (d.name && (d.name.indexOf('firestore') !== -1 || d.name.indexOf('firebase') !== -1)) {
-            promises.push(new Promise(function(resolve){
-              var req = indexedDB.deleteDatabase(d.name);
-              req.onsuccess = req.onerror = req.onblocked = function(){ resolve(); };
-              setTimeout(resolve, 1500);
-            }));
-          }
-        });
-        Promise.all(promises).then(function(){
-          localStorage.setItem('idbCleanedV4855', '1');
-          console.log('v4.85.5: Eski Firestore IndexedDB cache temizlendi');
-        }).catch(function(){
-          localStorage.setItem('idbCleanedV4855', '1');
-        });
-      }).catch(function(){
-        localStorage.setItem('idbCleanedV4855', '1');
-      });
-    } else {
-      // Eski tarayıcılar - bilinen DB adlarını dene
+    if (typeof indexedDB === 'undefined') {
+      localStorage.setItem('idbCleanedV4856', '1');
+      resolve(); return;
+    }
+    if (typeof indexedDB.databases !== 'function') {
+      // Eski tarayıcılar - bilinen Firestore DB'lerini sil
       try { indexedDB.deleteDatabase('firestore/[DEFAULT]/pochub-co/main'); } catch(e){}
       try { indexedDB.deleteDatabase('firestore/[DEFAULT]/pochub-co/main-secondary'); } catch(e){}
       try { indexedDB.deleteDatabase('firebaseLocalStorageDb'); } catch(e){}
-      localStorage.setItem('idbCleanedV4855', '1');
+      localStorage.setItem('idbCleanedV4856', '1');
+      setTimeout(resolve, 500); // delete'in işlenmesi için bekle
+      return;
     }
+    indexedDB.databases().then(function(dbs){
+      var firestoreDbs = dbs.filter(function(d){
+        return d.name && (d.name.indexOf('firestore') !== -1 || d.name.indexOf('firebase') !== -1);
+      });
+      if (firestoreDbs.length === 0) {
+        localStorage.setItem('idbCleanedV4856', '1');
+        resolve(); return;
+      }
+      var pending = firestoreDbs.length;
+      var done = function(){
+        pending--;
+        if (pending <= 0) {
+          localStorage.setItem('idbCleanedV4856', '1');
+          console.log('v4.85.6: ' + firestoreDbs.length + ' IndexedDB temizlendi');
+          resolve();
+        }
+      };
+      firestoreDbs.forEach(function(d){
+        try {
+          var req = indexedDB.deleteDatabase(d.name);
+          req.onsuccess = done;
+          req.onerror = done;
+          req.onblocked = done;
+          // Timeout fallback (5sn)
+          setTimeout(done, 5000);
+        } catch(e){ done(); }
+      });
+    }).catch(function(){
+      localStorage.setItem('idbCleanedV4856', '1');
+      resolve();
+    });
   } catch(e){
-    try { localStorage.setItem('idbCleanedV4855', '1'); } catch(e2){}
+    try { localStorage.setItem('idbCleanedV4856', '1'); } catch(e2){}
+    resolve();
   }
-})();
+
+  // Hard timeout - 8 saniyede her halükarda devam
+  setTimeout(function(){
+    try { localStorage.setItem('idbCleanedV4856', '1'); } catch(e){}
+    resolve();
+  }, 8000);
+});
 </script>
 
 <script>window._jsPDFLoaded=false;function loadJsPDF(){return new Promise(function(res,rej){if(window._jsPDFLoaded){res();return;}var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=function(){window._jsPDFLoaded=true;res();};s.onerror=rej;document.head.appendChild(s);});}</script>
@@ -377,7 +396,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.85.5';
+const VERSION = 'v4.85.6';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -612,6 +631,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.85.6': ['KOK SEBEP COZULDU: IndexedDB cache cleanup async oldugu icin Firebase init beklemiyordu, bozuk cache ile baslayan SDK getDoc cagrılarini sonsuz bekletiyor (login Lutfen bekleyin durumunda kaliyor). FIX: Cleanup tamamlanana kadar Firebase init Promise ile bekletiliyor. Cleanup BITTIKTEN sonra Firestore init oluyor. Race condition kalmadı.'],
   'v4.85.5': ['CRITICAL ROLLBACK: v4.85.4 initializeFirestore + memoryLocalCache yaklaşımı sayfayı kilitliyordu (Yükleniyor sonsuz). Geri getFirestore (standart) + IndexedDB sync delete on init. Sayfa açılır açılmaz IndexedDB temizleniyor, ardından Firebase init oluyor - sıralı, race condition yok.'],
   'v4.85.4': ['CRITICAL FIX: Açık tema (beyaz arka plan) üzerinde beyaz yazı kullanılıyordu (color rgba(255,255,255,.x)) - tüm vendor banner + onboarding checklist + status banner yazıları görünmüyordu. Açık temaya uygun koyu yazı renklerine çevrildi. Cache corruption recovery hala aktif.'],
   'v4.85.3': ['FIX: v4.85.2 patch - Onboarding checklist tum gorev tamamlandiginda otomatik gizlenmiyordu (dismiss flag set ediliyordu ama ayni render dongusunde gosteriliyordu). Cache corruption recovery handler daha agresif (her Firestore hatasini yakalar). Done gorev gorsel okunabilirlik iyilestirildi (gri yazi yerine yesil + check icon).'],
@@ -1550,6 +1570,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+// v4.85.6: KRİTİK - IndexedDB cleanup tamamlanana kadar bekle
+// Cleanup head'deki script'te başlatıldı, window.__cacheReady Promise olarak duruyor
+// Bu await olmazsa Firestore SDK bozuk cache ile başlar, getDoc kilitlenir
+if (window.__cacheReady) {
+  try { await window.__cacheReady; } catch(e){}
+}
 const db = getFirestore(app);
 // v4.75: Firebase Functions client (europe-west1 region)
 const fns = getFunctions(app, 'europe-west1');
