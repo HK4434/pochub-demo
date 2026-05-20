@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.88.1 | pochub.co -->
+<!-- PoCHub v4.89 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.88.1</title>
+<title>PoCHub.co — v4.89</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -300,6 +300,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <div class="scr" id="scr-vendor"></div>
 <div class="scr" id="scr-admin"></div>
 <div class="scr" id="scr-vendor-public"></div>
+<div class="scr" id="scr-demo"></div>
 
 <!-- AUTH MODAL -->
 <div class="modal-bg" id="auth-modal">
@@ -332,7 +333,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.88.1';
+const VERSION = 'v4.89';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -567,6 +568,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.89': ['MAJOR: Phase 3.9 - Calendly entegrasyonu. Public demo talep sayfasi (#demo), Calendly inline widget, demo_requests koleksiyonu, admin Calendly konfigurasyon paneli, admin Demo Talepleri yonetimi, anasayfa Demo CTA butonu. Outreach maillerinin verim icin link verilecek hazir.'],
   'v4.88.1': ['FIX: Davet Et sayfasi composite index hatasi - orderBy kaldirildi, client-side siralama yapildi. referrals koleksiyonu where + orderBy kombinasyonu Firebase index gerektiriyor, gereksiz karmaşa - vendor başına davet sayısı az, client-side sıralama performans icin yeterli.'],
   'v4.88': ['MAJOR: Phase 3.8 - Referral Sistemi. Vendor benzersiz davet linki (pochub.co/?ref=slug), bonus PoC kotasi (kalici +1/ay), Davet Et tab (vendor paneli), signup ekraninda davet eden banner. Network effect ivmesi.'],
   'v4.87': ['MAJOR: Phase 3.7 - Landing Page Social Proof. Vendor logo bar (Verified + Pro tier oncelikli), 3 adimli nasil calisir infografigi (Musteri/Vendor tab), FAQ bolumu (8 soru), Hero CTA mobil uyumlu grid. Network effect icin guven gostergeleri.'],
@@ -3221,9 +3223,9 @@ function renderScreen(s) {
   else if (s==='customer') renderCustomer();
   else if (s==='vendor') renderVendor();
   else if (s==='admin') renderAdmin();
+  else if (s==='demo') renderDemoRequest();
   else if (s==='vendor-public') {
     // v4.86: renderVendorPublic() ayrı çağrılır (slug parametresi parseAndNavigate'ten gelir)
-    // Burada sadece ekranı aktif et
   }
 }
 
@@ -3724,6 +3726,7 @@ async function renderHome() {
         <button class="btn-p" id="home-events-btn" style="padding:11px 24px;font-size:13.5px">PoC Etkinliklerini İncele →</button>
         <button class="btn-g" id="home-catalog-btn" style="padding:11px 24px;font-size:13.5px">Ürün Kataloğu</button>
         ${!CUR_USER ? '<button class="btn-ok" id="home-vendor-signup-btn" style="padding:11px 24px;font-size:13.5px;background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(34,208,120,.25)">🎁 Vendor Olarak Ücretsiz Katıl</button>' : ''}
+        ${!CUR_USER ? '<button class="btn-g" id="home-demo-btn" style="padding:11px 24px;font-size:13.5px;font-weight:600">📅 15dk Demo İste</button>' : ''}
       </div>
       <div class="trust-bar">
         <div class="trust-item"><span>✓</span> Bağımsız PoC Değerlendirme</div>
@@ -3795,6 +3798,10 @@ async function renderHome() {
     // Vendor tipi seçim modal'ı açabiliriz, ama şimdilik üretici default
     AUTH_MODE = 'register';
     openAuthModal('vendor', 'ureticid');
+  });
+  // v4.89: Demo iste CTA
+  el('home-demo-btn')?.addEventListener('click', () => {
+    window.location.hash = '#demo';
   });
   el('home-all-events').addEventListener('click', () => go('events'));
   el('cta-catalog').addEventListener('click', () => go('catalog'));
@@ -18605,7 +18612,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -18639,6 +18646,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'revenue')    { await admRevenue(m);    return; }
     if (CUR_ADM_TAB === 'vendorsubs') { await admVendorSubs(m); return; }
     if (CUR_ADM_TAB === 'vendorapprovals') { await admVendorApprovals(m); return; }
+    if (CUR_ADM_TAB === 'demo-requests') { await admDemoRequests(m); return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
@@ -21428,6 +21436,14 @@ const DEFAULT_CONFIG = {
     suspiciousFpThreshold: 3,        // 1 saatte 3+ kayıt (aynı fingerprint) = suspicious
     autoBlockSuspicious: false,      // true: otomatik block, false: admin'e işaretle
   },
+  // v4.89: Calendly entegrasyonu (15dk demo)
+  calendly: {
+    enabled: false,                   // false: demo sayfası "yakında" mesajı gösterir
+    url: 'https://calendly.com/hasan-kayapinar/15min',  // Admin'in Calendly linki
+    embedHeight: 700,                 // Inline widget yüksekliği
+    welcomeMessage: 'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı, ürünlerinizi nasıl listeleyeceğinizi konuşalım.',
+    showAfterMinutes: 0,              // 0: hemen göster, X: form sonrası gecikme
+  },
   freeTier: {
     pocAcceptanceMode: 'no_acceptance',
     freePocsPerPeriod: 0,
@@ -22066,6 +22082,14 @@ async function admSettings(m) {
     s0.appendChild(field('Şüphelileri Otomatik Blok', 'cfg-spam-auto', 'toggle', cfg.spamProtection?.autoBlockSuspicious ?? false, 'Açıksa şüpheli signup otomatik bloklanır. Kapalıda admin\'e işaret olur.'));
     m.appendChild(s0);
 
+    // v4.89: Calendly Entegrasyonu
+    var s0b = section('📅 Calendly Entegrasyonu (15dk Demo)', '#22d078');
+    s0b.appendChild(field('Calendly Aktif Mi?', 'cfg-cal-enabled', 'toggle', cfg.calendly?.enabled ?? false, 'Açıksa /#demo sayfasında inline widget gösterilir. Kapalıda e-posta yönlendirme.'));
+    s0b.appendChild(field('Calendly URL', 'cfg-cal-url', 'text', cfg.calendly?.url || 'https://calendly.com/hasan-kayapinar/15min', 'Tam Calendly event URLi (örn: https://calendly.com/hasan/15min)'));
+    s0b.appendChild(field('Widget Yüksekliği (px)', 'cfg-cal-height', 'number', cfg.calendly?.embedHeight ?? 700, 'Inline widget yüksekliği'));
+    s0b.appendChild(field('Hoş Geldin Mesajı', 'cfg-cal-msg', 'text', cfg.calendly?.welcomeMessage || '', 'Demo sayfasında üstte gösterilen mesaj'));
+    m.appendChild(s0b);
+
     // Free Tier
     var s1 = section('🆓 Free Tier Davranışı', '#5a6278');
     s1.appendChild(field('PoC Kabul Modu', 'cfg-free-mode', 'select', {
@@ -22252,6 +22276,14 @@ async function admSettings(m) {
             suspiciousIpThreshold: parseInt(el('cfg-spam-ip').value)||5,
             suspiciousFpThreshold: parseInt(el('cfg-spam-fp').value)||3,
             autoBlockSuspicious: el('cfg-spam-auto').value === 'true',
+          },
+          // v4.89: Calendly
+          calendly: {
+            enabled: el('cfg-cal-enabled').value === 'true',
+            url: el('cfg-cal-url').value.trim() || 'https://calendly.com/hasan-kayapinar/15min',
+            embedHeight: parseInt(el('cfg-cal-height').value) || 700,
+            welcomeMessage: el('cfg-cal-msg').value.trim() || 'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı, ürünlerinizi nasıl listeleyeceğinizi konuşalım.',
+            showAfterMinutes: 0,
           },
           freeTier: {
             pocAcceptanceMode: el('cfg-free-mode').value,
@@ -22685,6 +22717,99 @@ async function admPayments(m) {
     render();
   } catch(e) {
     m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+// v4.89: ADMIN — DEMO TALEPLERİ
+// Calendly üzerinden gelen demo isteklerini gör + lead takibi
+// ════════════════════════════════════════════════════════════════════
+async function admDemoRequests(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Demo talepleri yükleniyor...</div>';
+  try {
+    var snap = await getDocs(collection(db,'demo_requests'));
+    var reqs = snap.docs.map(function(d){ return { ...d.data(), id:d.id }; });
+    // Client-side sırala (en yeni üstte)
+    reqs.sort(function(a, b){
+      var aT = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
+      var bT = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+      return bT - aT;
+    });
+
+    // Stat'ler
+    var total = reqs.length;
+    var last7d = reqs.filter(function(r){
+      if (!r.timestamp?.toMillis) return false;
+      return Date.now() - r.timestamp.toMillis() < 7*24*60*60*1000;
+    }).length;
+    var withUser = reqs.filter(function(r){ return r.userId; }).length;
+
+    var html = '<div style="max-width:1200px">'
+      + '<div style="margin-bottom:18px"><h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin:0">📅 Demo Talepleri</h2><div style="font-size:12px;color:var(--text-muted);margin-top:4px">Calendly üzerinden gelen / demo sayfasını ziyaret eden kullanıcılar</div></div>'
+
+      // Stat cards
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">'
+      +   '<div class="card" style="padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#7db4ff">'+total+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Toplam Talep</div></div>'
+      +   '<div class="card" style="padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#22d078">'+last7d+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Son 7 Gün</div></div>'
+      +   '<div class="card" style="padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#f0a429">'+withUser+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Kayıtlı Kullanıcı</div></div>'
+      +   '<div class="card" style="padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#a855f7">'+(total-withUser)+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Anonim (Lead)</div></div>'
+      + '</div>'
+
+      + '<div class="card" style="padding:0;overflow:hidden">';
+
+    if (reqs.length === 0) {
+      html += '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:8px">📭</div>Henüz demo talebi yok. LinkedIn outreach\'inde <strong>pochub.co/#demo</strong> linkini paylaşmaya başla!</div>';
+    } else {
+      html += '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+        + '<thead><tr style="background:var(--bg-elevated);text-align:left">'
+        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Tarih</th>'
+        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Kullanıcı</th>'
+        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Kaynak</th>'
+        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Referrer</th>'
+        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Status</th>'
+        + '</tr></thead><tbody>';
+
+      html += reqs.map(function(r, i){
+        var dStr = r.timestamp?.toDate
+          ? r.timestamp.toDate().toLocaleString('tr-TR', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})
+          : '—';
+        var userInfo = r.userEmail
+          ? '<div style="font-size:12.5px;font-weight:600;color:var(--text-primary)">'+r.userEmail+'</div>'
+          : '<span style="color:var(--text-muted);font-style:italic;font-size:12px">Anonim</span>';
+        var statusBdg = r.status === 'page_viewed'
+          ? '<span style="background:rgba(125,180,255,.15);color:#7db4ff;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700">SAYFA AÇILDI</span>'
+          : '<span style="background:var(--bg-elevated);color:var(--text-muted);padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700">'+(r.status||'?').toUpperCase()+'</span>';
+        var refStr = r.referrer && r.referrer.length > 0 ? (r.referrer.length > 40 ? r.referrer.substring(0,40)+'...' : r.referrer) : '<span style="color:var(--text-muted)">—</span>';
+
+        return '<tr style="border-top:1px solid var(--border)">'
+          + '<td style="padding:10px 12px;font-size:12px;color:var(--text-secondary);white-space:nowrap">'+dStr+'</td>'
+          + '<td style="padding:10px 12px">'+userInfo+'</td>'
+          + '<td style="padding:10px 12px;font-size:12px;color:var(--text-secondary)">'+(r.source||'?')+'</td>'
+          + '<td style="padding:10px 12px;font-size:11px;color:var(--text-muted);font-family:monospace">'+refStr+'</td>'
+          + '<td style="padding:10px 12px">'+statusBdg+'</td>'
+          + '</tr>';
+      }).join('');
+
+      html += '</tbody></table>';
+    }
+
+    html += '</div>'
+
+      // Tips footer
+      + '<div style="background:linear-gradient(135deg,rgba(125,180,255,.06),rgba(125,180,255,.02));border:1px solid rgba(125,180,255,.25);border-radius:10px;padding:16px;margin-top:18px;font-size:12.5px;color:var(--text-secondary);line-height:1.6">'
+      +   '<strong style="color:var(--text-primary)">💡 İpuçları:</strong><br>'
+      +   '• <strong>Outreach mesajına ekle:</strong> "15 dakikalık demo: pochub.co/#demo"<br>'
+      +   '• <strong>Calendly hesabı:</strong> Sistem Ayarları → Calendly Entegrasyonu kısmından URL\'yi güncelle<br>'
+      +   '• <strong>Calendly\'de hesabını oluştur:</strong> calendly.com → 15 dakikalık event oluştur → URL\'yi al<br>'
+      +   '• <strong>Aktif/Pasif toggle:</strong> Calendly aktif değilse demo sayfasında e-posta yönlendirmesi gösterilir'
+      + '</div>'
+
+      + '</div>';
+
+    m.innerHTML = html;
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Demo talepleri yüklenirken hata: ' + e.message + '</div>';
   }
 }
 
@@ -24133,6 +24258,109 @@ function openSharePopup(vendor, shareUrl, linkedinUrl, twitterUrl, whatsappUrl) 
 
 window.renderVendorPublic = renderVendorPublic;
 
+// ════════════════════════════════════════════════════════════════════
+// v4.89: DEMO TALEP SAYFASI - Calendly entegrasyonu
+// URL: pochub.co/#demo
+// LinkedIn outreachten gelen lead'ler buraya gelir, 15dk demo alir
+// ════════════════════════════════════════════════════════════════════
+async function renderDemoRequest() {
+  var scr = el('scr-demo');
+  if (!scr) return;
+
+  scr.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div><div style="margin-top:10px;color:var(--text-muted)">Yükleniyor...</div></div>';
+
+  // SYSTEM_CONFIG'i yükle (Calendly ayarları için)
+  await loadSystemConfig();
+  var calCfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.calendly) || DEFAULT_CONFIG.calendly;
+
+  document.title = '15 Dakikalık Demo | PoCHub';
+  setMetaTag('description', 'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı öğrenin.');
+
+  // Calendly devre dışıysa: "Yakında" mesajı + e-posta ile iletişim
+  if (!calCfg.enabled) {
+    scr.innerHTML =
+      '<div style="max-width:680px;margin:50px auto;padding:30px;text-align:center">'
+      + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:36px 28px">'
+      +   '<div style="font-size:48px;margin-bottom:14px">📅</div>'
+      +   '<h1 style="font-size:24px;font-weight:800;color:var(--text-primary);margin:0 0 10px">Demo Talebi</h1>'
+      +   '<div style="font-size:13.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:20px">PoCHub ekibiyle 15 dakikalık tanışma görüşmesi. Vendor olarak nasıl başlayacağınızı, ürünlerinizi listelemenin yolunu konuşalım.</div>'
+      +   '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:18px;text-align:left">'
+      +     '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:10px"><strong style="color:var(--text-primary)">📧 İletişim:</strong></div>'
+      +     '<a href="mailto:hasan.kayapinar@gitsteknoloji.com?subject=PoCHub%20Demo%20Talebi&body=Merhaba%2C%0A%0A15%20dakikal%C4%B1k%20bir%20demo%20al%C4%B1mas%C4%B1na%20kat%C4%B1lmak%20istiyorum.%0A%0AFirma%3A%20%0AAd%20Soyad%3A%20%0ATercih%20Edilen%20Saat%3A%20%0A%0ATe%C5%9Fekk%C3%BCrler" style="color:#7db4ff;font-size:13px;font-weight:600;text-decoration:none">hasan.kayapinar@gitsteknoloji.com</a>'
+      +     '<div style="font-size:11.5px;color:var(--text-muted);margin-top:8px">E-posta ile uygun saati belirleyelim.</div>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+      +     '<button class="btn-p" onclick="window.location.hash=\'#home\'" style="padding:10px 20px;font-size:13px">Ana Sayfaya Dön</button>'
+      +     '<button class="btn-g" onclick="window.location.hash=\'#catalog\'" style="padding:10px 20px;font-size:13px">Kataloğu Gör</button>'
+      +   '</div>'
+      + '</div>'
+      + '</div>';
+    return;
+  }
+
+  // Calendly aktifse - inline widget
+  scr.innerHTML =
+    '<div style="max-width:880px;margin:30px auto;padding:20px">'
+
+    // Header
+    + '<div style="text-align:center;margin-bottom:24px">'
+    +   '<div style="display:inline-block;background:linear-gradient(135deg,rgba(34,208,120,.1),rgba(34,208,120,.04));border:1px solid rgba(34,208,120,.3);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;color:#22d078;letter-spacing:.5px;margin-bottom:12px">📅 15 DAKİKALIK ÜCRETSİZ DEMO</div>'
+    +   '<h1 style="font-size:28px;font-weight:800;color:var(--text-primary);margin:0 0 8px">PoCHub\'la Tanışalım</h1>'
+    +   '<div style="font-size:14px;color:var(--text-secondary);max-width:560px;margin:0 auto;line-height:1.6">' + (calCfg.welcomeMessage || 'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı konuşalım.') + '</div>'
+    + '</div>'
+
+    // 3 Avantaj kart
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px">'
+    +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center"><div style="font-size:28px;margin-bottom:6px">⚡</div><div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Sadece 15 Dakika</div><div style="font-size:11.5px;color:var(--text-secondary);line-height:1.4">Kısa, öz, etkili. Boş yere zamanınızı almayacağız.</div></div>'
+    +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center"><div style="font-size:28px;margin-bottom:6px">🎁</div><div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Ücretsiz Pro Paket</div><div style="font-size:11.5px;color:var(--text-secondary);line-height:1.4">Launch döneminde Pro paket avantajları (Free için bonus).</div></div>'
+    +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center"><div style="font-size:28px;margin-bottom:6px">📊</div><div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:4px">Canlı Demo</div><div style="font-size:11.5px;color:var(--text-secondary);line-height:1.4">Vendor panelini birlikte gezelim, sorularınızı yanıtlayalım.</div></div>'
+    + '</div>'
+
+    // Calendly Widget
+    + '<div class="card" style="padding:0;overflow:hidden">'
+    +   '<div class="calendly-inline-widget" data-url="' + calCfg.url + '" style="min-width:320px;height:' + (calCfg.embedHeight || 700) + 'px"></div>'
+    + '</div>'
+
+    // Footer
+    + '<div style="text-align:center;margin-top:18px;font-size:12.5px;color:var(--text-muted)">'
+    +   'Doğrudan iletişim: <a href="mailto:hasan.kayapinar@gitsteknoloji.com" style="color:#7db4ff;font-weight:600;text-decoration:none">hasan.kayapinar@gitsteknoloji.com</a>'
+    + '</div>'
+
+    + '</div>';
+
+  // Calendly script'i lazy load
+  if (!window._calendlyLoaded) {
+    var s = document.createElement('script');
+    s.src = 'https://assets.calendly.com/assets/external/widget.js';
+    s.async = true;
+    s.onload = function(){ window._calendlyLoaded = true; };
+    document.head.appendChild(s);
+    // CSS de yükle
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://assets.calendly.com/assets/external/widget.css';
+    document.head.appendChild(link);
+  } else if (window.Calendly && window.Calendly.initInlineWidgets) {
+    // Zaten yüklenmişse yeniden init
+    window.Calendly.initInlineWidgets();
+  }
+
+  // Demo isteği kaydı (analytics için)
+  try {
+    await addDoc(collection(db,'demo_requests'), {
+      source: 'demo_page',
+      referrer: document.referrer || null,
+      userAgent: navigator.userAgent,
+      timestamp: serverTimestamp(),
+      status: 'page_viewed',
+      userId: CUR_USER?.uid || null,
+      userEmail: CUR_USER?.email || null,
+    });
+  } catch(e) {}
+}
+
+// loadSystemConfig zaten v4.84'te var - reuse edilir
+
 // ── URL Hash Router ─────────────────────────────────────────────
 function parseAndNavigate(hash) {
   if (!hash || hash === '#') return;
@@ -24148,7 +24376,7 @@ function parseAndNavigate(hash) {
     return;
   }
 
-  if (!['home','events','catalog','customer','vendor','admin'].includes(screen)) return;
+  if (!['home','events','catalog','customer','vendor','admin','demo'].includes(screen)) return;
   if (screen !== CUR_SCREEN) { CUR_SCREEN = screen; buildNav(); renderScreen(screen); }
   setTimeout(function() {
     if (screen === 'vendor'   && tab !== CUR_VEND_TAB) { CUR_VEND_TAB = tab; loadVendTab(); }
