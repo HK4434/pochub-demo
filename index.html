@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.89 | pochub.co -->
+<!-- PoCHub v4.90 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.89</title>
+<title>PoCHub.co — v4.90</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -333,7 +333,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.89';
+const VERSION = 'v4.90';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -568,6 +568,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.90': ['MAJOR: Phase 3.10 - Calendly Booked Tracking. Calendly postMessage listener (event_scheduled), demo_requests status guncellemesi (page_viewed -> booked), Admin Demo Talepleri funnel stat ve filtre, randevu tarihi sutunu. Functions deploy beklenmeden client-side calisir.'],
   'v4.89': ['MAJOR: Phase 3.9 - Calendly entegrasyonu. Public demo talep sayfasi (#demo), Calendly inline widget, demo_requests koleksiyonu, admin Calendly konfigurasyon paneli, admin Demo Talepleri yonetimi, anasayfa Demo CTA butonu. Outreach maillerinin verim icin link verilecek hazir.'],
   'v4.88.1': ['FIX: Davet Et sayfasi composite index hatasi - orderBy kaldirildi, client-side siralama yapildi. referrals koleksiyonu where + orderBy kombinasyonu Firebase index gerektiriyor, gereksiz karmaşa - vendor başına davet sayısı az, client-side sıralama performans icin yeterli.'],
   'v4.88': ['MAJOR: Phase 3.8 - Referral Sistemi. Vendor benzersiz davet linki (pochub.co/?ref=slug), bonus PoC kotasi (kalici +1/ay), Davet Et tab (vendor paneli), signup ekraninda davet eden banner. Network effect ivmesi.'],
@@ -22723,7 +22724,7 @@ async function admPayments(m) {
 // ════════════════════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════════════════════
 // v4.89: ADMIN — DEMO TALEPLERİ
-// Calendly üzerinden gelen demo isteklerini gör + lead takibi
+// v4.90: Funnel stat (page_viewed -> booked), status filtre
 // ════════════════════════════════════════════════════════════════════
 async function admDemoRequests(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Demo talepleri yükleniyor...</div>';
@@ -22737,55 +22738,103 @@ async function admDemoRequests(m) {
       return bT - aT;
     });
 
-    // Stat'ler
+    // v4.90: Funnel istatistikleri
     var total = reqs.length;
+    var booked = reqs.filter(function(r){ return r.status === 'booked'; }).length;
+    var pageViewed = reqs.filter(function(r){ return r.status === 'page_viewed'; }).length;
+    var conversionRate = total > 0 ? Math.round((booked / total) * 100) : 0;
+
+    // Son 7 gün
     var last7d = reqs.filter(function(r){
       if (!r.timestamp?.toMillis) return false;
       return Date.now() - r.timestamp.toMillis() < 7*24*60*60*1000;
-    }).length;
-    var withUser = reqs.filter(function(r){ return r.userId; }).length;
+    });
+    var last7dTotal = last7d.length;
+    var last7dBooked = last7d.filter(function(r){ return r.status === 'booked'; }).length;
+
+    // Filter state
+    if (!window._demoFilter) window._demoFilter = 'all';
+    var curFilter = window._demoFilter;
+
+    var filteredReqs = curFilter === 'all' ? reqs
+      : curFilter === 'booked' ? reqs.filter(function(r){ return r.status === 'booked'; })
+      : reqs.filter(function(r){ return r.status === 'page_viewed'; });
 
     var html = '<div style="max-width:1200px">'
       + '<div style="margin-bottom:18px"><h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin:0">📅 Demo Talepleri</h2><div style="font-size:12px;color:var(--text-muted);margin-top:4px">Calendly üzerinden gelen / demo sayfasını ziyaret eden kullanıcılar</div></div>'
 
-      // Stat cards
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">'
-      +   '<div class="card" style="padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#7db4ff">'+total+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Toplam Talep</div></div>'
-      +   '<div class="card" style="padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#22d078">'+last7d+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Son 7 Gün</div></div>'
-      +   '<div class="card" style="padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#f0a429">'+withUser+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Kayıtlı Kullanıcı</div></div>'
-      +   '<div class="card" style="padding:14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#a855f7">'+(total-withUser)+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Anonim (Lead)</div></div>'
+      // v4.90: FUNNEL CARD
+      + '<div class="card" style="padding:20px;margin-bottom:18px;background:linear-gradient(135deg,rgba(125,180,255,.04),rgba(34,208,120,.02))">'
+      +   '<div style="font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:14px">🎯 Conversion Funnel</div>'
+      +   '<div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:10px;flex-wrap:wrap">'
+      +     '<div style="text-align:center;padding:14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px">'
+      +       '<div style="font-size:28px;font-weight:800;color:#7db4ff">'+total+'</div>'
+      +       '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:4px">Sayfa Açılışı</div>'
+      +     '</div>'
+      +     '<div style="text-align:center;font-size:22px;color:var(--text-muted);font-weight:300">→</div>'
+      +     '<div style="text-align:center;padding:14px;background:var(--bg-surface);border:1px solid rgba(34,208,120,.4);border-radius:10px">'
+      +       '<div style="font-size:28px;font-weight:800;color:#22d078">'+booked+'</div>'
+      +       '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:4px">Randevu Alındı</div>'
+      +     '</div>'
+      +     '<div style="text-align:center;font-size:22px;color:var(--text-muted);font-weight:300">=</div>'
+      +     '<div style="text-align:center;padding:14px;background:linear-gradient(135deg,rgba(34,208,120,.1),rgba(34,208,120,.02));border:1px solid rgba(34,208,120,.3);border-radius:10px">'
+      +       '<div style="font-size:32px;font-weight:800;color:#22d078">%'+conversionRate+'</div>'
+      +       '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:4px">Conversion</div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div style="font-size:11.5px;color:var(--text-secondary);margin-top:12px;text-align:center">Son 7 gün: <strong style="color:#7db4ff">'+last7dTotal+'</strong> görüntüleme, <strong style="color:#22d078">'+last7dBooked+'</strong> randevu</div>'
       + '</div>'
 
-      + '<div class="card" style="padding:0;overflow:hidden">';
+      // FİLTRE BUTONLARI
+      + '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">'
+      +   '<button class="demo-fil-btn'+(curFilter==='all'?' on':'')+'" data-f="all" style="padding:6px 14px;border:1px solid var(--border);border-radius:7px;background:'+(curFilter==='all'?'#7db4ff':'var(--bg-surface)')+';color:'+(curFilter==='all'?'#fff':'var(--text-primary)')+';font-size:12px;font-weight:600;cursor:pointer">Tümü ('+total+')</button>'
+      +   '<button class="demo-fil-btn'+(curFilter==='booked'?' on':'')+'" data-f="booked" style="padding:6px 14px;border:1px solid var(--border);border-radius:7px;background:'+(curFilter==='booked'?'#22d078':'var(--bg-surface)')+';color:'+(curFilter==='booked'?'#fff':'var(--text-primary)')+';font-size:12px;font-weight:600;cursor:pointer">✓ Randevu Alındı ('+booked+')</button>'
+      +   '<button class="demo-fil-btn'+(curFilter==='page_viewed'?' on':'')+'" data-f="page_viewed" style="padding:6px 14px;border:1px solid var(--border);border-radius:7px;background:'+(curFilter==='page_viewed'?'#7db4ff':'var(--bg-surface)')+';color:'+(curFilter==='page_viewed'?'#fff':'var(--text-primary)')+';font-size:12px;font-weight:600;cursor:pointer">👁 Sadece Görüntüleyenler ('+pageViewed+')</button>'
+      + '</div>'
 
-    if (reqs.length === 0) {
-      html += '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:8px">📭</div>Henüz demo talebi yok. LinkedIn outreach\'inde <strong>pochub.co/#demo</strong> linkini paylaşmaya başla!</div>';
+      + '<div class="card" style="padding:0;overflow:hidden;overflow-x:auto">';
+
+    if (filteredReqs.length === 0) {
+      html += '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:8px">📭</div>' + (total === 0 ? 'Henüz demo talebi yok. LinkedIn outreach\'inde <strong>pochub.co/#demo</strong> linkini paylaşmaya başla!' : 'Bu filtrede kayıt yok.') + '</div>';
     } else {
-      html += '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+      html += '<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:780px">'
         + '<thead><tr style="background:var(--bg-elevated);text-align:left">'
-        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Tarih</th>'
+        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Sayfa Açılışı</th>'
+        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Randevu</th>'
         +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Kullanıcı</th>'
-        +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Kaynak</th>'
         +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Referrer</th>'
         +   '<th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700">Status</th>'
         + '</tr></thead><tbody>';
 
-      html += reqs.map(function(r, i){
+      html += filteredReqs.map(function(r){
         var dStr = r.timestamp?.toDate
           ? r.timestamp.toDate().toLocaleString('tr-TR', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})
           : '—';
+        var bookedStr = r.bookedAt?.toDate
+          ? r.bookedAt.toDate().toLocaleString('tr-TR', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})
+          : '<span style="color:var(--text-muted)">—</span>';
         var userInfo = r.userEmail
           ? '<div style="font-size:12.5px;font-weight:600;color:var(--text-primary)">'+r.userEmail+'</div>'
           : '<span style="color:var(--text-muted);font-style:italic;font-size:12px">Anonim</span>';
-        var statusBdg = r.status === 'page_viewed'
-          ? '<span style="background:rgba(125,180,255,.15);color:#7db4ff;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700">SAYFA AÇILDI</span>'
-          : '<span style="background:var(--bg-elevated);color:var(--text-muted);padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700">'+(r.status||'?').toUpperCase()+'</span>';
+
+        var statusBdg;
+        if (r.status === 'booked') {
+          statusBdg = '<span style="background:rgba(34,208,120,.15);color:#22d078;padding:3px 10px;border-radius:10px;font-size:10.5px;font-weight:700">✓ RANDEVU ALINDI</span>';
+        } else if (r.status === 'page_viewed') {
+          statusBdg = '<span style="background:rgba(125,180,255,.15);color:#7db4ff;padding:3px 10px;border-radius:10px;font-size:10.5px;font-weight:700">👁 SAYFA AÇILDI</span>';
+        } else {
+          statusBdg = '<span style="background:var(--bg-elevated);color:var(--text-muted);padding:3px 10px;border-radius:10px;font-size:10.5px;font-weight:700">'+(r.status||'?').toUpperCase()+'</span>';
+        }
+
         var refStr = r.referrer && r.referrer.length > 0 ? (r.referrer.length > 40 ? r.referrer.substring(0,40)+'...' : r.referrer) : '<span style="color:var(--text-muted)">—</span>';
 
-        return '<tr style="border-top:1px solid var(--border)">'
+        // Booked satırı arka planı hafif yeşil
+        var rowBg = r.status === 'booked' ? 'background:rgba(34,208,120,.03)' : '';
+
+        return '<tr style="border-top:1px solid var(--border);'+rowBg+'">'
           + '<td style="padding:10px 12px;font-size:12px;color:var(--text-secondary);white-space:nowrap">'+dStr+'</td>'
+          + '<td style="padding:10px 12px;font-size:12px;color:var(--text-secondary);white-space:nowrap">'+bookedStr+'</td>'
           + '<td style="padding:10px 12px">'+userInfo+'</td>'
-          + '<td style="padding:10px 12px;font-size:12px;color:var(--text-secondary)">'+(r.source||'?')+'</td>'
           + '<td style="padding:10px 12px;font-size:11px;color:var(--text-muted);font-family:monospace">'+refStr+'</td>'
           + '<td style="padding:10px 12px">'+statusBdg+'</td>'
           + '</tr>';
@@ -22798,16 +22847,24 @@ async function admDemoRequests(m) {
 
       // Tips footer
       + '<div style="background:linear-gradient(135deg,rgba(125,180,255,.06),rgba(125,180,255,.02));border:1px solid rgba(125,180,255,.25);border-radius:10px;padding:16px;margin-top:18px;font-size:12.5px;color:var(--text-secondary);line-height:1.6">'
-      +   '<strong style="color:var(--text-primary)">💡 İpuçları:</strong><br>'
-      +   '• <strong>Outreach mesajına ekle:</strong> "15 dakikalık demo: pochub.co/#demo"<br>'
-      +   '• <strong>Calendly hesabı:</strong> Sistem Ayarları → Calendly Entegrasyonu kısmından URL\'yi güncelle<br>'
-      +   '• <strong>Calendly\'de hesabını oluştur:</strong> calendly.com → 15 dakikalık event oluştur → URL\'yi al<br>'
-      +   '• <strong>Aktif/Pasif toggle:</strong> Calendly aktif değilse demo sayfasında e-posta yönlendirmesi gösterilir'
+      +   '<strong style="color:var(--text-primary)">💡 Funnel Optimizasyonu:</strong><br>'
+      +   '• <strong>Conversion düşükse</strong>: Demo sayfasındaki mesajı güçlendir (Sistem Ayarları → Calendly → Hoş Geldin Mesajı)<br>'
+      +   '• <strong>Sayfa açılışı düşükse</strong>: Outreach mesajına direkt <strong>pochub.co/#demo</strong> linki koy<br>'
+      +   '• <strong>Notification</strong>: Randevu alındığında admin\'lere bildirim gönderiliyor (bildirim çanı)<br>'
+      +   '• <strong>Calendly entegrasyonu</strong>: Webhook olmadan client-side postMessage ile çalışır (Functions deploy gerekmez)'
       + '</div>'
 
       + '</div>';
 
     m.innerHTML = html;
+
+    // Filtre event handlers
+    document.querySelectorAll('.demo-fil-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        window._demoFilter = btn.dataset.f;
+        admDemoRequests(m);
+      });
+    });
   } catch(e) {
     m.innerHTML = '<div class="alert alert-err">Demo talepleri yüklenirken hata: ' + e.message + '</div>';
   }
@@ -24346,8 +24403,9 @@ async function renderDemoRequest() {
   }
 
   // Demo isteği kaydı (analytics için)
+  var demoReqDocId = null;
   try {
-    await addDoc(collection(db,'demo_requests'), {
+    var demoRef = await addDoc(collection(db,'demo_requests'), {
       source: 'demo_page',
       referrer: document.referrer || null,
       userAgent: navigator.userAgent,
@@ -24356,7 +24414,65 @@ async function renderDemoRequest() {
       userId: CUR_USER?.uid || null,
       userEmail: CUR_USER?.email || null,
     });
+    demoReqDocId = demoRef.id;
+    // localStorage'a son demo request id'yi koy (anonymous booking için)
+    try { localStorage.setItem('lastDemoRequestId', demoReqDocId); } catch(e){}
   } catch(e) {}
+
+  // ════════════════════════════════════════════════════════════════════
+  // v4.90: CALENDLY postMessage LISTENER
+  // Calendly widget'te randevu alındığında 'event_scheduled' mesajı gelir
+  // demo_requests doc'u 'booked' status'a güncellenir
+  // ════════════════════════════════════════════════════════════════════
+  if (!window._calendlyBookingListenerAttached) {
+    window._calendlyBookingListenerAttached = true;
+    window.addEventListener('message', async function(e){
+      // Calendly origin kontrolü
+      if (!e.data || !e.data.event) return;
+      if (typeof e.data.event !== 'string' || !e.data.event.startsWith('calendly.')) return;
+
+      var eventType = e.data.event;  // calendly.profile_page_viewed, calendly.event_type_viewed, calendly.date_and_time_selected, calendly.event_scheduled
+      var payload = e.data.payload || {};
+
+      if (eventType === 'calendly.event_scheduled') {
+        // Randevu alındı!
+        var docId = null;
+        try { docId = localStorage.getItem('lastDemoRequestId'); } catch(e){}
+        if (!docId) return;
+
+        try {
+          await updateDoc(doc(db,'demo_requests',docId), {
+            status: 'booked',
+            bookedAt: serverTimestamp(),
+            calendlyEventUri: payload.event?.uri || null,
+            calendlyInviteeUri: payload.invitee?.uri || null,
+          });
+
+          // Admin'e bildirim (kayıtlı kullanıcıysa)
+          try {
+            // Hangi admin'e gidecek? Tüm admin'leri çek
+            var admSnap = await getDocs(query(collection(db,'users'), where('role','==','admin'), limit(5)));
+            for (var i=0; i<admSnap.docs.length; i++) {
+              await addDoc(collection(db,'notifications'), {
+                userId: admSnap.docs[i].id,
+                type: 'demo_booked',
+                title: '📅 Yeni Demo Randevusu Alındı',
+                message: 'Birisi PoCHub demo sayfasından 15dk randevu aldı. Calendly\'yi kontrol et.',
+                data: { demoRequestId: docId },
+                read: false,
+                createdAt: serverTimestamp()
+              });
+            }
+          } catch(e){}
+
+          // Kullanıcıya görsel feedback
+          showToast('🎉 Randevu alındı! Yakında detaylar e-postanıza gelecek.');
+        } catch(err) {
+          console.warn('Demo booking update error:', err.message);
+        }
+      }
+    });
+  }
 }
 
 // loadSystemConfig zaten v4.84'te var - reuse edilir
