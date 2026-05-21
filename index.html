@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.91 | pochub.co -->
+<!-- PoCHub v4.92 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.91</title>
+<title>PoCHub.co — v4.92</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -333,7 +333,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.91';
+const VERSION = 'v4.92';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -568,6 +568,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.92': ['MAJOR: Phase 3.12 - Vendor PoC detayinda musteri rozeti. renderCustomerBadge() helper, PoC liste kartlarinda rozet (vendor PoC Talepleri tab), PoC detay modalda buyuk rozet + tooltip aciklama, musteri PoC acma sirasinda preview. Sosyal kanit somutlasiyor.'],
   'v4.91': ['MAJOR: Phase 3.11 - Musteri-musteri referral sistemi. Musteri davet linki (?ref=cust-slug), 3 seviyeli rozet (Topluluk Uyesi/Destekcisi/Lideri), Customer Dashboardda Davet Et tab, anasayfada top musteri leaderboard, PoC sayfasinda musteri rozeti vendor gorur.'],
   'v4.90': ['MAJOR: Phase 3.10 - Calendly Booked Tracking. Calendly postMessage listener (event_scheduled), demo_requests status guncellemesi (page_viewed -> booked), Admin Demo Talepleri funnel stat ve filtre, randevu tarihi sutunu. Functions deploy beklenmeden client-side calisir.'],
   'v4.89': ['MAJOR: Phase 3.9 - Calendly entegrasyonu. Public demo talep sayfasi (#demo), Calendly inline widget, demo_requests koleksiyonu, admin Calendly konfigurasyon paneli, admin Demo Talepleri yonetimi, anasayfa Demo CTA butonu. Outreach maillerinin verim icin link verilecek hazir.'],
@@ -12893,6 +12894,26 @@ async function vendRequests(m) {
   var reqs = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
   reqs.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
+  // v4.92: Müşteri rozet bilgilerini batch fetch (N+1 önleme)
+  // PoC'lardaki tüm farklı customerId'leri topla, tek seferde users'tan çek
+  var customerBadgeMap = {};
+  try {
+    var customerIds = [...new Set(reqs.map(function(r){ return r.customerId; }).filter(Boolean))];
+    if (customerIds.length > 0 && customerIds.length <= 30) {
+      // Az sayıda - tek tek fetch (in operator 10 limitli, biz daha güvenli yapıyoruz)
+      var promises = customerIds.map(function(uid){
+        return getDoc(doc(db,'users',uid)).then(function(s){
+          if (s.exists()) return { uid:uid, data:s.data() };
+          return null;
+        }).catch(function(){ return null; });
+      });
+      var results = await Promise.all(promises);
+      results.forEach(function(r){
+        if (r) customerBadgeMap[r.uid] = r.data;
+      });
+    }
+  } catch(e) {}
+
   var stC = {pending:'#f0a429',active:'#22d078',completed:'#7db4ff',rejected:'#ff7070',cancelled:'#5a6278'};
   var stL = {pending:'Bekliyor',active:'Aktif',completed:'Tamamlandı',rejected:'Reddedildi',cancelled:'İptal'};
   var locL = {online:'🌐 Online',customer:'📍 Müşteri Lok.',vendor:'🏢 Vendor Lok.',hybrid:'🔄 Hibrit'};
@@ -13270,6 +13291,12 @@ async function vendRequests(m) {
       // Müşteri firma bilgisi
       var custLine = '<strong>'+(r.customerName||r.customerEmail||'Müşteri')+'</strong>';
       if (r.customerCompany) custLine += ' <span class="txt-muted-12">· 🏢 '+r.customerCompany+'</span>';
+      // v4.92: Müşteri rozet (varsa)
+      var custData = r.customerId ? customerBadgeMap[r.customerId] : null;
+      if (custData) {
+        var custBadgeHtml = renderCustomerBadge(custData, 'compact');
+        if (custBadgeHtml) custLine += ' ' + custBadgeHtml;
+      }
       if (sentAgoTxt) custLine += ' <span class="txt-muted-12">· '+sentAgoTxt+'</span>';
 
       var card = document.createElement('div');
@@ -21610,6 +21637,40 @@ function getCustomerReferralBadgeInfo(level) {
   if (level === 'supporter') return { icon: '🌿', label: 'Topluluk Destekçisi', color: '#7db4ff', bg: 'rgba(125,180,255,.12)', border: 'rgba(125,180,255,.4)' };
   if (level === 'member') return { icon: '🌱', label: 'Topluluk Üyesi', color: '#a855f7', bg: 'rgba(168,85,247,.12)', border: 'rgba(168,85,247,.4)' };
   return null;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.92: renderCustomerBadge - HTML string olarak müşteri rozet badge'i
+// Kullanım: var badgeHtml = renderCustomerBadge(customerData, 'compact'|'normal'|'large');
+// Customer doc'unda customerReferralBadge veya customerReferralCount olmalı
+// ════════════════════════════════════════════════════════════════════
+function renderCustomerBadge(customerData, size) {
+  if (!customerData) return '';
+  size = size || 'normal';
+  var count = customerData.customerReferralCount || 0;
+  var level = customerData.customerReferralBadge || getCustomerReferralBadgeLevel(count);
+  if (!level || count < 1) return '';
+  var info = getCustomerReferralBadgeInfo(level);
+  if (!info) return '';
+
+  var tooltip = info.label + ' — ' + count + ' kurum davet etmiş. PoCHub topluluğunu büyütüyor.';
+
+  if (size === 'compact') {
+    // Sadece ikon - liste/satır içi kullanım
+    return '<span title="'+tooltip+'" style="display:inline-flex;align-items:center;gap:3px;font-size:13px;background:'+info.bg+';border:1px solid '+info.border+';color:'+info.color+';padding:2px 6px;border-radius:8px;font-weight:600;cursor:help;line-height:1">'+info.icon+'<span style="font-size:10px;font-weight:700">'+count+'</span></span>';
+  }
+  if (size === 'large') {
+    // Büyük kart - PoC detay modal'da
+    return '<div title="'+tooltip+'" style="display:inline-flex;align-items:center;gap:10px;background:'+info.bg+';border:1px solid '+info.border+';padding:10px 14px;border-radius:10px;cursor:help">'
+      + '<div style="font-size:28px">'+info.icon+'</div>'
+      + '<div>'
+      +   '<div style="font-size:13px;font-weight:700;color:'+info.color+'">'+info.label+'</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted);margin-top:1px">'+count+' kurum davet etmiş</div>'
+      + '</div>'
+      + '</div>';
+  }
+  // normal - inline rozet (default)
+  return '<span title="'+tooltip+'" style="display:inline-flex;align-items:center;gap:5px;background:'+info.bg+';border:1px solid '+info.border+';color:'+info.color+';padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;cursor:help;letter-spacing:.2px">'+info.icon+' '+info.label+'</span>';
 }
 
 // limit fonksiyonu Firebase'den import edilmiş mi kontrol et — eğer yoksa workaround
