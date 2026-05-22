@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.97 | pochub.co -->
+<!-- PoCHub v4.98 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.97</title>
+<title>PoCHub.co — v4.98</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -328,12 +328,12 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <!-- FIREBASE + EMAILJS -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, PhoneAuthProvider } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.97';
+const VERSION = 'v4.98';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -568,6 +568,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.98': ['MAJOR: Phase 4.5 - Phone Verification (2FA Opsiyonel). Firebase Phone Auth SMS doğrulama, profile telefonunu doğrula CTA, doğrulanmış iletişim rozeti, vendor public profilde gösterim, admin Settings toggle, PoC detayda müşteri rozeti yaninda 📞 ikon.'],
   'v4.97': ['MAJOR: Phase 4.4 - Functions Deploy Hazırlığı. Yeni cron jobları (cycle reset, subscription expire), Calendly webhook handler, deploy guide v2. Kod hazır ama deploy ilk paying customer sonrası (Blaze plan).'],
   'v4.96': ['MAJOR: Phase 4.3 - Quota Reset + Referral Bonus Aktif. 3 kritik bug fix: (1) referralBonusPocs canVendorAcceptPoC fnde kullanılmıyordu - şimdi etkili, (2) aylık cycle reset mekanizması yoktu - login/PoC kabul anında otomatik reset, (3) bonus reset sırasında korunur kalıcı kazanım. Vendor abonelik tablosunda bonus + base ayrı görünür.'],
   'v4.95': ['MAJOR: Phase 4.2 - Vendor Public Profilde Referral Rozeti. Hero kismina 3 rozet entegrasyonu (tier + verified + referral 🥉🥈🥇), kompakt yan yana goruntu, tooltip detay. LinkedIn outreach icin gosterge.'],
@@ -8393,6 +8394,34 @@ async function loadCustTab() {
       m.appendChild(trustBan);
     }
 
+    // ═══ v4.98: PHONE VERIFY PROMO (sadece sistem aktifse, henüz doğrulanmamışsa) ═══
+    if (isPhoneVerifyEnabled() && !CUR_PROFILE?.phoneVerified) {
+      var phonePromoDismissed = false;
+      try { phonePromoDismissed = localStorage.getItem('phonePromoDismissed_' + CUR_USER.uid) === '1'; } catch(e){}
+      if (!phonePromoDismissed) {
+        var phonePromo = document.createElement('div');
+        phonePromo.style.cssText = 'background:linear-gradient(135deg,rgba(34,208,120,.08),rgba(34,208,120,.02));border:1px solid rgba(34,208,120,.3);border-radius:12px;padding:14px 18px;margin-bottom:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+        phonePromo.innerHTML =
+          '<div style="font-size:28px">📞</div>'
+          + '<div style="flex:1;min-width:200px">'
+          +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:3px">Telefonunu Doğrula, Güveni Artır</div>'
+          +   '<div style="font-size:12px;color:var(--text-secondary);line-height:1.4">SMS ile 6 haneli kod, 30 saniye. Doğrulanmış İletişim rozetini kazan, vendor PoC sürecinde önceliklen olsun.</div>'
+          + '</div>'
+          + '<div style="display:flex;gap:6px">'
+          +   '<button id="phone-promo-go" class="btn-p btn-sm" style="background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📞 Doğrula →</button>'
+          +   '<button id="phone-promo-dismiss" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:4px 8px">×</button>'
+          + '</div>';
+        m.appendChild(phonePromo);
+        phonePromo.querySelector('#phone-promo-go').addEventListener('click', function(){
+          showPhoneVerifyModal();
+        });
+        phonePromo.querySelector('#phone-promo-dismiss').addEventListener('click', function(){
+          try { localStorage.setItem('phonePromoDismissed_' + CUR_USER.uid, '1'); } catch(e){}
+          phonePromo.remove();
+        });
+      }
+    }
+
     // ═══ v4.91: CUSTOMER REFERRAL PROMO KARTI ═══
     var custRefDismissed = false;
     try { custRefDismissed = localStorage.getItem('custRefPromoDismissed_' + CUR_USER.uid) === '1'; } catch(e){}
@@ -13395,6 +13424,9 @@ async function vendRequests(m) {
       if (custData) {
         var custBadgeHtml = renderCustomerBadge(custData, 'compact');
         if (custBadgeHtml) custLine += ' ' + custBadgeHtml;
+        // v4.98: Phone verify rozeti
+        var phoneBadge = renderPhoneBadge(custData, 'compact');
+        if (phoneBadge) custLine += ' ' + phoneBadge;
       }
       if (sentAgoTxt) custLine += ' <span class="txt-muted-12">· '+sentAgoTxt+'</span>';
 
@@ -22123,6 +22155,14 @@ const DEFAULT_CONFIG = {
     resendCooldownSeconds: 60,        // Resend butonu cooldown
     showSoftBanner: true,             // Üst tarafta sarı banner gösterimi
   },
+  // v4.98: Phone Verification (2FA Opsiyonel)
+  phoneVerification: {
+    enabled: false,                   // false: hiçbir yerde gösterilmez (Blaze plan + maliyet için kapalı)
+    optional: true,                   // true: opsiyonel doğrulama, false: zorunlu (kritik aksiyonlar bloklanır)
+    showBadgeOnProfile: true,         // Public profile'da 📞 Doğrulanmış İletişim rozeti
+    allowedCountries: ['TR'],         // İzin verilen ülke kodları (TR ön ek +90)
+    smsCostNote: 'Firebase Phone Auth ücretlidir (~$0.06/SMS). Blaze plan gerekli.',
+  },
   freeTier: {
     pocAcceptanceMode: 'no_acceptance',
     freePocsPerPeriod: 0,
@@ -22462,6 +22502,288 @@ window.requireEmailVerified = requireEmailVerified;
 window.showEmailVerifyModal = showEmailVerifyModal;
 window.showEmailVerifyBanner = showEmailVerifyBanner;
 window.hideEmailVerifyBanner = hideEmailVerifyBanner;
+
+// ════════════════════════════════════════════════════════════════════
+// v4.98: PHONE VERIFICATION HELPERS (Firebase Phone Auth)
+// ════════════════════════════════════════════════════════════════════
+
+function isPhoneVerifyEnabled() {
+  var cfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.phoneVerification) || DEFAULT_CONFIG.phoneVerification;
+  return cfg.enabled === true;
+}
+
+function isPhoneVerifyRequired() {
+  var cfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.phoneVerification) || DEFAULT_CONFIG.phoneVerification;
+  return cfg.enabled === true && cfg.optional === false;
+}
+
+// Telefon numarası format kontrol + normalize
+// Türkiye için: 05XX XXX XX XX → +905XXXXXXXXX
+function normalizePhoneTR(input) {
+  if (!input) return null;
+  var digits = input.replace(/\D/g, '');
+  if (digits.startsWith('90') && digits.length === 12) return '+' + digits;
+  if (digits.startsWith('0') && digits.length === 11) return '+9' + digits;
+  if (digits.length === 10 && digits.startsWith('5')) return '+90' + digits;
+  return null;
+}
+
+// Phone Verify Modal — Telefon gir, SMS kodu al, doğrula
+function showPhoneVerifyModal() {
+  if (!CUR_USER) {
+    showToast('Önce giriş yapmalısınız', 'err');
+    return;
+  }
+  if (!isPhoneVerifyEnabled()) {
+    showToast('Telefon doğrulama şu an aktif değil', 'warn');
+    return;
+  }
+
+  var existing = document.getElementById('phone-verify-modal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'phone-verify-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border-radius:14px;max-width:480px;width:100%;padding:28px">'
+    + '<div style="text-align:center;margin-bottom:18px">'
+    +   '<div style="font-size:48px;margin-bottom:10px">📞</div>'
+    +   '<h2 style="margin:0 0 6px;color:var(--text-primary);font-size:20px;font-weight:800">Telefon Doğrulama</h2>'
+    +   '<div style="color:var(--text-secondary);font-size:13px;line-height:1.5">SMS ile gönderilecek 6 haneli kodla telefonunu doğrula. Doğrulanmış iletişim rozetini kazan.</div>'
+    + '</div>'
+
+    // Step 1: Phone input
+    + '<div id="pv-step-1">'
+    +   '<label style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:700;color:var(--text-primary)">Telefon Numarası</label>'
+    +   '<div style="display:flex;gap:8px;align-items:center;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:4px 10px;margin-bottom:10px">'
+    +     '<span style="font-size:13px;font-weight:700;color:var(--text-secondary)">+90</span>'
+    +     '<input id="pv-phone" type="tel" placeholder="5XX XXX XX XX" maxlength="14" style="flex:1;background:none;border:none;color:var(--text-primary);font-size:14px;padding:9px 0;outline:none">'
+    +   '</div>'
+    +   '<div id="pv-error-1" style="color:#ff7070;font-size:12px;margin-bottom:10px;display:none"></div>'
+    +   '<div id="recaptcha-container" style="margin-bottom:12px"></div>'
+    +   '<button id="pv-send-code" class="btn-p" style="width:100%;padding:11px;font-size:13px;font-weight:700">📨 SMS Kodu Gönder</button>'
+    + '</div>'
+
+    // Step 2: Code input (initially hidden)
+    + '<div id="pv-step-2" style="display:none">'
+    +   '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px"><strong id="pv-phone-display"></strong> numarasına 6 haneli kod gönderildi.</div>'
+    +   '<label style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:700;color:var(--text-primary)">Doğrulama Kodu</label>'
+    +   '<input id="pv-code" type="text" placeholder="123456" maxlength="6" inputmode="numeric" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:11px;font-size:18px;font-family:monospace;text-align:center;letter-spacing:6px;color:var(--text-primary);margin-bottom:10px;outline:none">'
+    +   '<div id="pv-error-2" style="color:#ff7070;font-size:12px;margin-bottom:10px;display:none"></div>'
+    +   '<button id="pv-verify-code" class="btn-p" style="width:100%;padding:11px;font-size:13px;font-weight:700;margin-bottom:8px">✓ Doğrula</button>'
+    +   '<button id="pv-back" style="width:100%;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:6px">← Numarayı değiştir</button>'
+    + '</div>'
+
+    + '<button id="pv-close" style="display:block;margin:14px auto 0;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;text-decoration:underline">Kapat</button>'
+    + '</div>';
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+
+  var confirmationResult = null;
+
+  el('pv-close').addEventListener('click', function(){ modal.remove(); cleanupRecaptcha(); });
+  el('pv-back').addEventListener('click', function(){
+    el('pv-step-1').style.display = '';
+    el('pv-step-2').style.display = 'none';
+    el('pv-error-2').style.display = 'none';
+    confirmationResult = null;
+  });
+
+  el('pv-send-code').addEventListener('click', async function(){
+    var phoneInput = el('pv-phone').value.trim();
+    var err = el('pv-error-1');
+    err.style.display = 'none';
+
+    // Format kontrol
+    var normalized = normalizePhoneTR(phoneInput);
+    if (!normalized) {
+      err.textContent = 'Geçersiz telefon numarası. Örnek: 5XX XXX XX XX';
+      err.style.display = '';
+      return;
+    }
+
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = '⏳ Hazırlanıyor...';
+
+    try {
+      // RecaptchaVerifier oluştur
+      if (!window._recaptchaVerifier) {
+        window._recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          'size': 'normal',
+          'callback': function(){ /* solved */ },
+          'expired-callback': function(){
+            showToast('reCAPTCHA süresi doldu, tekrar deneyin', 'warn');
+          }
+        });
+        await window._recaptchaVerifier.render();
+      }
+
+      btn.textContent = '📨 SMS Gönderiliyor...';
+
+      // linkWithPhoneNumber - mevcut email kullanıcısına telefon ekle
+      // Eğer hesap zaten phone'a sahipse signInWithPhoneNumber kullanılabilir
+      var hasPhone = auth.currentUser.phoneNumber;
+      if (hasPhone && hasPhone === normalized) {
+        err.textContent = 'Bu telefon zaten doğrulanmış.';
+        err.style.display = '';
+        btn.disabled = false;
+        btn.textContent = '📨 SMS Kodu Gönder';
+        return;
+      }
+
+      confirmationResult = await linkWithPhoneNumber(auth.currentUser, normalized, window._recaptchaVerifier);
+
+      // Başarılı - kod ekranına geç
+      el('pv-phone-display').textContent = normalized;
+      el('pv-step-1').style.display = 'none';
+      el('pv-step-2').style.display = '';
+      btn.disabled = false;
+      btn.textContent = '📨 SMS Kodu Gönder';
+
+      // Audit
+      try {
+        await addDoc(collection(db,'phone_verify_attempts'), {
+          userId: CUR_USER.uid,
+          userEmail: CUR_USER.email,
+          phoneNumber: normalized,
+          stage: 'sms_sent',
+          createdAt: serverTimestamp(),
+        });
+      } catch(e){}
+
+    } catch(e) {
+      console.error('Phone verify SMS error:', e);
+      btn.disabled = false;
+      btn.textContent = '📨 SMS Kodu Gönder';
+
+      var msg = 'SMS gönderilemedi: ';
+      if (e.code === 'auth/invalid-phone-number') msg += 'Geçersiz telefon numarası.';
+      else if (e.code === 'auth/too-many-requests') msg += 'Çok fazla deneme. Lütfen daha sonra tekrar deneyin.';
+      else if (e.code === 'auth/quota-exceeded') msg += 'Günlük SMS limiti aşıldı. Yarın tekrar deneyin.';
+      else if (e.code === 'auth/credential-already-in-use') msg += 'Bu telefon başka bir hesapta kayıtlı.';
+      else if (e.code === 'auth/provider-already-linked') msg += 'Bu hesaba zaten bir telefon bağlı. Önce kaldırın.';
+      else if (e.code === 'auth/captcha-check-failed') msg += 'reCAPTCHA doğrulaması başarısız.';
+      else msg += (e.message || 'Bilinmeyen hata');
+
+      err.textContent = msg;
+      err.style.display = '';
+
+      // reCAPTCHA reset
+      cleanupRecaptcha();
+    }
+  });
+
+  el('pv-verify-code').addEventListener('click', async function(){
+    var code = el('pv-code').value.trim();
+    var err = el('pv-error-2');
+    err.style.display = 'none';
+
+    if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
+      err.textContent = '6 haneli kod girin';
+      err.style.display = '';
+      return;
+    }
+
+    if (!confirmationResult) {
+      err.textContent = 'Önce SMS kodu gönderilmelidir';
+      err.style.display = '';
+      return;
+    }
+
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = '⏳ Doğrulanıyor...';
+
+    try {
+      var cred = await confirmationResult.confirm(code);
+      var verifiedPhone = cred.user.phoneNumber || (auth.currentUser?.phoneNumber);
+
+      // Firestore'a yansıt
+      await updateDoc(doc(db,'users',CUR_USER.uid), {
+        phoneVerified: true,
+        phoneVerifiedAt: serverTimestamp(),
+        phoneVerifiedNumber: verifiedPhone,
+        // phone alanını da güncelle (eğer farklıysa)
+        phone: verifiedPhone,
+      });
+      if (CUR_PROFILE) {
+        CUR_PROFILE.phoneVerified = true;
+        CUR_PROFILE.phoneVerifiedNumber = verifiedPhone;
+        CUR_PROFILE.phone = verifiedPhone;
+      }
+
+      // Audit
+      try {
+        await addDoc(collection(db,'phone_verify_attempts'), {
+          userId: CUR_USER.uid,
+          userEmail: CUR_USER.email,
+          phoneNumber: verifiedPhone,
+          stage: 'verified',
+          createdAt: serverTimestamp(),
+        });
+      } catch(e){}
+
+      modal.remove();
+      cleanupRecaptcha();
+      showToast('🎉 Telefon doğrulandı! "Doğrulanmış İletişim" rozetini kazandın.');
+
+    } catch(e) {
+      console.error('Phone code verify error:', e);
+      btn.disabled = false;
+      btn.textContent = '✓ Doğrula';
+
+      var msg = 'Doğrulama başarısız: ';
+      if (e.code === 'auth/invalid-verification-code') msg += 'Kod yanlış. Tekrar deneyin.';
+      else if (e.code === 'auth/code-expired') msg += 'Kod süresi doldu. Yeniden SMS isteyin.';
+      else msg += (e.message || 'Bilinmeyen hata');
+
+      err.textContent = msg;
+      err.style.display = '';
+    }
+  });
+
+  // Auto focus
+  setTimeout(function(){ el('pv-phone').focus(); }, 100);
+}
+
+function cleanupRecaptcha() {
+  try {
+    if (window._recaptchaVerifier) {
+      window._recaptchaVerifier.clear();
+      window._recaptchaVerifier = null;
+    }
+    var container = el('recaptcha-container');
+    if (container) container.innerHTML = '';
+  } catch(e){}
+}
+
+// Telefon doğrulanmış rozet HTML'i (compact / normal / large)
+function renderPhoneBadge(userData, size) {
+  if (!userData || !userData.phoneVerified) return '';
+  size = size || 'normal';
+  var tooltip = 'Doğrulanmış İletişim — bu kullanıcı SMS kodu ile telefonunu doğrulamış.';
+
+  if (size === 'compact') {
+    return '<span title="' + tooltip + '" style="display:inline-flex;align-items:center;gap:2px;font-size:11px;background:rgba(34,208,120,.12);border:1px solid rgba(34,208,120,.4);color:#22d078;padding:2px 6px;border-radius:8px;font-weight:700;cursor:help;line-height:1">📞</span>';
+  }
+  if (size === 'large') {
+    return '<div title="' + tooltip + '" style="display:inline-flex;align-items:center;gap:10px;background:rgba(34,208,120,.12);border:1px solid rgba(34,208,120,.4);padding:10px 14px;border-radius:10px;cursor:help">'
+      + '<div style="font-size:28px">📞</div>'
+      + '<div>'
+      +   '<div style="font-size:13px;font-weight:700;color:#22d078">Doğrulanmış İletişim</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted);margin-top:1px">SMS kodu ile telefon doğrulandı</div>'
+      + '</div>'
+      + '</div>';
+  }
+  return '<span title="' + tooltip + '" style="display:inline-flex;align-items:center;gap:4px;background:rgba(34,208,120,.12);border:1px solid rgba(34,208,120,.4);color:#22d078;padding:3px 9px;border-radius:10px;font-size:10.5px;font-weight:700;cursor:help;letter-spacing:.2px">📞 DOĞRULANMIŞ İLETİŞİM</span>';
+}
+
+window.showPhoneVerifyModal = showPhoneVerifyModal;
+window.renderPhoneBadge = renderPhoneBadge;
+window.isPhoneVerifyEnabled = isPhoneVerifyEnabled;
 
 // ════════════════════════════════════════════════════════════════════
 // v4.82: ADMIN VENDOR DOĞRULAMA SAYFASI
@@ -22957,6 +23279,13 @@ async function admSettings(m) {
     s0c.appendChild(field('Resend Cooldown (saniye)', 'cfg-ev-cooldown', 'number', cfg.emailVerification?.resendCooldownSeconds ?? 60, 'Doğrulama maili tekrar gönderme bekleme süresi'));
     m.appendChild(s0c);
 
+    // v4.98: Phone Verification (2FA)
+    var s0d = section('📞 Telefon Doğrulama (2FA Opsiyonel)', '#22d078');
+    s0d.appendChild(field('Phone Verify Sistemi Aktif Mi?', 'cfg-pv-enabled', 'toggle', cfg.phoneVerification?.enabled ?? false, 'AÇMADAN ÖNCE: Blaze plan + Firebase Phone Auth aktif olmalı. SMS başına ~$0.06 maliyet.'));
+    s0d.appendChild(field('Opsiyonel (Zorunlu Değil)', 'cfg-pv-optional', 'toggle', cfg.phoneVerification?.optional ?? true, 'Kapalıda zorunlu - phone_verified=false ise kritik aksiyonlar bloklanır'));
+    s0d.appendChild(field('Public Profilde Rozet Göster', 'cfg-pv-badge', 'toggle', cfg.phoneVerification?.showBadgeOnProfile ?? true, 'Doğrulanmış vendor public profilinde 📞 rozet görünür'));
+    m.appendChild(s0d);
+
     // v4.89: Calendly Entegrasyonu
     var s0b = section('📅 Calendly Entegrasyonu (15dk Demo)', '#22d078');
     s0b.appendChild(field('Calendly Aktif Mi?', 'cfg-cal-enabled', 'toggle', cfg.calendly?.enabled ?? false, 'Açıksa /#demo sayfasında inline widget gösterilir. Kapalıda e-posta yönlendirme.'));
@@ -23159,6 +23488,14 @@ async function admSettings(m) {
             blockCriticalActions: el('cfg-ev-block').value === 'true',
             resendCooldownSeconds: parseInt(el('cfg-ev-cooldown').value) || 60,
             blockedActions: ['accept_poc', 'send_offer', 'create_poc', 'submit_payment'],
+          },
+          // v4.98: Phone Verification (2FA)
+          phoneVerification: {
+            enabled: el('cfg-pv-enabled').value === 'true',
+            optional: el('cfg-pv-optional').value === 'true',
+            showBadgeOnProfile: el('cfg-pv-badge').value === 'true',
+            allowedCountries: ['TR'],
+            smsCostNote: 'Firebase Phone Auth ücretlidir (~$0.06/SMS). Blaze plan gerekli.',
           },
           // v4.89: Calendly
           calendly: {
@@ -24957,6 +25294,16 @@ async function renderVendorPublic(slug) {
         + '</span>';
     }
 
+    // v4.98: Phone verify rozeti (vendor doğrulanmışsa + config aktifse)
+    var phoneBadgeHtml = '';
+    var pvCfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.phoneVerification) || DEFAULT_CONFIG.phoneVerification;
+    if (vendor.phoneVerified && pvCfg.showBadgeOnProfile !== false) {
+      phoneBadgeHtml = '<span title="Doğrulanmış İletişim — bu vendor SMS kodu ile telefonunu doğrulamış. Direkt iletişime geçebilirsiniz."'
+        + ' style="display:inline-flex;align-items:center;gap:4px;background:rgba(34,208,120,.12);border:1px solid rgba(34,208,120,.4);color:#22d078;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px;letter-spacing:.3px;cursor:help">'
+        + '📞 DOĞRULANMIŞ İLETİŞİM'
+        + '</span>';
+    }
+
     // SEO: Document title + meta
     document.title = vendor.company + ' | PoCHub';
     setMetaTag('description', (vendor.shortDescription || 'PoCHub üzerinde ' + typeLabel + ' olarak hizmet veren ' + vendor.company + ' firması.').substring(0, 160));
@@ -25027,7 +25374,7 @@ async function renderVendorPublic(slug) {
       +     '<div style="flex:1;min-width:240px">'
       +       '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
       +         '<span style="font-size:13px;color:var(--text-muted);font-weight:600">'+typeIcon+' '+typeLabel+'</span>'
-      +         verifiedBadge + tierBadge + referralBadgeHtml
+      +         verifiedBadge + tierBadge + referralBadgeHtml + phoneBadgeHtml
       +       '</div>'
       +       '<h1 style="font-size:30px;font-weight:800;color:var(--text-primary);margin:0 0 8px;line-height:1.2">'+vendor.company+'</h1>'
       +       (vendor.shortDescription ? '<div style="font-size:14.5px;color:var(--text-secondary);margin-bottom:14px;line-height:1.5">'+vendor.shortDescription+'</div>' : '')
