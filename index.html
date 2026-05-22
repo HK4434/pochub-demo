@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.94 | pochub.co -->
+<!-- PoCHub v4.95 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.94</title>
+<title>PoCHub.co — v4.95</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -333,7 +333,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.94';
+const VERSION = 'v4.95';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -568,6 +568,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.95': ['MAJOR: Phase 4.2 - Vendor Public Profilde Referral Rozeti. Hero kismina 3 rozet entegrasyonu (tier + verified + referral 🥉🥈🥇), kompakt yan yana goruntu, tooltip detay. LinkedIn outreach icin gosterge.'],
   'v4.94': ['MAJOR: Phase 4.1 - Vendor Leaderboard + Rozet Sistemi. Vendor için 3 seviye madalya rozeti (🥉/🥈/🥇), anasayfada top vendor leaderboard, Davet Et tab Sıralamadaki Yerin widget, public profile rozet entegrasyonu. Network effect için vendor motivasyon.'],
   'v4.93': ['MAJOR: Phase 4.0 - Email Verify Zorunluluk (production hazirligi). Global doğrulama banner, soft gate (kritik aksiyonlar bloklanir), resend email throttle (60sn), Admin Settings emailVerification config, requireEmailVerified() helper, otomatik user.reload() fresh check.'],
   'v4.92': ['MAJOR: Phase 3.12 - Vendor PoC detayinda musteri rozeti. renderCustomerBadge() helper, PoC liste kartlarinda rozet (vendor PoC Talepleri tab), PoC detay modalda buyuk rozet + tooltip aciklama, musteri PoC acma sirasinda preview. Sosyal kanit somutlasiyor.'],
@@ -24869,6 +24870,18 @@ async function renderVendorPublic(slug) {
     else if (tier === 'business') tierBadge = '<span style="background:linear-gradient(135deg,#f0a429,#d18420);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px">BUSINESS</span>';
     else if (tier === 'enterprise') tierBadge = '<span style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px">ENTERPRISE</span>';
 
+    // v4.95: Vendor referral rozet (varsa)
+    var refCount = vendor.vendorReferralCount || 0;
+    var refLevel = vendor.vendorReferralBadge || getVendorReferralBadgeLevel(refCount);
+    var refBadgeInfo = getVendorReferralBadgeInfo(refLevel);
+    var referralBadgeHtml = '';
+    if (refBadgeInfo && refCount > 0) {
+      referralBadgeHtml = '<span title="' + refBadgeInfo.label + ' — ' + refCount + ' vendor davet etmiş. PoCHub topluluğunu büyütüyor."'
+        + ' style="display:inline-flex;align-items:center;gap:4px;background:' + refBadgeInfo.bg + ';border:1px solid ' + refBadgeInfo.border + ';color:' + refBadgeInfo.color + ';font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px;letter-spacing:.3px;cursor:help">'
+        + refBadgeInfo.icon + ' ' + refBadgeInfo.label.toUpperCase()
+        + '</span>';
+    }
+
     // SEO: Document title + meta
     document.title = vendor.company + ' | PoCHub';
     setMetaTag('description', (vendor.shortDescription || 'PoCHub üzerinde ' + typeLabel + ' olarak hizmet veren ' + vendor.company + ' firması.').substring(0, 160));
@@ -24939,7 +24952,7 @@ async function renderVendorPublic(slug) {
       +     '<div style="flex:1;min-width:240px">'
       +       '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
       +         '<span style="font-size:13px;color:var(--text-muted);font-weight:600">'+typeIcon+' '+typeLabel+'</span>'
-      +         verifiedBadge + tierBadge
+      +         verifiedBadge + tierBadge + referralBadgeHtml
       +       '</div>'
       +       '<h1 style="font-size:30px;font-weight:800;color:var(--text-primary);margin:0 0 8px;line-height:1.2">'+vendor.company+'</h1>'
       +       (vendor.shortDescription ? '<div style="font-size:14.5px;color:var(--text-secondary);margin-bottom:14px;line-height:1.5">'+vendor.shortDescription+'</div>' : '')
@@ -24956,6 +24969,7 @@ async function renderVendorPublic(slug) {
       +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#22d078">'+visibleProducts.length+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">Aktif Ürün</div></div>'
       +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#7db4ff">'+completedPocs+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">Tamamlanan PoC</div></div>'
       +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#f0a429">'+events.length+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">Yaklaşan Etkinlik</div></div>'
+      +   (refCount > 0 ? '<div style="background:var(--bg-surface);border:1px solid '+(refBadgeInfo?.border || 'var(--border)')+';border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:'+(refBadgeInfo?.color || '#a855f7')+'">'+refCount+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">'+(refBadgeInfo?.icon || '🎁')+' Vendor Daveti</div></div>' : '')
       + '</div>'
 
       // İletişim & Detaylar
