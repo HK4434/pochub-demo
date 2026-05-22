@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.93 | pochub.co -->
+<!-- PoCHub v4.94 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.93</title>
+<title>PoCHub.co — v4.94</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -333,7 +333,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.93';
+const VERSION = 'v4.94';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -568,6 +568,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.94': ['MAJOR: Phase 4.1 - Vendor Leaderboard + Rozet Sistemi. Vendor için 3 seviye madalya rozeti (🥉/🥈/🥇), anasayfada top vendor leaderboard, Davet Et tab Sıralamadaki Yerin widget, public profile rozet entegrasyonu. Network effect için vendor motivasyon.'],
   'v4.93': ['MAJOR: Phase 4.0 - Email Verify Zorunluluk (production hazirligi). Global doğrulama banner, soft gate (kritik aksiyonlar bloklanir), resend email throttle (60sn), Admin Settings emailVerification config, requireEmailVerified() helper, otomatik user.reload() fresh check.'],
   'v4.92': ['MAJOR: Phase 3.12 - Vendor PoC detayinda musteri rozeti. renderCustomerBadge() helper, PoC liste kartlarinda rozet (vendor PoC Talepleri tab), PoC detay modalda buyuk rozet + tooltip aciklama, musteri PoC acma sirasinda preview. Sosyal kanit somutlasiyor.'],
   'v4.91': ['MAJOR: Phase 3.11 - Musteri-musteri referral sistemi. Musteri davet linki (?ref=cust-slug), 3 seviyeli rozet (Topluluk Uyesi/Destekcisi/Lideri), Customer Dashboardda Davet Et tab, anasayfada top musteri leaderboard, PoC sayfasinda musteri rozeti vendor gorur.'],
@@ -3655,6 +3656,16 @@ async function handleAuth() {
                   lastReferralBonusAt: serverTimestamp()
                 });
               }
+              // v4.94: Vendor users dokumanına da count + badge yansıt
+              try {
+                var newVendorCount = (referrerSnap.data().vendorReferralCount || 0) + 1;
+                var newVendorBadge = getVendorReferralBadgeLevel(newVendorCount);
+                await updateDoc(doc(db,'users',referredByUid), {
+                  vendorReferralCount: newVendorCount,
+                  vendorReferralBadge: newVendorBadge,
+                  lastReferralAt: serverTimestamp()
+                });
+              } catch(e){}
             } else if (referrerRole === 'customer' && AUTH_ROLE === 'customer') {
               // v4.91: Customer → Customer: count arttır + rozet hesapla
               var curCount = referrerSnap.data().customerReferralCount || 0;
@@ -3806,6 +3817,9 @@ async function renderHome() {
 
     <!-- v4.87: VENDOR LOGO BAR -->
     <div id="home-vendor-bar" style="margin-bottom:24px"></div>
+
+    <!-- v4.94: TOP VENDOR LEADERBOARD -->
+    <div id="home-top-vendors" style="margin-bottom:24px"></div>
 
     <!-- v4.91: TOP CUSTOMER LEADERBOARD -->
     <div id="home-top-customers" style="margin-bottom:24px"></div>
@@ -4081,6 +4095,7 @@ async function renderHome() {
 
   // v4.87: Sosyal kanıt bölümlerini yükle
   loadVendorLogoBar();
+  loadTopVendors();    // v4.94
   loadTopCustomers();  // v4.91
   loadHowItWorks();
   loadFAQ();
@@ -4827,6 +4842,63 @@ function openEventAttendeesMailModal(eventTitle, regs) {
       showToast('📧 Katılımcı listesi ' + sent + ' alıcıya gönderildi!');
     }
   });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.94: TOP VENDOR LEADERBOARD - En çok davet eden vendor'lar
+// Anasayfada müşteri leaderboard'ı altında gösterilir
+// Madalya teması rozetler (🥉🥈🥇)
+// ════════════════════════════════════════════════════════════════════
+async function loadTopVendors() {
+  var wrap = el('home-top-vendors');
+  if (!wrap) return;
+  try {
+    var snap = await getDocs(query(collection(db,'users'), where('role','==','vendor'), limit(50)));
+    if (snap.empty) { wrap.innerHTML = ''; return; }
+
+    var vendors = snap.docs.map(function(d){ return { ...d.data(), uid:d.id }; });
+    // vendorReferralCount > 0 olanları filtrele
+    var topVendors = vendors
+      .filter(function(v){ return (v.vendorReferralCount || 0) > 0; })
+      .sort(function(a, b){ return (b.vendorReferralCount || 0) - (a.vendorReferralCount || 0); })
+      .slice(0, 5);
+
+    if (topVendors.length === 0) { wrap.innerHTML = ''; return; }
+
+    var html = topVendors.map(function(v, i){
+      var badge = getVendorReferralBadgeInfo(v.vendorReferralBadge || getVendorReferralBadgeLevel(v.vendorReferralCount));
+      var rank = i + 1;
+      var rankColor = rank === 1 ? '#f0a429' : rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : 'var(--text-muted)';
+      var rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank;
+      var slug = v.slug || generateSlug(v.company || v.displayName || 'vendor');
+      var typeIcon = v.vendorType === 'ureticid' ? '🏭'
+                  : v.vendorType === 'distributor' ? '🚚'
+                  : v.vendorType === 'integrator' ? '🔧' : '💼';
+      return '<a href="#v/'+slug+'" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:12px;text-decoration:none;transition:all .15s;cursor:pointer" onmouseover="this.style.borderColor=\'rgba(240,164,41,.4)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'translateY(0)\'">'
+        + '<div style="font-size:22px;font-weight:800;color:'+rankColor+';min-width:36px;text-align:center">'+rankEmoji+'</div>'
+        + '<div style="flex:1;min-width:120px">'
+        +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary)">'+typeIcon+' '+(v.company || 'Vendor')+'</div>'
+        +   (badge ? '<div style="font-size:11px;color:'+badge.color+';font-weight:600;margin-top:2px">'+badge.icon+' '+badge.label+'</div>' : '')
+        + '</div>'
+        + '<div style="text-align:right">'
+        +   '<div style="font-size:22px;font-weight:800;color:#f0a429">'+v.vendorReferralCount+'</div>'
+        +   '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600">davet</div>'
+        + '</div>'
+        + '</a>';
+    }).join('');
+
+    wrap.innerHTML =
+      '<div class="card" style="padding:22px">'
+      + '<div style="text-align:center;margin-bottom:16px">'
+      +   '<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);font-weight:700;margin-bottom:6px">🥇 VENDOR ŞAMPİYONLARI</div>'
+      +   '<div style="font-size:18px;font-weight:700;color:var(--text-primary)">En Çok Davet Eden Vendor\'lar</div>'
+      +   '<div style="font-size:12px;color:var(--text-muted);margin-top:4px">Bu firmalar PoCHub ekosistemini büyütüyor</div>'
+      + '</div>'
+      + '<div style="display:grid;gap:10px;max-width:560px;margin:0 auto">' + html + '</div>'
+      + '</div>';
+  } catch(e) {
+    wrap.innerHTML = '';
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -14828,6 +14900,42 @@ async function vendReferrals(m) {
     var activeReferrals = referrals.filter(function(r){ return r.status === 'active'; }).length;
     var suspiciousReferrals = referrals.filter(function(r){ return r.status === 'suspicious'; }).length;
 
+    // v4.94: Vendor rozet + sıralama bilgisi
+    var vendorRefCount = CUR_PROFILE?.vendorReferralCount || 0;
+    var vendorBadgeLvl = CUR_PROFILE?.vendorReferralBadge || getVendorReferralBadgeLevel(vendorRefCount);
+    var vendorBadgeInfo = getVendorReferralBadgeInfo(vendorBadgeLvl);
+
+    // Sıralama - tüm vendor'ları al, davet sayısına göre sırala
+    var myRank = null;
+    var topAhead = []; // benden üstte olanlar (max 3)
+    try {
+      var allVSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor'), limit(100)));
+      var allVendors = allVSnap.docs
+        .map(function(d){ return { ...d.data(), uid:d.id }; })
+        .filter(function(v){ return (v.vendorReferralCount || 0) > 0; })
+        .sort(function(a, b){ return (b.vendorReferralCount || 0) - (a.vendorReferralCount || 0); });
+
+      for (var i=0; i<allVendors.length; i++) {
+        if (allVendors[i].uid === CUR_USER.uid) {
+          myRank = i + 1;
+          break;
+        }
+      }
+      // Önümdeki en yakın 1-2 vendor (sadece davet edenler)
+      if (myRank && myRank > 1) {
+        topAhead = allVendors.slice(0, Math.min(myRank - 1, 3));
+      } else if (!myRank && vendorRefCount === 0) {
+        // Hiç davet etmemişse, en yakın hedef = en az davet eden
+        topAhead = allVendors.slice(-2).reverse();
+      }
+    } catch(e){}
+
+    // Sonraki rozet hedefi
+    var nextBadgeNeed = null;
+    if (!vendorBadgeLvl) nextBadgeNeed = { count: 1, label: 'Topluluk Yapıcı' };
+    else if (vendorBadgeLvl === 'bronze') nextBadgeNeed = { count: 3 - vendorRefCount, label: 'Topluluk Geliştirici' };
+    else if (vendorBadgeLvl === 'silver') nextBadgeNeed = { count: 6 - vendorRefCount, label: 'Topluluk Lideri' };
+
     // Paylaşım linkleri
     var shareText = encodeURIComponent('PoCHub - Türkiye IT PoC Pazaryeri. Ücretsiz vendor kayıt: ' + referralUrl);
     var linkedinShare = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(referralUrl);
@@ -14853,6 +14961,39 @@ async function vendReferrals(m) {
       +     '<div><div style="font-size:24px;font-weight:800;color:#f0a429">+'+bonusPocs+'</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:3px">PoC Bonusu/Ay</div></div>'
       +     (suspiciousReferrals > 0 ? '<div><div style="font-size:24px;font-weight:800;color:#ff7070">'+suspiciousReferrals+'</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:3px">Şüpheli</div></div>' : '')
       +   '</div>'
+      + '</div>'
+
+      // v4.94: ROZET + SIRALAMA WIDGET
+      + '<div style="background:linear-gradient(135deg,rgba(240,164,41,.06),rgba(240,164,41,.02));border:1px solid rgba(240,164,41,.3);border-radius:12px;padding:20px;margin-bottom:18px">'
+      +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center" class="lb-widget-grid">'
+      +     '<div style="text-align:center">'
+      +       '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700;margin-bottom:8px">🏆 Rozetin</div>'
+      +       '<div style="font-size:46px;line-height:1">' + (vendorBadgeInfo?.icon || '⚪') + '</div>'
+      +       '<div style="font-size:13.5px;font-weight:700;color:' + (vendorBadgeInfo?.color || 'var(--text-muted)') + ';margin-top:6px">' + (vendorBadgeInfo?.label || 'Henüz Rozetin Yok') + '</div>'
+      +       (nextBadgeNeed ? '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + Math.max(1, nextBadgeNeed.count) + ' davet daha → ' + nextBadgeNeed.label + '</div>' : '<div style="font-size:11px;color:#f0a429;margin-top:3px;font-weight:700">🏅 En yüksek seviyedesin!</div>')
+      +     '</div>'
+      +     '<div style="text-align:center;border-left:1px solid var(--border);padding-left:16px" class="lb-rank-col">'
+      +       '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700;margin-bottom:8px">📊 Sıralamadaki Yerin</div>'
+      +       '<div style="font-size:46px;font-weight:800;color:#f0a429;line-height:1">' + (myRank ? '#' + myRank : '—') + '</div>'
+      +       '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-top:6px">' + (myRank === 1 ? '🥇 ŞAMPIYON' : myRank ? 'Vendor Sıralamasında' : 'Sıralamada yok') + '</div>'
+      +       (topAhead.length > 0 && !myRank ? '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">İlk daveti yap, sıralamaya gir!</div>' : myRank && myRank > 1 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + (myRank - 1) + ' kişiyi geçmek için davet et</div>' : '')
+      +     '</div>'
+      +   '</div>'
+      +   (topAhead.length > 0 && myRank !== 1 ? '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">'
+            + '<div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700;margin-bottom:10px">🎯 Geçmen Gerekenler</div>'
+            + '<div style="display:grid;gap:6px">'
+            + topAhead.map(function(v, i){
+                var badge = getVendorReferralBadgeInfo(v.vendorReferralBadge || getVendorReferralBadgeLevel(v.vendorReferralCount));
+                return '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+                  + '<div style="display:flex;align-items:center;gap:8px">'
+                  +   '<span style="font-size:12px;font-weight:700;color:var(--text-muted);min-width:24px">#' + (i+1) + '</span>'
+                  +   '<span style="font-size:13px;font-weight:600;color:var(--text-primary)">' + (v.company || 'Vendor') + '</span>'
+                  +   (badge ? '<span style="font-size:13px">'+badge.icon+'</span>' : '')
+                  + '</div>'
+                  + '<div style="font-size:13px;font-weight:700;color:#f0a429">' + (v.vendorReferralCount || 0) + ' davet</div>'
+                  + '</div>';
+              }).join('')
+            + '</div></div>' : '')
       + '</div>'
 
       // LINK + COPY
@@ -21666,6 +21807,58 @@ function getCustomerReferralBadgeInfo(level) {
   if (level === 'supporter') return { icon: '🌿', label: 'Topluluk Destekçisi', color: '#7db4ff', bg: 'rgba(125,180,255,.12)', border: 'rgba(125,180,255,.4)' };
   if (level === 'member') return { icon: '🌱', label: 'Topluluk Üyesi', color: '#a855f7', bg: 'rgba(168,85,247,.12)', border: 'rgba(168,85,247,.4)' };
   return null;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v4.94: VENDOR REFERRAL ROZET SİSTEMİ (madalya teması)
+// Müşteri rozetlerinden görsel olarak ayrı:
+//   Customer: 🌱🌿🌳 (doğa)
+//   Vendor:   🥉🥈🥇 (madalya)
+// 1-2 davet: 🥉 Topluluk Yapıcı
+// 3-5 davet: 🥈 Topluluk Geliştirici
+// 6+ davet:  🥇 Topluluk Lideri
+// ════════════════════════════════════════════════════════════════════
+function getVendorReferralBadgeLevel(count) {
+  if (!count || count < 1) return null;
+  if (count >= 6) return 'gold';
+  if (count >= 3) return 'silver';
+  return 'bronze';
+}
+
+function getVendorReferralBadgeInfo(level) {
+  if (level === 'gold')   return { icon: '🥇', label: 'Topluluk Lideri',      color: '#f0a429', bg: 'rgba(240,164,41,.12)',  border: 'rgba(240,164,41,.4)'  };
+  if (level === 'silver') return { icon: '🥈', label: 'Topluluk Geliştirici', color: '#7db4ff', bg: 'rgba(125,180,255,.12)', border: 'rgba(125,180,255,.4)' };
+  if (level === 'bronze') return { icon: '🥉', label: 'Topluluk Yapıcı',      color: '#cd7f32', bg: 'rgba(205,127,50,.15)',  border: 'rgba(205,127,50,.45)' };
+  return null;
+}
+
+// Vendor için referral count - vendor_subscriptions koleksiyonunda referralBonusPocs
+// veya users dokumanına yansıtılan bilgi kullanılır
+function renderVendorBadge(vendorData, vendorSub, size) {
+  if (!vendorData) return '';
+  size = size || 'normal';
+  // Vendor için davet sayısı = subscription'daki referralBonusPocs (her başarılı davet = 1 bonus PoC)
+  var count = (vendorSub?.referralBonusPocs) || vendorData.vendorReferralCount || 0;
+  var level = vendorData.vendorReferralBadge || getVendorReferralBadgeLevel(count);
+  if (!level || count < 1) return '';
+  var info = getVendorReferralBadgeInfo(level);
+  if (!info) return '';
+
+  var tooltip = info.label + ' — ' + count + ' vendor davet etmiş. PoCHub topluluğunu büyütüyor.';
+
+  if (size === 'compact') {
+    return '<span title="'+tooltip+'" style="display:inline-flex;align-items:center;gap:3px;font-size:13px;background:'+info.bg+';border:1px solid '+info.border+';color:'+info.color+';padding:2px 6px;border-radius:8px;font-weight:600;cursor:help;line-height:1">'+info.icon+'<span style="font-size:10px;font-weight:700">'+count+'</span></span>';
+  }
+  if (size === 'large') {
+    return '<div title="'+tooltip+'" style="display:inline-flex;align-items:center;gap:10px;background:'+info.bg+';border:1px solid '+info.border+';padding:10px 14px;border-radius:10px;cursor:help">'
+      + '<div style="font-size:28px">'+info.icon+'</div>'
+      + '<div>'
+      +   '<div style="font-size:13px;font-weight:700;color:'+info.color+'">'+info.label+'</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted);margin-top:1px">'+count+' vendor davet etmiş</div>'
+      + '</div>'
+      + '</div>';
+  }
+  return '<span title="'+tooltip+'" style="display:inline-flex;align-items:center;gap:5px;background:'+info.bg+';border:1px solid '+info.border+';color:'+info.color+';padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;cursor:help;letter-spacing:.2px">'+info.icon+' '+info.label+'</span>';
 }
 
 // ════════════════════════════════════════════════════════════════════
