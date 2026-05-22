@@ -553,3 +553,94 @@ export const weeklyDigestCron = onSchedule(
     }
   }
 );
+
+// ═════════════════════════════════════════════════════════════════════
+// v4.97: cycleResetCron — her gün 04:00 UTC (TR 07:00)
+// ═════════════════════════════════════════════════════════════════════
+//
+// İş: vendor_subscriptions için 30 günü dolan cycle'ları reset eder.
+// pocUsedThisCycle = 0, cycleStartedAt = now, lastCycleResetAt = now
+// referralBonusPocs ASLA SIFIRLANMAZ (kalıcı kazanım - v4.96 ile uyumlu).
+//
+// Backup mekanizma: Client-side reset (v4.96) zaten var ama vendor pasifse
+// hiç tetiklenmez. Bu cron her gün sweep yaparak güvence verir.
+//
+export const cycleResetCron = onSchedule(
+  {
+    schedule: "0 4 * * *", // her gün 04:00 UTC
+    timeZone: "UTC",
+    region: "europe-west1",
+    memory: "512MiB",
+    timeoutSeconds: 540,
+  },
+  async (event) => {
+    const today = formatDate(new Date());
+    const cronType = "cycle_reset";
+
+    if (!(await claimCronRun(cronType, today))) {
+      return;
+    }
+
+    const db = admin.firestore();
+    const stats = {
+      checked: 0,
+      reset: 0,
+      bonusPreserved: 0,
+      errors: [] as string[],
+    };
+
+    try {
+      const now = admin.firestore.Timestamp.now();
+      const thirtyDaysAgoMs = Date.now() - 30 * 86400 * 1000;
+      const cutoff = admin.firestore.Timestamp.fromMillis(thirtyDaysAgoMs);
+
+      // cycleStartedAt 30+ gün önceki active subscription'lar
+      const oldCycleSnap = await db.collection("vendor_subscriptions")
+        .where("status", "in", ["active", "grace_period"])
+        .where("cycleStartedAt", "<=", cutoff)
+        .limit(500)
+        .get();
+
+      stats.checked = oldCycleSnap.size;
+
+      const batch = db.batch();
+      let batchCount = 0;
+      const batches: admin.firestore.WriteBatch[] = [batch];
+
+      for (const sub of oldCycleSnap.docs) {
+        const subData = sub.data();
+        const oldBonus = subData.referralBonusPocs || 0;
+
+        // Reset - pocUsedThisCycle 0, cycleStartedAt now
+        // referralBonusPocs DOKUNULMUYOR (kalıcı kazanım)
+        batches[batches.length - 1].update(sub.ref, {
+          pocUsedThisCycle: 0,
+          inviteUsedThisCycle: 0,  // davet kotası da reset
+          cycleStartedAt: now,
+          lastCycleResetAt: now,
+          // referralBonusPocs: KORUNUR
+        });
+
+        if (oldBonus > 0) stats.bonusPreserved++;
+        stats.reset++;
+
+        batchCount++;
+        if (batchCount >= 250) {
+          batches.push(db.batch());
+          batchCount = 0;
+        }
+      }
+
+      for (const b of batches) {
+        await b.commit();
+      }
+
+      await markCronComplete(cronType, today, stats);
+      console.log("[cycleReset] DONE:", JSON.stringify(stats));
+    } catch (e: any) {
+      console.error("[cycleReset] FAIL:", e);
+      await markCronFailed(cronType, today, e.message || String(e));
+      throw e;
+    }
+  }
+);
