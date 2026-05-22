@@ -61,6 +61,30 @@ export {dailyMaintenanceCron} from "./cron";
 export {hourlyBillingCheckCron} from "./cron";
 export {weeklyDigestCron} from "./cron";
 
+// ─── v4.97: Cycle reset cron (AKTİF) ─────────────────────────────────
+// Her gün 04:00 UTC çalışır.
+// 30 günü dolan vendor cycle'larını reset eder, referralBonusPocs korunur.
+// Client-side reset (v4.96) yedek olarak çalışmaya devam eder.
+// Deploy:
+//   firebase deploy --only functions:cycleResetCron
+export {cycleResetCron} from "./cron";
+
+// ─── v4.97: Calendly webhook (AKTİF) ─────────────────────────────────
+// HTTP endpoint - Calendly randevu event'lerini dinler.
+// Setup:
+//   1. firebase functions:secrets:set CALENDLY_SIGNING_KEY
+//      (Calendly Webhook ayarlarından signing key kopyala)
+//   2. firebase deploy --only functions:calendlyWebhook
+//   3. Calendly'de webhook URL ekle:
+//      https://europe-west1-pochub-co.cloudfunctions.net/calendlyWebhook
+//   4. Events: invitee.created, invitee.canceled
+//
+// Client-side postMessage (v4.90) ile hibrit çalışır:
+//   - Kullanıcı embed widget'te randevu alırsa → postMessage tetiklenir
+//   - Kullanıcı sayfayı kapatıp Calendly'den randevu alırsa → webhook tetiklenir
+//   - Her iki durumda demo_requests doc güncellenir
+export {calendlyWebhook} from "./calendly-webhook";
+
 // ─── v4.79+: Production fonksiyonları (PLACEHOLDER) ──────────────────
 // export {createPocCharge} from "./charges";
 // export {approvePocCharge} from "./charges";
