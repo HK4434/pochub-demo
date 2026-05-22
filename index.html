@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.92 | pochub.co -->
+<!-- PoCHub v4.93 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.92</title>
+<title>PoCHub.co — v4.93</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -333,7 +333,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.92';
+const VERSION = 'v4.93';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -568,6 +568,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.93': ['MAJOR: Phase 4.0 - Email Verify Zorunluluk (production hazirligi). Global doğrulama banner, soft gate (kritik aksiyonlar bloklanir), resend email throttle (60sn), Admin Settings emailVerification config, requireEmailVerified() helper, otomatik user.reload() fresh check.'],
   'v4.92': ['MAJOR: Phase 3.12 - Vendor PoC detayinda musteri rozeti. renderCustomerBadge() helper, PoC liste kartlarinda rozet (vendor PoC Talepleri tab), PoC detay modalda buyuk rozet + tooltip aciklama, musteri PoC acma sirasinda preview. Sosyal kanit somutlasiyor.'],
   'v4.91': ['MAJOR: Phase 3.11 - Musteri-musteri referral sistemi. Musteri davet linki (?ref=cust-slug), 3 seviyeli rozet (Topluluk Uyesi/Destekcisi/Lideri), Customer Dashboardda Davet Et tab, anasayfada top musteri leaderboard, PoC sayfasinda musteri rozeti vendor gorur.'],
   'v4.90': ['MAJOR: Phase 3.10 - Calendly Booked Tracking. Calendly postMessage listener (event_scheduled), demo_requests status guncellemesi (page_viewed -> booked), Admin Demo Talepleri funnel stat ve filtre, randevu tarihi sutunu. Functions deploy beklenmeden client-side calisir.'],
@@ -2770,6 +2771,18 @@ onAuthStateChanged(auth, async user => {
     const snap = await getDoc(doc(db, 'users', user.uid));
     CUR_PROFILE = snap.exists() ? snap.data() : null;
 
+    // v4.93: Email verified status sync - Firebase Auth ile Firestore tutarlı tutulur
+    // Eğer Firebase tarafında doğrulanmış ama Firestore'da false ise güncelle
+    if (user.emailVerified && CUR_PROFILE && !CUR_PROFILE.emailVerified) {
+      try {
+        await updateDoc(doc(db,'users',user.uid), {
+          emailVerified: true,
+          emailVerifiedAt: serverTimestamp()
+        });
+        CUR_PROFILE.emailVerified = true;
+      } catch(e){}
+    }
+
     // Email doğrulama: Firebase Auth veya Firestore flag'i
     const isVerified = user.emailVerified || CUR_PROFILE?.emailVerified === true;
 
@@ -2778,6 +2791,13 @@ onAuthStateChanged(auth, async user => {
     } else {
       const b = document.getElementById('verify-banner');
       if (b) b.remove();
+    }
+
+    // v4.93: Email verify banner (tüm roller için - admin hariç)
+    if (!isVerified && CUR_PROFILE?.role !== 'admin') {
+      setTimeout(showEmailVerifyBanner, 600);
+    } else {
+      hideEmailVerifyBanner();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -2872,6 +2892,7 @@ onAuthStateChanged(auth, async user => {
     CUR_PROFILE = null;
     const b = document.getElementById('verify-banner');
     if (b) b.remove();
+    hideEmailVerifyBanner();  // v4.93
   }
   buildNav();
   renderScreen(CUR_SCREEN);
@@ -7230,6 +7251,9 @@ async function openPocTimeline(poc) {
 }
 
 async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
+  // v4.93: Email verify kontrolü (kritik aksiyon)
+  if (!(await requireEmailVerified('create_poc', 'PoC talebi açma'))) return;
+
   const modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.id = 'poc-multi-modal';
@@ -13383,7 +13407,9 @@ async function vendRequests(m) {
       });
     });
     lst.querySelectorAll('.rq-off').forEach(function(b){
-      b.addEventListener('click', function(){
+      b.addEventListener('click', async function(){
+        // v4.93: Email verify kontrolü
+        if (!(await requireEmailVerified('send_offer', 'Teklif gönderme'))) return;
         if (typeof openSendOfferModal === 'function') {
           // Signature: (pocId, customerId, customerEmail, customerName, productName, vendorType)
           openSendOfferModal(
@@ -14432,6 +14458,9 @@ async function canVendorAcceptPoC(vendorId) {
 // PoC kabul akışı — kontenjan kontrolü + transaction + bildirim
 // onAccepted callback: kabul başarılı olunca render güncellemek için
 async function vendorAcceptPocWithQuotaCheck(pocId, vendorId, pocData, onAccepted) {
+  // v4.93: Email verify kontrolü (kritik aksiyon)
+  if (!(await requireEmailVerified('accept_poc', 'PoC kabul'))) return;
+
   const check = await canVendorAcceptPoC(vendorId);
 
   if (check.allowed === true) {
@@ -21812,6 +21841,19 @@ const DEFAULT_CONFIG = {
     welcomeMessage: 'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı, ürünlerinizi nasıl listeleyeceğinizi konuşalım.',
     showAfterMinutes: 0,              // 0: hemen göster, X: form sonrası gecikme
   },
+  // v4.93: Email Verification zorunluluğu
+  emailVerification: {
+    enabled: true,                    // Banner gösterimi (true ise email_verified=false olanlar uyarılır)
+    blockCriticalActions: true,       // Kritik aksiyonlar (PoC kabul, teklif gönder, ödeme) blok edilir
+    blockedActions: [                 // Bloklanacak aksiyon listesi (genişletilebilir)
+      'accept_poc',                   // Vendor PoC kabul
+      'send_offer',                   // Vendor teklif gönder
+      'create_poc',                   // Customer PoC açma
+      'submit_payment',               // Ödeme talep
+    ],
+    resendCooldownSeconds: 60,        // Resend butonu cooldown
+    showSoftBanner: true,             // Üst tarafta sarı banner gösterimi
+  },
   freeTier: {
     pocAcceptanceMode: 'no_acceptance',
     freePocsPerPeriod: 0,
@@ -21963,6 +22005,194 @@ async function loadSystemConfig() {
 }
 // Sayfa açılır açılmaz çağır (login olmadan)
 loadSystemConfig();
+
+// ════════════════════════════════════════════════════════════════════
+// v4.93: EMAIL VERIFICATION HELPERS
+// ════════════════════════════════════════════════════════════════════
+
+// Email verify aktif mi? (admin tarafından konfigüre)
+function isEmailVerifyEnabled() {
+  var cfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.emailVerification) || DEFAULT_CONFIG.emailVerification;
+  return cfg.enabled !== false;
+}
+
+function shouldBlockAction(actionKey) {
+  var cfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.emailVerification) || DEFAULT_CONFIG.emailVerification;
+  if (!cfg.enabled || !cfg.blockCriticalActions) return false;
+  var blocked = cfg.blockedActions || DEFAULT_CONFIG.emailVerification.blockedActions;
+  return blocked.indexOf(actionKey) !== -1;
+}
+
+// requireEmailVerified — kritik aksiyon öncesi kontrol
+// Eğer email doğrulanmamışsa modal gösterir, false döner
+// Doğrulanmışsa true döner ve aksiyon devam eder
+async function requireEmailVerified(actionKey, actionLabel) {
+  if (!CUR_USER) return true; // logout için kontrol etmiyoruz (signup vs.)
+  if (!shouldBlockAction(actionKey)) return true;
+
+  // Önce fresh status check (Firebase'den)
+  try {
+    await auth.currentUser.reload();
+    if (auth.currentUser.emailVerified) {
+      // Doğrulanmış - users dokumana yansıt
+      if (!CUR_PROFILE.emailVerified) {
+        try {
+          await updateDoc(doc(db,'users',CUR_USER.uid), { emailVerified: true, emailVerifiedAt: serverTimestamp() });
+          CUR_PROFILE.emailVerified = true;
+        } catch(e){}
+      }
+      return true;
+    }
+  } catch(e){}
+
+  // Doğrulanmamış - modal aç
+  showEmailVerifyModal(actionLabel || 'bu işlem');
+  return false;
+}
+
+// Email Verify Modal — kullanıcı bilgilendirilir + resend butonu
+function showEmailVerifyModal(actionLabel) {
+  // Mevcut modal varsa kapat
+  var existing = document.getElementById('email-verify-modal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'email-verify-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border-radius:14px;max-width:480px;width:100%;padding:28px;text-align:center">'
+    + '<div style="font-size:56px;margin-bottom:14px">📧</div>'
+    + '<h2 style="margin:0 0 8px;color:var(--text-primary);font-size:20px;font-weight:800">E-posta Doğrulama Gerekli</h2>'
+    + '<div style="color:var(--text-secondary);font-size:13.5px;line-height:1.6;margin-bottom:16px">'
+    +   actionLabel + ' işlemi için <strong style="color:var(--text-primary)">e-posta adresinizi doğrulamış</strong> olmanız gerekir.'
+    + '</div>'
+    + '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;text-align:left">'
+    +   '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Kayıtlı e-posta:</div>'
+    +   '<div style="font-size:13.5px;font-weight:600;color:var(--text-primary)">' + (CUR_USER?.email || '—') + '</div>'
+    + '</div>'
+    + '<div style="display:grid;gap:8px">'
+    +   '<button id="ev-resend" class="btn-p" style="padding:11px 16px;font-size:13px;font-weight:700">📧 Doğrulama Maili Tekrar Gönder</button>'
+    +   '<button id="ev-check" class="btn-g" style="padding:11px 16px;font-size:13px">✓ Doğruladım, Kontrol Et</button>'
+    +   '<button id="ev-close" style="background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:8px;text-decoration:underline">Sonra</button>'
+    + '</div>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-top:14px;line-height:1.5">📥 Mailini kontrol edin (spam klasörü dahil). Linke tıklayıp doğruladıktan sonra "Doğruladım, Kontrol Et" butonuna basın.</div>'
+    + '</div>';
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+
+  el('ev-close').addEventListener('click', function(){ modal.remove(); });
+
+  el('ev-resend').addEventListener('click', async function(){
+    var btn = this;
+    var cfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.emailVerification) || DEFAULT_CONFIG.emailVerification;
+    var cooldown = cfg.resendCooldownSeconds || 60;
+    var lastSent = parseInt(localStorage.getItem('lastEmailVerifySent') || '0');
+    var remaining = cooldown - Math.floor((Date.now() - lastSent) / 1000);
+    if (remaining > 0) {
+      showToast('Tekrar göndermek için ' + remaining + ' saniye bekleyin', 'warn');
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '📤 Gönderiliyor...';
+    try {
+      await sendEmailVerification(auth.currentUser);
+      localStorage.setItem('lastEmailVerifySent', Date.now().toString());
+      showToast('📧 Doğrulama maili gönderildi! Mailinizi kontrol edin.');
+      btn.textContent = '✓ Gönderildi';
+      setTimeout(function(){
+        btn.disabled = false;
+        btn.textContent = '📧 Doğrulama Maili Tekrar Gönder';
+      }, cooldown * 1000);
+    } catch(e) {
+      showToast('Hata: ' + (e.message || 'Mail gönderilemedi'), 'err');
+      btn.disabled = false;
+      btn.textContent = '📧 Doğrulama Maili Tekrar Gönder';
+    }
+  });
+
+  el('ev-check').addEventListener('click', async function(){
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = '⏳ Kontrol ediliyor...';
+    try {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        // Users dokumana yansıt
+        try {
+          await updateDoc(doc(db,'users',CUR_USER.uid), {
+            emailVerified: true,
+            emailVerifiedAt: serverTimestamp()
+          });
+          CUR_PROFILE.emailVerified = true;
+        } catch(e){}
+        modal.remove();
+        showToast('🎉 E-posta doğrulandı! Tekrar deneyin.');
+        // Sayfayı yenile (banner kaybolur, aksiyonlar açılır)
+        setTimeout(function(){
+          // Mevcut sayfaya kalsın, banner'ı kaldır
+          hideEmailVerifyBanner();
+        }, 500);
+      } else {
+        btn.disabled = false;
+        btn.textContent = '✓ Doğruladım, Kontrol Et';
+        showToast('Henüz doğrulanmamış. Mailinizdeki linke tıklayıp tekrar deneyin.', 'warn');
+      }
+    } catch(e) {
+      btn.disabled = false;
+      btn.textContent = '✓ Doğruladım, Kontrol Et';
+      showToast('Hata: ' + (e.message || 'Kontrol edilemedi'), 'err');
+    }
+  });
+}
+
+// Email verify banner — üst kısımda sarı uyarı
+function showEmailVerifyBanner() {
+  if (!CUR_USER || !CUR_PROFILE) return;
+  if (CUR_PROFILE.emailVerified || auth.currentUser?.emailVerified) return;
+  var cfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.emailVerification) || DEFAULT_CONFIG.emailVerification;
+  if (!cfg.enabled || !cfg.showSoftBanner) return;
+
+  // Banner zaten varsa atlama
+  if (document.getElementById('email-verify-banner')) return;
+
+  // Dismiss flag kontrolü (session bazlı, kalıcı değil)
+  if (sessionStorage.getItem('emailVerifyBannerDismissed') === '1') return;
+
+  var banner = document.createElement('div');
+  banner.id = 'email-verify-banner';
+  banner.style.cssText = 'background:linear-gradient(90deg,rgba(240,164,41,.18),rgba(240,164,41,.08));border-bottom:1px solid rgba(240,164,41,.4);padding:10px 18px;display:flex;align-items:center;gap:12px;font-size:12.5px;color:var(--text-primary);position:sticky;top:0;z-index:50;flex-wrap:wrap';
+  banner.innerHTML =
+    '<div style="font-size:18px">📧</div>'
+    + '<div style="flex:1;min-width:200px">'
+    +   '<strong>E-posta doğrulanmadı.</strong> '
+    +   '<span style="color:var(--text-secondary)">Kritik işlemler için <strong>' + (CUR_USER.email || '') + '</strong> adresini doğrulayın.</span>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px">'
+    +   '<button id="evb-verify" style="background:#f0a429;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">Doğrula →</button>'
+    +   '<button id="evb-dismiss" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:0 4px">×</button>'
+    + '</div>';
+
+  document.body.insertBefore(banner, document.body.firstChild);
+
+  el('evb-verify').addEventListener('click', function(){
+    showEmailVerifyModal('Kritik işlem');
+  });
+  el('evb-dismiss').addEventListener('click', function(){
+    try { sessionStorage.setItem('emailVerifyBannerDismissed', '1'); } catch(e){}
+    banner.remove();
+  });
+}
+
+function hideEmailVerifyBanner() {
+  var b = document.getElementById('email-verify-banner');
+  if (b) b.remove();
+}
+
+window.requireEmailVerified = requireEmailVerified;
+window.showEmailVerifyModal = showEmailVerifyModal;
+window.showEmailVerifyBanner = showEmailVerifyBanner;
+window.hideEmailVerifyBanner = hideEmailVerifyBanner;
 
 // ════════════════════════════════════════════════════════════════════
 // v4.82: ADMIN VENDOR DOĞRULAMA SAYFASI
@@ -22450,6 +22680,14 @@ async function admSettings(m) {
     s0.appendChild(field('Şüphelileri Otomatik Blok', 'cfg-spam-auto', 'toggle', cfg.spamProtection?.autoBlockSuspicious ?? false, 'Açıksa şüpheli signup otomatik bloklanır. Kapalıda admin\'e işaret olur.'));
     m.appendChild(s0);
 
+    // v4.93: Email Verification
+    var s0c = section('📧 E-posta Doğrulama Zorunluluğu', '#f0a429');
+    s0c.appendChild(field('Email Verify Sistemi Aktif Mi?', 'cfg-ev-enabled', 'toggle', cfg.emailVerification?.enabled ?? true, 'Kapalıda banner ve aksiyon blokları çalışmaz. Production için açık olmalı.'));
+    s0c.appendChild(field('Soft Banner Göster', 'cfg-ev-banner', 'toggle', cfg.emailVerification?.showSoftBanner ?? true, 'Üst tarafta sarı uyarı banner gösterilir'));
+    s0c.appendChild(field('Kritik Aksiyonları Blokla', 'cfg-ev-block', 'toggle', cfg.emailVerification?.blockCriticalActions ?? true, 'PoC kabul, teklif gönder, PoC aç gibi aksiyonlar email_verified zorunlu'));
+    s0c.appendChild(field('Resend Cooldown (saniye)', 'cfg-ev-cooldown', 'number', cfg.emailVerification?.resendCooldownSeconds ?? 60, 'Doğrulama maili tekrar gönderme bekleme süresi'));
+    m.appendChild(s0c);
+
     // v4.89: Calendly Entegrasyonu
     var s0b = section('📅 Calendly Entegrasyonu (15dk Demo)', '#22d078');
     s0b.appendChild(field('Calendly Aktif Mi?', 'cfg-cal-enabled', 'toggle', cfg.calendly?.enabled ?? false, 'Açıksa /#demo sayfasında inline widget gösterilir. Kapalıda e-posta yönlendirme.'));
@@ -22644,6 +22882,14 @@ async function admSettings(m) {
             suspiciousIpThreshold: parseInt(el('cfg-spam-ip').value)||5,
             suspiciousFpThreshold: parseInt(el('cfg-spam-fp').value)||3,
             autoBlockSuspicious: el('cfg-spam-auto').value === 'true',
+          },
+          // v4.93: Email Verification
+          emailVerification: {
+            enabled: el('cfg-ev-enabled').value === 'true',
+            showSoftBanner: el('cfg-ev-banner').value === 'true',
+            blockCriticalActions: el('cfg-ev-block').value === 'true',
+            resendCooldownSeconds: parseInt(el('cfg-ev-cooldown').value) || 60,
+            blockedActions: ['accept_poc', 'send_offer', 'create_poc', 'submit_payment'],
           },
           // v4.89: Calendly
           calendly: {
