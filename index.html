@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- PoCHub v4.95 | pochub.co -->
+<!-- PoCHub v4.96 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PoCHub.co — v4.95</title>
+<title>PoCHub.co — v4.96</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2322d078'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg-dark:#07080d;--bg-dark-2:#0f1117;--bg-dark-3:#1c1f2a;--bg-base:#faf9f7;--bg-surface:#ffffff;--bg-elevated:#f3f2f0;--bg-hover:rgba(59,124,255,.05);--color-primary:#0066cc;--color-primary-dim:rgba(0,102,204,.10);--color-primary-hover:#0052a3;--color-success:#16a34a;--color-success-dim:rgba(22,163,74,.10);--color-warning:#d97706;--color-warning-dim:rgba(217,119,6,.10);--color-danger:#dc2626;--color-danger-dim:rgba(220,38,38,.10);--color-info:#2563eb;--color-info-dim:rgba(37,99,235,.10);--color-purple:#7c3aed;--color-purple-dim:rgba(124,58,237,.10);--text-primary:#17253d;--text-secondary:#323130;--text-muted:#605e5c;--border:rgba(15,23,42,.10);--border-focus:var(--color-primary);--role-customer-accent:#16a34a;--role-customer-dim:rgba(22,163,74,.08);--role-vendor-accent:#2563eb;--role-vendor-dim:rgba(37,99,235,.08);--role-admin-accent:#7c3aed;--role-admin-dim:rgba(124,58,237,.08);--shadow-sm:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 16px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.06);--shadow-lg:0 10px 40px rgba(15,23,42,.12);}
@@ -333,7 +333,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v4.95';
+const VERSION = 'v4.96';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -568,6 +568,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v4.96': ['MAJOR: Phase 4.3 - Quota Reset + Referral Bonus Aktif. 3 kritik bug fix: (1) referralBonusPocs canVendorAcceptPoC fnde kullanılmıyordu - şimdi etkili, (2) aylık cycle reset mekanizması yoktu - login/PoC kabul anında otomatik reset, (3) bonus reset sırasında korunur kalıcı kazanım. Vendor abonelik tablosunda bonus + base ayrı görünür.'],
   'v4.95': ['MAJOR: Phase 4.2 - Vendor Public Profilde Referral Rozeti. Hero kismina 3 rozet entegrasyonu (tier + verified + referral 🥉🥈🥇), kompakt yan yana goruntu, tooltip detay. LinkedIn outreach icin gosterge.'],
   'v4.94': ['MAJOR: Phase 4.1 - Vendor Leaderboard + Rozet Sistemi. Vendor için 3 seviye madalya rozeti (🥉/🥈/🥇), anasayfada top vendor leaderboard, Davet Et tab Sıralamadaki Yerin widget, public profile rozet entegrasyonu. Network effect için vendor motivasyon.'],
   'v4.93': ['MAJOR: Phase 4.0 - Email Verify Zorunluluk (production hazirligi). Global doğrulama banner, soft gate (kritik aksiyonlar bloklanir), resend email throttle (60sn), Admin Settings emailVerification config, requireEmailVerified() helper, otomatik user.reload() fresh check.'],
@@ -14448,6 +14449,51 @@ async function openSendInviteModal() {
 
 // Vendor'ın PoC kabul edebilirliğini kontrol et
 // Returns: { allowed, reason, message, source, amount, package, options }
+// ════════════════════════════════════════════════════════════════════
+// v4.96: CYCLE RESET HELPER
+// Vendor subscription cycle (ay başı) gelmişse counter'ı sıfırlar.
+// referralBonusPocs KORUNUR (kalıcı kazanım).
+// ════════════════════════════════════════════════════════════════════
+async function checkAndResetCycle(vendorId, sub) {
+  if (!sub) return sub;
+  try {
+    var now = new Date();
+    var startedMs = sub.cycleStartedAt?.toMillis ? sub.cycleStartedAt.toMillis() : null;
+    if (!startedMs) {
+      // İlk kez - cycleStartedAt eksikse şimdi başlat
+      await updateDoc(doc(db,'vendor_subscriptions',vendorId), {
+        cycleStartedAt: serverTimestamp(),
+        pocUsedThisCycle: 0,
+      });
+      sub.cycleStartedAt = { toMillis: () => now.getTime() };
+      sub.pocUsedThisCycle = 0;
+      return sub;
+    }
+
+    var startedDate = new Date(startedMs);
+    // Bir cycle = 30 gün (basit yaklaşım)
+    var daysSinceStart = (now - startedDate) / (1000*60*60*24);
+
+    if (daysSinceStart >= 30) {
+      // Cycle dolu - reset!
+      // referralBonusPocs ASLA SIFIRLANMAZ
+      var newCycleStart = serverTimestamp();
+      await updateDoc(doc(db,'vendor_subscriptions',vendorId), {
+        pocUsedThisCycle: 0,
+        cycleStartedAt: newCycleStart,
+        lastCycleResetAt: serverTimestamp(),
+        // referralBonusPocs DOKUNULMUYOR - kalıcı kazanım
+      });
+      sub.pocUsedThisCycle = 0;
+      sub.cycleStartedAt = { toMillis: () => now.getTime() };
+      console.log('[v4.96] Cycle reset:', vendorId, 'days since start:', Math.floor(daysSinceStart));
+    }
+  } catch(e) {
+    console.warn('checkAndResetCycle error:', e.message);
+  }
+  return sub;
+}
+
 async function canVendorAcceptPoC(vendorId) {
   try {
     // 1. Vendor billing — suspend mi?
@@ -14470,7 +14516,11 @@ async function canVendorAcceptPoC(vendorId) {
         options: ['buy_package', 'request_override'],
       };
     }
-    const sub = subSnap.data();
+    var sub = subSnap.data();
+
+    // v4.96: Cycle reset kontrolü (30 gün geçtiyse otomatik reset)
+    sub = await checkAndResetCycle(vendorId, sub);
+
     if (sub.status !== 'active' && sub.status !== 'grace_period') {
       return {
         allowed: false,
@@ -14498,16 +14548,23 @@ async function canVendorAcceptPoC(vendorId) {
       };
     }
 
-    // 5. Kontenjan dahilinde mi?
+    // 5. v4.96: TOPLAM KOTA = paketBase + referralBonusPocs
+    const baseQuota = pkg.pocQuota || 0;
+    const referralBonus = sub.referralBonusPocs || 0;
+    const totalQuota = baseQuota + referralBonus;
     const used = sub.pocUsedThisCycle || 0;
-    if (used < pkg.pocQuota) {
+
+    if (used < totalQuota) {
       return {
         allowed: true,
         source: 'monthly_quota',
         amount: 0,
         package: pkg,
         subscription: sub,
-        remaining: pkg.pocQuota - used,
+        remaining: totalQuota - used,
+        baseQuota: baseQuota,
+        referralBonus: referralBonus,
+        totalQuota: totalQuota,
       };
     }
 
@@ -14519,7 +14576,10 @@ async function canVendorAcceptPoC(vendorId) {
       package: pkg,
       subscription: sub,
       reason: 'quota_exceeded',
-      message: 'Aylık PoC kontenjanınız doldu. Bu PoC için ekstra ödeme yapmanız veya paketi yükseltmeniz gerekiyor.',
+      baseQuota: baseQuota,
+      referralBonus: referralBonus,
+      totalQuota: totalQuota,
+      message: 'Aylık PoC kontenjanınız doldu (' + used + '/' + totalQuota + (referralBonus > 0 ? ', bonus dahil' : '') + '). Bu PoC için ekstra ödeme yapmanız veya paketi yükseltmeniz gerekiyor.',
       options: ['pay_overflow', 'upgrade_package', 'request_override'],
     };
   } catch(e) {
@@ -15905,7 +15965,9 @@ async function vendSubscription(m) {
       // Free paket bilgileri DEFAULT_PACKAGES'tan oku
       var freePkg = (window.PACKAGES_CACHE || DEFAULT_PACKAGES).find(function(p){return p.id==='free';}) || DEFAULT_PACKAGES[0];
       var freePocUsed = subscription?.pocUsedThisCycle || 0;
-      var freePocQuota = freePkg.pocQuota || 3;
+      var freePocBase = freePkg.pocQuota || 3;
+      var freePocBonus = subscription?.referralBonusPocs || 0;
+      var freePocQuota = freePocBase + freePocBonus;
       var freeInviteUsed = subscription?.inviteUsedThisCycle || 0;
       var freeInviteQuota = freePkg.inviteQuotaPerMonth || 5;
       var freePocPercent = freePocQuota > 0 ? (freePocUsed / freePocQuota) * 100 : 0;
@@ -15930,6 +15992,7 @@ async function vendSubscription(m) {
         +   '<div>'
         +     '<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px"><span class="txt-muted">PoC Kullanımı</span><span style="font-weight:700">'+freePocUsed+' / '+freePocQuota+'</span></div>'
         +     '<div style="background:rgba(255,255,255,.06);height:6px;border-radius:3px;overflow:hidden"><div style="background:'+(freePocPercent>=100?'#ff7070':freePocPercent>=75?'#f0a429':'#22d078')+';height:100%;width:'+Math.min(freePocPercent,100)+'%;transition:width .3s"></div></div>'
+        +     (freePocBonus > 0 ? '<div style="font-size:10.5px;color:#22d078;font-weight:700;margin-top:4px">🎁 ' + freePocBase + ' paket + ' + freePocBonus + ' davet bonusu</div>' : '')
         +   '</div>'
         +   '<div>'
         +     '<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px"><span class="txt-muted">Davet Kullanımı</span><span style="font-weight:700">'+freeInviteUsed+' / '+freeInviteQuota+'</span></div>'
@@ -15950,8 +16013,12 @@ async function vendSubscription(m) {
       var endDate = subscription.endDate?.toDate ? subscription.endDate.toDate() : null;
       var daysLeft = endDate ? Math.ceil((endDate.getTime() - Date.now())/86400000) : 0;
       var pocUsed = subscription.pocUsedThisCycle || 0;
-      var pocQuota = currentPkg.pocQuota === -1 ? '∞' : currentPkg.pocQuota;
-      var pocPercent = currentPkg.pocQuota === -1 ? 0 : (pocQuota > 0 ? (pocUsed / pocQuota) * 100 : 0);
+      // v4.96: Toplam kota = paketBase + referralBonusPocs
+      var pocBonus = subscription.referralBonusPocs || 0;
+      var pocBaseQuota = currentPkg.pocQuota === -1 ? -1 : (currentPkg.pocQuota || 0);
+      var pocTotalQuota = pocBaseQuota === -1 ? -1 : (pocBaseQuota + pocBonus);
+      var pocQuota = pocTotalQuota === -1 ? '∞' : pocTotalQuota;
+      var pocPercent = pocTotalQuota === -1 ? 0 : (pocTotalQuota > 0 ? (pocUsed / pocTotalQuota) * 100 : 0);
       var inviteUsed = subscription.inviteUsedThisCycle || 0;
       var inviteQuota = currentPkg.inviteQuotaPerMonth === -1 ? '∞' : currentPkg.inviteQuotaPerMonth;
       var invitePercent = currentPkg.inviteQuotaPerMonth === -1 ? 0 : (inviteQuota > 0 ? (inviteUsed / inviteQuota) * 100 : 0);
@@ -15979,7 +16046,8 @@ async function vendSubscription(m) {
         +     '<span style="font-size:12px;font-weight:600">📋 PoC Kabul</span>'
         +     '<span style="font-size:13px;font-weight:700;color:'+color+'">'+pocUsed+' / '+pocQuota+'</span>'
         +   '</div>'
-        +   (currentPkg.pocQuota !== -1 ? '<div style="background:rgba(255,255,255,.05);height:6px;border-radius:3px;overflow:hidden"><div style="background:'+color+';height:100%;width:'+Math.min(100,pocPercent)+'%;transition:width .3s"></div></div>' : '<div style="font-size:10.5px;color:'+color+';font-weight:700">Sınırsız</div>')
+        +   (pocTotalQuota !== -1 ? '<div style="background:rgba(255,255,255,.05);height:6px;border-radius:3px;overflow:hidden"><div style="background:'+color+';height:100%;width:'+Math.min(100,pocPercent)+'%;transition:width .3s"></div></div>' : '<div style="font-size:10.5px;color:'+color+';font-weight:700">Sınırsız</div>')
+        +   (pocBonus > 0 ? '<div style="font-size:10.5px;color:#22d078;font-weight:700;margin-top:4px">🎁 ' + pocBaseQuota + ' paket + ' + pocBonus + ' davet bonusu</div>' : '')
         + '</div>'
         // Davet
         + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:10px">'
@@ -20844,7 +20912,13 @@ async function admVendorSubs(m) {
           var sb = statusBadges[statusKey] || statusBadges.unknown;
           var tierColor = TIER_COLORS[r.tier] || '#5a6278';
           var tierLabel = TIER_LABELS[r.tier] || r.tier;
-          var quotaText = r.pkg ? (r.pocQuota === -1 ? '∞' : r.pocUsed + '/' + r.pocQuota) : '—';
+          // v4.96: Bonus dahil quota text
+          var rBonus = r.sub?.referralBonusPocs || 0;
+          var rTotalQuota = r.pocQuota === -1 ? -1 : ((r.pocQuota || 0) + rBonus);
+          var quotaText;
+          if (!r.pkg) quotaText = '—';
+          else if (rTotalQuota === -1) quotaText = '∞';
+          else quotaText = r.pocUsed + '/' + rTotalQuota + (rBonus > 0 ? ' <span style="color:#22d078;font-size:10px">+'+rBonus+'🎁</span>' : '');
           var dateText = r.endDate ? r.endDate.toLocaleDateString('tr-TR') : '—';
           var daysText = r.daysLeft !== null ? (r.daysLeft >= 0 ? '('+r.daysLeft+'g)' : '(geçti)') : '';
 
