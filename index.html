@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.00 | pochub.co -->
+<!-- PoCHub v5.01 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -394,6 +394,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <div class="scr" id="scr-admin"></div>
 <div class="scr" id="scr-vendor-public"></div>
 <div class="scr" id="scr-demo"></div>
+<div class="scr" id="scr-help"></div>
 
 <!-- AUTH MODAL -->
 <div class="modal-bg" id="auth-modal">
@@ -426,7 +427,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.00';
+const VERSION = 'v5.01';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -661,6 +662,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.01': ['MAJOR: Phase 5.0.1 - Help / SSS sayfasi (pochub.co/#help). 7 kategori, 50+ SSS, inline arama, accordion yapi, Schema.org FAQPage. Outreach destek + SEO katki + self-service.'],
   'v5.00': ['🎉 MILESTONE: v5.00 - SEO Sertlestirme. Default meta tags anasayfada, sitemap.xml dinamik uretici, robots.txt, performance hints (preconnect/dns-prefetch), Schema.org Organization, canonical URL her sayfada, hreflang TR+EN, sayfa-spesifik meta (Catalog/Events), Admin tools sitemap manuel uretim. Google indekslemesi 2-3x hizlanacak.'],
   'v4.99': ['MAJOR: Phase 4.6 - EN Locale İskelet. t() helper, locale detection (URL ?lang + browser fallback), dictionary yapisi (TR varsayilan + EN 5-10 kritik string), header dil switcher (TR/EN dropdown), Admin Settings defaultLocale. Tam ceviri ileride.'],
   'v4.98': ['MAJOR: Phase 4.5 - Phone Verification (2FA Opsiyonel). Firebase Phone Auth SMS doğrulama, profile telefonunu doğrula CTA, doğrulanmış iletişim rozeti, vendor public profilde gösterim, admin Settings toggle, PoC detayda müşteri rozeti yaninda 📞 ikon.'],
@@ -3400,6 +3402,7 @@ function renderScreen(s) {
   else if (s==='vendor') renderVendor();
   else if (s==='admin') renderAdmin();
   else if (s==='demo') renderDemoRequest();
+  else if (s==='help') renderHelp();
   else if (s==='vendor-public') {
     // v4.86: renderVendorPublic() ayrı çağrılır (slug parametresi parseAndNavigate'ten gelir)
   }
@@ -5305,7 +5308,7 @@ function loadFAQ() {
           + '</details>';
       }).join('')
     + '</div>'
-    + '<div style="text-align:center;margin-top:18px;font-size:12.5px;color:var(--text-muted)">Daha fazla sorunuz mu var? <a href="mailto:hasan.kayapinar@gitsteknoloji.com" style="color:#7db4ff;font-weight:600;text-decoration:none">İletişime geçin →</a></div>'
+    + '<div style="text-align:center;margin-top:18px;font-size:12.5px;color:var(--text-muted)">📚 <a href="#help" style="color:#22d078;font-weight:700;text-decoration:none">Detaylı Yardım Merkezi →</a> &nbsp;•&nbsp; Daha fazla sorunuz mu var? <a href="mailto:hasan.kayapinar@gitsteknoloji.com" style="color:#7db4ff;font-weight:600;text-decoration:none">İletişime geçin →</a></div>'
     + '</div>';
 
   // Accordion arrow rotation
@@ -25957,6 +25960,7 @@ function updatePageSEO(screen) {
     catalog: 'Ürün Kataloğu | PoCHub IT Çözümleri',
     events:  'PoC Etkinlikleri | PoCHub',
     demo:    '15 Dakikalık Ücretsiz Demo | PoCHub',
+    help:    'Yardım & SSS | PoCHub — Sık Sorulan Sorular',
     vendor:  'Vendor Paneli | PoCHub',
     customer:'Müşteri Paneli | PoCHub',
     admin:   'Admin Paneli | PoCHub',
@@ -25966,6 +25970,7 @@ function updatePageSEO(screen) {
     catalog: 'IT vendor\'larından çeşitli ürün ve çözümler. Üreticiler, distribütörler, entegratörler tek pazarda.',
     events:  'PoC etkinlikleri, vendor demoları ve buluşmalar. Kurumsal IT için canlı etkinlik takvimi.',
     demo:    'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı öğrenin.',
+    help:    'PoCHub kullanım rehberi. Vendor ve müşteri için sık sorulan sorular, paketler, ödeme, davet sistemi.',
   };
 
   if (titles[screen]) document.title = titles[screen];
@@ -26283,6 +26288,401 @@ async function renderDemoRequest() {
 
 // loadSystemConfig zaten v4.84'te var - reuse edilir
 
+// ════════════════════════════════════════════════════════════════════
+// v5.01: HELP / SSS SAYFASI
+// URL: pochub.co/#help
+// 7 kategori, 50+ SSS, inline arama
+// ════════════════════════════════════════════════════════════════════
+
+const HELP_DATA = [
+  {
+    id: 'quickstart',
+    icon: '🚀',
+    title: 'Hızlı Başlangıç',
+    desc: 'PoCHub\'a yeni mi katıldınız? Nereden başlayacağınızı öğrenin.',
+    questions: [
+      {
+        q: 'PoCHub nedir?',
+        a: 'PoCHub, Türkiye\'nin ilk IT PoC (Proof of Concept) pazaryeridir. Müşteriler PoC talebi açar, vendor\'lar (üretici/distribütör/entegratör) teklif gönderir. Süreç hızlanır, zaman ve maliyet tasarrufu sağlanır.'
+      },
+      {
+        q: 'Vendor olarak nasıl kayıt olabilirim?',
+        a: 'Sağ üst köşedeki <strong>"Giriş Yap ▾"</strong> butonuna tıklayın, ardından "Üretici / Distribütör / Entegratör" seçeneklerinden birini seçin. E-posta + şifre + firma bilgileri yeterli. Kayıt anında <strong>Ücretsiz Free paket</strong> aktif olur (ayda 3 PoC kabul + 5 davet hakkı).'
+      },
+      {
+        q: 'Müşteri olarak nasıl başlarım?',
+        a: '"Giriş Yap ▾" → "Müşteri Girişi / Kayıt" tıklayın. Firma bilgilerinizi girin, e-postanızı doğrulayın. Katalogdan ilgilendiğiniz ürün/çözümü bulun, <strong>"PoC Talebi Aç"</strong> butonuyla birden fazla vendor\'a aynı anda talep gönderin.'
+      },
+      {
+        q: 'Kullanım ücretli mi?',
+        a: '<strong>Müşteri için tamamen ücretsiz</strong>. Vendor için Free paket ücretsiz (3 PoC/ay, 5 davet/ay, 10 ürün listeleme). Daha fazla kapasite isteyenler için Pro/Business/Enterprise paketler mevcut.'
+      },
+      {
+        q: 'Onboarding ne kadar sürer?',
+        a: 'Vendor için: kayıt 3 dakika + welcome wizard 5 dakika = toplam <strong>8 dakikada hazırsınız</strong>. Müşteri için: kayıt 2 dakika, ilk PoC talebi 3 dakikada açılabilir.'
+      },
+    ]
+  },
+  {
+    id: 'poc',
+    icon: '📋',
+    title: 'PoC Süreci',
+    desc: 'PoC açma, kabul etme, teklif verme, tamamlama akışları.',
+    questions: [
+      {
+        q: 'PoC nedir?',
+        a: 'PoC = <strong>Proof of Concept</strong> (Konsept Kanıtı). Bir IT çözümünün gerçek ortamınızda çalışıp çalışmadığını test etmek için yapılan kısa süreli (genelde 2-4 hafta) deneme uygulamasıdır.'
+      },
+      {
+        q: 'Müşteri olarak nasıl PoC talebi açarım?',
+        a: '<strong>1.</strong> Katalogdan ürün(ler) seçin → <strong>2.</strong> "PoC Talebi Aç" tıklayın → <strong>3.</strong> Birden fazla vendor seçin (çoklu paralel PoC) → <strong>4.</strong> İhtiyacınızı açıklayın (süre, ortam, beklenti) → <strong>5.</strong> Gönder. Vendor\'lar 1-3 iş günü içinde size yanıt verir.'
+      },
+      {
+        q: 'Vendor olarak gelen PoC talebini nasıl yanıtlarım?',
+        a: 'Vendor Paneli → <strong>PoC Talepleri</strong> tab → ilgilendiğiniz talep → <strong>"Kabul Et"</strong> veya <strong>"Teklif Gönder"</strong>. Kabul ederseniz PoC süreciniz başlar. Teklif vermek isterseniz fiyat, süre ve şartları belirleyerek müşteriye gönderirsiniz.'
+      },
+      {
+        q: 'Aynı anda kaç PoC sürecim olabilir?',
+        a: 'Müşteri için sınır yok — aynı kategori altında 5-6 vendor\'a paralel talep gönderebilirsiniz, en uygun çözümü seçersiniz. Vendor için paketinize bağlı (Free: 3/ay, Pro: 10/ay, Business: 25/ay, Enterprise: sınırsız).'
+      },
+      {
+        q: 'Çoklu vendor PoC nedir?',
+        a: 'Aynı ürün/kategori için <strong>birden fazla vendor\'a aynı anda PoC talebi</strong> gönderme. Müşterinin avantajı: paralel test → daha hızlı karar. Vendor\'ın avantajı: kalifiye lead → daha az müzakere.'
+      },
+      {
+        q: 'PoC tamamlandı, ne yapmalıyım?',
+        a: 'Müşteri: PoC sonucunu işaretler (Başarılı / Başarısız / Devam) ve vendor\'a feedback verir. Vendor: tamamlanan PoC için bağlantı (commercial offer) sürecine geçebilir. PoCHub artık karışmaz.'
+      },
+      {
+        q: 'PoC iptal edebilir miyim?',
+        a: 'Evet, her iki taraf da süreç içinde iptal edebilir. İptal sebebi belirtmeniz önemli — sistem bunu kaydeder, gelecekteki eşleşmeler iyileşir. Vendor için iptal edilen PoC kotanızdan düşmez.'
+      },
+    ]
+  },
+  {
+    id: 'packages',
+    icon: '💎',
+    title: 'Paketler & Ödeme',
+    desc: 'Vendor paket seçenekleri, fiyat, ödeme yöntemleri.',
+    questions: [
+      {
+        q: 'Free paket nelere izin verir?',
+        a: '<strong>Ücretsiz Free paket</strong> (vendor için): Ayda 3 PoC kabul, 5 müşteri daveti, 10 ürün listeleme, public profile, davet sistemine erişim. Lansman döneminde yeni kayıt olanlara cömert paket — risksiz deneme.'
+      },
+      {
+        q: 'Pro paket neyi farklı?',
+        a: 'Pro (₺499/ay): 10 PoC kabul/ay, 15 davet/ay, 50 ürün, öne çıkan ürün carousel\'inde yer alma, gelişmiş analitik, premium destek.'
+      },
+      {
+        q: 'Business ve Enterprise farkı?',
+        a: 'Business (₺999/ay): 25 PoC/ay, 50 davet/ay, 200 ürün, custom branding, API erişim. Enterprise (özel fiyat): sınırsız her şey, dedicated account manager, SLA, on-prem entegrasyon imkânı.'
+      },
+      {
+        q: 'Ödeme nasıl yapılır?',
+        a: 'Kredi/banka kartı ile iyzico üzerinden anında ödeme (Visa, Master, Troy desteklenir). Kurumsal müşteriler için manuel havale + fatura seçeneği de mevcut (admin onayı gerekir).'
+      },
+      {
+        q: 'Aylık mı, yıllık mı?',
+        a: 'Aylık ödeme varsayılan. Yıllık ödeyenlere %15 indirim (özel talep ile). Otomatik yenileme aktif, istediğiniz zaman iptal edebilirsiniz.'
+      },
+      {
+        q: 'PoC kotam dolarsa ne olur?',
+        a: 'İki seçeneğiniz var: <strong>(1)</strong> Aşan PoC için ekstra ücret ödeyip kabul edersiniz (paket overflow fiyatı) veya <strong>(2)</strong> Üst pakete geçersiniz. Quota her ay otomatik resetlenir.'
+      },
+      {
+        q: 'Cari hesap (askıya alma) ne demek?',
+        a: 'Ekstra (overflow) PoC ödemelerinizi vaktinde yapmadığınızda, vendor hesabınız geçici olarak askıya alınır. Yeni PoC kabul edemezsiniz. Borcu kapattığınızda otomatik aktif olur.'
+      },
+    ]
+  },
+  {
+    id: 'referral',
+    icon: '🎁',
+    title: 'Davet Sistemi',
+    desc: 'Vendor ve müşteri davet sistemleri, rozetler, bonuslar.',
+    questions: [
+      {
+        q: 'Davet sistemi nedir?',
+        a: 'Network effect için PoCHub\'a yeni vendor/müşteri kazandırma sistemi. Her başarılı davete bonus + rozet kazanırsınız.'
+      },
+      {
+        q: 'Vendor olarak davet bonusu nedir?',
+        a: 'Her başarılı vendor daveti için <strong>+1 PoC kabul kotası/ay kalıcı bonus</strong>. 3 vendor davet ettiyseniz, paket kotanıza 3 PoC daha eklenir ve bu her ay yenilenir (paket süresince).'
+      },
+      {
+        q: 'Vendor rozetleri nelerdir?',
+        a: '🥉 <strong>Topluluk Yapıcı</strong> (1-2 davet) → 🥈 <strong>Topluluk Geliştirici</strong> (3-5 davet) → 🥇 <strong>Topluluk Lideri</strong> (6+ davet). Rozetler public profilde ve anasayfa leaderboard\'unda gözükür.'
+      },
+      {
+        q: 'Müşteri rozetleri nelerdir?',
+        a: '🌱 <strong>Topluluk Üyesi</strong> (1-2 davet) → 🌿 <strong>Topluluk Destekçisi</strong> (3-5 davet) → 🌳 <strong>Topluluk Lideri</strong> (6+ davet). Vendor PoC\'unuza baktığında rozetinizi görür — kalifiye lead sinyali.'
+      },
+      {
+        q: 'Davet linkim nerede?',
+        a: 'Vendor Paneli → <strong>🎁 Davet Et</strong> tab. Format: <code>pochub.co/?ref=firma-slug</code>. Müşteriler için Müşteri Paneli → <strong>🌳 Davet Et</strong>.'
+      },
+      {
+        q: 'Davet hilesi yapmayı düşünmeyin',
+        a: 'Sistem otomatik şüpheli kayıtları (aynı IP, fingerprint) tespit eder. Şüpheli davetler bonus vermez ve admin tarafından incelenir. Organik davete odaklanın.'
+      },
+      {
+        q: 'Bonusum ne zaman gelir?',
+        a: 'Davet ettiğiniz vendor/müşteri kayıt olduğu an, sistem anında bonusunuzu işler ve size bildirim gelir. Spam kontrolünden geçen kayıtlar için.'
+      },
+    ]
+  },
+  {
+    id: 'verification',
+    icon: '✓',
+    title: 'E-posta & Telefon Doğrulama',
+    desc: 'Hesap güvenliği, doğrulama akışları, sorun giderme.',
+    questions: [
+      {
+        q: 'E-posta neden doğrulamam gerekiyor?',
+        a: 'Spam hesapları önler ve bildirimlerin (PoC talepleri, teklifler, faturalar) size ulaşmasını garanti eder. Kayıt anında otomatik doğrulama maili gönderilir.'
+      },
+      {
+        q: 'E-posta gelmedi, ne yapayım?',
+        a: '<strong>1.</strong> Spam/Junk klasörünü kontrol edin. <strong>2.</strong> Üst banner\'daki "Doğrula" butonu ile tekrar gönderin (60sn cooldown). <strong>3.</strong> Hala gelmiyorsa hasan.kayapinar@gitsteknoloji.com\'a yazın.'
+      },
+      {
+        q: 'E-posta doğrulamadan kullanabilir miyim?',
+        a: 'Kısıtlı olarak: profil oluşturup gezebilirsiniz ama <strong>kritik aksiyonlar</strong> (PoC kabul, teklif gönderme, ödeme) bloklanır. 1-2 dakikalık işlem, hemen yapmanızı öneririz.'
+      },
+      {
+        q: 'Telefon doğrulama zorunlu mu?',
+        a: 'Şu an <strong>opsiyonel</strong>. Doğrulayanlara 📞 "Doğrulanmış İletişim" rozeti verilir, vendor sürecinde önceliklenirsiniz. İleride zorunlu yapılabilir.'
+      },
+      {
+        q: 'Telefon nasıl doğrulanır?',
+        a: 'Dashboard\'da "Telefonunu Doğrula" promo kartı görünür (sistem aktifken). Tıklayın → numaranızı girin → SMS ile gelen 6 haneli kodu girin. 30 saniye sürer.'
+      },
+    ]
+  },
+  {
+    id: 'troubleshoot',
+    icon: '🔧',
+    title: 'Teknik / Sorun Giderme',
+    desc: 'Sayfa açılmıyor, bildirim gelmiyor, ödeme hatası...',
+    questions: [
+      {
+        q: 'Sayfa yüklenmiyor / boş gözüküyor',
+        a: 'Tarayıcı cache temizleyin (Ctrl+Shift+R / Cmd+Shift+R). Hala sorun varsa <strong>Incognito sekmede</strong> deneyin. Çalışıyorsa cache sorunudur — tarayıcıdan PoCHub site verilerini silin.'
+      },
+      {
+        q: 'Bildirim çanında sayı görünmüyor',
+        a: 'Sağ üst 🔔 simgesinde sayı görünmüyorsa: <strong>1.</strong> Çıkış yapıp tekrar girin (auth refresh). <strong>2.</strong> Tarayıcı bildirim izinlerini kontrol edin. <strong>3.</strong> Hala sorun varsa Firebase bağlantı problemi olabilir, 5 dk bekleyip tekrar deneyin.'
+      },
+      {
+        q: 'Ödeme yapamıyorum',
+        a: 'iyzico üzerinden ödeme bazen banka tarafında ek doğrulama (3D Secure) ister. Kartınızın internet alışverişe açık olduğundan ve günlük limitinizin yeterli olduğundan emin olun. Hala sorun varsa manuel havale seçeneği var (Vendor Paneli → Aboneliğim).'
+      },
+      {
+        q: 'Mobilden kullanıyorum, bazı şeyler bozuk gözüküyor',
+        a: 'PoCHub responsive ama bazı tablolar geniş ekran için optimize. Mobil iyileştirme v5.04\'te planlı. Acil ihtiyaç varsa tablet/laptop kullanmanızı öneririz.'
+      },
+      {
+        q: 'Şifremi unuttum',
+        a: 'Login modal\'da "Şifremi Unuttum" linki — e-posta adresinizi girin, Firebase reset linki gönderir. Spam klasörünü de kontrol edin.'
+      },
+      {
+        q: 'Hesabımı silmek istiyorum',
+        a: 'KVKK gereği hesap silme talebinizi hasan.kayapinar@gitsteknoloji.com\'a iletmeniz yeterli. 14 gün içinde verileriniz silinir (yasal saklama gereken faturalar hariç).'
+      },
+    ]
+  },
+  {
+    id: 'contact',
+    icon: '📞',
+    title: 'İletişim',
+    desc: 'Soru, öneri, geri bildirim için bizimle iletişim.',
+    questions: [
+      {
+        q: 'Genel sorular için kim?',
+        a: 'E-posta: <a href="mailto:hasan.kayapinar@gitsteknoloji.com" style="color:#22d078">hasan.kayapinar@gitsteknoloji.com</a><br>Ortalama yanıt süresi: 1 iş günü.'
+      },
+      {
+        q: '15 dakikalık demo nasıl talep edebilirim?',
+        a: '<a href="#demo" style="color:#22d078">pochub.co/#demo</a> sayfasından Calendly üzerinden takviminize anında randevu alabilirsiniz. Tanışma + onboarding + sorular için ideal.'
+      },
+      {
+        q: 'Topluca firma için özel paket istiyorum',
+        a: 'Enterprise paket için doğrudan iletişime geçin. SLA, on-prem entegrasyon, dedicated account manager dahil özelleştirilmiş çözümler sunabiliyoruz.'
+      },
+      {
+        q: 'Geri bildirim göndermek istiyorum',
+        a: 'Özellik isteği, hata bildirimi, geliştirme önerisi: <a href="mailto:hasan.kayapinar@gitsteknoloji.com?subject=PoCHub Geri Bildirim" style="color:#22d078">hasan.kayapinar@gitsteknoloji.com</a> — her bildirim okunup yanıtlanır. Topluluk büyütmenin en güzel yolu.'
+      },
+      {
+        q: 'Basın / medya?',
+        a: 'PoCHub hikayesi, basın açıklaması, röportaj için aynı e-postaya yazın. Subject\'e "[BASIN]" ekleyin.'
+      },
+    ]
+  },
+];
+
+async function renderHelp() {
+  var scr = el('scr-help');
+  if (!scr) return;
+
+  // FAQ Schema.org JSON-LD üret
+  injectFaqSchema();
+
+  // Render
+  scr.innerHTML =
+    '<div style="max-width:980px;margin:30px auto;padding:0 20px">'
+
+    // HERO
+    + '<div style="text-align:center;margin-bottom:30px">'
+    +   '<div style="display:inline-block;background:rgba(125,180,255,.1);border:1px solid rgba(125,180,255,.3);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;color:#7db4ff;letter-spacing:.5px;margin-bottom:12px">📚 PoCHub YARDIM MERKEZİ</div>'
+    +   '<h1 style="font-size:32px;font-weight:800;color:var(--text-primary);margin:0 0 10px">Nasıl yardımcı olabiliriz?</h1>'
+    +   '<div style="font-size:14px;color:var(--text-secondary);max-width:560px;margin:0 auto 18px;line-height:1.6">PoC süreci, paketler, davet sistemi, doğrulama ve daha fazlası. Cevabını bulamazsanız bize yazın.</div>'
+
+    // Arama kutusu
+    +   '<div style="max-width:560px;margin:0 auto;position:relative">'
+    +     '<input id="help-search" type="search" placeholder="Sorunuzu aramaya başlayın..." style="width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px 14px 46px;font-size:14px;color:var(--text-primary);outline:none;box-shadow:var(--shadow-sm)">'
+    +     '<div style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--text-muted);pointer-events:none">🔍</div>'
+    +   '</div>'
+    + '</div>'
+
+    // KATEGORİLER GRID (HIZLI ERİŞİM)
+    + '<div id="help-cats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:30px">'
+    +   HELP_DATA.map(function(cat){
+          return '<a href="#help-cat-' + cat.id + '" class="help-cat-link" data-cat="' + cat.id + '" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-decoration:none;color:inherit;transition:all .15s" onmouseover="this.style.borderColor=\'rgba(125,180,255,.4)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'translateY(0)\'">'
+            + '<div style="font-size:28px;margin-bottom:8px">' + cat.icon + '</div>'
+            + '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px">' + cat.title + '</div>'
+            + '<div style="font-size:11.5px;color:var(--text-muted);line-height:1.4">' + cat.desc + '</div>'
+            + '<div style="margin-top:8px;font-size:11px;color:var(--text-muted);font-weight:600">' + cat.questions.length + ' soru</div>'
+            + '</a>';
+        }).join('')
+    + '</div>'
+
+    // İÇERİK - HER KATEGORİ
+    + '<div id="help-content">'
+    +   HELP_DATA.map(function(cat){
+          return '<section id="help-cat-' + cat.id + '" class="help-section" style="margin-bottom:30px;scroll-margin-top:80px">'
+            + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--border)">'
+            +   '<div style="font-size:32px">' + cat.icon + '</div>'
+            +   '<div>'
+            +     '<h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0">' + cat.title + '</h2>'
+            +     '<div style="font-size:12.5px;color:var(--text-muted);margin-top:2px">' + cat.desc + '</div>'
+            +   '</div>'
+            + '</div>'
+            + '<div class="help-questions">'
+            + cat.questions.map(function(qa, i){
+                return '<details class="help-item" data-q="' + escHtml((qa.q + ' ' + qa.a).toLowerCase()) + '" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">'
+                  + '<summary style="padding:14px 18px;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-primary);list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>' + qa.q + '</span><span class="help-arrow" style="font-size:14px;color:var(--text-muted);transition:transform .2s">▼</span></summary>'
+                  + '<div style="padding:0 18px 16px;font-size:13px;line-height:1.6;color:var(--text-secondary)">' + qa.a + '</div>'
+                  + '</details>';
+              }).join('')
+            + '</div>'
+            + '</section>';
+        }).join('')
+    + '</div>'
+
+    // FOOTER - HALA SORU VARSA
+    + '<div style="background:linear-gradient(135deg,rgba(34,208,120,.06),rgba(34,208,120,.02));border:1px solid rgba(34,208,120,.3);border-radius:14px;padding:24px;text-align:center;margin:30px 0">'
+    +   '<div style="font-size:32px;margin-bottom:8px">💬</div>'
+    +   '<h3 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px">Hâlâ cevap bulamadınız mı?</h3>'
+    +   '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Aşağıdaki yollardan birini deneyin, en kısa sürede yanıt veriyoruz.</div>'
+    +   '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+    +     '<a href="mailto:hasan.kayapinar@gitsteknoloji.com" style="background:#22d078;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700">📧 E-posta Gönder</a>'
+    +     '<a href="#demo" style="background:var(--bg-surface);border:1px solid var(--border);color:var(--text-primary);text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700">📅 15dk Demo İste</a>'
+    +   '</div>'
+    + '</div>'
+
+    + '</div>';
+
+  // Arama davranışı
+  var searchInput = el('help-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', function(){
+      var query = this.value.trim().toLowerCase();
+      var allItems = document.querySelectorAll('.help-item');
+      var allSections = document.querySelectorAll('.help-section');
+
+      if (!query) {
+        // Boş - hepsini göster
+        allItems.forEach(function(it){ it.style.display = ''; });
+        allSections.forEach(function(s){ s.style.display = ''; });
+        return;
+      }
+
+      // Filtre
+      var matches = {};
+      allItems.forEach(function(it){
+        var text = it.dataset.q || '';
+        if (text.indexOf(query) !== -1) {
+          it.style.display = '';
+          it.setAttribute('open', '');  // Otomatik aç
+          var section = it.closest('.help-section');
+          if (section) matches[section.id] = true;
+        } else {
+          it.style.display = 'none';
+          it.removeAttribute('open');
+        }
+      });
+
+      // Sadece eşleşen section'lar görünür
+      allSections.forEach(function(s){
+        s.style.display = matches[s.id] ? '' : 'none';
+      });
+    });
+  }
+
+  // Kategori linklerinden smooth scroll
+  document.querySelectorAll('.help-cat-link').forEach(function(link){
+    link.addEventListener('click', function(e){
+      e.preventDefault();
+      var catId = this.dataset.cat;
+      var target = document.getElementById('help-cat-' + catId);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // İlk soruyu otomatik aç
+        var firstQ = target.querySelector('.help-item');
+        if (firstQ) firstQ.setAttribute('open', '');
+      }
+    });
+  });
+}
+
+// Schema.org FAQPage JSON-LD (SEO için)
+function injectFaqSchema() {
+  // Mevcut faq schema varsa sil
+  var old = document.getElementById('faq-jsonld');
+  if (old) old.remove();
+
+  var faqItems = [];
+  HELP_DATA.forEach(function(cat){
+    cat.questions.forEach(function(qa){
+      // HTML tag'leri temizle (Schema için plain text)
+      var plainAnswer = qa.a.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+      faqItems.push({
+        '@type': 'Question',
+        name: qa.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: plainAnswer
+        }
+      });
+    });
+  });
+
+  var schema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqItems
+  };
+
+  var s = document.createElement('script');
+  s.id = 'faq-jsonld';
+  s.type = 'application/ld+json';
+  s.text = JSON.stringify(schema);
+  document.head.appendChild(s);
+}
+
+window.renderHelp = renderHelp;
+
 // ── URL Hash Router ─────────────────────────────────────────────
 function parseAndNavigate(hash) {
   if (!hash || hash === '#') return;
@@ -26298,7 +26698,7 @@ function parseAndNavigate(hash) {
     return;
   }
 
-  if (!['home','events','catalog','customer','vendor','admin','demo'].includes(screen)) return;
+  if (!['home','events','catalog','customer','vendor','admin','demo','help'].includes(screen)) return;
   if (screen !== CUR_SCREEN) { CUR_SCREEN = screen; buildNav(); renderScreen(screen); }
   setTimeout(function() {
     if (screen === 'vendor'   && tab !== CUR_VEND_TAB) { CUR_VEND_TAB = tab; loadVendTab(); }
