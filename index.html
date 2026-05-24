@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.01 | pochub.co -->
+<!-- PoCHub v5.02 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -427,7 +427,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.01';
+const VERSION = 'v5.02';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -662,6 +662,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.02': ['MAJOR: Phase 5.0.2 - Customer Onboarding Wizard + Icerik Yonetim Altyapisi. Musteri ilk girdiginde welcome wizard (4 adim), SSS/Wizard adimlari Firestore (pochub_content), Admin Panel SSS Yonetimi (CRUD), tum statik icerik dinamik olarak yonetilebilir. Hardcoded icerik politikasi: artik hicbir icerik hardcoded olmayacak.'],
   'v5.01': ['MAJOR: Phase 5.0.1 - Help / SSS sayfasi (pochub.co/#help). 7 kategori, 50+ SSS, inline arama, accordion yapi, Schema.org FAQPage. Outreach destek + SEO katki + self-service.'],
   'v5.00': ['🎉 MILESTONE: v5.00 - SEO Sertlestirme. Default meta tags anasayfada, sitemap.xml dinamik uretici, robots.txt, performance hints (preconnect/dns-prefetch), Schema.org Organization, canonical URL her sayfada, hreflang TR+EN, sayfa-spesifik meta (Catalog/Events), Admin tools sitemap manuel uretim. Google indekslemesi 2-3x hizlanacak.'],
   'v4.99': ['MAJOR: Phase 4.6 - EN Locale İskelet. t() helper, locale detection (URL ?lang + browser fallback), dictionary yapisi (TR varsayilan + EN 5-10 kritik string), header dil switcher (TR/EN dropdown), Admin Settings defaultLocale. Tam ceviri ileride.'],
@@ -2967,11 +2968,15 @@ onAuthStateChanged(auth, async user => {
       }
 
       // v4.83: Welcome wizard tetikleyici (pending flag varsa)
+      // v5.02: Customer için de tetiklenir
       try {
         const wizardFlag = localStorage.getItem('welcomeWizard_' + user.uid);
         if (wizardFlag === 'pending') {
           // 1.5 sn bekle (UI render bitsin), sonra aç
-          setTimeout(function(){ openWelcomeWizard(); }, 1500);
+          setTimeout(function(){
+            if (CUR_PROFILE?.role === 'vendor') openWelcomeWizard();
+            else if (CUR_PROFILE?.role === 'customer') openCustomerWelcomeWizard();
+          }, 1500);
         }
       } catch(e){}
     }
@@ -3893,7 +3898,8 @@ async function handleAuth() {
       await sendEmailVerification(cred.user);
 
       // v4.83: Vendor signup sonrası welcome wizard tetikleyici
-      if (AUTH_ROLE === 'vendor') {
+      // v5.02: Customer signup sonrası da welcome wizard tetiklenir
+      if (AUTH_ROLE === 'vendor' || AUTH_ROLE === 'customer') {
         try {
           localStorage.setItem('welcomeWizard_' + cred.user.uid, 'pending');
         } catch(e){}
@@ -15720,6 +15726,151 @@ async function updateVendorBilling(vendorId, deltaAmount, deltaCount) {
 let WIZ_STEP = 1;
 let WIZ_DATA = {};
 
+// ════════════════════════════════════════════════════════════════════
+// v5.02: CUSTOMER WELCOME WIZARD — Yeni müşteri için 4 adımlı sihirbaz
+// Adımlar Firestore'dan yüklenir (admin yönetilebilir),
+// fallback: hardcoded varsayılan adımlar
+// ════════════════════════════════════════════════════════════════════
+let CUST_WIZ_STEP = 1;
+
+const CUSTOMER_WIZARD_FALLBACK = [
+  {
+    title: 'PoCHub\'a Hoş Geldin! 👋',
+    icon: '🎉',
+    body: 'Türkiye\'nin IT PoC pazaryeri PoCHub\'a hoş geldin! Burada birden fazla vendor\'la <strong>paralel PoC</strong> yapabilir, en uygun çözümü seçebilirsin.<br><br>Bu kısa sihirbaz seni yönlendirmek için. Sadece 1 dakika sürer.',
+    ctaText: 'Başla →',
+  },
+  {
+    title: 'PoC Talebi Açma',
+    icon: '📋',
+    body: '<strong>3 adımda</strong> PoC talebi açabilirsin:<br><br>1️⃣ <strong>Katalog</strong> sayfasından ilgilendiğin ürünleri seç<br>2️⃣ "PoC Talebi Aç" butonuna tıkla — istersen birden fazla vendor seç (paralel PoC)<br>3️⃣ İhtiyacını açıkla, gönder<br><br>Vendor\'lar 1-3 iş günü içinde teklif gönderir.',
+    ctaText: 'Devam →',
+  },
+  {
+    title: 'Etkinlikler & Vendor Demoları',
+    icon: '📅',
+    body: 'Vendor\'lar düzenli olarak <strong>canlı demo etkinlikleri</strong> düzenliyor.<br><br>• Yeni ürünleri keşfet<br>• Sorularını canlı sor<br>• Network kur, sektördeki insanlarla tanış<br><br><strong>Etkinlikler</strong> sayfasından takvimi gör, kayıt ol.',
+    ctaText: 'Devam →',
+  },
+  {
+    title: 'Davet Et, Topluluk Lideri Ol! 🌳',
+    icon: '🎁',
+    body: 'PoCHub\'tan memnun kaldıysan tanıdığın CIO/CTO\'ları davet et.<br><br>Her başarılı davete:<br>🌱 1-2 davet: <strong>Topluluk Üyesi</strong> rozeti<br>🌿 3-5 davet: <strong>Topluluk Destekçisi</strong> rozeti<br>🌳 6+ davet: <strong>Topluluk Lideri</strong> rozeti<br><br>Vendor\'lar rozet sahibi müşterilerin PoC taleplerine öncelik verir.',
+    ctaText: 'Hadi Başlayalım! 🚀',
+  },
+];
+
+async function loadCustomerWizardSteps() {
+  try {
+    var snap = await getDoc(doc(db, 'pochub_content', 'wizard_customer'));
+    if (snap.exists()) {
+      var data = snap.data();
+      if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
+        var steps = [...data.steps].sort(function(a, b){ return (a.ord || 0) - (b.ord || 0); });
+        return steps;
+      }
+    }
+  } catch(e) {
+    console.warn('loadCustomerWizardSteps error:', e.message);
+  }
+  return CUSTOMER_WIZARD_FALLBACK;
+}
+
+async function openCustomerWelcomeWizard() {
+  if (!CUR_USER || !CUR_PROFILE || CUR_PROFILE.role !== 'customer') return;
+  if (CUR_PROFILE.welcomeWizardCompleted) return;
+
+  CUST_WIZ_STEP = 1;
+  var steps = await loadCustomerWizardSteps();
+  if (!steps || steps.length === 0) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cust-wiz-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;backdrop-filter:blur(4px)';
+
+  function renderStep() {
+    var step = steps[CUST_WIZ_STEP - 1];
+    if (!step) return;
+
+    var isLast = CUST_WIZ_STEP === steps.length;
+    var isFirst = CUST_WIZ_STEP === 1;
+
+    overlay.innerHTML =
+      '<div style="background:var(--bg-surface);border-radius:18px;max-width:540px;width:100%;padding:34px 32px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.5)">'
+
+      // Step indicator
+      + '<div style="display:flex;gap:6px;justify-content:center;margin-bottom:20px">'
+      +   steps.map(function(_, i){
+            var active = (i + 1) <= CUST_WIZ_STEP;
+            return '<div style="width:32px;height:4px;border-radius:2px;background:' + (active ? '#22d078' : 'var(--border)') + ';transition:background .3s"></div>';
+          }).join('')
+      + '</div>'
+
+      // Skip button (tüm adımlarda görünür, sağ üst)
+      + '<button id="cust-wiz-skip" style="position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;text-decoration:underline">Atla</button>'
+
+      // Content
+      + '<div style="text-align:center">'
+      +   '<div style="font-size:56px;margin-bottom:12px">' + (step.icon || '👋') + '</div>'
+      +   '<h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0 0 14px">' + (step.title || 'Adım ' + CUST_WIZ_STEP) + '</h2>'
+      +   '<div style="font-size:14px;line-height:1.7;color:var(--text-secondary);margin-bottom:24px;text-align:left">' + (step.body || '') + '</div>'
+      + '</div>'
+
+      // Buttons
+      + '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center">'
+      +   (isFirst
+          ? '<div></div>'
+          : '<button id="cust-wiz-back" class="btn-g" style="padding:10px 20px;font-size:13px">← Geri</button>')
+      +   '<button id="cust-wiz-next" class="btn-p" style="padding:11px 24px;font-size:13.5px;font-weight:700;background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;border:none;border-radius:8px;cursor:pointer">' + (step.ctaText || (isLast ? 'Tamamla 🎉' : 'Devam →')) + '</button>'
+      + '</div>'
+
+      + '<div style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Adım ' + CUST_WIZ_STEP + ' / ' + steps.length + '</div>'
+      + '</div>';
+
+    el('cust-wiz-skip')?.addEventListener('click', closeWizard);
+    el('cust-wiz-back')?.addEventListener('click', function(){
+      if (CUST_WIZ_STEP > 1) { CUST_WIZ_STEP--; renderStep(); }
+    });
+    el('cust-wiz-next')?.addEventListener('click', function(){
+      if (isLast) {
+        completeWizard();
+      } else {
+        CUST_WIZ_STEP++;
+        renderStep();
+      }
+    });
+  }
+
+  async function closeWizard() {
+    overlay.remove();
+    // Atla = "şimdilik gizle", tekrar açılabilir
+    try { localStorage.removeItem('welcomeWizard_' + CUR_USER.uid); } catch(e){}
+  }
+
+  async function completeWizard() {
+    try {
+      await updateDoc(doc(db, 'users', CUR_USER.uid), {
+        welcomeWizardCompleted: true,
+        welcomeWizardCompletedAt: serverTimestamp(),
+      });
+      if (CUR_PROFILE) CUR_PROFILE.welcomeWizardCompleted = true;
+    } catch(e){}
+    try { localStorage.removeItem('welcomeWizard_' + CUR_USER.uid); } catch(e){}
+    overlay.remove();
+    showToast('🎉 Hoş geldin! Hemen ilk PoC talebini açmaya başlayabilirsin.');
+    // Customer paneline yönlendir (kataloğa)
+    setTimeout(function(){
+      window.location.hash = '#catalog';
+    }, 500);
+  }
+
+  document.body.appendChild(overlay);
+  renderStep();
+}
+
+window.openCustomerWelcomeWizard = openCustomerWelcomeWizard;
+window.loadCustomerWizardSteps = loadCustomerWizardSteps;
+
 async function openWelcomeWizard() {
   if (!CUR_USER || !CUR_PROFILE || CUR_PROFILE.role !== 'vendor') return;
   // Daha önce tamamlandı mı?
@@ -19351,7 +19502,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['content','📝 İçerik Yönetimi'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -19386,6 +19537,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'vendorsubs') { await admVendorSubs(m); return; }
     if (CUR_ADM_TAB === 'vendorapprovals') { await admVendorApprovals(m); return; }
     if (CUR_ADM_TAB === 'demo-requests') { await admDemoRequests(m); return; }
+    if (CUR_ADM_TAB === 'content') { await admContent(m); return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
@@ -24369,6 +24521,496 @@ async function admPayments(m) {
 
 // ════════════════════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════════════════════
+// v5.02: ADMIN — İÇERİK YÖNETİMİ (SSS + Wizard Adımları)
+// pochub_content/help dokumanı: { categories: [...] }
+// pochub_content/wizard_customer dokumanı: { steps: [...] }
+// ════════════════════════════════════════════════════════════════════
+let _contentTab = 'help'; // 'help' | 'wizard'
+let _editingCategoryIndex = null;
+let _editingQuestionIndex = null;
+let _editingWizardStepIndex = null;
+
+async function admContent(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>İçerik yükleniyor...</div>';
+
+  // Tab seç
+  var subtabsHtml =
+    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap">'
+    + '<button class="cnt-tab' + (_contentTab==='help'?' on':'') + '" data-t="help" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_contentTab==='help'?'#7db4ff':'var(--bg-surface)') + ';color:' + (_contentTab==='help'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">📚 SSS / Yardım Merkezi</button>'
+    + '<button class="cnt-tab' + (_contentTab==='wizard'?' on':'') + '" data-t="wizard" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_contentTab==='wizard'?'#7db4ff':'var(--bg-surface)') + ';color:' + (_contentTab==='wizard'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">🎯 Müşteri Wizard Adımları</button>'
+    + '</div>';
+
+  if (_contentTab === 'help') {
+    await renderHelpAdmin(m, subtabsHtml);
+  } else {
+    await renderWizardAdmin(m, subtabsHtml);
+  }
+
+  // Tab handler
+  document.querySelectorAll('.cnt-tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      _contentTab = btn.dataset.t;
+      _editingCategoryIndex = null;
+      _editingQuestionIndex = null;
+      _editingWizardStepIndex = null;
+      admContent(m);
+    });
+  });
+}
+
+async function renderHelpAdmin(m, subtabsHtml) {
+  var helpData = await loadHelpContent();
+  // helpData fallback ise (yani Firestore boşsa) seed önerisi göster
+  var isFromFallback = false;
+  try {
+    var snap = await getDoc(doc(db, 'pochub_content', 'help'));
+    isFromFallback = !snap.exists();
+  } catch(e) {}
+
+  var html = '<div style="max-width:1100px">'
+    + '<h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin:0 0 6px">📝 İçerik Yönetimi</h2>'
+    + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px">SSS, Wizard adımları gibi statik içerikleri yönetin. Değişiklikler anında /#help sayfasına yansır.</div>'
+    + subtabsHtml;
+
+  if (isFromFallback) {
+    html += '<div style="background:rgba(240,164,41,.1);border:1px solid rgba(240,164,41,.3);border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;color:var(--text-secondary)">'
+      + '<strong style="color:#f0a429">⚠️ İçerik henüz Firestore\'a kaydedilmemiş.</strong> Şu an varsayılan içerik (kod içine gömülü) gösteriliyor. <strong>İlk düzenlemenizden sonra Firestore\'a yazılacak</strong>, oradan sonra siz yöneteceksiniz.'
+      + '<br><br><button id="cnt-seed-from-fallback" class="btn-p btn-sm" style="margin-top:6px">📦 Varsayılan İçeriği Firestore\'a Kopyala</button>'
+      + '</div>';
+  }
+
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">'
+    + '<div style="font-size:13px;color:var(--text-secondary)"><strong>' + helpData.length + '</strong> kategori, <strong>' + helpData.reduce(function(acc, c){ return acc + (c.questions?.length || 0); }, 0) + '</strong> soru</div>'
+    + '<button id="cnt-add-cat" class="btn-p btn-sm" style="padding:8px 14px;font-size:12.5px;font-weight:700">+ Yeni Kategori</button>'
+    + '</div>';
+
+  // Kategori listesi (accordion benzeri)
+  helpData.forEach(function(cat, ci){
+    html += '<div class="card" style="padding:0;margin-bottom:12px;overflow:hidden">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg-elevated);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">'
+      +   '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:200px">'
+      +     '<span style="font-size:24px">' + escHtml(cat.icon || '📄') + '</span>'
+      +     '<div>'
+      +       '<div style="font-size:14px;font-weight:700;color:var(--text-primary)">' + escHtml(cat.title || 'Kategori ' + (ci+1)) + '</div>'
+      +       '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">' + (cat.questions?.length || 0) + ' soru · ID: <code style="font-size:10px">' + escHtml(cat.id) + '</code></div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:6px">'
+      +     '<button class="cnt-cat-edit btn-g btn-sm" data-ci="' + ci + '" style="padding:6px 10px;font-size:11.5px">✏ Düzenle</button>'
+      +     '<button class="cnt-cat-add-q btn-p btn-sm" data-ci="' + ci + '" style="padding:6px 10px;font-size:11.5px">+ Soru</button>'
+      +     '<button class="cnt-cat-up btn-g btn-sm" data-ci="' + ci + '" style="padding:6px 8px;font-size:11.5px" ' + (ci===0?'disabled':'') + '>↑</button>'
+      +     '<button class="cnt-cat-down btn-g btn-sm" data-ci="' + ci + '" style="padding:6px 8px;font-size:11.5px" ' + (ci===helpData.length-1?'disabled':'') + '>↓</button>'
+      +     '<button class="cnt-cat-del btn-g btn-sm" data-ci="' + ci + '" style="padding:6px 10px;font-size:11.5px;color:#ff7070">🗑</button>'
+      +   '</div>'
+      + '</div>';
+
+    // Sorular listesi
+    if (cat.questions && cat.questions.length > 0) {
+      html += '<div style="padding:6px">';
+      cat.questions.forEach(function(qa, qi){
+        html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)">'
+          + '<div style="flex:1;min-width:200px">'
+          +   '<div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:3px">' + escHtml(qa.q || 'Soru ' + (qi+1)) + '</div>'
+          +   '<div style="font-size:11.5px;color:var(--text-muted);max-height:40px;overflow:hidden;text-overflow:ellipsis">' + escHtml((qa.a || '').replace(/<[^>]+>/g, '').slice(0, 150)) + '</div>'
+          + '</div>'
+          + '<div style="display:flex;gap:4px;flex-wrap:wrap">'
+          +   '<button class="cnt-q-edit btn-g btn-sm" data-ci="' + ci + '" data-qi="' + qi + '" style="padding:4px 8px;font-size:11px">✏</button>'
+          +   '<button class="cnt-q-up btn-g btn-sm" data-ci="' + ci + '" data-qi="' + qi + '" style="padding:4px 6px;font-size:11px" ' + (qi===0?'disabled':'') + '>↑</button>'
+          +   '<button class="cnt-q-down btn-g btn-sm" data-ci="' + ci + '" data-qi="' + qi + '" style="padding:4px 6px;font-size:11px" ' + (qi===cat.questions.length-1?'disabled':'') + '>↓</button>'
+          +   '<button class="cnt-q-del btn-g btn-sm" data-ci="' + ci + '" data-qi="' + qi + '" style="padding:4px 8px;font-size:11px;color:#ff7070">🗑</button>'
+          + '</div>'
+          + '</div>';
+      });
+      html += '</div>';
+    } else {
+      html += '<div style="padding:14px 18px;font-size:12px;color:var(--text-muted);font-style:italic">Bu kategoride henüz soru yok. "+ Soru" butonuyla ekleyin.</div>';
+    }
+    html += '</div>';
+  });
+
+  html += '</div>';
+  m.innerHTML = html;
+
+  // Event handlers
+  el('cnt-seed-from-fallback')?.addEventListener('click', async function(){
+    if (!confirm('Varsayılan SSS içeriğini Firestore\'a kopyalamak istiyor musun? Bundan sonra düzenlemeleri buradan yapabileceksin.')) return;
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Kopyalanıyor...';
+    try {
+      var seedData = { categories: HELP_DATA.map(function(c, i){
+        return {
+          ...c,
+          ord: i * 10,
+          questions: (c.questions || []).map(function(q, qi){ return { ...q, ord: qi * 10 }; })
+        };
+      })};
+      await setDoc(doc(db, 'pochub_content', 'help'), seedData);
+      showToast('✓ İçerik Firestore\'a kopyalandı.');
+      admContent(m);
+    } catch(e) {
+      alert('Hata: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '📦 Varsayılan İçeriği Firestore\'a Kopyala';
+    }
+  });
+
+  el('cnt-add-cat')?.addEventListener('click', function(){
+    openCategoryEditor(null, helpData, m);
+  });
+
+  document.querySelectorAll('.cnt-cat-edit').forEach(function(b){
+    b.addEventListener('click', function(){ openCategoryEditor(parseInt(b.dataset.ci), helpData, m); });
+  });
+  document.querySelectorAll('.cnt-cat-add-q').forEach(function(b){
+    b.addEventListener('click', function(){ openQuestionEditor(parseInt(b.dataset.ci), null, helpData, m); });
+  });
+  document.querySelectorAll('.cnt-cat-del').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var ci = parseInt(b.dataset.ci);
+      if (!confirm('"' + helpData[ci].title + '" kategorisini ve tüm sorularını silmek istediğine emin misin?')) return;
+      helpData.splice(ci, 1);
+      // Ord'ları yeniden hesapla
+      helpData.forEach(function(c, i){ c.ord = i * 10; });
+      await setDoc(doc(db, 'pochub_content', 'help'), { categories: helpData });
+      showToast('Kategori silindi');
+      admContent(m);
+    });
+  });
+  document.querySelectorAll('.cnt-cat-up').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var ci = parseInt(b.dataset.ci);
+      if (ci > 0) {
+        var tmp = helpData[ci]; helpData[ci] = helpData[ci-1]; helpData[ci-1] = tmp;
+        helpData.forEach(function(c, i){ c.ord = i * 10; });
+        await setDoc(doc(db, 'pochub_content', 'help'), { categories: helpData });
+        admContent(m);
+      }
+    });
+  });
+  document.querySelectorAll('.cnt-cat-down').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var ci = parseInt(b.dataset.ci);
+      if (ci < helpData.length - 1) {
+        var tmp = helpData[ci]; helpData[ci] = helpData[ci+1]; helpData[ci+1] = tmp;
+        helpData.forEach(function(c, i){ c.ord = i * 10; });
+        await setDoc(doc(db, 'pochub_content', 'help'), { categories: helpData });
+        admContent(m);
+      }
+    });
+  });
+  document.querySelectorAll('.cnt-q-edit').forEach(function(b){
+    b.addEventListener('click', function(){ openQuestionEditor(parseInt(b.dataset.ci), parseInt(b.dataset.qi), helpData, m); });
+  });
+  document.querySelectorAll('.cnt-q-del').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var ci = parseInt(b.dataset.ci), qi = parseInt(b.dataset.qi);
+      if (!confirm('"' + helpData[ci].questions[qi].q + '" sorusunu silmek istediğine emin misin?')) return;
+      helpData[ci].questions.splice(qi, 1);
+      helpData[ci].questions.forEach(function(q, i){ q.ord = i * 10; });
+      await setDoc(doc(db, 'pochub_content', 'help'), { categories: helpData });
+      showToast('Soru silindi');
+      admContent(m);
+    });
+  });
+  document.querySelectorAll('.cnt-q-up').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var ci = parseInt(b.dataset.ci), qi = parseInt(b.dataset.qi);
+      if (qi > 0) {
+        var arr = helpData[ci].questions;
+        var tmp = arr[qi]; arr[qi] = arr[qi-1]; arr[qi-1] = tmp;
+        arr.forEach(function(q, i){ q.ord = i * 10; });
+        await setDoc(doc(db, 'pochub_content', 'help'), { categories: helpData });
+        admContent(m);
+      }
+    });
+  });
+  document.querySelectorAll('.cnt-q-down').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var ci = parseInt(b.dataset.ci), qi = parseInt(b.dataset.qi);
+      var arr = helpData[ci].questions;
+      if (qi < arr.length - 1) {
+        var tmp = arr[qi]; arr[qi] = arr[qi+1]; arr[qi+1] = tmp;
+        arr.forEach(function(q, i){ q.ord = i * 10; });
+        await setDoc(doc(db, 'pochub_content', 'help'), { categories: helpData });
+        admContent(m);
+      }
+    });
+  });
+}
+
+// Kategori editor modal
+function openCategoryEditor(ci, helpData, m) {
+  var isNew = ci === null;
+  var cat = isNew ? { id: '', icon: '📄', title: '', desc: '', ord: helpData.length * 10, questions: [] } : helpData[ci];
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border-radius:14px;max-width:540px;width:100%;padding:24px">'
+    + '<h3 style="font-size:18px;font-weight:800;margin:0 0 16px;color:var(--text-primary)">' + (isNew ? '+ Yeni Kategori' : '✏ Kategori Düzenle') + '</h3>'
+    + '<div style="display:grid;gap:12px">'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">ID (URL anchor, slug)</label><input id="cat-id" class="inp" value="' + escHtml(cat.id || '') + '" placeholder="ornek-kategori" style="width:100%"' + (isNew ? '' : ' disabled') + '></div>'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">İkon (emoji)</label><input id="cat-icon" class="inp" value="' + escHtml(cat.icon || '📄') + '" style="width:100%"></div>'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Başlık</label><input id="cat-title" class="inp" value="' + escHtml(cat.title || '') + '" style="width:100%"></div>'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Kısa Açıklama</label><input id="cat-desc" class="inp" value="' + escHtml(cat.desc || '') + '" style="width:100%"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
+    +   '<button id="cat-cancel" class="btn-g">İptal</button>'
+    +   '<button id="cat-save" class="btn-p">💾 Kaydet</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#cat-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+
+  modal.querySelector('#cat-save').addEventListener('click', async function(){
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+    try {
+      var newCat = {
+        id: modal.querySelector('#cat-id').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        icon: modal.querySelector('#cat-icon').value.trim() || '📄',
+        title: modal.querySelector('#cat-title').value.trim(),
+        desc: modal.querySelector('#cat-desc').value.trim(),
+        ord: cat.ord,
+        questions: cat.questions || [],
+      };
+      if (!newCat.id || !newCat.title) { alert('ID ve Başlık zorunlu'); btn.disabled = false; btn.textContent = '💾 Kaydet'; return; }
+
+      if (isNew) {
+        helpData.push(newCat);
+      } else {
+        helpData[ci] = { ...helpData[ci], ...newCat };
+      }
+      await setDoc(doc(db, 'pochub_content', 'help'), { categories: helpData });
+      showToast(isNew ? 'Kategori eklendi' : 'Kategori güncellendi');
+      modal.remove();
+      admContent(m);
+    } catch(e) {
+      alert('Hata: ' + e.message);
+      btn.disabled = false; btn.textContent = '💾 Kaydet';
+    }
+  });
+}
+
+// Soru editor modal
+function openQuestionEditor(ci, qi, helpData, m) {
+  var isNew = qi === null;
+  var cat = helpData[ci];
+  var question = isNew ? { q: '', a: '', ord: (cat.questions?.length || 0) * 10 } : cat.questions[qi];
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border-radius:14px;max-width:680px;width:100%;padding:24px;max-height:90vh;overflow-y:auto">'
+    + '<h3 style="font-size:18px;font-weight:800;margin:0 0 6px;color:var(--text-primary)">' + (isNew ? '+ Yeni Soru' : '✏ Soru Düzenle') + '</h3>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Kategori: <strong>' + escHtml(cat.title) + '</strong></div>'
+    + '<div style="display:grid;gap:12px">'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Soru</label><input id="q-q" class="inp" value="' + escHtml(question.q || '') + '" placeholder="Sorulan soru..." style="width:100%"></div>'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Cevap (HTML destekli)</label><textarea id="q-a" class="inp" placeholder="Detaylı cevap. HTML: <strong>, <a>, <br>, <code> kullanabilirsin" style="width:100%;min-height:160px;resize:vertical;font-family:inherit">' + escHtml(question.a || '') + '</textarea></div>'
+    +   '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11.5px;color:var(--text-muted);line-height:1.5"><strong style="color:var(--text-primary)">💡 HTML İpucu:</strong> <code>&lt;strong&gt;</code> kalın, <code>&lt;a href="..."&gt;</code> link, <code>&lt;br&gt;</code> satır sonu, <code>&lt;code&gt;</code> kod. Link örneği: <code>&lt;a href="#demo" style="color:#22d078"&gt;Demo iste&lt;/a&gt;</code></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
+    +   '<button id="q-cancel" class="btn-g">İptal</button>'
+    +   '<button id="q-save" class="btn-p">💾 Kaydet</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#q-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+
+  modal.querySelector('#q-save').addEventListener('click', async function(){
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+    try {
+      var newQ = {
+        q: modal.querySelector('#q-q').value.trim(),
+        a: modal.querySelector('#q-a').value.trim(),
+        ord: question.ord,
+      };
+      if (!newQ.q || !newQ.a) { alert('Soru ve Cevap zorunlu'); btn.disabled = false; btn.textContent = '💾 Kaydet'; return; }
+
+      if (!cat.questions) cat.questions = [];
+      if (isNew) {
+        cat.questions.push(newQ);
+      } else {
+        cat.questions[qi] = newQ;
+      }
+      await setDoc(doc(db, 'pochub_content', 'help'), { categories: helpData });
+      showToast(isNew ? 'Soru eklendi' : 'Soru güncellendi');
+      modal.remove();
+      admContent(m);
+    } catch(e) {
+      alert('Hata: ' + e.message);
+      btn.disabled = false; btn.textContent = '💾 Kaydet';
+    }
+  });
+}
+
+async function renderWizardAdmin(m, subtabsHtml) {
+  var steps = await loadCustomerWizardSteps();
+  var isFromFallback = false;
+  try {
+    var snap = await getDoc(doc(db, 'pochub_content', 'wizard_customer'));
+    isFromFallback = !snap.exists();
+  } catch(e) {}
+
+  var html = '<div style="max-width:1100px">'
+    + '<h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin:0 0 6px">📝 İçerik Yönetimi</h2>'
+    + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px">Yeni müşterilere gösterilen welcome wizard adımları.</div>'
+    + subtabsHtml;
+
+  if (isFromFallback) {
+    html += '<div style="background:rgba(240,164,41,.1);border:1px solid rgba(240,164,41,.3);border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;color:var(--text-secondary)">'
+      + '<strong style="color:#f0a429">⚠️ Wizard adımları henüz Firestore\'a kaydedilmemiş.</strong> Varsayılan adımlar (4 adet) kullanılıyor.'
+      + '<br><br><button id="wiz-seed-from-fallback" class="btn-p btn-sm" style="margin-top:6px">📦 Varsayılan Adımları Firestore\'a Kopyala</button>'
+      + '</div>';
+  }
+
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">'
+    + '<div style="font-size:13px;color:var(--text-secondary)"><strong>' + steps.length + '</strong> adım (müşteri sırayla görür)</div>'
+    + '<button id="wiz-add-step" class="btn-p btn-sm" style="padding:8px 14px;font-size:12.5px;font-weight:700">+ Yeni Adım</button>'
+    + '</div>';
+
+  steps.forEach(function(step, si){
+    html += '<div class="card" style="padding:14px 18px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">'
+      + '<div style="flex:1;min-width:250px">'
+      +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+      +     '<span style="background:#22d078;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">Adım ' + (si+1) + '</span>'
+      +     '<span style="font-size:22px">' + escHtml(step.icon || '👋') + '</span>'
+      +     '<span style="font-size:14px;font-weight:700;color:var(--text-primary)">' + escHtml(step.title || 'Adım ' + (si+1)) + '</span>'
+      +   '</div>'
+      +   '<div style="font-size:12px;color:var(--text-muted);max-height:50px;overflow:hidden">' + escHtml((step.body || '').replace(/<[^>]+>/g, '').slice(0, 200)) + '</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:4px;flex-wrap:wrap">'
+      +   '<button class="wiz-step-edit btn-g btn-sm" data-si="' + si + '" style="padding:5px 10px;font-size:11.5px">✏ Düzenle</button>'
+      +   '<button class="wiz-step-up btn-g btn-sm" data-si="' + si + '" style="padding:5px 8px;font-size:11.5px" ' + (si===0?'disabled':'') + '>↑</button>'
+      +   '<button class="wiz-step-down btn-g btn-sm" data-si="' + si + '" style="padding:5px 8px;font-size:11.5px" ' + (si===steps.length-1?'disabled':'') + '>↓</button>'
+      +   '<button class="wiz-step-del btn-g btn-sm" data-si="' + si + '" style="padding:5px 10px;font-size:11.5px;color:#ff7070">🗑</button>'
+      + '</div>'
+      + '</div>';
+  });
+
+  html += '</div>';
+  m.innerHTML = html;
+
+  el('wiz-seed-from-fallback')?.addEventListener('click', async function(){
+    if (!confirm('Varsayılan wizard adımlarını Firestore\'a kopyalamak istiyor musun?')) return;
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Kopyalanıyor...';
+    try {
+      var seedData = { steps: CUSTOMER_WIZARD_FALLBACK.map(function(s, i){ return { ...s, ord: i * 10 }; }) };
+      await setDoc(doc(db, 'pochub_content', 'wizard_customer'), seedData);
+      showToast('✓ Wizard adımları Firestore\'a kopyalandı.');
+      admContent(m);
+    } catch(e) {
+      alert('Hata: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '📦 Varsayılan Adımları Firestore\'a Kopyala';
+    }
+  });
+
+  el('wiz-add-step')?.addEventListener('click', function(){
+    openWizardStepEditor(null, steps, m);
+  });
+
+  document.querySelectorAll('.wiz-step-edit').forEach(function(b){
+    b.addEventListener('click', function(){ openWizardStepEditor(parseInt(b.dataset.si), steps, m); });
+  });
+  document.querySelectorAll('.wiz-step-up').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var si = parseInt(b.dataset.si);
+      if (si > 0) {
+        var tmp = steps[si]; steps[si] = steps[si-1]; steps[si-1] = tmp;
+        steps.forEach(function(s, i){ s.ord = i * 10; });
+        await setDoc(doc(db, 'pochub_content', 'wizard_customer'), { steps: steps });
+        admContent(m);
+      }
+    });
+  });
+  document.querySelectorAll('.wiz-step-down').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var si = parseInt(b.dataset.si);
+      if (si < steps.length - 1) {
+        var tmp = steps[si]; steps[si] = steps[si+1]; steps[si+1] = tmp;
+        steps.forEach(function(s, i){ s.ord = i * 10; });
+        await setDoc(doc(db, 'pochub_content', 'wizard_customer'), { steps: steps });
+        admContent(m);
+      }
+    });
+  });
+  document.querySelectorAll('.wiz-step-del').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var si = parseInt(b.dataset.si);
+      if (!confirm('"' + steps[si].title + '" adımını silmek istediğine emin misin?')) return;
+      steps.splice(si, 1);
+      steps.forEach(function(s, i){ s.ord = i * 10; });
+      await setDoc(doc(db, 'pochub_content', 'wizard_customer'), { steps: steps });
+      showToast('Adım silindi');
+      admContent(m);
+    });
+  });
+}
+
+function openWizardStepEditor(si, steps, m) {
+  var isNew = si === null;
+  var step = isNew
+    ? { title: '', icon: '👋', body: '', ctaText: 'Devam →', ord: steps.length * 10 }
+    : steps[si];
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border-radius:14px;max-width:680px;width:100%;padding:24px;max-height:90vh;overflow-y:auto">'
+    + '<h3 style="font-size:18px;font-weight:800;margin:0 0 16px;color:var(--text-primary)">' + (isNew ? '+ Yeni Wizard Adımı' : '✏ Wizard Adımı Düzenle') + '</h3>'
+    + '<div style="display:grid;gap:12px">'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">İkon (emoji)</label><input id="ws-icon" class="inp" value="' + escHtml(step.icon || '👋') + '" style="width:100%"></div>'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Başlık</label><input id="ws-title" class="inp" value="' + escHtml(step.title || '') + '" style="width:100%"></div>'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">İçerik (HTML)</label><textarea id="ws-body" class="inp" style="width:100%;min-height:160px;resize:vertical;font-family:inherit">' + escHtml(step.body || '') + '</textarea></div>'
+    +   '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Buton Yazısı</label><input id="ws-cta" class="inp" value="' + escHtml(step.ctaText || 'Devam →') + '" style="width:100%"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
+    +   '<button id="ws-cancel" class="btn-g">İptal</button>'
+    +   '<button id="ws-save" class="btn-p">💾 Kaydet</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  modal.querySelector('#ws-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+
+  modal.querySelector('#ws-save').addEventListener('click', async function(){
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+    try {
+      var newStep = {
+        icon: modal.querySelector('#ws-icon').value.trim() || '👋',
+        title: modal.querySelector('#ws-title').value.trim(),
+        body: modal.querySelector('#ws-body').value.trim(),
+        ctaText: modal.querySelector('#ws-cta').value.trim() || 'Devam →',
+        ord: step.ord,
+      };
+      if (!newStep.title || !newStep.body) { alert('Başlık ve İçerik zorunlu'); btn.disabled = false; btn.textContent = '💾 Kaydet'; return; }
+
+      if (isNew) {
+        steps.push(newStep);
+      } else {
+        steps[si] = { ...steps[si], ...newStep };
+      }
+      await setDoc(doc(db, 'pochub_content', 'wizard_customer'), { steps: steps });
+      showToast(isNew ? 'Adım eklendi' : 'Adım güncellendi');
+      modal.remove();
+      admContent(m);
+    } catch(e) {
+      alert('Hata: ' + e.message);
+      btn.disabled = false; btn.textContent = '💾 Kaydet';
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
 // v4.89: ADMIN — DEMO TALEPLERİ
 // v4.90: Funnel stat (page_viewed -> booked), status filtre
 // ════════════════════════════════════════════════════════════════════
@@ -26525,8 +27167,13 @@ async function renderHelp() {
   var scr = el('scr-help');
   if (!scr) return;
 
+  scr.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div><div style="margin-top:10px;color:var(--text-muted)">Yardım merkezi yükleniyor...</div></div>';
+
+  // v5.02: Firestore'dan icerik cek, yoksa HELP_DATA fallback
+  var helpData = await loadHelpContent();
+
   // FAQ Schema.org JSON-LD üret
-  injectFaqSchema();
+  injectFaqSchema(helpData);
 
   // Render
   scr.innerHTML =
@@ -26547,7 +27194,7 @@ async function renderHelp() {
 
     // KATEGORİLER GRID (HIZLI ERİŞİM)
     + '<div id="help-cats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:30px">'
-    +   HELP_DATA.map(function(cat){
+    +   helpData.map(function(cat){
           return '<a href="#help-cat-' + cat.id + '" class="help-cat-link" data-cat="' + cat.id + '" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-decoration:none;color:inherit;transition:all .15s" onmouseover="this.style.borderColor=\'rgba(125,180,255,.4)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'translateY(0)\'">'
             + '<div style="font-size:28px;margin-bottom:8px">' + cat.icon + '</div>'
             + '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px">' + cat.title + '</div>'
@@ -26559,7 +27206,7 @@ async function renderHelp() {
 
     // İÇERİK - HER KATEGORİ
     + '<div id="help-content">'
-    +   HELP_DATA.map(function(cat){
+    +   helpData.map(function(cat){
           return '<section id="help-cat-' + cat.id + '" class="help-section" style="margin-bottom:30px;scroll-margin-top:80px">'
             + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--border)">'
             +   '<div style="font-size:32px">' + cat.icon + '</div>'
@@ -26647,13 +27294,14 @@ async function renderHelp() {
 }
 
 // Schema.org FAQPage JSON-LD (SEO için)
-function injectFaqSchema() {
+function injectFaqSchema(helpData) {
+  if (!helpData) helpData = HELP_DATA;
   // Mevcut faq schema varsa sil
   var old = document.getElementById('faq-jsonld');
   if (old) old.remove();
 
   var faqItems = [];
-  HELP_DATA.forEach(function(cat){
+  helpData.forEach(function(cat){
     cat.questions.forEach(function(qa){
       // HTML tag'leri temizle (Schema için plain text)
       var plainAnswer = qa.a.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
@@ -26682,6 +27330,37 @@ function injectFaqSchema() {
 }
 
 window.renderHelp = renderHelp;
+
+// ════════════════════════════════════════════════════════════════════
+// v5.02: HELP İÇERİĞİNİ FIRESTORE'DAN ÇEK (admin tarafından yönetilebilir)
+// Boşsa HELP_DATA fallback kullanılır
+// pochub_content/help dokumanında: { categories: [{ id, icon, title, desc, ord, questions: [{q,a,ord}] }] }
+// ════════════════════════════════════════════════════════════════════
+async function loadHelpContent() {
+  try {
+    var snap = await getDoc(doc(db, 'pochub_content', 'help'));
+    if (snap.exists()) {
+      var data = snap.data();
+      if (data.categories && Array.isArray(data.categories) && data.categories.length > 0) {
+        // Kategorileri ord'a göre sırala
+        var cats = [...data.categories].sort(function(a, b){ return (a.ord || 0) - (b.ord || 0); });
+        // Her kategorinin sorularını da ord'a göre sırala
+        cats.forEach(function(cat){
+          if (cat.questions && Array.isArray(cat.questions)) {
+            cat.questions.sort(function(a, b){ return (a.ord || 0) - (b.ord || 0); });
+          }
+        });
+        return cats;
+      }
+    }
+  } catch(e) {
+    console.warn('loadHelpContent error:', e.message);
+  }
+  // Fallback: hardcoded HELP_DATA (ilk kurulumda)
+  return HELP_DATA;
+}
+
+window.loadHelpContent = loadHelpContent;
 
 // ── URL Hash Router ─────────────────────────────────────────────
 function parseAndNavigate(hash) {
