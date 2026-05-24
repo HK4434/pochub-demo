@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.02 | pochub.co -->
+<!-- PoCHub v5.03 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -427,7 +427,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.02';
+const VERSION = 'v5.03';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -662,6 +662,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.03': ['MAJOR: Phase 5.0.3 - Vendor Analytics Dashboard. Vendor Paneline yeni tab Analytics. 6 KPI kart, aylik PoC alim bar chart SVG, kabul/red donut chart, quota progress, etkinlik metrikleri. Sticky engagement icin gunluk vendor girisi sebebi. Admin Settings analytics gorunurluk konfigurasyonu.'],
   'v5.02': ['MAJOR: Phase 5.0.2 - Customer Onboarding Wizard + Icerik Yonetim Altyapisi. Musteri ilk girdiginde welcome wizard (4 adim), SSS/Wizard adimlari Firestore (pochub_content), Admin Panel SSS Yonetimi (CRUD), tum statik icerik dinamik olarak yonetilebilir. Hardcoded icerik politikasi: artik hicbir icerik hardcoded olmayacak.'],
   'v5.01': ['MAJOR: Phase 5.0.1 - Help / SSS sayfasi (pochub.co/#help). 7 kategori, 50+ SSS, inline arama, accordion yapi, Schema.org FAQPage. Outreach destek + SEO katki + self-service.'],
   'v5.00': ['🎉 MILESTONE: v5.00 - SEO Sertlestirme. Default meta tags anasayfada, sitemap.xml dinamik uretici, robots.txt, performance hints (preconnect/dns-prefetch), Schema.org Organization, canonical URL her sayfada, hreflang TR+EN, sayfa-spesifik meta (Catalog/Events), Admin tools sitemap manuel uretim. Google indekslemesi 2-3x hizlanacak.'],
@@ -9839,8 +9840,13 @@ function renderVendor() {
   if (el('vend-main')) { loadVendTab(); return; }
   const vtypeLabels = {ureticid:'Üretici',distributor:'Distribütör',integrator:'Entegratör'};
   const vtypeLabel = vtypeLabels[CUR_PROFILE.vendorType]||'Vendor';
+  // v5.03: Vendor Analytics tab opsiyonel (config'e göre)
+  var anCfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.vendorAnalytics) || DEFAULT_CONFIG.vendorAnalytics;
+  var analyticsTab = (anCfg.enabled !== false) ? [['analytics','📊 Analytics']] : [];
   const tabs = [
-    ['dashboard','Dashboard'],['requests','PoC Talepleri'],['calendar','Takvim'],
+    ['dashboard','Dashboard'],
+    ...analyticsTab,
+    ['requests','PoC Talepleri'],['calendar','Takvim'],
     ['products','Ürünlerim'],['portfolio','Portföyüm'],
     ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','💰 Tekliflerim'],['messages','💬 Mesajlar'],
     ['referrals','🎁 Davet Et'],
@@ -9882,6 +9888,7 @@ async function loadVendTab() {
   if (CUR_VEND_TAB === 'subscription') { await vendSubscription(m); return; }
   if (CUR_VEND_TAB === 'billing') { await vendBilling(m); return; }
   if (CUR_VEND_TAB === 'referrals') { await vendReferrals(m); return; }
+  if (CUR_VEND_TAB === 'analytics') { await vendAnalytics(m); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     m.innerHTML = '<div class="loading"><div class="spinner"></div>Dashboard yükleniyor...</div>';
 
@@ -15119,6 +15126,417 @@ async function openOverrideRequestModal(pocId, pocData, check, onAccepted) {
 // ════════════════════════════════════════════════════════════════════
 // v4.88: VENDOR REFERRALS - Davet Et sayfası
 // Benzersiz davet linki + kopyala/paylaş + davet ettiklerinin listesi
+// ════════════════════════════════════════════════════════════════════
+// v5.03: VENDOR ANALYTICS DASHBOARD
+// 6 KPI kart + aylık PoC bar chart + kabul/red donut + etkinlik metrikleri
+// ════════════════════════════════════════════════════════════════════
+async function vendAnalytics(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Analytics yükleniyor...</div>';
+
+  try {
+    var cfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.vendorAnalytics) || DEFAULT_CONFIG.vendorAnalytics;
+
+    // Tier kontrolü
+    var tierOrder = { free: 0, professional: 1, business: 2, enterprise: 3 };
+    var vendorTier = 'free';
+    try {
+      var subSnap = await getDoc(doc(db, 'vendor_subscriptions', CUR_USER.uid));
+      if (subSnap.exists()) vendorTier = subSnap.data().currentTier || 'free';
+    } catch(e) {}
+
+    var minTierLevel = tierOrder[cfg.minTier] ?? 0;
+    var vendorTierLevel = tierOrder[vendorTier] ?? 0;
+
+    if (vendorTierLevel < minTierLevel) {
+      // Bu tier'a izin yok
+      m.innerHTML =
+        '<div style="max-width:680px;margin:40px auto;padding:32px;background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;text-align:center">'
+        + '<div style="font-size:54px;margin-bottom:14px">🔒</div>'
+        + '<h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin:0 0 8px">Analytics ' + cfg.minTier.charAt(0).toUpperCase() + cfg.minTier.slice(1) + ' paketten itibaren</h2>'
+        + '<div style="font-size:13.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:20px">Detaylı performans metriklerine erişmek için paketinizi yükseltin. Analytics dashboard\'da PoC alım trendlerinizi, kabul oranınızı ve performansınızı görebilirsiniz.</div>'
+        + '<button id="an-upgrade" class="btn-p" style="padding:11px 22px;font-size:13.5px;font-weight:700;background:linear-gradient(135deg,#22d078,#1ab366);color:#fff;border:none;border-radius:8px;cursor:pointer">💎 Paketi Yükselt</button>'
+        + '</div>';
+      el('an-upgrade')?.addEventListener('click', function(){ CUR_VEND_TAB = 'subscription'; loadVendTab(); });
+      return;
+    }
+
+    // ─── VERİ ÇEK ───
+    var [pocSnap, offSnap, evSnap, regSnap, subSnap2] = await Promise.all([
+      getDocs(query(collection(db, 'poc_requests'), where('vendorIds', 'array-contains', CUR_USER.uid))),
+      getDocs(query(collection(db, 'offers'), where('vendorId', '==', CUR_USER.uid))),
+      getDocs(query(collection(db, 'events'), where('vendorId', '==', CUR_USER.uid))),
+      getDocs(query(collection(db, 'event_registrations'), where('vendorId', '==', CUR_USER.uid))),
+      getDoc(doc(db, 'vendor_subscriptions', CUR_USER.uid)),
+    ]);
+
+    var pocs = pocSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+    var offers = offSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+    var events = evSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+    var regs = regSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+    var sub = subSnap2.exists() ? subSnap2.data() : null;
+
+    // ─── METRİKLER HESAPLA ───
+    var nowMs = Date.now();
+    var thirtyDaysAgo = nowMs - 30 * 86400 * 1000;
+
+    // Bu vendor için PoC durumu
+    var totalReceived = pocs.length;
+    var acceptedPocs = pocs.filter(function(p){
+      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
+      return resp.status === 'accepted' || resp.status === 'in_progress' || resp.status === 'completed';
+    });
+    var rejectedPocs = pocs.filter(function(p){
+      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
+      return resp.status === 'rejected';
+    });
+    var pendingPocs = pocs.filter(function(p){
+      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
+      return !resp.status || resp.status === 'pending';
+    });
+    var completedPocs = pocs.filter(function(p){
+      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
+      return resp.status === 'completed';
+    });
+    var activePocs = acceptedPocs.filter(function(p){
+      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
+      return resp.status === 'accepted' || resp.status === 'in_progress';
+    });
+
+    var acceptanceRate = totalReceived > 0
+      ? Math.round((acceptedPocs.length / (acceptedPocs.length + rejectedPocs.length || 1)) * 100)
+      : 0;
+
+    var successRate = (acceptedPocs.length + completedPocs.length) > 0 && completedPocs.length > 0
+      ? Math.round((completedPocs.filter(function(p){
+          var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
+          return resp.outcome === 'success' || resp.outcome === 'won';
+        }).length / completedPocs.length) * 100)
+      : 0;
+
+    // Ortalama cevap süresi (saat)
+    var totalResponseHours = 0;
+    var responseCount = 0;
+    acceptedPocs.concat(rejectedPocs).forEach(function(p){
+      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
+      var createdMs = p.createdAt?.toMillis ? p.createdAt.toMillis() : null;
+      var respMs = resp.respondedAt?.toMillis ? resp.respondedAt.toMillis() : null;
+      if (createdMs && respMs && respMs > createdMs) {
+        totalResponseHours += (respMs - createdMs) / 3600000;
+        responseCount++;
+      }
+    });
+    var avgResponseHours = responseCount > 0 ? Math.round(totalResponseHours / responseCount * 10) / 10 : 0;
+
+    var totalOffers = offers.length;
+
+    // ─── AYLIK GRAFİK (son N ay) ───
+    var monthsToShow = cfg.chartMonths || 6;
+    var monthlyData = [];
+    var now = new Date();
+    for (var i = monthsToShow - 1; i >= 0; i--) {
+      var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      var nextD = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      var label = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()];
+      var count = pocs.filter(function(p){
+        var t = p.createdAt?.toMillis ? p.createdAt.toMillis() : 0;
+        return t >= d.getTime() && t < nextD.getTime();
+      }).length;
+      monthlyData.push({ label: label, count: count, year: d.getFullYear() });
+    }
+    var maxMonthly = Math.max.apply(null, monthlyData.map(function(d){ return d.count; }).concat([1]));
+
+    // ─── ETKİNLİK METRİKLERİ ───
+    var futureEvents = events.filter(function(e){
+      var t = e.startsAt?.toMillis ? e.startsAt.toMillis() : 0;
+      return t > nowMs;
+    });
+    var pastEvents = events.filter(function(e){
+      var t = e.startsAt?.toMillis ? e.startsAt.toMillis() : 0;
+      return t <= nowMs;
+    });
+
+    // ─── RENDER ───
+    var html = '<div style="max-width:1140px">';
+
+    // Header
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;flex-wrap:wrap;gap:10px">'
+      + '<div>'
+      +   '<h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0 0 4px">📊 Analytics</h2>'
+      +   '<div style="font-size:12.5px;color:var(--text-muted)">PoC alım trendi, kabul oranı, performans göstergeleri.</div>'
+      + '</div>'
+      + '<div style="font-size:11.5px;color:var(--text-muted);background:var(--bg-elevated);padding:6px 12px;border-radius:8px;border:1px solid var(--border)">'
+      +   'Tier: <strong style="color:var(--text-primary)">' + (vendorTier.charAt(0).toUpperCase() + vendorTier.slice(1)) + '</strong> · Son ' + monthsToShow + ' ay'
+      + '</div>'
+      + '</div>';
+
+    // ─── TIER 1: 6 KPI Kart ───
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px">';
+
+    // 1. Toplam PoC Talebi
+    html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:14px">'
+      + '<div style="font-size:11px;color:var(--text-muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Toplam Talep</div>'
+      + '<div style="font-size:26px;font-weight:800;color:var(--text-primary)">' + totalReceived + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Gelen tüm PoC talepleri</div>'
+      + '</div>';
+
+    // 2. Aktif PoC
+    html += '<div style="background:var(--bg-surface);border:1px solid rgba(59,124,255,.3);border-radius:12px;padding:14px">'
+      + '<div style="font-size:11px;color:#7db4ff;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Aktif PoC</div>'
+      + '<div style="font-size:26px;font-weight:800;color:#7db4ff">' + activePocs.length + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Devam eden süreçler</div>'
+      + '</div>';
+
+    // 3. Kabul Oranı (cfg.showAcceptanceRate)
+    if (cfg.showAcceptanceRate !== false) {
+      html += '<div style="background:var(--bg-surface);border:1px solid rgba(34,208,120,.3);border-radius:12px;padding:14px">'
+        + '<div style="font-size:11px;color:#22d078;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Kabul Oranı</div>'
+        + '<div style="font-size:26px;font-weight:800;color:#22d078">%' + acceptanceRate + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + acceptedPocs.length + ' kabul / ' + (acceptedPocs.length + rejectedPocs.length) + ' yanıtlanmış</div>'
+        + '</div>';
+    }
+
+    // 4. Tamamlanan PoC
+    html += '<div style="background:var(--bg-surface);border:1px solid rgba(168,85,247,.3);border-radius:12px;padding:14px">'
+      + '<div style="font-size:11px;color:#a855f7;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Tamamlanan</div>'
+      + '<div style="font-size:26px;font-weight:800;color:#a855f7">' + completedPocs.length + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Bitmiş PoC süreçleri</div>'
+      + '</div>';
+
+    // 5. Gönderilen Teklif
+    html += '<div style="background:var(--bg-surface);border:1px solid rgba(240,164,41,.3);border-radius:12px;padding:14px">'
+      + '<div style="font-size:11px;color:#f0a429;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Gönderilen Teklif</div>'
+      + '<div style="font-size:26px;font-weight:800;color:#f0a429">' + totalOffers + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Tüm zamanlar</div>'
+      + '</div>';
+
+    // 6. Ort. Cevap Süresi (cfg.showResponseTime)
+    if (cfg.showResponseTime !== false) {
+      var respLabel = avgResponseHours < 1 ? '< 1 sa' : (avgResponseHours < 24 ? avgResponseHours + ' sa' : Math.round(avgResponseHours/24*10)/10 + ' gün');
+      html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:14px">'
+        + '<div style="font-size:11px;color:var(--text-muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Ort. Cevap Süresi</div>'
+        + '<div style="font-size:26px;font-weight:800;color:var(--text-primary)">' + (responseCount === 0 ? '—' : respLabel) + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + responseCount + ' yanıt bazında</div>'
+        + '</div>';
+    }
+
+    html += '</div>';  // KPI grid son
+
+    // ─── TIER 2: 2 sütun - Aylık Grafik + Kabul/Red Donut ───
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">'
+      + '<style>@media(max-width:800px){.an-grid2{grid-template-columns:1fr !important}}</style>';
+
+    // Aylık PoC alım grafiği (SVG bar chart)
+    html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;min-height:280px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +   '<div style="font-size:13px;font-weight:700;color:var(--text-primary)">📈 Aylık PoC Alım Trendi</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted)">Son ' + monthsToShow + ' ay</div>'
+      + '</div>';
+
+    if (totalReceived === 0) {
+      html += '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:12.5px">Henüz PoC talebi gelmedi. Profilini güncel tut ve aktif kal!</div>';
+    } else {
+      // Basit SVG bar chart
+      var chartW = 480;
+      var chartH = 180;
+      var paddingL = 40;
+      var paddingB = 30;
+      var paddingT = 10;
+      var paddingR = 10;
+      var innerW = chartW - paddingL - paddingR;
+      var innerH = chartH - paddingT - paddingB;
+      var barGap = 6;
+      var barW = (innerW - barGap * (monthsToShow - 1)) / monthsToShow;
+
+      html += '<svg viewBox="0 0 ' + chartW + ' ' + chartH + '" style="width:100%;height:auto;display:block">';
+
+      // Y-axis gridlines (4 satır)
+      for (var i = 0; i <= 4; i++) {
+        var y = paddingT + (innerH * i / 4);
+        var val = Math.round(maxMonthly * (4 - i) / 4);
+        html += '<line x1="' + paddingL + '" y1="' + y + '" x2="' + (chartW - paddingR) + '" y2="' + y + '" stroke="var(--border)" stroke-width="1" stroke-dasharray="2,3"/>';
+        html += '<text x="' + (paddingL - 6) + '" y="' + (y + 3) + '" font-size="9" fill="var(--text-muted)" text-anchor="end">' + val + '</text>';
+      }
+
+      // Bars
+      monthlyData.forEach(function(d, i){
+        var x = paddingL + i * (barW + barGap);
+        var barH = maxMonthly > 0 ? (d.count / maxMonthly) * innerH : 0;
+        var barY = paddingT + (innerH - barH);
+        // Bar
+        html += '<rect x="' + x + '" y="' + barY + '" width="' + barW + '" height="' + barH + '" rx="3" fill="#22d078" opacity="' + (d.count > 0 ? 0.85 : 0.15) + '"/>';
+        // Sayı (üstte)
+        if (d.count > 0) {
+          html += '<text x="' + (x + barW/2) + '" y="' + (barY - 4) + '" font-size="9" font-weight="700" fill="#22d078" text-anchor="middle">' + d.count + '</text>';
+        }
+        // Ay etiketi (altta)
+        html += '<text x="' + (x + barW/2) + '" y="' + (chartH - 12) + '" font-size="10" fill="var(--text-muted)" text-anchor="middle">' + d.label + '</text>';
+      });
+
+      html += '</svg>';
+    }
+    html += '</div>';
+
+    // Donut: Kabul vs Red
+    var totalRespondedDonut = acceptedPocs.length + rejectedPocs.length;
+    html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;min-height:280px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +   '<div style="font-size:13px;font-weight:700;color:var(--text-primary)">🎯 PoC Yanıt Dağılımı</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted)">' + totalRespondedDonut + ' yanıt</div>'
+      + '</div>';
+
+    if (totalRespondedDonut === 0) {
+      html += '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:12.5px">Henüz yanıtlanmış PoC yok.</div>';
+    } else {
+      var pctAccepted = (acceptedPocs.length / totalRespondedDonut) * 100;
+      var pctRejected = (rejectedPocs.length / totalRespondedDonut) * 100;
+      // SVG donut chart
+      var donutSize = 160;
+      var donutR = 60;
+      var donutCircum = 2 * Math.PI * donutR;
+      var dashAccepted = (pctAccepted / 100) * donutCircum;
+      var dashRejected = (pctRejected / 100) * donutCircum;
+
+      html += '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">'
+        + '<svg viewBox="0 0 ' + donutSize + ' ' + donutSize + '" style="width:140px;height:140px;flex-shrink:0">'
+        +   '<circle cx="' + donutSize/2 + '" cy="' + donutSize/2 + '" r="' + donutR + '" fill="none" stroke="var(--border)" stroke-width="18"/>'
+        +   '<circle cx="' + donutSize/2 + '" cy="' + donutSize/2 + '" r="' + donutR + '" fill="none" stroke="#22d078" stroke-width="18" stroke-dasharray="' + dashAccepted + ' ' + donutCircum + '" stroke-linecap="round" transform="rotate(-90 ' + donutSize/2 + ' ' + donutSize/2 + ')"/>'
+        +   '<circle cx="' + donutSize/2 + '" cy="' + donutSize/2 + '" r="' + donutR + '" fill="none" stroke="#ff7070" stroke-width="18" stroke-dasharray="' + dashRejected + ' ' + donutCircum + '" stroke-linecap="round" transform="rotate(' + (pctAccepted * 3.6 - 90) + ' ' + donutSize/2 + ' ' + donutSize/2 + ')"/>'
+        +   '<text x="' + donutSize/2 + '" y="' + (donutSize/2 - 4) + '" font-size="22" font-weight="800" fill="var(--text-primary)" text-anchor="middle">%' + Math.round(pctAccepted) + '</text>'
+        +   '<text x="' + donutSize/2 + '" y="' + (donutSize/2 + 14) + '" font-size="10" fill="var(--text-muted)" text-anchor="middle">Kabul oranı</text>'
+        + '</svg>'
+        + '<div style="flex:1;min-width:140px">'
+        +   '<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;color:var(--text-primary)"><span style="width:12px;height:12px;background:#22d078;border-radius:3px"></span><strong>' + acceptedPocs.length + '</strong> Kabul edilen</div>'
+        +   '<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;color:var(--text-primary)"><span style="width:12px;height:12px;background:#ff7070;border-radius:3px"></span><strong>' + rejectedPocs.length + '</strong> Reddedilen</div>'
+        +   '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-primary)"><span style="width:12px;height:12px;background:var(--border);border-radius:3px"></span><strong>' + pendingPocs.length + '</strong> Bekliyor</div>'
+        + '</div>'
+        + '</div>';
+    }
+    html += '</div>';
+
+    html += '</div>';  // 2 sütun grid son
+
+    // ─── TIER 2: Quota progress (mevcut subscription verisi ile) ───
+    if (sub) {
+      var pocUsed = sub.pocUsedThisCycle || 0;
+      var pocBonus = sub.referralBonusPocs || 0;
+      // Paket bilgisi
+      var pkgQuota = 3; // default Free
+      var pkgInviteQuota = 5;
+      try {
+        var pkgSnap = await getDoc(doc(db, 'pochub_packages', sub.currentPackageId || 'free'));
+        if (pkgSnap.exists()) {
+          var pkg = pkgSnap.data();
+          pkgQuota = pkg.pocQuota || 0;
+          pkgInviteQuota = pkg.inviteQuotaPerMonth || 0;
+        }
+      } catch(e){}
+      var totalPocQuota = pkgQuota === -1 ? -1 : pkgQuota + pocBonus;
+      var pocPct = totalPocQuota === -1 ? 0 : (totalPocQuota > 0 ? Math.min(100, (pocUsed / totalPocQuota) * 100) : 0);
+      var inviteUsed = sub.inviteUsedThisCycle || 0;
+      var invPct = pkgInviteQuota === -1 ? 0 : (pkgInviteQuota > 0 ? Math.min(100, (inviteUsed / pkgInviteQuota) * 100) : 0);
+
+      html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:18px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+        +   '<div style="font-size:13px;font-weight:700;color:var(--text-primary)">⏱ Bu Döngü Kullanım</div>'
+        +   '<button class="btn-g btn-sm" id="an-go-sub" style="padding:6px 12px;font-size:11.5px">Aboneliğim →</button>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">'
+        // PoC
+        + '<div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:var(--text-muted)">PoC Kabul</span><span style="font-weight:700;color:var(--text-primary)">' + pocUsed + ' / ' + (totalPocQuota === -1 ? '∞' : totalPocQuota) + '</span></div>'
+        +   (totalPocQuota === -1
+            ? '<div style="font-size:11.5px;color:#a855f7;font-weight:700">Sınırsız (Enterprise)</div>'
+            : '<div style="background:var(--bg-elevated);height:8px;border-radius:4px;overflow:hidden"><div style="background:' + (pocPct >= 90 ? '#ff7070' : '#22d078') + ';height:100%;width:' + pocPct + '%;transition:width .3s"></div></div>')
+        +   (pocBonus > 0 ? '<div style="font-size:10.5px;color:#22d078;font-weight:700;margin-top:4px">🎁 ' + pkgQuota + ' paket + ' + pocBonus + ' davet bonusu</div>' : '')
+        + '</div>'
+        // Davet
+        + '<div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:var(--text-muted)">Davet</span><span style="font-weight:700;color:var(--text-primary)">' + inviteUsed + ' / ' + (pkgInviteQuota === -1 ? '∞' : pkgInviteQuota) + '</span></div>'
+        +   (pkgInviteQuota === -1
+            ? '<div style="font-size:11.5px;color:#a855f7;font-weight:700">Sınırsız</div>'
+            : '<div style="background:var(--bg-elevated);height:8px;border-radius:4px;overflow:hidden"><div style="background:' + (invPct >= 90 ? '#ff7070' : '#7db4ff') + ';height:100%;width:' + invPct + '%;transition:width .3s"></div></div>')
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }
+
+    // ─── TIER 4: Etkinlik metrikleri ───
+    if (cfg.showEventMetrics !== false && (events.length > 0 || regs.length > 0)) {
+      html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:18px">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:14px">📅 Etkinlik Metrikleri</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">'
+        // Toplam etkinlik
+        + '<div style="text-align:center;padding:12px;background:var(--bg-elevated);border-radius:8px">'
+        +   '<div style="font-size:24px;font-weight:800;color:#7db4ff">' + events.length + '</div>'
+        +   '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.3px;font-weight:600">Toplam Etkinlik</div>'
+        + '</div>'
+        // Yaklaşan
+        + '<div style="text-align:center;padding:12px;background:var(--bg-elevated);border-radius:8px">'
+        +   '<div style="font-size:24px;font-weight:800;color:#22d078">' + futureEvents.length + '</div>'
+        +   '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.3px;font-weight:600">Yaklaşan</div>'
+        + '</div>'
+        // Geçmiş
+        + '<div style="text-align:center;padding:12px;background:var(--bg-elevated);border-radius:8px">'
+        +   '<div style="font-size:24px;font-weight:800;color:var(--text-secondary)">' + pastEvents.length + '</div>'
+        +   '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.3px;font-weight:600">Geçmiş</div>'
+        + '</div>'
+        // Toplam kayıt
+        + '<div style="text-align:center;padding:12px;background:var(--bg-elevated);border-radius:8px">'
+        +   '<div style="font-size:24px;font-weight:800;color:#f0a429">' + regs.length + '</div>'
+        +   '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.3px;font-weight:600">Toplam Kayıt</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }
+
+    // ─── İPUÇLARI / EYLEM ÖNERİSİ ───
+    var tips = [];
+    if (acceptanceRate < 40 && totalReceived > 5) tips.push({
+      icon: '⚡', color: '#f0a429',
+      title: 'Kabul oranınız düşük',
+      text: 'Profil bilgilerini güncelle, ürünlerini güncel tut ve gelen PoC\'ları hızlı yanıtla. Müşteri için netlik = güven.',
+    });
+    if (avgResponseHours > 48 && responseCount > 3) tips.push({
+      icon: '🕐', color: '#7db4ff',
+      title: 'Cevap süreniz uzun',
+      text: 'Ortalama ' + avgResponseHours + ' saatte yanıt veriyorsun. Hızlı yanıt = daha çok kazanılan müşteri. Bildirimleri açık tut.',
+    });
+    if (totalReceived === 0) tips.push({
+      icon: '🚀', color: '#22d078',
+      title: 'Hadi başlayalım!',
+      text: 'Profilini tamamla, ürünlerini ekle, public profile linkini paylaş. İlk PoC talebi gelmeden önce hazır ol.',
+    });
+    if (tips.length === 0 && totalReceived > 0) tips.push({
+      icon: '✨', color: '#22d078',
+      title: 'Harika gidiyorsun!',
+      text: 'Performansın iyi. Düzenli giriş yap, profili güncel tut ve davet sistemini kullanarak topluluğa katkı sağla.',
+    });
+
+    if (tips.length > 0) {
+      html += '<div style="background:linear-gradient(135deg,rgba(34,208,120,.06),rgba(34,208,120,.02));border:1px solid rgba(34,208,120,.25);border-radius:12px;padding:16px;margin-bottom:18px">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px">💡 Performans Önerileri</div>'
+        + tips.map(function(t){
+            return '<div style="display:flex;gap:12px;padding:10px;background:var(--bg-elevated);border-radius:8px;margin-bottom:6px">'
+              + '<div style="font-size:22px;flex-shrink:0">' + t.icon + '</div>'
+              + '<div><div style="font-size:13px;font-weight:700;color:' + t.color + ';margin-bottom:2px">' + t.title + '</div><div style="font-size:12px;color:var(--text-secondary);line-height:1.5">' + t.text + '</div></div>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+    }
+
+    html += '</div>';
+
+    m.innerHTML = html;
+
+    // Handlers
+    el('an-go-sub')?.addEventListener('click', function(){ CUR_VEND_TAB = 'subscription'; loadVendTab(); });
+
+  } catch(e) {
+    console.error('vendAnalytics error:', e);
+    m.innerHTML = '<div style="padding:24px;background:rgba(255,112,112,.08);border:1px solid rgba(255,112,112,.3);border-radius:10px;color:#ff7070">Analytics yüklenemedi: ' + (e.message || e) + '</div>';
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════
 async function vendReferrals(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Davet bilgileri yükleniyor...</div>';
@@ -22473,6 +22891,15 @@ const DEFAULT_CONFIG = {
     showLocaleSwitcher: true,         // Header'da TR/EN dropdown
     autoDetectBrowser: false,         // true: browser dilini otomatik kullan (TR Türk kullanıcı için kapalı)
   },
+  // v5.03: Vendor Analytics
+  vendorAnalytics: {
+    enabled: true,                    // Vendor paneline Analytics tab eklensin mi
+    minTier: 'free',                  // 'free' | 'professional' | 'business' | 'enterprise' - bu tier+ görür
+    chartMonths: 6,                   // Aylık grafik aralığı (3, 6, 12)
+    showAcceptanceRate: true,         // Kabul oranı KPI'ı
+    showResponseTime: true,           // Ortalama cevap süresi KPI'ı
+    showEventMetrics: true,           // Etkinlik metrikleri bölümü
+  },
   freeTier: {
     pocAcceptanceMode: 'no_acceptance',
     freePocsPerPeriod: 0,
@@ -23771,6 +24198,27 @@ async function admSettings(m) {
     s0e.appendChild(field('Tarayıcı Dilini Otomatik Algıla', 'cfg-i18n-autodetect', 'toggle', cfg.i18n?.autoDetectBrowser ?? false, 'Açıkken: navigator.language tarayıcı dilinden EN olanlara EN gösterir. Kapalı (önerilen): default TR.'));
     m.appendChild(s0e);
 
+    // v5.03: Vendor Analytics
+    var s0g = section('📊 Vendor Analytics', '#a855f7');
+    s0g.appendChild(field('Analytics Tab Aktif Mi?', 'cfg-an-enabled', 'toggle', cfg.vendorAnalytics?.enabled ?? true, 'Kapalı: vendor panelinde Analytics tab gizlenir'));
+    s0g.appendChild(field('Min. Tier (görüntüleme)', 'cfg-an-mintier', 'select', {
+      cur: cfg.vendorAnalytics?.minTier || 'free',
+      options: [
+        {v:'free',l:'🆓 Free (Tüm tier\'lar)'},
+        {v:'professional',l:'💼 Pro+ (Free hariç)'},
+        {v:'business',l:'🏢 Business+ (Sadece Business/Enterprise)'},
+        {v:'enterprise',l:'🌟 Sadece Enterprise'}
+      ]
+    }, 'Bu tier ve üstündeki vendor\'lar analytics görür. Diğerleri "paketi yükselt" ekranı görür.'));
+    s0g.appendChild(field('Aylık Grafik Aralığı', 'cfg-an-months', 'select', {
+      cur: String(cfg.vendorAnalytics?.chartMonths || 6),
+      options: [{v:'3',l:'Son 3 ay'}, {v:'6',l:'Son 6 ay'}, {v:'12',l:'Son 12 ay'}]
+    }, 'PoC alım trendi grafiğinde gösterilen ay sayısı'));
+    s0g.appendChild(field('Kabul Oranı KPI', 'cfg-an-acceptance', 'toggle', cfg.vendorAnalytics?.showAcceptanceRate ?? true, '% Kabul oranı kartı'));
+    s0g.appendChild(field('Cevap Süresi KPI', 'cfg-an-response', 'toggle', cfg.vendorAnalytics?.showResponseTime ?? true, 'Ort. cevap süresi kartı (saat/gün)'));
+    s0g.appendChild(field('Etkinlik Metrikleri', 'cfg-an-events', 'toggle', cfg.vendorAnalytics?.showEventMetrics ?? true, 'Toplam etkinlik / kayıt sayıları bölümü'));
+    m.appendChild(s0g);
+
     // v5.00: SEO Araçları
     var s0f = section('🔎 SEO Araçları', '#f0a429');
     var seoInfo = document.createElement('div');
@@ -24075,6 +24523,15 @@ async function admSettings(m) {
             availableLocales: ['tr', 'en'],
             showLocaleSwitcher: el('cfg-i18n-switcher').value === 'true',
             autoDetectBrowser: el('cfg-i18n-autodetect').value === 'true',
+          },
+          // v5.03: Vendor Analytics
+          vendorAnalytics: {
+            enabled: el('cfg-an-enabled').value === 'true',
+            minTier: el('cfg-an-mintier').value || 'free',
+            chartMonths: parseInt(el('cfg-an-months').value) || 6,
+            showAcceptanceRate: el('cfg-an-acceptance').value === 'true',
+            showResponseTime: el('cfg-an-response').value === 'true',
+            showEventMetrics: el('cfg-an-events').value === 'true',
           },
           // v4.89: Calendly
           calendly: {
