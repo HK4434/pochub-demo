@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.09 | pochub.co -->
+<!-- PoCHub v5.10 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -519,7 +519,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.09';
+const VERSION = 'v5.10';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -754,6 +754,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.10': ['MAJOR: Avatar yayilimi - PoC kartlari (musteri/vendor satiri), Mesaj balonlari (chat avatar), Vendor cards (katalog), Featured carousel. renderAvatar her yerde.'],
   'v5.09': ['MAJOR: Profil fotografi tam entegrasyon - top nav avatar, public profile hero, vendor leaderboard, PoC kartlari, mesaj balonlari, vendor cards. renderAvatar global helper.'],
   'v5.08': ['MAJOR: Vendor/Customer Dashboard tiklanabilirlik (filtre destekli), Profil resmi yukleme (base64 ile Firestore - Storage gereksiz), drag-drop UI, client-side resize.'],
   'v5.07': ['MAJOR: Admin Onayi Bekliyor filtre fix, tum panellere Profil tab (vendor/customer/admin), Admin Dashboard tum sayilar/badgeler tiklanabilir hedef sayfaya filtreli yonlendirir.'],
@@ -2804,9 +2805,19 @@ function openChatModal(pocId, pocTitle, otherName) {
       const msg = d.data();
       const isMine = msg.senderId === CUR_USER?.uid;
       const time = msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '';
-      return `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}">
-        <div class="msg-bubble ${isMine?'msg-mine':'msg-other'}">${msg.text}</div>
-        <div class="msg-time" style="text-align:${isMine?'right':'left'}">${msg.senderName||''} · ${time}</div>
+      // v5.10: Mesaj avatarı
+      const avatarHtml = renderAvatar({
+        photoBase64: msg.senderPhoto,
+        displayName: msg.senderName,
+        email: msg.senderEmail,
+        uid: msg.senderId,
+      }, 28);
+      return `<div style="display:flex;flex-direction:${isMine?'row-reverse':'row'};align-items:flex-end;gap:8px;margin-bottom:4px">
+        <div style="flex-shrink:0">${avatarHtml}</div>
+        <div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'};max-width:80%">
+          <div class="msg-bubble ${isMine?'msg-mine':'msg-other'}">${msg.text}</div>
+          <div class="msg-time" style="text-align:${isMine?'right':'left'}">${escHtml(msg.senderName||'')} · ${time}</div>
+        </div>
       </div>`;
     }).join('');
     msgsEl.scrollTop = msgsEl.scrollHeight;
@@ -2826,6 +2837,8 @@ function openChatModal(pocId, pocTitle, otherName) {
         pocId,
         senderId: CUR_USER.uid,
         senderName: CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email,
+        senderEmail: CUR_USER.email || '',
+        senderPhoto: CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl || '',  // v5.10: avatar için
         senderRole: CUR_PROFILE?.role || '',
         text,
         readBy: [CUR_USER.uid],
@@ -2873,9 +2886,19 @@ async function ACTIVE_CHAT_UNSUB2(pocId, msgsEl) {
     msgsEl.innerHTML = msgs.map(msg => {
       const isMine = msg.senderId === CUR_USER?.uid;
       const time = msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '';
-      return `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}">
-        <div class="msg-bubble ${isMine?'msg-mine':'msg-other'}">${msg.text}</div>
-        <div class="msg-time">${msg.senderName||''} · ${time}</div>
+      // v5.10: Mesaj avatarı
+      const avatarHtml = renderAvatar({
+        photoBase64: msg.senderPhoto,
+        displayName: msg.senderName,
+        email: msg.senderEmail,
+        uid: msg.senderId,
+      }, 28);
+      return `<div style="display:flex;flex-direction:${isMine?'row-reverse':'row'};align-items:flex-end;gap:8px;margin-bottom:4px">
+        <div style="flex-shrink:0">${avatarHtml}</div>
+        <div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'};max-width:80%">
+          <div class="msg-bubble ${isMine?'msg-mine':'msg-other'}">${msg.text}</div>
+          <div class="msg-time">${escHtml(msg.senderName||'')} · ${time}</div>
+        </div>
       </div>`;
     }).join('');
     msgsEl.scrollTop = msgsEl.scrollHeight;
@@ -6079,9 +6102,12 @@ async function loadCatalog() {
         <span class="bdg" style="background:var(--bg-elevated);color:#7c87a0">${p.category||'—'}</span>
       </div>
       <div style="font-size:14.5px;font-weight:700;margin-bottom:3px">${p.name}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:12px;color:#7c87a0;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>${p.vendorName||'—'}</span>${getVendorBadgeRow(p.vendorId)}</div>
-        ${p.avgRating ? '<div style="font-size:11.5px;color:#f59e0b;font-weight:600">&#11088; ' + p.avgRating.toFixed(1) + ' <span style="color:var(--text-muted);font-weight:400">(' + (p.ratingCount||0) + ')</span></div>' : ''}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px">
+        <div style="font-size:12px;color:#7c87a0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;flex:1">
+          ${p.vendorId ? getVendorAvatarFromCache(p.vendorId, 24, {square:true}) : ''}
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.vendorName||'—'}</span>${getVendorBadgeRow(p.vendorId)}
+        </div>
+        ${p.avgRating ? '<div style="font-size:11.5px;color:#f59e0b;font-weight:600;flex-shrink:0">&#11088; ' + p.avgRating.toFixed(1) + ' <span style="color:var(--text-muted);font-weight:400">(' + (p.ratingCount||0) + ')</span></div>' : ''}
       </div>
       <p style="font-size:12px;color:#9ca3af;line-height:1.5;flex:1;margin-bottom:12px">${p.description||''}</p>
       ${p.specs?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${
@@ -8477,15 +8503,27 @@ async function loadCustTab() {
           sentAgoR = ' · 📅 '+ago4;
         }
 
+        // v5.10: Vendor avatarı (PoC'tan)
+        var vendAvatar = renderAvatar({
+          photoBase64: r.vendorPhoto,
+          logoUrl: r.vendorLogo,
+          displayName: r.vendorName,
+          company: r.vendorName,
+          uid: r.vendorId,
+        }, 36);
+
         var card = document.createElement('div');
         card.style.cssText = 'background:var(--bg-surface);border:1px solid '+(r.status==='pending'?'rgba(240,164,41,.35)':r.status==='active'?'rgba(59,124,255,.3)':'var(--border)')+';border-radius:12px;padding:16px';
         card.innerHTML =
           '<div class="flx-bw-s-mb10">'
-          + '<div class="flx1">'
-          +   '<div class="fs14-fw7">'+(r.productName||r.title||'--')+perfBadgeRq+'</div>'
-          +   '<div class="txt-muted-12-mt2">'+(r.vendorName?'<strong>'+r.vendorName+'</strong>':'—')+sentAgoR+'</div>'
-          +   waitBadge
-          +   vendorTrustHint
+          + '<div class="flx1" style="display:flex;gap:12px;align-items:flex-start">'
+          +   (r.vendorName ? '<div style="flex-shrink:0;margin-top:2px">'+vendAvatar+'</div>' : '')
+          +   '<div style="flex:1;min-width:0">'
+          +     '<div class="fs14-fw7">'+(r.productName||r.title||'--')+perfBadgeRq+'</div>'
+          +     '<div class="txt-muted-12-mt2">'+(r.vendorName?'<strong>'+r.vendorName+'</strong>':'—')+sentAgoR+'</div>'
+          +     waitBadge
+          +     vendorTrustHint
+          +   '</div>'
           + '</div>'
           + '<span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;color:'+sc+';background:'+sc+'18;flex-shrink:0">'+sl+'</span>'
           + '</div>'
@@ -13852,14 +13890,26 @@ async function vendRequests(m) {
       }
       if (sentAgoTxt) custLine += ' <span class="txt-muted-12">· '+sentAgoTxt+'</span>';
 
+      // v5.10: Müşteri avatarı (custData veya fallback)
+      var custAvatar = renderAvatar({
+        photoBase64: custData?.photoBase64,
+        displayName: r.customerName || r.customerEmail,
+        company: r.customerCompany || custData?.company,
+        email: r.customerEmail,
+        uid: r.customerId,
+      }, 36);
+
       var card = document.createElement('div');
       card.style.cssText = 'background:var(--bg-surface);border:1px solid '+(r.status==='pending'?'rgba(240,164,41,.35)':r.status==='active'?'rgba(59,124,255,.3)':'var(--border)')+';border-radius:12px;padding:16px';
       card.innerHTML =
         '<div class="flx-bw-s-mb10">'
-        + '<div class="flx1">'
-        +   '<div class="fs14-fw7">'+(r.productName||r.title||'--')+perfBadge+'</div>'
-        +   '<div class="txt-muted-12-mt2">'+custLine+'</div>'
-        +   waitBadge
+        + '<div class="flx1" style="display:flex;gap:12px;align-items:flex-start">'
+        +   '<div style="flex-shrink:0;margin-top:2px">'+custAvatar+'</div>'
+        +   '<div style="flex:1;min-width:0">'
+        +     '<div class="fs14-fw7">'+(r.productName||r.title||'--')+perfBadge+'</div>'
+        +     '<div class="txt-muted-12-mt2">'+custLine+'</div>'
+        +     waitBadge
+        +   '</div>'
         + '</div>'
         + '<span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;color:'+sc+';background:'+sc+'18">'+sl+'</span>'
         + '</div>'
@@ -18584,6 +18634,17 @@ async function loadFeaturedCarousels() {
       return;
     }
 
+    // v5.10: Featured vendor/product'lardaki vendor'ları preload
+    try {
+      var allVendorIds = [
+        ...(data.featuredVendors || []).map(v => v.vendorId),
+        ...(data.featuredProducts || []).map(p => p.vendorId),
+      ].filter(Boolean);
+      if (allVendorIds.length > 0) {
+        await preloadVendorBadges([...new Set(allVendorIds)]);
+      }
+    } catch(e) {}
+
     var html = '';
 
     // Featured Vendors Carousel
@@ -18597,12 +18658,19 @@ async function loadFeaturedCarousels() {
       data.featuredVendors.slice(0, 6).forEach(function(v){
         var color = TIER_COLORS[v.tier] || '#5a6278';
         var ent = v.tier === 'enterprise';
+        // v5.10: Vendor avatarı
+        var vAvatar = getVendorAvatarFromCache(v.vendorId, 40, {square:true});
         html += '<div class="ftd-vendor-card" data-vendor="'+v.vendorId+'" style="background:linear-gradient(135deg,'+color+'15,'+color+'05);border:1px solid '+color+'40;border-radius:10px;padding:14px;cursor:pointer;transition:.15s">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">';
-        html += '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+(TIER_LABELS[v.tier]||v.tier)+'</div>';
-        html += (ent ? '<div style="font-size:10px;color:'+color+';font-weight:700">⭐ Premium</div>' : '');
+        html += '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:6px">';
+        html += '<div style="flex-shrink:0">'+vAvatar+'</div>';
+        html += '<div style="flex:1;min-width:0">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:start;gap:4px">';
+        html += '<div style="font-size:10.5px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+(TIER_LABELS[v.tier]||v.tier)+'</div>';
+        html += (ent ? '<div style="font-size:9.5px;color:'+color+';font-weight:700;flex-shrink:0">⭐</div>' : '');
         html += '</div>';
-        html += '<div style="font-size:13.5px;font-weight:700;line-height:1.3">'+(v.vendorName||'Vendor')+'</div>';
+        html += '<div style="font-size:13px;font-weight:700;line-height:1.3;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(v.vendorName||'Vendor')+'</div>';
+        html += '</div>';
+        html += '</div>';
         html += '</div>';
       });
       html += '</div></div>';
@@ -18626,7 +18694,9 @@ async function loadFeaturedCarousels() {
         html += '<div class="ftd-product-card" data-product="'+p.productId+'" style="background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid '+color+';border-radius:8px;padding:12px;cursor:pointer;transition:.15s">';
         html += '<div style="font-size:10.5px;color:var(--text-muted);margin-bottom:4px">'+(p.category||'—')+(p.brand?' · '+p.brand:'')+'</div>';
         html += '<div style="font-size:13px;font-weight:700;margin-bottom:4px;line-height:1.3">'+(p.productName||'Ürün')+'</div>';
-        html += '<div class="fs11-muted" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>🏢 '+(p.vendorName||'')+'</span>'+tierBadge+'</div>';
+        // v5.10: vendor avatar (cache'den)
+        var vendAvatarFtd = p.vendorId ? getVendorAvatarFromCache(p.vendorId, 20, {square:true}) : '';
+        html += '<div class="fs11-muted" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+vendAvatarFtd+'<span>'+(p.vendorName||'')+'</span>'+tierBadge+'</div>';
         if (p.unitPrice) html += '<div style="font-size:13px;font-weight:700;color:'+color+';margin-top:6px">₺'+p.unitPrice.toLocaleString('tr-TR')+'</div>';
         html += '</div>';
       });
@@ -23059,6 +23129,11 @@ async function preloadVendorBadges(vendorIds) {
         isTrial: sub?.isTrial || false,
         // v4.82: vendorStatus eklendi
         vendorStatus: user?.vendorStatus || 'auto_approved',
+        // v5.10: avatar bilgisi
+        photoBase64: user?.photoBase64 || '',
+        logoUrl: user?.logoUrl || '',
+        company: user?.company || '',
+        displayName: user?.displayName || '',
         fetchedAt: now,
       };
     } catch(e) {
@@ -23089,6 +23164,24 @@ function getVendorBadgeHtml(vendorId) {
   }
   return html;
 }
+
+// v5.10: Vendor avatarı cache'den (preloadVendorBadges sonrası kullanılabilir)
+function getVendorAvatarFromCache(vendorId, size, opts) {
+  if (!size) size = 32;
+  var cached = window._vendorBadgeCache[vendorId];
+  if (!cached) {
+    // Cache yok - boş avatar (initials veya gradient ile)
+    return renderAvatar({ uid: vendorId }, size, opts);
+  }
+  return renderAvatar({
+    photoBase64: cached.photoBase64,
+    logoUrl: cached.logoUrl,
+    company: cached.company,
+    displayName: cached.displayName,
+    uid: vendorId,
+  }, size, opts);
+}
+window.getVendorAvatarFromCache = getVendorAvatarFromCache;
 
 // Vendor için tam rozet satırı (paket + trial + doğrulama varsa)
 function getVendorBadgeRow(vendorId) {
