@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.08 | pochub.co -->
+<!-- PoCHub v5.09 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -519,7 +519,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.08';
+const VERSION = 'v5.09';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -754,6 +754,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.09': ['MAJOR: Profil fotografi tam entegrasyon - top nav avatar, public profile hero, vendor leaderboard, PoC kartlari, mesaj balonlari, vendor cards. renderAvatar global helper.'],
   'v5.08': ['MAJOR: Vendor/Customer Dashboard tiklanabilirlik (filtre destekli), Profil resmi yukleme (base64 ile Firestore - Storage gereksiz), drag-drop UI, client-side resize.'],
   'v5.07': ['MAJOR: Admin Onayi Bekliyor filtre fix, tum panellere Profil tab (vendor/customer/admin), Admin Dashboard tum sayilar/badgeler tiklanabilir hedef sayfaya filtreli yonlendirir.'],
   'v5.06': ['MAJOR: HOTFIX - Theme uyumsuzlugu (beyaz text -> koyu text light theme), tum dashboard zenginlestir (vendor/customer/admin), Admin Urun Onaylari butonu fix.'],
@@ -3339,10 +3340,38 @@ function buildNav() {
   // Nav right
   if (CUR_USER && CUR_PROFILE) {
     const roleLbl = {customer:'Müşteri', vendor: CUR_PROFILE.vendorType||'Vendor', admin:'Admin'};
+    // v5.09: Avatar bilgisi
+    var avatarUser = {
+      photoBase64: CUR_PROFILE.photoBase64,
+      logoUrl: CUR_PROFILE.logoUrl,
+      displayName: CUR_PROFILE.displayName,
+      company: CUR_PROFILE.company,
+      email: CUR_USER.email,
+      uid: CUR_USER.uid,
+    };
     navr.innerHTML = `
       ${getLocaleSwitcherHtml()}
-      <span style="font-size:12px;color:#7c87a0">${CUR_PROFILE.displayName||CUR_USER.email}</span>
-      <span class="bdg" style="background:rgba(59,124,255,.12);color:#7db4ff">${roleLbl[CUR_PROFILE.role]||''}</span>
+      <div style="position:relative;display:inline-block">
+        <button id="nav-profile-btn" style="background:none;border:none;padding:2px;cursor:pointer;display:flex;align-items:center;gap:6px;border-radius:8px;transition:background .15s" title="${t('nav.profile.tooltip', 'Profil menüsü')}">
+          ${renderAvatar(avatarUser, 28, {border:true, borderWidth:2, borderColor:'rgba(255,255,255,.2)'})}
+          <span style="font-size:12px;color:rgba(255,255,255,.85);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(CUR_PROFILE.displayName||CUR_USER.email)}</span>
+          <span style="font-size:9px;color:rgba(255,255,255,.5)">▾</span>
+        </button>
+        <div id="nav-profile-menu" style="display:none;position:absolute;right:0;top:calc(100%+6px);background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px;min-width:200px;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+          <div style="padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:10px">
+              ${renderAvatar(avatarUser, 36)}
+              <div style="overflow:hidden">
+                <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(CUR_PROFILE.displayName||'-')}</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(CUR_USER.email)}</div>
+              </div>
+            </div>
+            <div style="margin-top:6px"><span class="bdg" style="background:rgba(59,124,255,.2);color:#7db4ff;font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700">${roleLbl[CUR_PROFILE.role]||''}</span></div>
+          </div>
+          <button class="nav-menu-item" id="nav-menu-profile" style="display:block;width:100%;text-align:left;background:none;border:none;color:rgba(255,255,255,.85);font-size:12.5px;padding:8px 12px;border-radius:6px;cursor:pointer">👤 ${t('nav.profile', 'Profilim')}</button>
+          <button class="nav-menu-item" id="nav-menu-dashboard" style="display:block;width:100%;text-align:left;background:none;border:none;color:rgba(255,255,255,.85);font-size:12.5px;padding:8px 12px;border-radius:6px;cursor:pointer">📊 ${t('nav.panel', 'Panelim')}</button>
+        </div>
+      </div>
       <div style="position:relative;display:inline-block">
         <button class="btn-g btn-sm" id="notif-btn" style="position:relative">
           🔔 <span id="notif-badge" style="display:none;background:#ff4d4d;color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;margin-left:2px"></span>
@@ -3350,6 +3379,38 @@ function buildNav() {
       </div>
       <button class="btn-g btn-sm" id="sync-btn" title="Verileri yenile" style="padding:6px 10px">🔄</button>
       <button class="btn-g btn-sm" id="logout-btn">${t('nav.logout', 'Çıkış')}</button>`;
+
+    // v5.09: Profil menüsü toggle
+    el('nav-profile-btn')?.addEventListener('click', function(e){
+      e.stopPropagation();
+      var menu = el('nav-profile-menu');
+      if (menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    });
+    document.addEventListener('click', function(e){
+      var menu = el('nav-profile-menu');
+      var btn = el('nav-profile-btn');
+      if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
+        menu.style.display = 'none';
+      }
+    });
+    el('nav-menu-profile')?.addEventListener('click', function(){
+      el('nav-profile-menu').style.display = 'none';
+      if (CUR_PROFILE.role === 'customer') { CUR_CUST_TAB = 'profile'; go('customer'); loadCustTab(); }
+      else if (CUR_PROFILE.role === 'vendor') { CUR_VEND_TAB = 'profile'; go('vendor'); loadVendTab(); }
+      else { CUR_ADM_TAB = 'profile'; go('admin'); loadAdmTab(); }
+    });
+    el('nav-menu-dashboard')?.addEventListener('click', function(){
+      el('nav-profile-menu').style.display = 'none';
+      if (CUR_PROFILE.role === 'customer') { CUR_CUST_TAB = 'dashboard'; go('customer'); loadCustTab(); }
+      else if (CUR_PROFILE.role === 'vendor') { CUR_VEND_TAB = 'dashboard'; go('vendor'); loadVendTab(); }
+      else { CUR_ADM_TAB = 'dashboard'; go('admin'); loadAdmTab(); }
+    });
+    // Hover menu items
+    document.querySelectorAll('.nav-menu-item').forEach(function(item){
+      item.addEventListener('mouseenter', function(){ item.style.background = 'rgba(255,255,255,.06)'; });
+      item.addEventListener('mouseleave', function(){ item.style.background = 'none'; });
+    });
+
     el('sync-btn').addEventListener('click', async () => {
       const btn = el('sync-btn');
       btn.textContent = '⏳';
@@ -3459,6 +3520,53 @@ function escHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ════════════════════════════════════════════════════════════════════
+// v5.09: AVATAR HELPER - foto varsa <img>, yoksa initials + gradient
+// user: { photoBase64?, logoUrl?, displayName?, company?, email? }
+// size: pixel (default 32)
+// ════════════════════════════════════════════════════════════════════
+function renderAvatar(user, size, opts) {
+  if (!user) user = {};
+  if (!size) size = 32;
+  opts = opts || {};
+  var photo = user.photoBase64 || user.logoUrl || '';
+  var nameSource = user.displayName || user.company || user.email || '?';
+  var initials = String(nameSource).trim().split(/\s+/)
+    .map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase();
+  if (!initials) initials = '?';
+
+  // Renk - email/uid'den deterministic
+  var hashSrc = user.uid || user.email || nameSource;
+  var hash = 0;
+  for (var i = 0; i < String(hashSrc).length; i++) {
+    hash = ((hash << 5) - hash) + String(hashSrc).charCodeAt(i);
+    hash |= 0;
+  }
+  var gradients = [
+    ['#2563eb','#7c3aed'],  // mavi-mor
+    ['#16a34a','#22d078'],  // yeşil
+    ['#d97706','#f0a429'],  // turuncu
+    ['#dc2626','#f87171'],  // kırmızı
+    ['#7c3aed','#a855f7'],  // mor
+    ['#0891b2','#22d3ee'],  // camgöbeği
+    ['#be185d','#ec4899'],  // pembe
+    ['#475569','#64748b'],  // gri
+  ];
+  var grad = gradients[Math.abs(hash) % gradients.length];
+  var fontSize = Math.max(10, Math.round(size * 0.4));
+  var borderRadius = opts.square ? Math.round(size * 0.15) : '50%';
+  var border = opts.border ? 'border:'+(opts.borderWidth||2)+'px solid '+(opts.borderColor||'#fff')+';' : '';
+
+  if (photo) {
+    return '<div style="width:'+size+'px;height:'+size+'px;border-radius:'+borderRadius+';background:transparent;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;'+border+'">'
+      + '<img src="'+photo+'" style="width:100%;height:100%;object-fit:cover" alt="'+escHtml(nameSource)+'">'
+      + '</div>';
+  }
+  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:'+borderRadius+';background:linear-gradient(135deg,'+grad[0]+','+grad[1]+');display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-family:Segoe UI,sans-serif;font-size:'+fontSize+'px;flex-shrink:0;line-height:1;'+border+'">'
+    + escHtml(initials) + '</div>';
+}
+window.renderAvatar = renderAvatar;
 
 function cleanTitle(s) {
   if (!s) return '';
@@ -5242,13 +5350,24 @@ async function loadVendorLogoBar() {
                   : v.vendorType === 'distributor' ? '🚚'
                   : v.vendorType === 'integrator' ? '🔧' : '💼';
       var slug = v.slug || generateSlug(v.company || v.displayName || 'vendor');
-      var inner = v.logoUrl
-        ? '<img src="'+v.logoUrl+'" alt="'+(v.company||'Vendor')+'" style="max-width:100px;max-height:48px;object-fit:contain;filter:grayscale(.2);transition:filter .2s" onerror="this.parentElement.innerHTML=\''+typeIcon+' '+(v.company||'').replace(/\'/g,"\\\\\'")+'\'">'
-        : '<div style="font-size:13px;color:var(--text-secondary);font-weight:600;text-align:center">'+typeIcon+' '+(v.company || 'Vendor')+'</div>';
+      // v5.09: Avatar - photoBase64 > logoUrl > initials placeholder
+      var photo = v.photoBase64 || v.logoUrl || '';
+      var inner;
+      if (photo) {
+        inner = '<img src="'+photo+'" alt="'+(v.company||'Vendor')+'" style="max-width:100px;max-height:48px;object-fit:contain;filter:grayscale(.2);transition:filter .2s" onerror="this.parentElement.innerHTML=\''+typeIcon+' '+(v.company||'').replace(/\'/g,"\\\\\'")+'\'">';
+      } else {
+        // renderAvatar 48px square
+        inner = renderAvatar({
+          displayName: v.company || v.displayName,
+          company: v.company,
+          uid: v.uid,
+        }, 44, {square: true})
+        + '<div style="font-size:11.5px;color:var(--text-secondary);font-weight:600;text-align:center;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(v.company || 'Vendor')+'</div>';
+      }
       var verified = v.vendorStatus === 'admin_verified'
         ? '<span style="position:absolute;top:6px;right:6px;background:#7db4ff;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:700">✓</span>'
         : '';
-      return '<a href="#v/'+slug+'" style="position:relative;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:center;justify-content:center;min-height:72px;text-decoration:none;transition:all .15s;cursor:pointer" onmouseover="this.style.borderColor=\'rgba(125,180,255,.4)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'translateY(0)\'">'
+      return '<a href="#v/'+slug+'" style="position:relative;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:'+(photo?'row':'column')+';align-items:center;justify-content:center;min-height:72px;text-decoration:none;transition:all .15s;cursor:pointer" onmouseover="this.style.borderColor=\'rgba(125,180,255,.4)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'translateY(0)\'">'
         + verified + inner + '</a>';
     }).join('');
 
@@ -27722,10 +27841,18 @@ async function renderVendorPublic(slug) {
       completedPocs = pocSnap.size;
     } catch(e) {}
 
-    // Logo veya placeholder
-    var logoHtml = vendor.logoUrl
-      ? '<img src="'+vendor.logoUrl+'" alt="'+vendor.company+' logo" style="max-width:120px;max-height:120px;object-fit:contain;border-radius:14px;background:#fff;padding:10px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">'
-      : '<div style="width:120px;height:120px;background:linear-gradient(135deg,#7db4ff,#5a9ee0);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:48px;color:#fff;font-weight:800">'+(vendor.company||'V').substring(0,1).toUpperCase()+'</div>';
+    // v5.09: Avatar - photoBase64 > logoUrl > initials
+    var heroPhoto = vendor.photoBase64 || vendor.logoUrl || '';
+    var logoHtml;
+    if (heroPhoto) {
+      logoHtml = '<img src="'+heroPhoto+'" alt="'+vendor.company+' logo" style="width:120px;height:120px;object-fit:cover;border-radius:14px;background:#fff;padding:'+(vendor.photoBase64?'0':'10px')+';border:1px solid var(--border)" onerror="this.style.display=\'none\'">';
+    } else {
+      logoHtml = renderAvatar({
+        displayName: vendor.company || vendor.displayName,
+        company: vendor.company,
+        uid: vendor.uid,
+      }, 120, {square: true});
+    }
 
     // CTA — logged-in için "PoC Aç", logout için "Vendor olarak katıl"
     var ctaHtml = CUR_USER
