@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.07 | pochub.co -->
+<!-- PoCHub v5.08 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -519,7 +519,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.07';
+const VERSION = 'v5.08';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -754,6 +754,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.08': ['MAJOR: Vendor/Customer Dashboard tiklanabilirlik (filtre destekli), Profil resmi yukleme (base64 ile Firestore - Storage gereksiz), drag-drop UI, client-side resize.'],
   'v5.07': ['MAJOR: Admin Onayi Bekliyor filtre fix, tum panellere Profil tab (vendor/customer/admin), Admin Dashboard tum sayilar/badgeler tiklanabilir hedef sayfaya filtreli yonlendirir.'],
   'v5.06': ['MAJOR: HOTFIX - Theme uyumsuzlugu (beyaz text -> koyu text light theme), tum dashboard zenginlestir (vendor/customer/admin), Admin Urun Onaylari butonu fix.'],
   'v5.05': ['MAJOR: Phase 5.0.5 - Production Deploy Hazirlik. Production Firestore Rules dosyasi (sıkı guvenlik), composite indexes tanimi, Functions production config, deploy checklist v3, pre-launch test rehberi, disaster recovery doku. Tam deploy ilk paying customer sonrasi yapilacak (strateji - Blaze beklemede).'],
@@ -8388,7 +8389,14 @@ async function loadCustTab() {
       lst.querySelectorAll('.rq-msg').forEach(function(b){ b.addEventListener('click', function(){ openChatModal(b.dataset.id, b.dataset.title, 'Vendor'); }); });
       lst.querySelectorAll('.rq-off').forEach(function(b){ b.addEventListener('click', function(){ CUR_CUST_TAB='offers'; loadCustTab(); }); });
     };
-    renderReqs('','','');
+
+    // v5.08: Dashboard'dan pre-filter
+    var _custReqPreFs = '';
+    if (window._panelPreFilter && window._panelPreFilter.status) {
+      _custReqPreFs = window._panelPreFilter.status;
+      window._panelPreFilter = null;
+    }
+    renderReqs('', _custReqPreFs, '');
   }
 
   else if (CUR_CUST_TAB === 'dashboard') {
@@ -8570,17 +8578,29 @@ async function loadCustTab() {
     m.appendChild(welcome);
 
     // ═══ v4.60: 8 STAT KARTLARI (trend ok'larıyla) ═══
-    function makeCustStatCard(val, label, sub, trend, color, bg, border, tab) {
+    function makeCustStatCard(val, label, sub, trend, color, bg, border, tab, filter) {
       var card = document.createElement('div');
-      card.style.cssText = 'background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;cursor:pointer;transition:all .15s';
+      card.style.cssText = 'background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;cursor:'+(tab?'pointer':'default')+';transition:all .15s;position:relative';
       card.innerHTML =
-        '<div style="font-size:'+(typeof val==='string' && val.length>6?'18px':'26px')+';font-weight:800;color:'+color+';font-family:monospace;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'
+        (tab ? '<div style="position:absolute;top:6px;right:8px;font-size:10px;color:var(--text-muted);opacity:.5;transition:opacity .15s">→</div>' : '')
+        + '<div style="font-size:'+(typeof val==='string' && val.length>6?'18px':'26px')+';font-weight:800;color:'+color+';font-family:monospace;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'
         + '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;font-weight:600">'+label+(trend||'')+'</div>'
         + (sub ? '<div style="font-size:10.5px;margin-top:3px;color:var(--text-muted);font-weight:500">'+sub+'</div>' : '');
       if (tab) {
-        card.addEventListener('click', function(){ CUR_CUST_TAB=tab; loadCustTab(); });
-        card.addEventListener('mouseover', function(){ card.style.transform='translateY(-2px)'; card.style.borderColor=color; });
-        card.addEventListener('mouseout',  function(){ card.style.transform=''; card.style.borderColor=border; });
+        card.addEventListener('click', function(){
+          if (filter) window._panelPreFilter = filter;
+          CUR_CUST_TAB = tab;
+          loadCustTab();
+          el('scr-customer')?.querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
+        });
+        card.addEventListener('mouseover', function(){
+          card.style.transform='translateY(-2px)'; card.style.borderColor=color;
+          var hint = card.querySelector('div[style*="→"]'); if (hint) hint.style.opacity = '1';
+        });
+        card.addEventListener('mouseout',  function(){
+          card.style.transform=''; card.style.borderColor=border;
+          var hint = card.querySelector('div[style*="→"]'); if (hint) hint.style.opacity = '.5';
+        });
       }
       return card;
     }
@@ -8588,14 +8608,14 @@ async function loadCustTab() {
     var statsGridD = document.createElement('div');
     statsGridD.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px';
 
-    statsGridD.appendChild(makeCustStatCard(activePocs, 'Aktif PoC', pendingPocs?'+'+pendingPocs+' bekliyor':'', trendArrowD(thisMonthPocs, lastMonthPocs), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','requests'));
-    statsGridD.appendChild(makeCustStatCard(pendingOffers, 'Bekleyen Teklif', revisionOffers?revisionOffers+' revizyon':'', trendArrowD(thisMonthOffs, lastMonthOffs), '#7db4ff','rgba(59,124,255,.07)','rgba(59,124,255,.2)','offers'));
+    statsGridD.appendChild(makeCustStatCard(activePocs, 'Aktif PoC', pendingPocs?'+'+pendingPocs+' bekliyor':'', trendArrowD(thisMonthPocs, lastMonthPocs), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','requests', {status:'active'}));
+    statsGridD.appendChild(makeCustStatCard(pendingOffers, 'Bekleyen Teklif', revisionOffers?revisionOffers+' revizyon':'', trendArrowD(thisMonthOffs, lastMonthOffs), '#7db4ff','rgba(59,124,255,.07)','rgba(59,124,255,.2)','offers', {status:'pending'}));
     statsGridD.appendChild(makeCustStatCard(pendingInvites, 'Yeni Davet', pendingInvites?'Yanıt bekleniyor':'', '', pendingInvites?'#f0a429':'var(--text-muted)', pendingInvites?'rgba(240,164,41,.1)':'rgba(15,23,42,.03)', pendingInvites?'rgba(240,164,41,.3)':'var(--border)','invites'));
     statsGridD.appendChild(makeCustStatCard(upcomingRegs, 'Yaklaşan Etkinlik', '', '', '#c4a8ff','rgba(196,168,255,.07)','rgba(196,168,255,.2)','registrations'));
-    statsGridD.appendChild(makeCustStatCard(totalSpentD>0?formatMoney(totalSpentD,'TRY'):'—', 'Toplam Yatırım', acceptedOffers.length+' kabul', trendArrowD(thisMonthSpent, lastMonthSpent), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','offers'));
-    statsGridD.appendChild(makeCustStatCard(pendingValueD>0?formatMoney(pendingValueD,'TRY'):'—', 'Bekleyen Tutar', '', '', '#f0a429','rgba(240,164,41,.07)','rgba(240,164,41,.2)','offers'));
-    statsGridD.appendChild(makeCustStatCard(activeVendorsD, 'Aktif Vendor', '', '', '#c4a8ff','rgba(196,168,255,.05)','rgba(196,168,255,.15)','requests'));
-    statsGridD.appendChild(makeCustStatCard(completedPocs, 'Tamamlanan PoC', '', trendArrowD(thisMonthCompleted, lastMonthCompleted), '#7db4ff','rgba(125,180,255,.05)','rgba(125,180,255,.15)','requests'));
+    statsGridD.appendChild(makeCustStatCard(totalSpentD>0?formatMoney(totalSpentD,'TRY'):'—', 'Toplam Yatırım', acceptedOffers.length+' kabul', trendArrowD(thisMonthSpent, lastMonthSpent), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','offers', {status:'accepted'}));
+    statsGridD.appendChild(makeCustStatCard(pendingValueD>0?formatMoney(pendingValueD,'TRY'):'—', 'Bekleyen Tutar', '', '', '#f0a429','rgba(240,164,41,.07)','rgba(240,164,41,.2)','offers', {status:'pending'}));
+    statsGridD.appendChild(makeCustStatCard(activeVendorsD, 'Aktif Vendor', '', '', '#c4a8ff','rgba(196,168,255,.05)','rgba(196,168,255,.15)','requests', {status:'active'}));
+    statsGridD.appendChild(makeCustStatCard(completedPocs, 'Tamamlanan PoC', '', trendArrowD(thisMonthCompleted, lastMonthCompleted), '#7db4ff','rgba(125,180,255,.05)','rgba(125,180,255,.15)','requests', {status:'completed'}));
     m.appendChild(statsGridD);
 
     // ═══ v4.60: 🚨 ACİL AKSİYONLAR BANNER ═══
@@ -9350,6 +9370,12 @@ async function loadOffersWithComparison(m) {
     var vendors = [...new Set(offers.map(function(o){ return o.vendorName; }).filter(Boolean))].sort();
 
     var filters = {status:'', vendor:'', dateFrom:'', dateTo:'', search:'', preset:''};
+
+    // v5.08: Dashboard pre-filter
+    if (window._panelPreFilter && window._panelPreFilter.status) {
+      filters.status = window._panelPreFilter.status;
+      window._panelPreFilter = null;
+    }
 
     function matchDate(o) {
       if (!filters.dateFrom && !filters.dateTo) return true;
@@ -10363,27 +10389,39 @@ async function loadVendTab() {
       }
     }
 
-    // ═══ 8 STAT KARTLARI (tıklanabilir + trend ok'ları) ═══
-    function makeVendStatCard(val, label, sub, trend, color, bg, border, tab) {
+    // ═══ 8 STAT KARTLARI (tıklanabilir + trend ok'ları + v5.08 filter) ═══
+    function makeVendStatCard(val, label, sub, trend, color, bg, border, tab, filter) {
       var card = document.createElement('div');
-      card.style.cssText = 'background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;cursor:pointer;transition:all .15s';
+      card.style.cssText = 'background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;position:relative';
       card.innerHTML =
-        '<div style="font-size:'+(typeof val==='string' && val.length>6?'18px':'26px')+';font-weight:800;color:'+color+';font-family:monospace;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'
+        '<div style="position:absolute;top:6px;right:8px;font-size:10px;color:var(--text-muted);opacity:.5;transition:opacity .15s">→</div>'
+        + '<div style="font-size:'+(typeof val==='string' && val.length>6?'18px':'26px')+';font-weight:800;color:'+color+';font-family:monospace;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'
         + '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;font-weight:600">'+label+(trend||'')+'</div>'
         + (sub ? '<div style="font-size:10.5px;margin-top:3px;color:var(--text-muted);font-weight:500">'+sub+'</div>' : '');
-      card.addEventListener('click', function(){ CUR_VEND_TAB=tab; loadVendTab(); });
-      card.addEventListener('mouseover', function(){ card.style.transform='translateY(-2px)'; card.style.borderColor=color; });
-      card.addEventListener('mouseout',  function(){ card.style.transform=''; card.style.borderColor=border; });
+      card.addEventListener('click', function(){
+        if (filter) window._panelPreFilter = filter;
+        CUR_VEND_TAB = tab;
+        loadVendTab();
+        el('scr-vendor')?.querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
+      });
+      card.addEventListener('mouseover', function(){
+        card.style.transform='translateY(-2px)'; card.style.borderColor=color;
+        var hint = card.querySelector('div[style*="→"]'); if (hint) hint.style.opacity = '1';
+      });
+      card.addEventListener('mouseout',  function(){
+        card.style.transform=''; card.style.borderColor=border;
+        var hint = card.querySelector('div[style*="→"]'); if (hint) hint.style.opacity = '.5';
+      });
       return card;
     }
 
     var statGrid = document.createElement('div');
     statGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px';
-    statGrid.appendChild(makeVendStatCard(activePocs,    'Aktif PoC',        pendingPocs?'+'+pendingPocs+' bekliyor':'',  trendArrow(thisMonthPocs, lastMonthPocs), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','requests'));
-    statGrid.appendChild(makeVendStatCard(pendingOffers, 'Bekleyen Teklif',  revisionOffers?revisionOffers+' revizyon':'',trendArrow(thisMonthOffs, lastMonthOffs), '#f0a429','rgba(240,164,41,.07)','rgba(240,164,41,.2)','offers-sent'));
-    statGrid.appendChild(makeVendStatCard(activeProds,   'Aktif Ürün',       pendingApproval?pendingApproval+' onay bekliyor':'', '', '#7db4ff','rgba(59,124,255,.07)','rgba(59,124,255,.2)','products'));
+    statGrid.appendChild(makeVendStatCard(activePocs,    'Aktif PoC',        pendingPocs?'+'+pendingPocs+' bekliyor':'',  trendArrow(thisMonthPocs, lastMonthPocs), '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','requests', {status:'active'}));
+    statGrid.appendChild(makeVendStatCard(pendingOffers, 'Bekleyen Teklif',  revisionOffers?revisionOffers+' revizyon':'',trendArrow(thisMonthOffs, lastMonthOffs), '#f0a429','rgba(240,164,41,.07)','rgba(240,164,41,.2)','offers-sent', {status:'pending'}));
+    statGrid.appendChild(makeVendStatCard(activeProds,   'Aktif Ürün',       pendingApproval?pendingApproval+' onay bekliyor':'', '', '#7db4ff','rgba(59,124,255,.07)','rgba(59,124,255,.2)','products', {status:'active'}));
     statGrid.appendChild(makeVendStatCard(upcomingEvs,   'Yaklaşan Etkinlik','',                                           '', '#c4a8ff','rgba(196,168,255,.07)','rgba(196,168,255,.2)','calendar'));
-    statGrid.appendChild(makeVendStatCard(pendingInvites,'Yanıtsız Davet',   acceptedInvites?acceptedInvites+' kabul':'',  '', '#22d078','rgba(34,208,120,.05)','rgba(34,208,120,.15)','invites'));
+    statGrid.appendChild(makeVendStatCard(pendingInvites,'Yanıtsız Davet',   acceptedInvites?acceptedInvites+' kabul':'',  '', '#22d078','rgba(34,208,120,.05)','rgba(34,208,120,.15)','invites', {status:'pending'}));
     statGrid.appendChild(makeVendStatCard(convRate+'%',  'Teklif Dönüşüm',   offs.length+' teklif',                        trendArrow(thisMonthAcc, lastMonthAcc), '#3b7cff','rgba(59,124,255,.05)','rgba(59,124,255,.15)','offers-sent'));
     statGrid.appendChild(makeVendStatCard(totalCustomers,'Müşteri',          regs.length?regs.length+' kayıt':'',          '', '#c4a8ff','rgba(196,168,255,.05)','rgba(196,168,255,.15)','requests'));
     statGrid.appendChild(makeVendStatCard(
@@ -10391,7 +10429,7 @@ async function loadVendTab() {
       'Pipeline ₺',
       acceptedOffers.length+' kabul',
       trendArrow(thisMonthPipeline, lastMonthPipeline),
-      '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','offers-sent'));
+      '#22d078','rgba(34,208,120,.07)','rgba(34,208,120,.2)','offers-sent', {status:'accepted'}));
     m.appendChild(statGrid);
 
     // ═══ 🚨 ACİL AKSİYONLAR BANNER (önceliklendirilmiş) ═══
@@ -13798,7 +13836,14 @@ async function vendRequests(m) {
       });
     });
   };
-  render('','','');
+
+  // v5.08: Dashboard'dan pre-filter geldiyse uygula
+  var _preFilterStatus = '';
+  if (window._panelPreFilter && window._panelPreFilter.status) {
+    _preFilterStatus = window._panelPreFilter.status;
+    window._panelPreFilter = null;
+  }
+  render('', _preFilterStatus, '');
 }
 
 async function vendInvites(m) {
@@ -15271,6 +15316,28 @@ async function renderUserProfile(m, role) {
       + '</div>';
   }
 
+  // v5.08: ═══ PROFİL FOTOĞRAFI ═══
+  var photoData = p.photoBase64 || '';
+  var initials = (p.displayName || CUR_USER.email || '?').trim()
+    .split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase();
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">📷 Profil Fotoğrafı</h3>'
+    + '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">'
+    +   '<div id="pf-photo-preview" style="width:96px;height:96px;border-radius:50%;background:'+(photoData?'transparent':'linear-gradient(135deg,#2563eb,#7c3aed)')+';border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:800;font-family:Segoe UI,sans-serif;flex-shrink:0;position:relative">'
+    +     (photoData ? '<img src="'+photoData+'" style="width:100%;height:100%;object-fit:cover" alt="Profil">' : '<span>'+escHtml(initials)+'</span>')
+    +   '</div>'
+    +   '<div style="flex:1;min-width:200px">'
+    +     '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;line-height:1.5">JPG, PNG, GIF — max 2MB. Otomatik 200x200 yeniden boyutlandırılır.</div>'
+    +     '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +       '<label for="pf-photo-input" class="btn-p btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:8px 14px">📁 Dosya Seç</label>'
+    +       '<input id="pf-photo-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none">'
+    +       (photoData ? '<button id="pf-photo-clear" class="btn-g btn-sm" style="padding:8px 14px">🗑 Kaldır</button>' : '')
+    +     '</div>'
+    +     '<div id="pf-photo-status" style="font-size:11.5px;color:var(--text-muted);margin-top:6px"></div>'
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+
   // ═══ ANA BİLGİLER ═══
   html += '<div class="card" style="margin-bottom:14px">'
     + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">📝 Temel Bilgiler</h3>'
@@ -15418,6 +15485,98 @@ async function renderUserProfile(m, role) {
   m.innerHTML = html;
 
   // ═══ EVENT HANDLERS ═══
+
+  // v5.08: Profil fotoğrafı yükleme (base64, Firestore'a)
+  var _currentPhotoData = p.photoBase64 || '';
+  function updatePhotoPreview(data) {
+    var prev = el('pf-photo-preview');
+    if (!prev) return;
+    if (data) {
+      prev.style.background = 'transparent';
+      prev.innerHTML = '<img src="'+data+'" style="width:100%;height:100%;object-fit:cover" alt="Profil">';
+    } else {
+      prev.style.background = 'linear-gradient(135deg,#2563eb,#7c3aed)';
+      prev.innerHTML = '<span>'+escHtml(initials)+'</span>';
+    }
+  }
+  function resizeImage(file) {
+    return new Promise(function(resolve, reject){
+      if (file.size > 2 * 1024 * 1024) {
+        reject(new Error('Dosya 2MB\'dan büyük. Lütfen daha küçük bir resim seçin.'));
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e){
+        var img = new Image();
+        img.onload = function(){
+          var maxSize = 200;
+          var canvas = document.createElement('canvas');
+          var w = img.width, h = img.height;
+          if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize; } }
+          else { if (h > maxSize) { w = w * maxSize / h; h = maxSize; } }
+          canvas.width = w; canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          // JPEG 0.85 quality (PNG için png olsa şeffaflık kalır ama küçük olsun)
+          var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(dataUrl);
+        };
+        img.onerror = function(){ reject(new Error('Resim yüklenemedi')); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function(){ reject(new Error('Dosya okunamadı')); };
+      reader.readAsDataURL(file);
+    });
+  }
+  el('pf-photo-input')?.addEventListener('change', async function(e){
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var statusEl = el('pf-photo-status');
+    if (statusEl) { statusEl.textContent = '⏳ İşleniyor...'; statusEl.style.color = 'var(--text-secondary)'; }
+    try {
+      var dataUrl = await resizeImage(file);
+      // Boyut kontrol (Firestore 1MB document limiti)
+      if (dataUrl.length > 900 * 1024) {
+        throw new Error('Resim çok büyük (>900KB). Daha küçük bir resim deneyin.');
+      }
+      _currentPhotoData = dataUrl;
+      updatePhotoPreview(dataUrl);
+      // "Kaldır" butonu eklenmemişse ekle
+      if (!el('pf-photo-clear')) {
+        var clearBtn = document.createElement('button');
+        clearBtn.id = 'pf-photo-clear';
+        clearBtn.className = 'btn-g btn-sm';
+        clearBtn.style.cssText = 'padding:8px 14px';
+        clearBtn.textContent = '🗑 Kaldır';
+        e.target.parentNode.appendChild(clearBtn);
+        clearBtn.addEventListener('click', clearPhoto);
+      }
+      if (statusEl) {
+        statusEl.textContent = '✓ Yüklendi — "Kaydet" butonuyla onaylayın';
+        statusEl.style.color = '#16a34a';
+      }
+    } catch(err) {
+      if (statusEl) {
+        statusEl.textContent = '⚠ ' + err.message;
+        statusEl.style.color = '#dc2626';
+      }
+    }
+    // Input reset (aynı dosya tekrar seçilebilsin)
+    e.target.value = '';
+  });
+  function clearPhoto() {
+    if (!confirm('Profil fotoğrafını kaldırmak istediğinize emin misiniz?')) return;
+    _currentPhotoData = '';
+    updatePhotoPreview('');
+    el('pf-photo-clear')?.remove();
+    var statusEl = el('pf-photo-status');
+    if (statusEl) {
+      statusEl.textContent = 'Foto kaldırıldı — "Kaydet" butonuyla onaylayın';
+      statusEl.style.color = 'var(--text-secondary)';
+    }
+  }
+  el('pf-photo-clear')?.addEventListener('click', clearPhoto);
+
   // Public profile butonları (vendor)
   el('pf-view-public')?.addEventListener('click', function(){
     var slug = p.slug || generateSlug(p.company || p.displayName || 'vendor');
@@ -15469,6 +15628,7 @@ async function renderUserProfile(m, role) {
         address: el('pf-address')?.value.trim() || '',
         linkedinUrl: el('pf-linkedin')?.value.trim() || '',
         website: el('pf-website')?.value.trim() || '',
+        photoBase64: _currentPhotoData || '',  // v5.08: profil fotoğrafı
         updatedAt: serverTimestamp(),
       };
 
