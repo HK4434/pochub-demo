@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.13 | pochub.co -->
+<!-- PoCHub v5.14 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -566,7 +566,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.13';
+const VERSION = 'v5.14';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -801,6 +801,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.14': ['MAJOR: Profil genişlet (vergi no/dairesi, KEP, fatura bilgileri, vendor: cal.sayisi/kurulus/sektor/sertifikalar, customer: sektor/sirket buyuklugu/karar verici), admin urun onayi filtre empty state ipucu.'],
   'v5.13': ['MAJOR: Production hazirlik final - Demo data temizleme araci, sitemap update, PWA manifest, kalan loading state skeletonlari, landing CTA optimization.'],
   'v5.12': ['MAJOR: UX polish - empty state illustrations, loading skeletons (shimmer), toast queue management, tooltip helper.'],
   'v5.11': ['MAJOR: Onboarding checklist tiklanabilirlik (vendor + customer), bildirim panelinde avatar, notification badge guncellemeleri.'],
@@ -15915,19 +15916,77 @@ async function renderUserProfile(m, role) {
     +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">E-posta değiştirilemez</div>'
     +   '</div>'
     +   '<div>'
-    +     '<label class="lbl">Telefon</label>'
-    +     '<input id="pf-phone" class="inp" value="'+escHtml(p.phone||'')+'" placeholder="+90 555 555 5555">'
+    +     '<label class="lbl">Pozisyon / Unvan</label>'
+    +     '<input id="pf-position" class="inp" value="'+escHtml(p.position||p.jobTitle||'')+'" placeholder="Genel Müdür, CTO, IT Müdürü, vs.">'
     +   '</div>'
     +   '<div>'
     +     '<label class="lbl">Şirket / Kurum</label>'
     +     '<input id="pf-company" class="inp" value="'+escHtml(p.company||'')+'" placeholder="Firma adı">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Telefon (Ana)</label>'
+    +     '<input id="pf-phone" class="inp" value="'+escHtml(p.phone||'')+'" placeholder="+90 555 555 5555">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Telefon (Yedek)</label>'
+    +     '<input id="pf-phone2" class="inp" value="'+escHtml(p.phone2||'')+'" placeholder="+90 (opsiyonel)">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">İkincil E-posta</label>'
+    +     '<input id="pf-email2" class="inp" type="email" value="'+escHtml(p.secondaryEmail||'')+'" placeholder="ek@firma.com (opsiyonel)">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Tercih Edilen İletişim</label>'
+    +     '<select id="pf-pref-contact" class="inp">'
+    +       '<option value="email"'+(p.preferredContact==='email'?' selected':'')+'>📧 E-posta</option>'
+    +       '<option value="phone"'+(p.preferredContact==='phone'?' selected':'')+'>📞 Telefon</option>'
+    +       '<option value="whatsapp"'+(p.preferredContact==='whatsapp'?' selected':'')+'>💬 WhatsApp</option>'
+    +       '<option value="any"'+(!p.preferredContact||p.preferredContact==='any'?' selected':'')+'>🤷 Farketmez</option>'
+    +     '</select>'
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+
+  // ═══ FATURA BİLGİLERİ (KRITIK - YENİ) ═══
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">🧾 Fatura & Resmi Bilgiler</h3>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">Bu bilgiler fatura kesimi ve resmi yazışmalar için kullanılacak. KVKK kapsamında korunmaktadır.</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
+    +   '<div>'
+    +     '<label class="lbl">Vergi Türü</label>'
+    +     '<select id="pf-tax-type" class="inp">'
+    +       '<option value=""'+(!p.taxType?' selected':'')+'>Seçiniz</option>'
+    +       '<option value="legal"'+(p.taxType==='legal'?' selected':'')+'>🏢 Tüzel Kişi (Şirket)</option>'
+    +       '<option value="individual"'+(p.taxType==='individual'?' selected':'')+'>👤 Gerçek Kişi (Şahıs)</option>'
+    +     '</select>'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Vergi/TC No</label>'
+    +     '<input id="pf-tax-no" class="inp" value="'+escHtml(p.taxNo||'')+'" placeholder="10 haneli (VKN) veya 11 haneli (TCKN)" pattern="[0-9]{10,11}">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Vergi Dairesi</label>'
+    +     '<input id="pf-tax-office" class="inp" value="'+escHtml(p.taxOffice||'')+'" placeholder="Örn: Beşiktaş, Çankaya">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">MERSIS No (varsa)</label>'
+    +     '<input id="pf-mersis" class="inp" value="'+escHtml(p.mersisNo||'')+'" placeholder="16 haneli MERSIS numarası">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">KEP Adresi</label>'
+    +     '<input id="pf-kep" type="email" class="inp" value="'+escHtml(p.kepAddress||'')+'" placeholder="firma@hs01.kep.tr">'
+    +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Kayıtlı Elektronik Posta — resmi yazışmalar için</div>'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Fatura Adresi (Resmi)</label>'
+    +     '<textarea id="pf-billing-address" class="inp" rows="2" placeholder="Vergi dairesine kayıtlı adres">'+escHtml(p.billingAddress||'')+'</textarea>'
     +   '</div>'
     + '</div>'
     + '</div>';
 
   // ═══ İLETİŞİM & ADRES ═══
   html += '<div class="card" style="margin-bottom:14px">'
-    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">📍 Adres & İletişim</h3>'
+    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">📍 Adres & Sosyal</h3>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
     +   '<div>'
     +     '<label class="lbl">Şehir</label>'
@@ -15938,7 +15997,7 @@ async function renderUserProfile(m, role) {
     +     '<input id="pf-country" class="inp" value="'+escHtml(p.country||'Türkiye')+'" placeholder="Türkiye">'
     +   '</div>'
     +   '<div style="grid-column:1/-1">'
-    +     '<label class="lbl">Adres</label>'
+    +     '<label class="lbl">İletişim Adresi (Posta için)</label>'
     +     '<textarea id="pf-address" class="inp" rows="2" placeholder="Tam adres (opsiyonel)">'+escHtml(p.address||'')+'</textarea>'
     +   '</div>'
     +   '<div>'
@@ -15963,8 +16022,33 @@ async function renderUserProfile(m, role) {
       +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Tipi değiştirmek için admin\'e başvurun</div>'
       +   '</div>'
       +   '<div>'
-      +     '<label class="lbl">Logo URL</label>'
+      +     '<label class="lbl">Logo URL (alternatif)</label>'
       +     '<input id="pf-logo" class="inp" value="'+escHtml(p.logoUrl||'')+'" placeholder="https://...">'
+      +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Profil fotoğrafı yüklediyseniz boş bırakın</div>'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">Çalışan Sayısı</label>'
+      +     '<select id="pf-emp-count" class="inp">'
+      +       '<option value=""'+(!p.employeeCount?' selected':'')+'>Seçiniz</option>'
+      +       '<option value="1-10"'+(p.employeeCount==='1-10'?' selected':'')+'>1-10</option>'
+      +       '<option value="11-50"'+(p.employeeCount==='11-50'?' selected':'')+'>11-50</option>'
+      +       '<option value="51-200"'+(p.employeeCount==='51-200'?' selected':'')+'>51-200</option>'
+      +       '<option value="201-500"'+(p.employeeCount==='201-500'?' selected':'')+'>201-500</option>'
+      +       '<option value="500+"'+(p.employeeCount==='500+'?' selected':'')+'>500+</option>'
+      +     '</select>'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">Kuruluş Yılı</label>'
+      +     '<input id="pf-founded" class="inp" type="number" min="1900" max="'+(new Date().getFullYear())+'" value="'+escHtml(p.foundedYear||'')+'" placeholder="2010">'
+      +   '</div>'
+      +   '<div style="grid-column:1/-1">'
+      +     '<label class="lbl">Uzmanlık Alanları (virgülle ayırın)</label>'
+      +     '<input id="pf-expertise" class="inp" value="'+escHtml((p.expertiseAreas||[]).join(', '))+'" placeholder="Cybersecurity, Cloud Migration, Backup, Network, vs.">'
+      +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Müşterilerin sizi daha kolay bulması için</div>'
+      +   '</div>'
+      +   '<div style="grid-column:1/-1">'
+      +     '<label class="lbl">Sertifikalar (virgülle ayırın)</label>'
+      +     '<input id="pf-certs" class="inp" value="'+escHtml((p.certifications||[]).join(', '))+'" placeholder="ISO 27001, ISO 9001, CISSP, MCSA, vs.">'
       +   '</div>'
       +   '<div style="grid-column:1/-1">'
       +     '<label class="lbl">Kısa Açıklama (max 160 karakter)</label>'
@@ -15973,6 +16057,14 @@ async function renderUserProfile(m, role) {
       +   '<div style="grid-column:1/-1">'
       +     '<label class="lbl">Detaylı Açıklama (Public profile için)</label>'
       +     '<textarea id="pf-bio" class="inp" rows="4" placeholder="Detaylı tanıtım, ürünler, hizmetler, uzmanlıklar...">'+escHtml(p.bio||p.description||'')+'</textarea>'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">YouTube Tanıtım Videosu (opsiyonel)</label>'
+      +     '<input id="pf-video" class="inp" value="'+escHtml(p.promoVideoUrl||'')+'" placeholder="https://youtube.com/watch?v=...">'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">Twitter / X</label>'
+      +     '<input id="pf-twitter" class="inp" value="'+escHtml(p.twitterUrl||'')+'" placeholder="https://x.com/firma">'
       +   '</div>'
       + '</div>'
       + '</div>';
@@ -15994,17 +16086,57 @@ async function renderUserProfile(m, role) {
       + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">👤 Müşteri Bilgileri</h3>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
       +   '<div>'
-      +     '<label class="lbl">İş Pozisyonu / Unvan</label>'
-      +     '<input id="pf-title" class="inp" value="'+escHtml(p.jobTitle||'')+'" placeholder="CIO, IT Müdürü, vs.">'
-      +   '</div>'
-      +   '<div>'
       +     '<label class="lbl">Departman</label>'
       +     '<input id="pf-dept" class="inp" value="'+escHtml(p.department||'')+'" placeholder="Bilgi İşlem, IT, vs.">'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">Karar Verici Rolü</label>'
+      +     '<select id="pf-decision" class="inp">'
+      +       '<option value=""'+(!p.decisionRole?' selected':'')+'>Seçiniz</option>'
+      +       '<option value="decision_maker"'+(p.decisionRole==='decision_maker'?' selected':'')+'>🎯 Nihai Karar Verici</option>'
+      +       '<option value="influencer"'+(p.decisionRole==='influencer'?' selected':'')+'>💡 Etki Sahibi (Influencer)</option>'
+      +       '<option value="evaluator"'+(p.decisionRole==='evaluator'?' selected':'')+'>🔍 Teknik Değerlendirici</option>'
+      +       '<option value="end_user"'+(p.decisionRole==='end_user'?' selected':'')+'>👤 Son Kullanıcı</option>'
+      +     '</select>'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">Sektör</label>'
+      +     '<select id="pf-sector" class="inp">'
+      +       '<option value=""'+(!p.sector?' selected':'')+'>Seçiniz</option>'
+      +       '<option value="finance"'+(p.sector==='finance'?' selected':'')+'>🏦 Finans / Bankacılık</option>'
+      +       '<option value="healthcare"'+(p.sector==='healthcare'?' selected':'')+'>🏥 Sağlık</option>'
+      +       '<option value="education"'+(p.sector==='education'?' selected':'')+'>🎓 Eğitim</option>'
+      +       '<option value="manufacturing"'+(p.sector==='manufacturing'?' selected':'')+'>🏭 Üretim / Sanayi</option>'
+      +       '<option value="retail"'+(p.sector==='retail'?' selected':'')+'>🛒 Perakende</option>'
+      +       '<option value="telecom"'+(p.sector==='telecom'?' selected':'')+'>📡 Telekom</option>'
+      +       '<option value="government"'+(p.sector==='government'?' selected':'')+'>🏛 Kamu</option>'
+      +       '<option value="energy"'+(p.sector==='energy'?' selected':'')+'>⚡ Enerji</option>'
+      +       '<option value="logistics"'+(p.sector==='logistics'?' selected':'')+'>🚚 Lojistik</option>'
+      +       '<option value="media"'+(p.sector==='media'?' selected':'')+'>📺 Medya</option>'
+      +       '<option value="tech"'+(p.sector==='tech'?' selected':'')+'>💻 Teknoloji</option>'
+      +       '<option value="other"'+(p.sector==='other'?' selected':'')+'>🌐 Diğer</option>'
+      +     '</select>'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">Şirket Büyüklüğü</label>'
+      +     '<select id="pf-cust-size" class="inp">'
+      +       '<option value=""'+(!p.companySize?' selected':'')+'>Seçiniz</option>'
+      +       '<option value="1-10"'+(p.companySize==='1-10'?' selected':'')+'>Mikro (1-10)</option>'
+      +       '<option value="11-50"'+(p.companySize==='11-50'?' selected':'')+'>Küçük (11-50)</option>'
+      +       '<option value="51-250"'+(p.companySize==='51-250'?' selected':'')+'>Orta (51-250)</option>'
+      +       '<option value="251-1000"'+(p.companySize==='251-1000'?' selected':'')+'>Büyük (251-1000)</option>'
+      +       '<option value="1000+"'+(p.companySize==='1000+'?' selected':'')+'>Kurumsal (1000+)</option>'
+      +     '</select>'
       +   '</div>'
       +   '<div style="grid-column:1/-1">'
       +     '<label class="lbl">İlgi Alanları (virgülle ayırın)</label>'
       +     '<input id="pf-interests" class="inp" value="'+escHtml((p.interests||[]).join(', '))+'" placeholder="Güvenlik, Bulut, Yedekleme, vs.">'
       +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Vendor\'lar size daha uygun teklif yapabilmek için</div>'
+      +   '</div>'
+      +   '<div style="grid-column:1/-1">'
+      +     '<label class="lbl">Şu An Kullandığınız Çözümler (opsiyonel)</label>'
+      +     '<input id="pf-current-vendors" class="inp" value="'+escHtml((p.currentVendors||[]).join(', '))+'" placeholder="Fortinet, Veeam, Microsoft 365, vs.">'
+      +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Mevcut tedarikçileriniz — vendor\'lar daha iyi teklif hazırlayabilir</div>'
       +   '</div>'
       + '</div>'
       + '</div>';
@@ -16185,25 +16317,63 @@ async function renderUserProfile(m, role) {
       var updates = {
         displayName: el('pf-name')?.value.trim() || '',
         phone: el('pf-phone')?.value.trim() || '',
+        phone2: el('pf-phone2')?.value.trim() || '',
+        secondaryEmail: el('pf-email2')?.value.trim() || '',
+        preferredContact: el('pf-pref-contact')?.value || 'any',
+        position: el('pf-position')?.value.trim() || '',
         company: el('pf-company')?.value.trim() || '',
         city: el('pf-city')?.value.trim() || '',
         country: el('pf-country')?.value.trim() || '',
         address: el('pf-address')?.value.trim() || '',
         linkedinUrl: el('pf-linkedin')?.value.trim() || '',
         website: el('pf-website')?.value.trim() || '',
-        photoBase64: _currentPhotoData || '',  // v5.08: profil fotoğrafı
+        photoBase64: _currentPhotoData || '',
+        // v5.14: Fatura bilgileri
+        taxType: el('pf-tax-type')?.value || '',
+        taxNo: el('pf-tax-no')?.value.trim() || '',
+        taxOffice: el('pf-tax-office')?.value.trim() || '',
+        mersisNo: el('pf-mersis')?.value.trim() || '',
+        kepAddress: el('pf-kep')?.value.trim() || '',
+        billingAddress: el('pf-billing-address')?.value.trim() || '',
         updatedAt: serverTimestamp(),
       };
+
+      // v5.14: Vergi/TC No validasyon
+      if (updates.taxNo) {
+        var taxClean = updates.taxNo.replace(/\D/g, '');
+        if (taxClean.length !== 10 && taxClean.length !== 11) {
+          showToast('Vergi No 10 haneli (VKN) veya 11 haneli (TCKN) olmalı', 'err');
+          btn.disabled = false; btn.textContent = '💾 Kaydet';
+          return;
+        }
+        updates.taxNo = taxClean;
+      }
 
       if (role === 'vendor') {
         updates.logoUrl = el('pf-logo')?.value.trim() || '';
         updates.shortDescription = el('pf-short-desc')?.value.trim() || '';
         updates.bio = el('pf-bio')?.value.trim() || '';
+        // v5.14: Vendor ek alanlar
+        updates.employeeCount = el('pf-emp-count')?.value || '';
+        var foundedRaw = el('pf-founded')?.value;
+        updates.foundedYear = foundedRaw ? parseInt(foundedRaw, 10) : null;
+        var rawExpertise = el('pf-expertise')?.value.trim() || '';
+        updates.expertiseAreas = rawExpertise ? rawExpertise.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+        var rawCerts = el('pf-certs')?.value.trim() || '';
+        updates.certifications = rawCerts ? rawCerts.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+        updates.promoVideoUrl = el('pf-video')?.value.trim() || '';
+        updates.twitterUrl = el('pf-twitter')?.value.trim() || '';
       } else if (role === 'customer') {
-        updates.jobTitle = el('pf-title')?.value.trim() || '';
+        updates.jobTitle = updates.position;
         updates.department = el('pf-dept')?.value.trim() || '';
         var rawInterests = el('pf-interests')?.value.trim() || '';
         updates.interests = rawInterests ? rawInterests.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+        // v5.14: Customer ek alanlar
+        updates.decisionRole = el('pf-decision')?.value || '';
+        updates.sector = el('pf-sector')?.value || '';
+        updates.companySize = el('pf-cust-size')?.value || '';
+        var rawCurrentVendors = el('pf-current-vendors')?.value.trim() || '';
+        updates.currentVendors = rawCurrentVendors ? rawCurrentVendors.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
       } else if (role === 'admin') {
         updates.adminSignature = el('pf-sig')?.value.trim() || '';
       }
@@ -21772,7 +21942,32 @@ async function admProducts(m) {
     if (!tbody) return;
 
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Sonuç bulunamadı.</td></tr>';
+      // v5.14: Filtre bağlamına özgü empty state
+      var emptyMsg = 'Sonuç bulunamadı.';
+      var hint = '';
+      if (f.publishStatus === 'awaiting_admin') {
+        emptyMsg = '✅ Onay bekleyen ürün yok';
+        hint = 'Tüm ürünler onaylanmış veya henüz vendor\'lardan onay talebi gelmedi.';
+      } else if (f.publishStatus === 'awaiting_integrator') {
+        emptyMsg = '🔗 Zincir bekleyen ürün yok';
+        hint = 'Tüm vendor zinciri tamamlandı.';
+      } else if (f.publishStatus === 'ready') {
+        emptyMsg = '📭 Yayında ürün yok';
+        hint = 'Henüz hiçbir ürün admin tarafından onaylanmadı.';
+      } else if (f.status === 'rejected') {
+        emptyMsg = '👍 Reddedilen ürün yok';
+        hint = 'Tüm ürünler ya bekliyor ya da aktif.';
+      } else if (f.status === 'pending') {
+        emptyMsg = '✅ Bekleyen ürün yok';
+        hint = 'Tüm ürünler işlenmiş durumda.';
+      } else if (f.search || f.category || f.origin || f.vendor || f.dateFrom || f.dateTo) {
+        emptyMsg = '🔍 Arama sonucu yok';
+        hint = 'Filtre veya arama kriterlerini değiştirin.';
+      }
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">' +
+        '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:6px">'+emptyMsg+'</div>' +
+        '<div style="font-size:12px">'+hint+'</div>' +
+        '</td></tr>';
       return;
     }
 
