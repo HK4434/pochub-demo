@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.12 | pochub.co -->
+<!-- PoCHub v5.13 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -14,6 +14,16 @@
 <meta name="googlebot" content="index, follow">
 <meta name="theme-color" content="#22d078">
 <link rel="canonical" href="https://pochub.co/">
+
+<!-- v5.13: PWA Manifest (inline data URL — extra file gerekmez) -->
+<link rel="manifest" href='data:application/manifest+json,{"name":"PoCHub","short_name":"PoCHub","description":"Türkiye%27nin IT PoC Pazaryeri","start_url":"/","display":"standalone","background_color":"%23faf9f7","theme_color":"%2322d078","orientation":"portrait-primary","icons":[{"src":"https://pochub.co/favicon-192.png","sizes":"192x192","type":"image/png"},{"src":"https://pochub.co/favicon-512.png","sizes":"512x512","type":"image/png"}],"categories":["business","productivity"],"lang":"tr-TR"}'>
+
+<!-- iOS PWA Support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PoCHub">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="https://pochub.co/favicon-192.png">
 
 <!-- Hreflang -->
 <link rel="alternate" hreflang="tr" href="https://pochub.co/?lang=tr">
@@ -556,7 +566,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.12';
+const VERSION = 'v5.13';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -791,6 +801,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.13': ['MAJOR: Production hazirlik final - Demo data temizleme araci, sitemap update, PWA manifest, kalan loading state skeletonlari, landing CTA optimization.'],
   'v5.12': ['MAJOR: UX polish - empty state illustrations, loading skeletons (shimmer), toast queue management, tooltip helper.'],
   'v5.11': ['MAJOR: Onboarding checklist tiklanabilirlik (vendor + customer), bildirim panelinde avatar, notification badge guncellemeleri.'],
   'v5.10': ['MAJOR: Avatar yayilimi - PoC kartlari (musteri/vendor satiri), Mesaj balonlari (chat avatar), Vendor cards (katalog), Featured carousel. renderAvatar her yerde.'],
@@ -4397,9 +4408,7 @@ async function renderHome() {
     <div id="featured-carousel-section" style="margin-bottom:24px"></div>
 
     <div class="g4" style="margin-bottom:20px" id="home-stats">
-      ${[{v:'...',l:'Yaklaşan Etkinlik',c:'#3b7cff'},{v:'...',l:'Kayıtlı Kurum',c:'#22d078'},{v:'...',l:'Aktif PoC',c:'#f0a429'},{v:'...',l:'Onaylı Ürün',c:'#e9ecf3'}].map(m=>
-        `<div class="stat-card"><div style="font-size:28px;font-weight:700;letter-spacing:-1px;color:${m.c};font-family:monospace">${m.v}</div><div style="font-size:11px;color:var(--text-secondary);margin-top:3px">${m.l}</div></div>`
-      ).join('')}
+      ${[1,2,3,4].map(()=>'<div class="stat-card"><div class="skel skel-line w50" style="height:28px"></div><div class="skel skel-line w70" style="height:10px;margin-top:6px"></div></div>').join('')}
     </div>
 
     <!-- v4.87: VENDOR LOGO BAR -->
@@ -7060,7 +7069,7 @@ function openEditPocModal(pocId, title, requirements, preferredDates, location) 
 
 /* ── MÜŞTERİ GELEN DAVETLER ── */
 async function custInvites(m) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Davetler yükleniyor...</div>';
+  m.innerHTML = renderSkeleton('card-list', 3);
   try {
     const [pendSnap, histSnap] = await Promise.all([
       getDocs(query(collection(db,'poc_invites'), where('customerEmail','==',CUR_USER.email), where('status','==','pending'))),
@@ -9341,7 +9350,7 @@ async function loadCustTab() {
   }
 
   else if (CUR_CUST_TAB === 'registrations') {
-    m.innerHTML = '<div class="loading"><div class="spinner"></div>Etkinlik kayıtları yükleniyor...</div>';
+    m.innerHTML = renderSkeleton('card-list', 3);
     const regSnap = await getDocs(query(collection(db,'registrations'), where('userId','==',CUR_USER.uid)));
     var regsRaw = regSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
 
@@ -9827,7 +9836,7 @@ async function loadCustTab() {
 }
 
 async function loadOffersWithComparison(m) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Teklifler yükleniyor...</div>';
+  m.innerHTML = renderSkeleton('card-list', 4);
   try {
     const [pocSnap, snapByUid, snapByEmail] = await Promise.all([
       getDocs(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid))),
@@ -15842,7 +15851,7 @@ async function renderUserProfile(m, role) {
     return;
   }
 
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Profil yükleniyor...</div>';
+  m.innerHTML = renderSkeleton('profile', 1);
 
   // Fresh profile (cache'lenmiş olabilir)
   var profileSnap = await getDoc(doc(db, 'users', CUR_USER.uid));
@@ -16221,7 +16230,7 @@ async function renderUserProfile(m, role) {
 window.renderUserProfile = renderUserProfile;
 
 async function vendAnalytics(m) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Analytics yükleniyor...</div>';
+  m.innerHTML = renderSkeleton('stat-grid', 6);
 
   try {
     var cfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.vendorAnalytics) || DEFAULT_CONFIG.vendorAnalytics;
@@ -22354,6 +22363,160 @@ async function admDataHealth(m) {
     syncInfo.style.cssText = 'font-size:11px;color:var(--text-muted);text-align:right;margin-top:12px';
     syncInfo.textContent = 'Son analiz: ' + new Date().toLocaleTimeString('tr-TR');
     m.appendChild(syncInfo);
+
+    // v5.13: ═══ DEMO/TEST DATA TEMİZLEME (Production hazırlığı) ═══
+    var demoSection = document.createElement('div');
+    demoSection.style.cssText = 'background:linear-gradient(135deg,rgba(220,38,38,.04),rgba(220,38,38,.01));border:1px solid rgba(220,38,38,.25);border-radius:12px;padding:18px;margin-top:24px';
+    demoSection.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
+        '<div style="font-size:18px">🚀</div>' +
+        '<div style="font-size:14px;font-weight:700;color:#dc2626">Production Hazırlığı — Demo Veri Temizleme</div>' +
+      '</div>' +
+      '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">' +
+        '<strong>İlk gerçek müşteri gelmeden önce kullanın.</strong> Bu araç tüm demo/test verilerini sistemden temizler. ' +
+        'Yapacağı işlem: <code>isTestRecord:true</code>, <code>test*</code> e-postalı kullanıcılar, demo PoClar, demo teklifler, demo bildirimler, ve test seed\'leri.<br><br>' +
+        '⚠️ <strong>DİKKAT:</strong> Bu işlem geri alınamaz! Önce dataları yedeklemeniz önerilir.' +
+      '</div>' +
+      '<div id="demo-scan-result" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--text-muted);min-height:40px">' +
+        '<div style="text-align:center;color:var(--text-muted);font-size:12px">"Tara" butonuna basın</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button id="demo-scan-btn" class="btn-g btn-sm" style="padding:8px 14px">🔍 Tara (sayıları göster)</button>' +
+        '<button id="demo-clean-btn" class="btn-red btn-sm" style="padding:8px 14px;display:none">🗑 Tüm Demo Veriyi Sil</button>' +
+        '<button id="demo-cancel-btn" class="btn-g btn-sm" style="padding:8px 14px;display:none">İptal</button>' +
+      '</div>';
+    m.appendChild(demoSection);
+
+    // Tara butonu
+    var scanBtn = m.querySelector('#demo-scan-btn');
+    var cleanBtn2 = m.querySelector('#demo-clean-btn');
+    var cancelBtn = m.querySelector('#demo-cancel-btn');
+    var resultEl = m.querySelector('#demo-scan-result');
+    var scanData = null;
+
+    scanBtn?.addEventListener('click', async function(){
+      scanBtn.disabled = true; scanBtn.textContent = '⏳ Taranıyor...';
+      resultEl.innerHTML = '<div style="text-align:center">Veriler analiz ediliyor...</div>';
+
+      try {
+        // Tüm koleksiyonlarda demo veri ara
+        var [pocsAll, offersAll, invitesAll, notifsAll, regsAll, usersAll, msgsAll] = await Promise.all([
+          getDocs(collection(db,'poc_requests')),
+          getDocs(collection(db,'offers')),
+          getDocs(collection(db,'poc_invites')),
+          getDocs(collection(db,'notifications')),
+          getDocs(collection(db,'registrations')),
+          getDocs(collection(db,'users')),
+          getDocs(collection(db,'poc_messages')),
+        ]);
+
+        function isTestUser(u) {
+          var e = (u.email || '').toLowerCase();
+          return e.includes('test') || e.includes('demo') || e.includes('@testpochub.') || u.isTestRecord === true;
+        }
+        function isDemo(d) {
+          var data = d.data();
+          return data.isTestRecord === true ||
+                 (data.customerEmail && data.customerEmail.toLowerCase().includes('test')) ||
+                 (data.vendorEmail && data.vendorEmail.toLowerCase().includes('test'));
+        }
+
+        scanData = {
+          pocs: pocsAll.docs.filter(isDemo),
+          offers: offersAll.docs.filter(isDemo),
+          invites: invitesAll.docs.filter(isDemo),
+          notifs: notifsAll.docs.filter(isDemo),
+          regs: regsAll.docs.filter(isDemo),
+          users: usersAll.docs.filter(function(d){ return isTestUser(d.data()); }),
+          msgs: msgsAll.docs.filter(isDemo),
+        };
+
+        var total = scanData.pocs.length + scanData.offers.length + scanData.invites.length + scanData.notifs.length + scanData.regs.length + scanData.users.length + scanData.msgs.length;
+
+        if (total === 0) {
+          resultEl.innerHTML = '<div style="text-align:center;color:#16a34a;font-weight:700"><span style="font-size:16px">✅</span> Demo veri bulunamadı — sistem temiz</div>';
+          scanBtn.textContent = '🔍 Tekrar Tara';
+        } else {
+          resultEl.innerHTML =
+            '<div style="font-weight:700;color:var(--text-primary);margin-bottom:8px;font-size:13px">📊 Bulunan Demo/Test Veriler (Toplam: <span style="color:#dc2626">'+total+'</span>)</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;font-size:12px">' +
+              [
+                ['👥 Kullanıcı', scanData.users.length],
+                ['📋 PoC Talebi', scanData.pocs.length],
+                ['💰 Teklif', scanData.offers.length],
+                ['💌 Davet', scanData.invites.length],
+                ['📅 Kayıt', scanData.regs.length],
+                ['🔔 Bildirim', scanData.notifs.length],
+                ['💬 Mesaj', scanData.msgs.length],
+              ].filter(function(e){ return e[1] > 0; })
+              .map(function(e){
+                return '<div style="background:rgba(220,38,38,.08);padding:6px 10px;border-radius:6px;color:#dc2626">'+e[0]+': <strong>'+e[1]+'</strong></div>';
+              }).join('') +
+            '</div>';
+          cleanBtn2.style.display = 'inline-flex';
+          cancelBtn.style.display = 'inline-flex';
+          scanBtn.style.display = 'none';
+        }
+        scanBtn.disabled = false;
+      } catch(e) {
+        resultEl.innerHTML = '<div style="color:#dc2626">Hata: '+e.message+'</div>';
+        scanBtn.disabled = false;
+        scanBtn.textContent = '🔍 Tara';
+      }
+    });
+
+    cancelBtn?.addEventListener('click', function(){
+      cleanBtn2.style.display = 'none';
+      cancelBtn.style.display = 'none';
+      scanBtn.style.display = 'inline-flex';
+      scanBtn.textContent = '🔍 Tara';
+      resultEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:12px">"Tara" butonuna basın</div>';
+      scanData = null;
+    });
+
+    cleanBtn2?.addEventListener('click', async function(){
+      if (!scanData) return;
+      var totalConfirm = scanData.pocs.length + scanData.offers.length + scanData.invites.length + scanData.notifs.length + scanData.regs.length + scanData.users.length + scanData.msgs.length;
+      var confirmText = prompt('Toplam ' + totalConfirm + ' demo kaydı silinecek. Geri alınamaz!\n\nOnaylamak için "SİL" yazın:');
+      if (confirmText !== 'SİL') {
+        showToast('İşlem iptal edildi', 'warn');
+        return;
+      }
+
+      cleanBtn2.disabled = true; cleanBtn2.textContent = '⏳ Siliniyor...';
+      var deleted = 0;
+      var errors = 0;
+      var batches = [
+        {col:'poc_requests', docs: scanData.pocs},
+        {col:'offers', docs: scanData.offers},
+        {col:'poc_invites', docs: scanData.invites},
+        {col:'notifications', docs: scanData.notifs},
+        {col:'registrations', docs: scanData.regs},
+        {col:'poc_messages', docs: scanData.msgs},
+        // Kullanıcılar EN SON (önce ilgili dataları temizle)
+        {col:'users', docs: scanData.users},
+      ];
+
+      for (var b of batches) {
+        for (var d of b.docs) {
+          try {
+            await deleteDoc(d.ref);
+            deleted++;
+            // Her 10 silmede bir UI güncelle
+            if (deleted % 10 === 0) {
+              cleanBtn2.textContent = '⏳ Silinen: ' + deleted + '/' + totalConfirm;
+            }
+          } catch(err) {
+            errors++;
+            console.error('Silme hatası:', d.id, err.message);
+          }
+        }
+      }
+
+      showToast('✓ ' + deleted + ' kayıt silindi' + (errors > 0 ? ' ('+errors+' hata)' : ''));
+      // 2 sn sonra refresh
+      setTimeout(function(){ admDataHealth(m); }, 1500);
+    });
 
     // Eventler
     m.querySelector('#health-refresh')?.addEventListener('click', function() { admDataHealth(m); });
