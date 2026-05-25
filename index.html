@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.06 | pochub.co -->
+<!-- PoCHub v5.07 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -519,7 +519,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.06';
+const VERSION = 'v5.07';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -754,6 +754,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.07': ['MAJOR: Admin Onayi Bekliyor filtre fix, tum panellere Profil tab (vendor/customer/admin), Admin Dashboard tum sayilar/badgeler tiklanabilir hedef sayfaya filtreli yonlendirir.'],
   'v5.06': ['MAJOR: HOTFIX - Theme uyumsuzlugu (beyaz text -> koyu text light theme), tum dashboard zenginlestir (vendor/customer/admin), Admin Urun Onaylari butonu fix.'],
   'v5.05': ['MAJOR: Phase 5.0.5 - Production Deploy Hazirlik. Production Firestore Rules dosyasi (sıkı guvenlik), composite indexes tanimi, Functions production config, deploy checklist v3, pre-launch test rehberi, disaster recovery doku. Tam deploy ilk paying customer sonrasi yapilacak (strateji - Blaze beklemede).'],
   'v5.04': ['MAJOR: Phase 5.0.4 - Mobile UX Audit. CSS media query genis audit, sidebar hamburger menu mobilde, tablo yatay scroll, modal full-screen mobile, touch-friendly butonlar 44px, header sikismisik fix, KPI grid mobile optimize.'],
@@ -7949,6 +7950,7 @@ function renderCustomer() {
   const tabs = [
     ['dashboard','Dashboard'],['invites','Gelen Davetler'],['requests','PoC Taleplerim'],['registrations','Etkinlik Kayıtlarım'],['offers','Teklifler'],['messages','💬 Mesajlar'],
     ['referrals','🌳 Davet Et'],
+    ['profile','👤 Profilim'],
   ];
   el('scr-customer').innerHTML = `<div class="dash">
     <div class="sbar">
@@ -7980,6 +7982,7 @@ async function loadCustTab() {
   if (CUR_CUST_TAB === 'invites')  { await custInvites(m); return; }
   if (CUR_CUST_TAB === 'messages') { await loadMessagesTab(m, 'customer'); return; }
   if (CUR_CUST_TAB === 'referrals') { await custReferrals(m); return; }
+  if (CUR_CUST_TAB === 'profile') { await renderUserProfile(m, 'customer'); return; }
   if (CUR_CUST_TAB === 'requests') {
     var rSnap = await getDocs(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid)));
     var reqs = rSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
@@ -9947,6 +9950,7 @@ function renderVendor() {
     ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','💰 Tekliflerim'],['messages','💬 Mesajlar'],
     ['referrals','🎁 Davet Et'],
     ['subscription','💎 Aboneliğim'],['billing','💳 Cari Hesap'],
+    ['profile','👤 Profilim'],
   ];
   el('scr-vendor').innerHTML = `<div class="dash">
     <div class="sbar">
@@ -9986,6 +9990,7 @@ async function loadVendTab() {
   if (CUR_VEND_TAB === 'billing') { await vendBilling(m); return; }
   if (CUR_VEND_TAB === 'referrals') { await vendReferrals(m); return; }
   if (CUR_VEND_TAB === 'analytics') { await vendAnalytics(m); return; }
+  if (CUR_VEND_TAB === 'profile') { await renderUserProfile(m, 'vendor'); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     m.innerHTML = '<div class="loading"><div class="spinner"></div>Dashboard yükleniyor...</div>';
 
@@ -15227,6 +15232,280 @@ async function openOverrideRequestModal(pocId, pocData, check, onAccepted) {
 // v5.03: VENDOR ANALYTICS DASHBOARD
 // 6 KPI kart + aylık PoC bar chart + kabul/red donut + etkinlik metrikleri
 // ════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════
+// v5.07: ORTAK PROFİL SAYFASI (Customer/Vendor/Admin)
+// Rol bazında ek alanlar gösterir
+// ════════════════════════════════════════════════════════════════════
+async function renderUserProfile(m, role) {
+  if (!CUR_USER || !CUR_PROFILE) {
+    m.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted)">Giriş yapmalısınız.</div>';
+    return;
+  }
+
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Profil yükleniyor...</div>';
+
+  // Fresh profile (cache'lenmiş olabilir)
+  var profileSnap = await getDoc(doc(db, 'users', CUR_USER.uid));
+  var p = profileSnap.exists() ? profileSnap.data() : CUR_PROFILE;
+
+  var html = '<div style="max-width:880px;margin:0 auto">';
+
+  // Header
+  html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px">'
+    + '<div>'
+    +   '<h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0 0 4px">👤 Profilim</h2>'
+    +   '<div style="font-size:13px;color:var(--text-muted)">Hesap bilgilerinizi yönetin</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;font-size:11px">'
+    +   '<span style="background:rgba(15,23,42,.06);color:var(--text-secondary);padding:4px 10px;border-radius:6px;font-weight:600">'+(role==='vendor'?'🏢 Vendor':role==='customer'?'👤 Müşteri':'👑 Admin')+'</span>'
+    +   (CUR_USER.emailVerified ? '<span style="background:rgba(22,163,74,.1);color:#16a34a;padding:4px 10px;border-radius:6px;font-weight:600">✓ E-posta Doğrulandı</span>' : '<span style="background:rgba(217,119,6,.1);color:#d97706;padding:4px 10px;border-radius:6px;font-weight:600">⏳ E-posta Bekliyor</span>')
+    + '</div>'
+    + '</div>';
+
+  // Kayıt tarihi info
+  var joinedDate = p.createdAt?.toDate ? p.createdAt.toDate() : (p.createdAt?.seconds ? new Date(p.createdAt.seconds*1000) : null);
+  if (joinedDate) {
+    html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12.5px;color:var(--text-muted)">'
+      + '📅 Üyelik başlangıcı: <strong style="color:var(--text-primary)">'+joinedDate.toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})+'</strong>'
+      + '</div>';
+  }
+
+  // ═══ ANA BİLGİLER ═══
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">📝 Temel Bilgiler</h3>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
+    +   '<div>'
+    +     '<label class="lbl">Ad Soyad / Tam Ad</label>'
+    +     '<input id="pf-name" class="inp" value="'+escHtml(p.displayName||'')+'" placeholder="Adınız Soyadınız">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">E-posta</label>'
+    +     '<input class="inp" value="'+escHtml(CUR_USER.email||'')+'" disabled style="background:var(--bg-elevated);color:var(--text-muted)">'
+    +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">E-posta değiştirilemez</div>'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Telefon</label>'
+    +     '<input id="pf-phone" class="inp" value="'+escHtml(p.phone||'')+'" placeholder="+90 555 555 5555">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Şirket / Kurum</label>'
+    +     '<input id="pf-company" class="inp" value="'+escHtml(p.company||'')+'" placeholder="Firma adı">'
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+
+  // ═══ İLETİŞİM & ADRES ═══
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">📍 Adres & İletişim</h3>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
+    +   '<div>'
+    +     '<label class="lbl">Şehir</label>'
+    +     '<input id="pf-city" class="inp" value="'+escHtml(p.city||'')+'" placeholder="İstanbul, Ankara, vs.">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Ülke</label>'
+    +     '<input id="pf-country" class="inp" value="'+escHtml(p.country||'Türkiye')+'" placeholder="Türkiye">'
+    +   '</div>'
+    +   '<div style="grid-column:1/-1">'
+    +     '<label class="lbl">Adres</label>'
+    +     '<textarea id="pf-address" class="inp" rows="2" placeholder="Tam adres (opsiyonel)">'+escHtml(p.address||'')+'</textarea>'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">LinkedIn</label>'
+    +     '<input id="pf-linkedin" class="inp" value="'+escHtml(p.linkedinUrl||'')+'" placeholder="https://linkedin.com/in/...">'
+    +   '</div>'
+    +   '<div>'
+    +     '<label class="lbl">Web Sitesi</label>'
+    +     '<input id="pf-website" class="inp" value="'+escHtml(p.website||'')+'" placeholder="https://...">'
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+
+  // ═══ ROLE BAZLI BÖLÜM ═══
+  if (role === 'vendor') {
+    html += '<div class="card" style="margin-bottom:14px">'
+      + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">🏢 Vendor Profili</h3>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
+      +   '<div>'
+      +     '<label class="lbl">Vendor Tipi</label>'
+      +     '<input class="inp" value="'+(p.vendorType==='ureticid'?'🏭 Üretici':p.vendorType==='distributor'?'📦 Distribütör':p.vendorType==='integrator'?'🔧 Entegratör':'—')+'" disabled style="background:var(--bg-elevated);color:var(--text-muted)">'
+      +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Tipi değiştirmek için admin\'e başvurun</div>'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">Logo URL</label>'
+      +     '<input id="pf-logo" class="inp" value="'+escHtml(p.logoUrl||'')+'" placeholder="https://...">'
+      +   '</div>'
+      +   '<div style="grid-column:1/-1">'
+      +     '<label class="lbl">Kısa Açıklama (max 160 karakter)</label>'
+      +     '<textarea id="pf-short-desc" class="inp" rows="2" maxlength="160" placeholder="Vendor profilinizde gözükecek kısa tanıtım">'+escHtml(p.shortDescription||'')+'</textarea>'
+      +   '</div>'
+      +   '<div style="grid-column:1/-1">'
+      +     '<label class="lbl">Detaylı Açıklama (Public profile için)</label>'
+      +     '<textarea id="pf-bio" class="inp" rows="4" placeholder="Detaylı tanıtım, ürünler, hizmetler, uzmanlıklar...">'+escHtml(p.bio||p.description||'')+'</textarea>'
+      +   '</div>'
+      + '</div>'
+      + '</div>';
+
+    // Public profile preview link
+    var slug = p.slug || generateSlug(p.company || p.displayName || 'vendor');
+    html += '<div style="background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(37,99,235,.02));border:1px solid rgba(37,99,235,.2);border-radius:10px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'
+      + '<div>'
+      +   '<div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:2px">🌐 Public Profile</div>'
+      +   '<div style="font-size:12px;color:var(--text-muted)">pochub.co/#v/'+slug+'</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px">'
+      +   '<button id="pf-view-public" class="btn-g btn-sm">👁 Görüntüle</button>'
+      +   '<button id="pf-copy-public" class="btn-p btn-sm">📋 Linki Kopyala</button>'
+      + '</div>'
+      + '</div>';
+  } else if (role === 'customer') {
+    html += '<div class="card" style="margin-bottom:14px">'
+      + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">👤 Müşteri Bilgileri</h3>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
+      +   '<div>'
+      +     '<label class="lbl">İş Pozisyonu / Unvan</label>'
+      +     '<input id="pf-title" class="inp" value="'+escHtml(p.jobTitle||'')+'" placeholder="CIO, IT Müdürü, vs.">'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">Departman</label>'
+      +     '<input id="pf-dept" class="inp" value="'+escHtml(p.department||'')+'" placeholder="Bilgi İşlem, IT, vs.">'
+      +   '</div>'
+      +   '<div style="grid-column:1/-1">'
+      +     '<label class="lbl">İlgi Alanları (virgülle ayırın)</label>'
+      +     '<input id="pf-interests" class="inp" value="'+escHtml((p.interests||[]).join(', '))+'" placeholder="Güvenlik, Bulut, Yedekleme, vs.">'
+      +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">Vendor\'lar size daha uygun teklif yapabilmek için</div>'
+      +   '</div>'
+      + '</div>'
+      + '</div>';
+  } else if (role === 'admin') {
+    html += '<div class="card" style="margin-bottom:14px">'
+      + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">👑 Admin Bilgileri</h3>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
+      +   '<div>'
+      +     '<label class="lbl">Rol</label>'
+      +     '<input class="inp" value="'+(p.role==='admin'?'👑 Admin (Super)':p.role==='moderator'?'🛡 Moderatör':p.role==='support'?'🎧 Destek':p.role)+'" disabled style="background:var(--bg-elevated);color:var(--text-muted)">'
+      +   '</div>'
+      +   '<div>'
+      +     '<label class="lbl">İmza/Görünen Ad (e-postada)</label>'
+      +     '<input id="pf-sig" class="inp" value="'+escHtml(p.adminSignature||p.displayName||'')+'" placeholder="PoCHub Ekibi">'
+      +   '</div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  // ═══ GÜVENLİK ═══
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">🔒 Güvenlik</h3>'
+    + '<div style="display:grid;gap:10px">'
+    +   '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg-elevated);border-radius:8px">'
+    +     '<div>'
+    +       '<div style="font-size:13px;font-weight:600;color:var(--text-primary)">Şifre Değiştir</div>'
+    +       '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">E-postanıza şifre sıfırlama bağlantısı gönderilir</div>'
+    +     '</div>'
+    +     '<button id="pf-pw-reset" class="btn-g btn-sm">🔑 Sıfırlama Maili Gönder</button>'
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+
+  // ═══ KAYDET BUTONU ═══
+  html += '<div style="position:sticky;bottom:14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;justify-content:flex-end;gap:8px;box-shadow:var(--shadow-md)">'
+    + '<button id="pf-cancel" class="btn-g" style="padding:9px 18px">Vazgeç</button>'
+    + '<button id="pf-save" class="btn-p" style="padding:9px 22px;font-weight:700">💾 Kaydet</button>'
+    + '</div>';
+
+  html += '</div>';
+  m.innerHTML = html;
+
+  // ═══ EVENT HANDLERS ═══
+  // Public profile butonları (vendor)
+  el('pf-view-public')?.addEventListener('click', function(){
+    var slug = p.slug || generateSlug(p.company || p.displayName || 'vendor');
+    window.open(window.location.origin + '/#v/' + slug, '_blank');
+  });
+  el('pf-copy-public')?.addEventListener('click', function(){
+    var slug = p.slug || generateSlug(p.company || p.displayName || 'vendor');
+    var url = window.location.origin + '/#v/' + slug;
+    navigator.clipboard?.writeText(url).then(function(){ showToast('✓ Link kopyalandı'); });
+  });
+
+  // Şifre sıfırlama
+  el('pf-pw-reset')?.addEventListener('click', async function(){
+    var btn = this;
+    if (!confirm('E-postanıza şifre sıfırlama bağlantısı gönderilsin mi?')) return;
+    btn.disabled = true; btn.textContent = '⏳ Gönderiliyor...';
+    try {
+      await sendPasswordResetEmail(auth, CUR_USER.email);
+      showToast('✓ Şifre sıfırlama maili gönderildi');
+      btn.textContent = '✓ Gönderildi';
+      setTimeout(function(){ btn.disabled = false; btn.textContent = '🔑 Sıfırlama Maili Gönder'; }, 4000);
+    } catch(e) {
+      showToast('Hata: '+e.message, 'err');
+      btn.disabled = false;
+      btn.textContent = '🔑 Sıfırlama Maili Gönder';
+    }
+  });
+
+  // Vazgeç
+  el('pf-cancel')?.addEventListener('click', function(){
+    if (confirm('Değişiklikleriniz kaydedilmeyecek. Vazgeçmek istiyor musunuz?')) {
+      if (role === 'customer') { CUR_CUST_TAB = 'dashboard'; loadCustTab(); }
+      else if (role === 'vendor') { CUR_VEND_TAB = 'dashboard'; loadVendTab(); }
+      else if (role === 'admin') { CUR_ADM_TAB = 'dashboard'; loadAdmTab(); }
+    }
+  });
+
+  // Kaydet
+  el('pf-save')?.addEventListener('click', async function(){
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+    try {
+      var updates = {
+        displayName: el('pf-name')?.value.trim() || '',
+        phone: el('pf-phone')?.value.trim() || '',
+        company: el('pf-company')?.value.trim() || '',
+        city: el('pf-city')?.value.trim() || '',
+        country: el('pf-country')?.value.trim() || '',
+        address: el('pf-address')?.value.trim() || '',
+        linkedinUrl: el('pf-linkedin')?.value.trim() || '',
+        website: el('pf-website')?.value.trim() || '',
+        updatedAt: serverTimestamp(),
+      };
+
+      if (role === 'vendor') {
+        updates.logoUrl = el('pf-logo')?.value.trim() || '';
+        updates.shortDescription = el('pf-short-desc')?.value.trim() || '';
+        updates.bio = el('pf-bio')?.value.trim() || '';
+      } else if (role === 'customer') {
+        updates.jobTitle = el('pf-title')?.value.trim() || '';
+        updates.department = el('pf-dept')?.value.trim() || '';
+        var rawInterests = el('pf-interests')?.value.trim() || '';
+        updates.interests = rawInterests ? rawInterests.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+      } else if (role === 'admin') {
+        updates.adminSignature = el('pf-sig')?.value.trim() || '';
+      }
+
+      await updateDoc(doc(db, 'users', CUR_USER.uid), updates);
+
+      // Cache güncelle
+      if (CUR_PROFILE) Object.assign(CUR_PROFILE, updates);
+
+      showToast('✓ Profil güncellendi');
+      btn.textContent = '✓ Kaydedildi';
+      setTimeout(function(){
+        btn.disabled = false;
+        btn.textContent = '💾 Kaydet';
+      }, 2000);
+    } catch(e) {
+      showToast('Hata: '+e.message, 'err');
+      btn.disabled = false;
+      btn.textContent = '💾 Kaydet';
+    }
+  });
+}
+
+window.renderUserProfile = renderUserProfile;
+
 async function vendAnalytics(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Analytics yükleniyor...</div>';
 
@@ -20019,6 +20298,7 @@ function renderAdmin() {
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
     ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['content','📝 İçerik Yönetimi'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
+    ['profile','👤 Profilim'],
   ];
   el('scr-admin').innerHTML = `<div class="dash">
     <div class="sbar">
@@ -20059,6 +20339,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
     if (CUR_ADM_TAB === 'settings')   { await admSettings(m);   return; }
   if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
+    if (CUR_ADM_TAB === 'profile')    { await renderUserProfile(m, 'admin');  return; }
 
     // DASHBOARD - v5.06: Zenginleştirildi
     const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap, subSnap, paymentsSnap, demoSnap] = await Promise.all([
@@ -20172,34 +20453,43 @@ async function loadAdmTab() {
     html += '</div>';
 
     // ─── KULLANICI DAĞILIMI ve PoC METRİKLERİ ───
+    // v5.07: Her stat kartı tıklanabilir (hedef tab + filtre)
     html += '<div class="g4" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">';
     var stats = [
-      {v:users.length, l:'Toplam Kullanıcı', c:'var(--text-primary)'},
-      {v:users.filter(function(u){return u.role==='customer';}).length, l:'Müşteri', c:'#16a34a'},
-      {v:users.filter(function(u){return u.role==='vendor';}).length, l:'Vendor', c:'#2563eb'},
-      {v:prods.length, l:'Toplam Ürün', c:'#7c3aed'},
-      {v:activeProds, l:'Aktif Ürün', c:'#16a34a'},
-      {v:pendingProds, l:'Admin Onayı Bekleyen', c:'#d97706'},
-      {v:chainWaiting, l:'Zincir Bekleyen Ürün', c:'#7c3aed'},
-      {v:pocs.filter(function(p){return p.status==='pending';}).length, l:'Bekleyen PoC', c:'#d97706'},
-      {v:pocs.filter(function(p){return p.status==='active';}).length, l:'Aktif PoC', c:'#16a34a'},
-      {v:evs.filter(function(e){return e.status==='published';}).length, l:'Aktif Etkinlik', c:'#2563eb'},
-      {v:offers.filter(function(o){return o.status==='accepted';}).length, l:'Kabul Edilen Teklif', c:'#16a34a'},
-      {v:newPocs7d, l:'7g Yeni PoC', c:'#2563eb'},
+      {v:users.length, l:'Toplam Kullanıcı', c:'var(--text-primary)', tab:'users'},
+      {v:users.filter(function(u){return u.role==='customer';}).length, l:'Müşteri', c:'#16a34a', tab:'users', filter:{role:'customer'}},
+      {v:users.filter(function(u){return u.role==='vendor';}).length, l:'Vendor', c:'#2563eb', tab:'users', filter:{role:'vendor'}},
+      {v:prods.length, l:'Toplam Ürün', c:'#7c3aed', tab:'products'},
+      {v:activeProds, l:'Aktif Ürün', c:'#16a34a', tab:'products', filter:{status:'active'}},
+      {v:pendingProds, l:'Admin Onayı Bekleyen', c:'#d97706', tab:'products', filter:{publishStatus:'awaiting_admin'}},
+      {v:chainWaiting, l:'Zincir Bekleyen Ürün', c:'#7c3aed', tab:'products', filter:{publishStatus:'awaiting_integrator'}},
+      {v:pocs.filter(function(p){return p.status==='pending';}).length, l:'Bekleyen PoC', c:'#d97706', tab:'requests', filter:{status:'pending'}},
+      {v:pocs.filter(function(p){return p.status==='active';}).length, l:'Aktif PoC', c:'#16a34a', tab:'requests', filter:{status:'active'}},
+      {v:evs.filter(function(e){return e.status==='published';}).length, l:'Aktif Etkinlik', c:'#2563eb', tab:'events'},
+      {v:offers.filter(function(o){return o.status==='accepted';}).length, l:'Kabul Edilen Teklif', c:'#16a34a', tab:'offers', filter:{status:'accepted'}},
+      {v:newPocs7d, l:'7g Yeni PoC', c:'#2563eb', tab:'requests'},
     ];
-    stats.forEach(function(s) {
-      html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:left"><div style="font-size:24px;font-weight:800;color:'+s.c+';font-family:monospace;line-height:1">'+s.v+'</div><div style="font-size:11.5px;color:var(--text-secondary);margin-top:5px;font-weight:600">'+s.l+'</div></div>';
+    stats.forEach(function(s, idx) {
+      var filterAttr = s.filter ? ' data-filter=\''+JSON.stringify(s.filter)+'\'' : '';
+      var clickable = s.tab ? ' adm-stat-clickable" data-tab="'+s.tab+'"' + filterAttr : '';
+      var hoverHint = s.tab ? '<div style="position:absolute;top:8px;right:10px;font-size:10px;color:var(--text-muted);opacity:.6">→</div>' : '';
+      html += '<div class="'+(s.tab ? 'adm-stat-clickable' : '')+'" '+(s.tab ? 'data-tab="'+s.tab+'"' + filterAttr : '')+' style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:left;'+(s.tab?'cursor:pointer;transition:all .15s;position:relative':'')+'">'
+        + hoverHint
+        + '<div style="font-size:24px;font-weight:800;color:'+s.c+';font-family:monospace;line-height:1">'+s.v+'</div>'
+        + '<div style="font-size:11.5px;color:var(--text-secondary);margin-top:5px;font-weight:600">'+s.l+'</div>'
+        + '</div>';
     });
     html += '</div>';
 
     // ─── 2 Sütun: PoC Durum + Vendor Tipi ───
+    // v5.07: Her satır tıklanabilir → ilgili tab + filtre
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">';
     html += '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text-primary)">📋 PoC Durum Dağılımı</div>';
     ['pending','active','completed','cancelled','rejected'].forEach(function(s) {
       var count = pocs.filter(function(p){return p.status===s;}).length;
       var pct = pocs.length > 0 ? Math.round((count/pocs.length)*100) : 0;
-      html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span>'+statusBadge(s)+'</span><span style="font-family:monospace;font-weight:700;color:var(--text-primary)">'+count+' <span style="color:var(--text-muted);font-size:11px">(%'+pct+')</span></span></div>'
+      html += '<div class="adm-poc-stat" data-status="'+s+'" style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;cursor:pointer;transition:all .15s;border-radius:6px;padding-left:4px;padding-right:4px" title="Bu duruma sahip PoC\'leri görüntüle">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span>'+statusBadge(s)+' <span style="font-size:9px;color:var(--text-muted);margin-left:4px">→</span></span><span style="font-family:monospace;font-weight:700;color:var(--text-primary)">'+count+' <span style="color:var(--text-muted);font-size:11px">(%'+pct+')</span></span></div>'
         + '<div style="background:rgba(15,23,42,.05);height:4px;border-radius:2px;overflow:hidden"><div style="background:#2563eb;height:100%;width:'+pct+'%"></div></div>'
         + '</div>';
     });
@@ -20209,8 +20499,8 @@ async function loadAdmTab() {
     [{k:'ureticid',l:'Üretici',i:'🏭'},{k:'distributor',l:'Distribütör',i:'📦'},{k:'integrator',l:'Entegratör',i:'🔧'}].forEach(function(t) {
       var count = users.filter(function(u){return u.vendorType===t.k;}).length;
       var pct = totalVendors > 0 ? Math.round((count/totalVendors)*100) : 0;
-      html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span style="color:var(--text-secondary)">'+t.i+' '+t.l+'</span><span style="font-family:monospace;font-weight:700;color:var(--text-primary)">'+count+' <span style="color:var(--text-muted);font-size:11px">(%'+pct+')</span></span></div>'
+      html += '<div class="adm-vendor-type" data-vtype="'+t.k+'" style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;cursor:pointer;transition:all .15s;border-radius:6px;padding-left:4px;padding-right:4px" title="Bu tipdeki vendor\'ları görüntüle">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span style="color:var(--text-secondary)">'+t.i+' '+t.l+' <span style="font-size:9px;color:var(--text-muted);margin-left:4px">→</span></span><span style="font-family:monospace;font-weight:700;color:var(--text-primary)">'+count+' <span style="color:var(--text-muted);font-size:11px">(%'+pct+')</span></span></div>'
         + '<div style="background:rgba(15,23,42,.05);height:4px;border-radius:2px;overflow:hidden"><div style="background:#7c3aed;height:100%;width:'+pct+'%"></div></div>'
         + '</div>';
     });
@@ -20219,12 +20509,68 @@ async function loadAdmTab() {
 
     m.innerHTML = html;
 
-    // Quick action handlers
+    // ═══ v5.07: Quick action + dashboard tıklanabilirlik handlers ═══
     m.querySelectorAll('.adm-quick-act').forEach(function(btn){
       btn.addEventListener('click', function(){
         CUR_ADM_TAB = btn.dataset.tab;
         loadAdmTab();
         el('scr-admin').querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t===btn.dataset.tab));
+      });
+    });
+
+    // Stat kartları (12 kart) - tıklanabilir + filtre
+    m.querySelectorAll('.adm-stat-clickable').forEach(function(card){
+      card.addEventListener('mouseenter', function(){
+        card.style.transform = 'translateY(-2px)';
+        card.style.borderColor = 'rgba(124,58,237,.3)';
+        card.style.boxShadow = '0 4px 12px rgba(124,58,237,.08)';
+      });
+      card.addEventListener('mouseleave', function(){
+        card.style.transform = '';
+        card.style.borderColor = 'var(--border)';
+        card.style.boxShadow = '';
+      });
+      card.addEventListener('click', function(){
+        var targetTab = card.dataset.tab;
+        var filter = null;
+        try { if (card.dataset.filter) filter = JSON.parse(card.dataset.filter); } catch(e){}
+        // Pre-filter set et (admin tab fn'leri okumalı)
+        window._adminPreFilter = filter;
+        CUR_ADM_TAB = targetTab;
+        loadAdmTab();
+        el('scr-admin').querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t===targetTab));
+      });
+    });
+
+    // PoC durum dağılımı - tıklanabilir
+    m.querySelectorAll('.adm-poc-stat').forEach(function(row){
+      row.addEventListener('mouseenter', function(){
+        row.style.background = 'rgba(37,99,235,.05)';
+      });
+      row.addEventListener('mouseleave', function(){
+        row.style.background = '';
+      });
+      row.addEventListener('click', function(){
+        window._adminPreFilter = { status: row.dataset.status };
+        CUR_ADM_TAB = 'requests';
+        loadAdmTab();
+        el('scr-admin').querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t==='requests'));
+      });
+    });
+
+    // Vendor tür dağılımı - tıklanabilir
+    m.querySelectorAll('.adm-vendor-type').forEach(function(row){
+      row.addEventListener('mouseenter', function(){
+        row.style.background = 'rgba(124,58,237,.05)';
+      });
+      row.addEventListener('mouseleave', function(){
+        row.style.background = '';
+      });
+      row.addEventListener('click', function(){
+        window._adminPreFilter = { role:'vendor', vendorType: row.dataset.vtype };
+        CUR_ADM_TAB = 'users';
+        loadAdmTab();
+        el('scr-admin').querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.dataset.t==='users'));
       });
     });
   } catch(err) {
@@ -20305,6 +20651,13 @@ async function admUsers(m) {
 
   var vtypes = {ureticid:'Üretici', distributor:'Distribütör', integrator:'Entegratör'};
   var filters = {role:'', vendorType:'', premium:'', country:'', dateFrom:'', dateTo:'', search:''};
+
+  // v5.07: Dashboard'dan gelen pre-filter
+  if (window._adminPreFilter) {
+    if (window._adminPreFilter.role) filters.role = window._adminPreFilter.role;
+    if (window._adminPreFilter.vendorType) filters.vendorType = window._adminPreFilter.vendorType;
+    window._adminPreFilter = null;
+  }
 
   // Dinamik ülkeler
   var countries = [...new Set(all.map(function(u){ return u.country; }).filter(Boolean))].sort();
@@ -20517,6 +20870,18 @@ async function admUsers(m) {
     applyFilter();
   });
 
+  // v5.07: Pre-filter'dan gelen filtre butonlarını görsel olarak aktive et
+  if (filters.role) {
+    m.querySelectorAll('.u-rf').forEach(function(b){
+      if (b.dataset.val === filters.role) b.className = 'u-rf btn-p btn-sm';
+    });
+  }
+  if (filters.vendorType) {
+    m.querySelectorAll('.u-vtf').forEach(function(b){
+      if (b.dataset.val === filters.vendorType) b.className = 'u-vtf btn-p btn-sm';
+    });
+  }
+
   applyFilter();
 }
 
@@ -20617,6 +20982,13 @@ async function admProducts(m) {
 
   var filters = {status:'', publishStatus:'', category:'', origin:'', vendor:'', dateFrom:'', dateTo:'', search:''};
 
+  // v5.07: Dashboard'dan gelen pre-filter
+  if (window._adminPreFilter) {
+    if (window._adminPreFilter.status) filters.status = window._adminPreFilter.status;
+    if (window._adminPreFilter.publishStatus) filters.publishStatus = window._adminPreFilter.publishStatus;
+    window._adminPreFilter = null;
+  }
+
   function matchDate(p) {
     if (!filters.dateFrom && !filters.dateTo) return true;
     var ts = p.createdAt?.toDate ? p.createdAt.toDate() : (p.createdAt?.seconds ? new Date(p.createdAt.seconds*1000) : null);
@@ -20668,20 +21040,25 @@ async function admProducts(m) {
       var rejectBtn  = '';
       var archiveBtn = '';
 
-      // Onay gerekli: publishStatus awaiting_admin VEYA status pending ise
+      // Onay gerekli: publishStatus awaiting_admin VE status aktif değil
+      // v5.07 FIX: status='active' ise zaten onaylanmış, onay butonu gösterme
       var needsApproval = (p.publishStatus||'awaiting_admin') === 'awaiting_admin' &&
-        p.status !== 'rejected' && p.status !== 'archived';
+        p.status !== 'rejected' && p.status !== 'archived' && p.status !== 'active';
       if (needsApproval) {
         if ((p.publishStatus||'awaiting_admin') === 'awaiting_integrator') {
           approveBtn = '<button class="btn-sm" data-id="'+p.id+'" data-ps="awaiting_integrator" style="background:rgba(255,112,112,.08);color:#ff7070;border:1px solid rgba(255,112,112,.2);border-radius:4px;padding:4px 8px;font-size:11px;cursor:default" title="Entegratör ataması bekleniyor">⛔ Zincir Eksik</button>';
         } else {
+          // v5.07 FIX: Onayla ve Reddet butonları DOĞRU rollere
           approveBtn = '<button class="ap-appr" data-id="'+p.id+
             '" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+
             '" data-pn="'+p.name+'" data-vid="'+(p.vendorId||'')+
-            '" style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">✕ Reddet</button>';
+            '" style="background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">✓ Onayla</button>';
+          rejectBtn = '<button class="ap-rej" data-id="'+p.id+
+            '" data-pn="'+p.name+'" data-vid="'+(p.vendorId||'')+
+            '" style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-left:6px">✕ Reddet</button>';
         }
       } else if (p.status === 'active') {
-        archiveBtn = '<button class="ap-arc" data-id="'+p.id+'" style="background:rgba(15,23,42,.04);color:var(--text-muted);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">📦 Arşivle</button>';
+        archiveBtn = '<button class="ap-arc" data-id="'+p.id+'" style="background:rgba(15,23,42,.04);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">📦 Arşivle</button>';
       }
 
       return '<tr>'+
@@ -20782,8 +21159,12 @@ async function admProducts(m) {
   }
 
   // ── UI ─────────────────────────────────────────────────────────
+  // v5.07: awaitingAdmin = filter butonu ile aynı kriter (filter ile tutarlı)
   var pendingCount    = all.filter(function(p){ return p.status==='pending'; }).length;
-  var awaitingAdmin   = all.filter(function(p){ return (p.publishStatus||'awaiting_admin')==='awaiting_admin' && p.status==='pending'; }).length;
+  var awaitingAdmin   = all.filter(function(p){
+    var ps = p.publishStatus || 'awaiting_admin';
+    return ps === 'awaiting_admin' && p.status !== 'rejected' && p.status !== 'archived' && p.status !== 'active';
+  }).length;
   var awaitingInt     = all.filter(function(p){ return p.publishStatus==='awaiting_integrator'; }).length;
   var activeCount     = all.filter(function(p){ return p.status==='active'; }).length;
 
@@ -20880,6 +21261,18 @@ async function admProducts(m) {
     applyFilter();
   });
 
+  // v5.07: Pre-filter geldiyse buton aktive et
+  if (filters.status) {
+    m.querySelectorAll('.ap-sf').forEach(function(b){
+      if (b.dataset.val === filters.status) b.className = 'ap-sf btn-p btn-sm fs12';
+    });
+  }
+  if (filters.publishStatus) {
+    m.querySelectorAll('.ap-psf').forEach(function(b){
+      if (b.dataset.val === filters.publishStatus) b.className = 'ap-psf btn-p btn-sm fs12';
+    });
+  }
+
   applyFilter();
 }
 
@@ -20888,6 +21281,11 @@ async function admRequests(m) {
   var all = snap.docs.map(d=>({...d.data(),id:d.id}));
   all.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   var stFilter='';
+  // v5.07: Pre-filter dashboard'dan
+  if (window._adminPreFilter && window._adminPreFilter.status) {
+    stFilter = window._adminPreFilter.status;
+    window._adminPreFilter = null;
+  }
   var locLabels={customer:'Müşteri',vendor:'Vendor',online:'Online',hybrid:'Hibrit'};
   function renderRows(items) {
     var tbody=m.querySelector('#r-tbody');
@@ -20926,6 +21324,14 @@ async function admRequests(m) {
     m.querySelectorAll('.r-sf').forEach(function(x){x.className='btn-g btn-sm r-sf';});
     b.className='btn-p btn-sm r-sf'; stFilter=b.dataset.s; applyFilter();
   });});
+
+  // v5.07: Pre-filter aktive
+  if (stFilter) {
+    m.querySelectorAll('.r-sf').forEach(function(b){
+      b.className = (b.dataset.s === stFilter) ? 'btn-p btn-sm r-sf' : 'btn-g btn-sm r-sf';
+    });
+    applyFilter();
+  }
 }
 
 async function admEvents(m) {
@@ -26374,6 +26780,12 @@ async function admOffers(m) {
   var stFilter='';
   var pFilter='upcoming'; // Default: yaklaşan
 
+  // v5.07: Pre-filter
+  if (window._adminPreFilter && window._adminPreFilter.status) {
+    stFilter = window._adminPreFilter.status;
+    window._adminPreFilter = null;
+  }
+
   function applyPeriod(items) {
     var now3 = new Date();
     var thisMonthStart = new Date(now3.getFullYear(), now3.getMonth(), 1);
@@ -26428,6 +26840,14 @@ async function admOffers(m) {
     m.querySelectorAll('.of-sf').forEach(function(x){x.className='btn-g btn-sm of-sf';});
     b.className='btn-p btn-sm of-sf'; stFilter=b.dataset.s; applyFilter();
   });});
+
+  // v5.07: Pre-filter aktive
+  if (stFilter) {
+    m.querySelectorAll('.of-sf').forEach(function(b){
+      b.className = (b.dataset.s === stFilter) ? 'btn-p btn-sm of-sf' : 'btn-g btn-sm of-sf';
+    });
+    applyFilter();
+  }
 }
 
 async function admCategories(m) {
