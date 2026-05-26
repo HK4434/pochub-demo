@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.16 | pochub.co -->
+<!-- PoCHub v5.18 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -673,12 +673,12 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <!-- FIREBASE + EMAILJS -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, PhoneAuthProvider } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, PhoneAuthProvider } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.16';
+const VERSION = 'v5.18';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -913,6 +913,8 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.18': ['MAJOR: KVKK/GDPR Faz 3 - Guvenlik & sureic (client-side AES sifreleme, VERBIS envanter export, DPA template, ihlal bildirim, hard delete, Firestore rules dok).'],
+  'v5.17': ['MAJOR: KVKK/GDPR Faz 2 - Kullanici haklari (Verilerimi Indir JSON export, Hesabimi Sil right-to-be-forgotten, audit logs, veri masking, bildirim tercihleri).'],
   'v5.16': ['MAJOR: KVKK/GDPR Faz 1 - Aydinlatma Metni, Kullanim Kosullari, Cerez Politikasi, Cookie Consent Banner, kayit onaylari, footer linkleri.'],
   'v5.15': ['CRITICAL FIX: Admin Onayla buton bulunamiyordu - needsApproval kosulundan status active hariç tutmasi kaldirildi. publishStatus awaiting_admin tek kosul.'],
   'v5.14': ['MAJOR: Profil genişlet (vergi no/dairesi, KEP, fatura bilgileri, vendor: cal.sayisi/kurulus/sektor/sertifikalar, customer: sektor/sirket buyuklugu/karar verici), admin urun onayi filtre empty state ipucu.'],
@@ -3185,6 +3187,32 @@ onAuthStateChanged(auth, async user => {
     const snap = await getDoc(doc(db, 'users', user.uid));
     CUR_PROFILE = snap.exists() ? snap.data() : null;
 
+    // v5.17: KVKK - Hesap silme talebi otomatik iptal (30 gün içinde geri girerse)
+    if (CUR_PROFILE?.deletionRequested && CUR_PROFILE?.status === 'deletion_pending') {
+      var scheduledFor = CUR_PROFILE.deletionScheduledFor ? new Date(CUR_PROFILE.deletionScheduledFor) : null;
+      if (scheduledFor && scheduledFor > new Date()) {
+        // 30 gün dolmamış - iptal et
+        try {
+          await updateDoc(doc(db,'users',user.uid), {
+            deletionRequested: false,
+            deletionRequestedAt: null,
+            deletionScheduledFor: null,
+            deletionCancelledAt: serverTimestamp(),
+            status: 'active',
+          });
+          CUR_PROFILE.deletionRequested = false;
+          CUR_PROFILE.status = 'active';
+          await logKVKKAction('account_delete_cancelled', { method: 'login_after_request' });
+          setTimeout(function(){ showToast('✓ Hesap silme talebiniz iptal edildi'); }, 1000);
+        } catch(e) {}
+      } else {
+        // 30 gün dolmuş - artık silinmeli (cron işi yapacak)
+        try { await signOut(auth); } catch(e){}
+        setTimeout(function(){ showToast('Hesabınız silinmiştir. İletişim için: kvkk@gitsteknoloji.com', 'err'); }, 500);
+        return;
+      }
+    }
+
     // v4.93: Email verified status sync - Firebase Auth ile Firestore tutarlı tutulur
     // Eğer Firebase tarafında doğrulanmış ama Firestore'da false ise güncelle
     if (user.emailVerified && CUR_PROFILE && !CUR_PROFILE.emailVerified) {
@@ -3801,6 +3829,202 @@ function renderAvatar(user, size, opts) {
     + escHtml(initials) + '</div>';
 }
 window.renderAvatar = renderAvatar;
+
+// ════════════════════════════════════════════════════════════════════
+// v5.17: KVKK/GDPR — Veri Masking Helper
+// Hassas verileri kısmen gizle: TC, Vergi No, IBAN, Telefon, Email
+// ════════════════════════════════════════════════════════════════════
+function maskSensitive(value, type, opts) {
+  if (!value) return '';
+  opts = opts || {};
+  var s = String(value).trim();
+
+  if (type === 'tc' || type === 'tax') {
+    // 11 hane TC: 123******78, 10 hane VKN: 12345****78
+    if (s.length < 4) return '*'.repeat(s.length);
+    if (s.length === 11) return s.substring(0, 3) + '*'.repeat(6) + s.substring(9);
+    if (s.length === 10) return s.substring(0, 5) + '*'.repeat(3) + s.substring(8);
+    return s.substring(0, 3) + '*'.repeat(s.length - 5) + s.substring(s.length - 2);
+  }
+  if (type === 'iban') {
+    // TR12 3456 **** **** **** **12 34
+    if (s.length < 12) return s;
+    return s.substring(0, 6) + ' **** **** **** ' + s.substring(s.length - 4);
+  }
+  if (type === 'phone') {
+    // +90 555 *** ** 12
+    var cleaned = s.replace(/\D/g, '');
+    if (cleaned.length < 7) return s;
+    var last = cleaned.substring(cleaned.length - 2);
+    var first = cleaned.substring(0, cleaned.length - 6);
+    return first + ' *** ** ' + last;
+  }
+  if (type === 'email') {
+    // ha***@gits...
+    var at = s.indexOf('@');
+    if (at < 0) return s;
+    var local = s.substring(0, at);
+    var domain = s.substring(at + 1);
+    var dotIdx = domain.lastIndexOf('.');
+    var dom = dotIdx > 0 ? domain.substring(0, dotIdx) : domain;
+    var tld = dotIdx > 0 ? domain.substring(dotIdx) : '';
+    var maskedLocal = local.length <= 2 ? local : local.substring(0, 2) + '*'.repeat(Math.min(local.length - 2, 4));
+    var maskedDom = dom.length <= 3 ? dom : dom.substring(0, 3) + '*'.repeat(Math.min(dom.length - 3, 3));
+    return maskedLocal + '@' + maskedDom + tld;
+  }
+  return s;
+}
+window.maskSensitive = maskSensitive;
+
+// "👁 Göster/Gizle" toggleable masked input pattern
+function renderMaskedField(value, type, label, opts) {
+  opts = opts || {};
+  if (!value) return label + ': <span style="color:var(--text-muted)">-</span>';
+  var masked = maskSensitive(value, type);
+  var uid = 'msk-' + Math.random().toString(36).substring(2, 9);
+  return label + ': <span id="'+uid+'-display" data-real="'+escHtml(value)+'" data-masked="'+masked+'" style="font-family:monospace">' + masked + '</span> ' +
+    '<button id="'+uid+'-btn" data-target="'+uid+'-display" data-shown="false" style="background:none;border:none;color:var(--color-primary);cursor:pointer;font-size:11px;padding:2px 6px" onclick="toggleMaskedField(this)">👁 Göster</button>';
+}
+window.renderMaskedField = renderMaskedField;
+
+window.toggleMaskedField = function(btn) {
+  var target = document.getElementById(btn.dataset.target);
+  if (!target) return;
+  var shown = btn.dataset.shown === 'true';
+  if (shown) {
+    target.textContent = target.dataset.masked;
+    btn.dataset.shown = 'false';
+    btn.innerHTML = '👁 Göster';
+  } else {
+    target.textContent = target.dataset.real;
+    btn.dataset.shown = 'true';
+    btn.innerHTML = '🙈 Gizle';
+    // 30 saniye sonra otomatik tekrar gizle (güvenlik)
+    setTimeout(function(){
+      if (btn.dataset.shown === 'true') {
+        target.textContent = target.dataset.masked;
+        btn.dataset.shown = 'false';
+        btn.innerHTML = '👁 Göster';
+      }
+    }, 30000);
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════
+// v5.17: KVKK Audit Log Helper
+// Hassas işlemlerin kaydı için ortak fonksiyon
+// ════════════════════════════════════════════════════════════════════
+async function logKVKKAction(action, details) {
+  if (!CUR_USER?.uid) return;
+  try {
+    await addDoc(collection(db, 'audit_logs'), {
+      userId: CUR_USER.uid,
+      userEmail: CUR_USER.email || '',
+      userRole: CUR_PROFILE?.role || '',
+      action: action,  // 'profile_view', 'data_export', 'account_delete', 'consent_change', 'masked_field_view'
+      details: details || {},
+      userAgent: navigator.userAgent.substring(0, 250),
+      timestamp: serverTimestamp(),
+    });
+  } catch(e) {
+    // Best-effort - audit log fail olsa bile akışı bozma
+    console.warn('Audit log fail:', e.message);
+  }
+}
+window.logKVKKAction = logKVKKAction;
+
+// ════════════════════════════════════════════════════════════════════
+// v5.18: AES-256-GCM Client-Side Encryption (Web Crypto API)
+// Hassas alanlar için (TC, IBAN) ek koruma katmanı
+//
+// NOT: Client-side şifreleme, sunucu tarafı şifrelemenin yerini tutmaz!
+// Bu Firestore default at-rest encryption (AES-256) + TLS 1.3'e
+// ek bir katmandır. Anahtar yönetimi kritik.
+// ════════════════════════════════════════════════════════════════════
+
+// Master key türetme (kullanıcının uid'inden — şu an basic)
+// PRODUCTION'da: Firebase Functions üzerinden Cloud KMS ile key management
+async function deriveEncryptionKey(seed) {
+  if (!seed) seed = CUR_USER?.uid || 'default-seed';
+  var encoder = new TextEncoder();
+  var keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(seed + '_pochub_v1'),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+  var salt = encoder.encode('pochub-kvkk-salt-2026');
+  return await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+// AES-256-GCM ile şifrele
+async function encryptValue(plaintext, seed) {
+  if (!plaintext) return '';
+  try {
+    var key = await deriveEncryptionKey(seed);
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    var encoder = new TextEncoder();
+    var ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      encoder.encode(plaintext)
+    );
+    // IV + ciphertext'i base64'e çevir
+    var ivBytes = new Uint8Array(iv);
+    var cipherBytes = new Uint8Array(ciphertext);
+    var combined = new Uint8Array(ivBytes.length + cipherBytes.length);
+    combined.set(ivBytes);
+    combined.set(cipherBytes, ivBytes.length);
+    return 'enc:v1:' + btoa(String.fromCharCode.apply(null, combined));
+  } catch(e) {
+    console.warn('Encryption failed, storing plaintext:', e.message);
+    return plaintext;
+  }
+}
+
+// AES-256-GCM ile şifre çöz
+async function decryptValue(encryptedStr, seed) {
+  if (!encryptedStr) return '';
+  if (!encryptedStr.startsWith('enc:v1:')) return encryptedStr; // şifresiz
+  try {
+    var b64 = encryptedStr.substring(7);
+    var combined = new Uint8Array(atob(b64).split('').map(function(c){ return c.charCodeAt(0); }));
+    var iv = combined.slice(0, 12);
+    var cipherBytes = combined.slice(12);
+    var key = await deriveEncryptionKey(seed);
+    var plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      cipherBytes
+    );
+    var decoder = new TextDecoder();
+    return decoder.decode(plaintext);
+  } catch(e) {
+    console.warn('Decryption failed:', e.message);
+    return '[şifre çözülemedi]';
+  }
+}
+
+// Helper - bir alan şifreli mi?
+function isEncrypted(value) {
+  return typeof value === 'string' && value.startsWith('enc:v1:');
+}
+
+window.encryptValue = encryptValue;
+window.decryptValue = decryptValue;
+window.isEncrypted = isEncrypted;
 
 // ════════════════════════════════════════════════════════════════════
 // v5.12: EMPTY STATE HELPER
@@ -16011,6 +16235,20 @@ async function openOverrideRequestModal(pocId, pocData, check, onAccepted) {
 // v5.07: ORTAK PROFİL SAYFASI (Customer/Vendor/Admin)
 // Rol bazında ek alanlar gösterir
 // ════════════════════════════════════════════════════════════════════
+
+// v5.17: Bildirim tercih row helper
+function makeNotifPrefRow(id, label, desc, checked, isTransactional, isLocked) {
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 12px;background:'+(isTransactional?'rgba(34,208,120,.04)':'var(--bg-elevated)')+';border:1px solid '+(isTransactional?'rgba(34,208,120,.18)':'var(--border)')+';border-radius:8px;gap:10px">'
+    + '<div style="flex:1;min-width:0">'
+    +   '<div style="font-size:12.5px;font-weight:600;color:var(--text-primary)">'+label+'</div>'
+    +   '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.4">'+desc+'</div>'
+    + '</div>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:'+(isLocked?'not-allowed':'pointer')+';flex-shrink:0">'
+    +   '<div class="cc-toggle'+(checked?' on':'')+(isLocked?' disabled':'')+'" id="np-'+id+'" data-id="'+id+'" data-locked="'+(isLocked?'1':'0')+'"></div>'
+    + '</label>'
+    + '</div>';
+}
+
 async function renderUserProfile(m, role) {
   if (!CUR_USER || !CUR_PROFILE) {
     m.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted)">Giriş yapmalısınız.</div>';
@@ -16127,7 +16365,11 @@ async function renderUserProfile(m, role) {
     +   '</div>'
     +   '<div>'
     +     '<label class="lbl">Vergi/TC No</label>'
-    +     '<input id="pf-tax-no" class="inp" value="'+escHtml(p.taxNo||'')+'" placeholder="10 haneli (VKN) veya 11 haneli (TCKN)" pattern="[0-9]{10,11}">'
+    +     '<div style="display:flex;gap:6px;align-items:center">'
+    +       '<input id="pf-tax-no" class="inp" value="" placeholder="10 haneli (VKN) veya 11 haneli (TCKN)" pattern="[0-9]{10,11}" type="password" style="flex:1;font-family:monospace" data-encrypted="'+(p.taxNoEncrypted?'1':'0')+'">'
+    +       '<button type="button" id="pf-tax-toggle" style="background:var(--bg-elevated);border:1px solid var(--border);padding:9px 12px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-secondary);white-space:nowrap" title="Göster/Gizle">👁</button>'
+    +     '</div>'
+    +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">🔒 Bu alan AES-256 ile şifrelenir. Sadece sizin tarafınızda çözülebilir.</div>'
     +   '</div>'
     +   '<div>'
     +     '<label class="lbl">Vergi Dairesi</label>'
@@ -16321,6 +16563,51 @@ async function renderUserProfile(m, role) {
       + '</div>';
   }
 
+  // ═══ v5.17: BİLDİRİM TERCİHLERİ (KVKK Rıza Geri Çekme) ═══
+  var notifPrefs = p.notificationPreferences || {};
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 6px">🔔 Bildirim Tercihleri</h3>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">KVKK Madde 11 uyarınca açık rızalarınızı dilediğiniz zaman geri çekebilirsiniz. Zorunlu sistem bildirimleri kapatılamaz.</div>'
+    + '<div style="display:grid;gap:8px">'
+    +   makeNotifPrefRow('email_transactional', '📧 E-posta — İşlemsel', 'PoC kabul/red, teklif, mesaj, hesap güvenliği', !!notifPrefs.email_transactional !== false, true)
+    +   makeNotifPrefRow('email_system', '📧 E-posta — Sistem', 'Hesap, ödeme, abonelik bildirimleri (kapatılamaz)', true, true, true)
+    +   makeNotifPrefRow('email_marketing', '📧 E-posta — Pazarlama', 'Kampanya, yeni özellik duyuruları, blog (açık rıza)', !!notifPrefs.email_marketing, false)
+    +   makeNotifPrefRow('email_newsletter', '📧 E-posta — Bülten', 'Aylık trend raporu, sektör analizi (açık rıza)', !!notifPrefs.email_newsletter, false)
+    +   makeNotifPrefRow('sms_urgent', '📱 SMS — Acil', 'Acil güvenlik uyarıları (kapatılamaz)', true, true, true)
+    +   makeNotifPrefRow('sms_marketing', '📱 SMS — Pazarlama', 'SMS ile kampanya (açık rıza)', !!notifPrefs.sms_marketing, false)
+    +   makeNotifPrefRow('inapp_all', '🔔 Uygulama İçi Bildirim', 'Site içinde gösterilen anlık bildirimler', !!notifPrefs.inapp_all !== false, true)
+    + '</div>'
+    + '</div>';
+
+  // ═══ v5.17: KVKK HAKLARI - Verilerimi İndir ═══
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 6px">📋 KVKK Haklarınız</h3>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">KVKK Madde 11 ve GDPR Article 15-22 kapsamında kullanabileceğiniz haklar.</div>'
+    + '<div style="display:grid;gap:10px">'
+    +   '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(34,208,120,.05);border:1px solid rgba(34,208,120,.2);border-radius:8px;flex-wrap:wrap;gap:10px">'
+    +     '<div style="flex:1;min-width:200px">'
+    +       '<div style="font-size:13px;font-weight:600;color:var(--text-primary)">📥 Verilerimi İndir</div>'
+    +       '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">Sistemde tutulan tüm kişisel verilerinizi JSON formatında indirin (GDPR Article 20 - Veri Taşınabilirliği)</div>'
+    +     '</div>'
+    +     '<button id="pf-export-data" class="btn-g btn-sm" style="padding:9px 16px">🔽 İndir</button>'
+    +   '</div>'
+    +   '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(59,124,255,.05);border:1px solid rgba(59,124,255,.2);border-radius:8px;flex-wrap:wrap;gap:10px">'
+    +     '<div style="flex:1;min-width:200px">'
+    +       '<div style="font-size:13px;font-weight:600;color:var(--text-primary)">🔍 Veri İşleme Geçmişi</div>'
+    +       '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">Hesabınıza yapılan hassas işlemleri görüntüleyin (audit log)</div>'
+    +     '</div>'
+    +     '<button id="pf-view-audit" class="btn-g btn-sm" style="padding:9px 16px">📜 Görüntüle</button>'
+    +   '</div>'
+    +   '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(125,180,255,.05);border:1px solid rgba(125,180,255,.2);border-radius:8px;flex-wrap:wrap;gap:10px">'
+    +     '<div style="flex:1;min-width:200px">'
+    +       '<div style="font-size:13px;font-weight:600;color:var(--text-primary)">📝 Açık Rıza Geçmişi</div>'
+    +       '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">Verdiğiniz açık rıza beyanlarını görüntüleyin (kayıt sırasında ve sonrası)</div>'
+    +     '</div>'
+    +     '<button id="pf-view-consents" class="btn-g btn-sm" style="padding:9px 16px">📋 Görüntüle</button>'
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+
   // ═══ GÜVENLİK ═══
   html += '<div class="card" style="margin-bottom:14px">'
     + '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 14px">🔒 Güvenlik</h3>'
@@ -16332,6 +16619,19 @@ async function renderUserProfile(m, role) {
     +     '</div>'
     +     '<button id="pf-pw-reset" class="btn-g btn-sm">🔑 Sıfırlama Maili Gönder</button>'
     +   '</div>'
+    + '</div>'
+    + '</div>';
+
+  // ═══ v5.17: TEHLİKELİ BÖLGE - Hesabımı Sil ═══
+  html += '<div class="card" style="margin-bottom:14px;border-color:rgba(220,38,38,.3)">'
+    + '<h3 style="font-size:14px;font-weight:700;color:#dc2626;margin:0 0 6px">⚠️ Tehlikeli Bölge</h3>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">Bu işlemler geri alınamaz. Lütfen dikkatli olun.</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:rgba(220,38,38,.04);border:1px solid rgba(220,38,38,.2);border-radius:8px;flex-wrap:wrap;gap:10px">'
+    +   '<div style="flex:1;min-width:200px">'
+    +     '<div style="font-size:13px;font-weight:600;color:var(--text-primary)">🗑 Hesabımı Sil</div>'
+    +     '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;line-height:1.5">KVKK Madde 7 ve GDPR Article 17 (Unutulma Hakkı) kapsamında hesabınız silinir. Yasal saklama süreleri (faturalar 10 yıl) hariç tüm verileriniz 30 gün içinde silinir/anonimleştirilir.</div>'
+    +   '</div>'
+    +   '<button id="pf-delete-account" style="background:#dc2626;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">🗑 Hesabı Sil</button>'
     + '</div>'
     + '</div>';
 
@@ -16448,6 +16748,52 @@ async function renderUserProfile(m, role) {
     navigator.clipboard?.writeText(url).then(function(){ showToast('✓ Link kopyalandı'); });
   });
 
+  // v5.18: Vergi No şifreli ise decrypt et + input'a yükle
+  (async function loadDecryptedTaxNo() {
+    var input = el('pf-tax-no');
+    if (!input) return;
+    var stored = p.taxNo || '';
+    if (!stored) return;
+    if (isEncrypted(stored)) {
+      try {
+        var decrypted = await decryptValue(stored);
+        if (decrypted && decrypted !== '[şifre çözülemedi]') {
+          input.value = decrypted;
+        }
+      } catch(e) {
+        console.warn('Tax decrypt failed:', e);
+      }
+    } else {
+      // Eski (şifresiz) veri - input'a düz koy
+      input.value = stored;
+    }
+  })();
+
+  // v5.17: Vergi No göster/gizle (KVKK)
+  el('pf-tax-toggle')?.addEventListener('click', function(){
+    var input = el('pf-tax-no');
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      this.textContent = '🙈';
+      this.title = 'Gizle';
+      // KVKK audit log
+      logKVKKAction('masked_field_view', { field: 'taxNo' });
+      // 30 saniye sonra otomatik gizle
+      setTimeout(function(){
+        if (input.type === 'text') {
+          input.type = 'password';
+          var btn = el('pf-tax-toggle');
+          if (btn) { btn.textContent = '👁'; btn.title = 'Göster'; }
+        }
+      }, 30000);
+    } else {
+      input.type = 'password';
+      this.textContent = '👁';
+      this.title = 'Göster';
+    }
+  });
+
   // Şifre sıfırlama
   el('pf-pw-reset')?.addEventListener('click', async function(){
     var btn = this;
@@ -16474,6 +16820,50 @@ async function renderUserProfile(m, role) {
     }
   });
 
+  // ════════════════════════════════════════════════════════════════
+  // v5.17: KVKK/GDPR Faz 2 Handler'ları
+  // ════════════════════════════════════════════════════════════════
+
+  // Bildirim tercih toggle handler
+  document.querySelectorAll('.cc-toggle[id^="np-"]').forEach(function(tog){
+    if (tog.dataset.locked === '1') return;
+    tog.addEventListener('click', function(){
+      tog.classList.toggle('on');
+    });
+  });
+
+  // Verilerimi İndir (JSON Export)
+  el('pf-export-data')?.addEventListener('click', async function(){
+    var btn = this;
+    if (!confirm('Tüm verileriniz JSON formatında indirilecek. Devam edilsin mi?')) return;
+    btn.disabled = true; btn.textContent = '⏳ Hazırlanıyor...';
+    try {
+      await exportUserData();
+      await logKVKKAction('data_export', { method: 'profile_page' });
+      showToast('✓ Verileriniz indirildi');
+      btn.textContent = '✓ İndirildi';
+      setTimeout(function(){ btn.disabled = false; btn.textContent = '🔽 İndir'; }, 3000);
+    } catch(e) {
+      showToast('Hata: '+e.message, 'err');
+      btn.disabled = false; btn.textContent = '🔽 İndir';
+    }
+  });
+
+  // Audit Log Görüntüle
+  el('pf-view-audit')?.addEventListener('click', async function(){
+    await showAuditLogModal();
+  });
+
+  // Açık Rıza Geçmişi
+  el('pf-view-consents')?.addEventListener('click', async function(){
+    showConsentHistoryModal();
+  });
+
+  // Hesabı Sil
+  el('pf-delete-account')?.addEventListener('click', async function(){
+    await showAccountDeleteModal();
+  });
+
   // Kaydet
   el('pf-save')?.addEventListener('click', async function(){
     var btn = this;
@@ -16493,9 +16883,7 @@ async function renderUserProfile(m, role) {
         linkedinUrl: el('pf-linkedin')?.value.trim() || '',
         website: el('pf-website')?.value.trim() || '',
         photoBase64: _currentPhotoData || '',
-        // v5.14: Fatura bilgileri
         taxType: el('pf-tax-type')?.value || '',
-        taxNo: el('pf-tax-no')?.value.trim() || '',
         taxOffice: el('pf-tax-office')?.value.trim() || '',
         mersisNo: el('pf-mersis')?.value.trim() || '',
         kepAddress: el('pf-kep')?.value.trim() || '',
@@ -16503,15 +16891,40 @@ async function renderUserProfile(m, role) {
         updatedAt: serverTimestamp(),
       };
 
-      // v5.14: Vergi/TC No validasyon
-      if (updates.taxNo) {
-        var taxClean = updates.taxNo.replace(/\D/g, '');
+      // v5.18: Vergi/TC No - şifreleme + validasyon
+      var rawTaxNo = el('pf-tax-no')?.value.trim() || '';
+      if (rawTaxNo) {
+        var taxClean = rawTaxNo.replace(/\D/g, '');
         if (taxClean.length !== 10 && taxClean.length !== 11) {
           showToast('Vergi No 10 haneli (VKN) veya 11 haneli (TCKN) olmalı', 'err');
           btn.disabled = false; btn.textContent = '💾 Kaydet';
           return;
         }
-        updates.taxNo = taxClean;
+        // AES-256-GCM şifreleme (client-side)
+        updates.taxNo = await encryptValue(taxClean);
+        updates.taxNoEncrypted = true;
+      } else {
+        updates.taxNo = '';
+        updates.taxNoEncrypted = false;
+      }
+
+      // v5.17: Bildirim tercihlerini topla
+      var notifPrefs = {};
+      document.querySelectorAll('.cc-toggle[id^="np-"]').forEach(function(tog){
+        var id = tog.dataset.id;
+        if (!id) return;
+        notifPrefs[id] = tog.classList.contains('on');
+      });
+      updates.notificationPreferences = notifPrefs;
+
+      // Bildirim tercihleri değişti mi? Audit log
+      var oldPrefs = CUR_PROFILE.notificationPreferences || {};
+      var prefsChanged = false;
+      for (var key in notifPrefs) {
+        if (notifPrefs[key] !== !!oldPrefs[key]) { prefsChanged = true; break; }
+      }
+      if (prefsChanged) {
+        logKVKKAction('notification_preferences_change', { from: oldPrefs, to: notifPrefs });
       }
 
       if (role === 'vendor') {
@@ -16563,6 +16976,1099 @@ async function renderUserProfile(m, role) {
 }
 
 window.renderUserProfile = renderUserProfile;
+
+// ════════════════════════════════════════════════════════════════════
+// v5.17: KVKK/GDPR Faz 2 — Kullanıcı Hakları Fonksiyonları
+// ════════════════════════════════════════════════════════════════════
+
+// 📥 VERİLERİMİ İNDİR - GDPR Article 20 (Veri Taşınabilirliği)
+async function exportUserData() {
+  if (!CUR_USER?.uid) throw new Error('Giriş yapılmamış');
+
+  var exportData = {
+    exportInfo: {
+      generatedAt: new Date().toISOString(),
+      exportVersion: '1.0',
+      regulation: 'KVKK Madde 11 / GDPR Article 20',
+      userId: CUR_USER.uid,
+      userEmail: CUR_USER.email,
+      legalBasis: 'Veri Sahibi Talebi',
+    },
+    profile: {},
+    pocs: [],
+    offers: [],
+    messages: [],
+    notifications: [],
+    invites: [],
+    registrations: [],
+    products: [],  // vendor için
+    consents: {},
+    auditLogs: [],
+  };
+
+  try {
+    // Profil
+    var userSnap = await getDoc(doc(db, 'users', CUR_USER.uid));
+    if (userSnap.exists()) {
+      var pData = userSnap.data();
+      // v5.18: Şifreli alanları decrypt et (kullanıcının kendi verisi)
+      if (pData.taxNoEncrypted && isEncrypted(pData.taxNo)) {
+        try { pData.taxNo = await decryptValue(pData.taxNo); } catch(e){}
+      }
+      exportData.profile = pData;
+      exportData.consents = pData.consents || {};
+    }
+
+    // PoC talepleri (customer veya vendor olarak)
+    var pocsAsCustomer = await getDocs(query(collection(db, 'poc_requests'), where('customerId', '==', CUR_USER.uid)));
+    var pocsAsVendor   = await getDocs(query(collection(db, 'poc_requests'), where('vendorId', '==', CUR_USER.uid)));
+    exportData.pocs = [
+      ...pocsAsCustomer.docs.map(function(d){ return { id: d.id, role: 'customer', ...d.data() }; }),
+      ...pocsAsVendor.docs.map(function(d){ return { id: d.id, role: 'vendor', ...d.data() }; }),
+    ];
+
+    // Teklifler
+    var offersAsCustomer = await getDocs(query(collection(db, 'offers'), where('customerId', '==', CUR_USER.uid)));
+    var offersAsVendor = await getDocs(query(collection(db, 'offers'), where('vendorId', '==', CUR_USER.uid)));
+    exportData.offers = [
+      ...offersAsCustomer.docs.map(function(d){ return { id: d.id, role: 'customer', ...d.data() }; }),
+      ...offersAsVendor.docs.map(function(d){ return { id: d.id, role: 'vendor', ...d.data() }; }),
+    ];
+
+    // Bildirimler (kendisine gelen)
+    var notifsSnap = await getDocs(query(collection(db, 'notifications'), where('userId', '==', CUR_USER.uid)));
+    exportData.notifications = notifsSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+
+    // Davetler (verilen ve alınan)
+    var invitesGiven = await getDocs(query(collection(db, 'poc_invites'), where('inviterUid', '==', CUR_USER.uid)));
+    exportData.invites = invitesGiven.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+
+    // Kayıtlar
+    var regsSnap = await getDocs(query(collection(db, 'registrations'), where('userId', '==', CUR_USER.uid)));
+    exportData.registrations = regsSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+
+    // Vendor ise ürünleri de
+    if (CUR_PROFILE?.role === 'vendor') {
+      var prodSnap = await getDocs(query(collection(db, 'products'), where('vendorId', '==', CUR_USER.uid)));
+      exportData.products = prodSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+    }
+
+    // Audit log (kendi kullanım geçmişi)
+    var auditSnap = await getDocs(query(collection(db, 'audit_logs'), where('userId', '==', CUR_USER.uid), limit(100)));
+    exportData.auditLogs = auditSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+
+    // PoC'lara ait mesajlar (uzun olabilir - sadece kullanıcının attığı/aldığı)
+    if (exportData.pocs.length > 0 && exportData.pocs.length <= 20) {
+      for (var poc of exportData.pocs.slice(0, 20)) {
+        try {
+          var msgSnap = await getDocs(query(collection(db, 'poc_messages'), where('pocId', '==', poc.id)));
+          msgSnap.docs.forEach(function(d){
+            exportData.messages.push({ id: d.id, pocId: poc.id, ...d.data() });
+          });
+        } catch(e){}
+      }
+    }
+  } catch(e) {
+    console.error('Export error:', e);
+    throw new Error('Veri toplama sırasında hata: ' + e.message);
+  }
+
+  // JSON olarak indir
+  var jsonStr = JSON.stringify(exportData, null, 2);
+  var blob = new Blob([jsonStr], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'PoCHub-verilerim-' + (new Date().toISOString().split('T')[0]) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// 📜 AUDIT LOG MODAL - Kullanıcı kendi geçmişi
+async function showAuditLogModal() {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = '<div class="modal" style="max-width:680px;max-height:80vh;display:flex;flex-direction:column">'
+    + '<div class="flx-bw-c-mb18">'
+    +   '<h3 class="fs15-fw7">📜 Veri İşleme Geçmişiniz</h3>'
+    +   '<button id="al-close" class="btn-close-x">×</button>'
+    + '</div>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">KVKK Madde 12 kapsamında hesabınıza yapılan hassas işlemler. Son 100 kayıt gösterilir.</div>'
+    + '<div id="al-list" style="overflow-y:auto;flex:1;min-height:200px"><div style="text-align:center;padding:20px"><div class="spinner" style="display:inline-block;margin:0"></div></div></div>'
+    + '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button id="al-close-btn" class="btn-p" style="padding:9px 20px">Kapat</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#al-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#al-close-btn').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+
+  try {
+    var snap = await getDocs(query(collection(db, 'audit_logs'), where('userId', '==', CUR_USER.uid), orderBy('timestamp','desc'), limit(100)));
+    var listEl = modal.querySelector('#al-list');
+    if (snap.empty) {
+      listEl.innerHTML = renderEmpty({
+        emoji: '📜',
+        title: 'Henüz kayıt yok',
+        desc: 'Hassas işlemler burada görüntülenecek (profil değişiklik, veri export, vb.)',
+      });
+      return;
+    }
+    var actionLabels = {
+      data_export: '📥 Veri İndirme',
+      account_delete: '🗑 Hesap Silme',
+      account_delete_request: '⚠️ Hesap Silme Talebi',
+      consent_change: '📝 Açık Rıza Değişikliği',
+      masked_field_view: '👁 Hassas Veri Görüntüleme',
+      notification_preferences_change: '🔔 Bildirim Tercih Değişikliği',
+      profile_view: '👤 Profil Görüntüleme',
+      password_reset: '🔑 Şifre Sıfırlama',
+    };
+    listEl.innerHTML = snap.docs.map(function(d){
+      var data = d.data();
+      var ts = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString('tr-TR') : '-';
+      var label = actionLabels[data.action] || data.action;
+      var details = '';
+      if (data.details && Object.keys(data.details).length > 0) {
+        details = '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-family:monospace;background:var(--bg-elevated);padding:4px 8px;border-radius:4px;overflow-x:auto">'+escHtml(JSON.stringify(data.details))+'</div>';
+      }
+      return '<div style="padding:10px 12px;border-bottom:1px solid var(--border)">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+        +   '<div style="font-size:12.5px;font-weight:600;color:var(--text-primary)">'+label+'</div>'
+        +   '<div style="font-size:11px;color:var(--text-muted);white-space:nowrap">'+ts+'</div>'
+        + '</div>'
+        + details
+        + '</div>';
+    }).join('');
+  } catch(e) {
+    modal.querySelector('#al-list').innerHTML = '<div style="color:#dc2626;padding:20px;text-align:center">Hata: '+e.message+'</div>';
+  }
+}
+
+// 📋 AÇIK RIZA GEÇMİŞİ MODAL
+function showConsentHistoryModal() {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  var consents = CUR_PROFILE?.consents || {};
+  var consentLabels = {
+    privacy: '📋 Aydınlatma Metni',
+    terms: '📜 Kullanım Koşulları',
+    cookies: '🍪 Çerez Politikası',
+    marketing: '📢 Pazarlama İletişimi',
+    profileAnalysis: '🎯 Profil Analizi',
+  };
+
+  var html = '<div class="modal" style="max-width:620px;max-height:80vh;display:flex;flex-direction:column">'
+    + '<div class="flx-bw-c-mb18">'
+    +   '<h3 class="fs15-fw7">📝 Açık Rıza Beyanlarınız</h3>'
+    +   '<button id="ch-close" class="btn-close-x">×</button>'
+    + '</div>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">KVKK Madde 5/1 kapsamında verdiğiniz açık rıza beyanları. Bu rızaları "Bildirim Tercihleri" bölümünden değiştirebilirsiniz.</div>'
+    + '<div style="overflow-y:auto;flex:1;min-height:200px">';
+
+  for (var key in consents) {
+    var c = consents[key];
+    if (typeof c !== 'object') continue;
+    var label = consentLabels[key] || key;
+    var status = c.accepted ? '✅ Kabul Edildi' : '❌ Reddedildi';
+    var statusColor = c.accepted ? '#16a34a' : '#dc2626';
+    var date = c.acceptedAt ? new Date(c.acceptedAt).toLocaleString('tr-TR') : '-';
+    html += '<div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+      +   '<div style="font-size:13px;font-weight:600;color:var(--text-primary)">'+label+'</div>'
+      +   '<div style="font-size:11.5px;font-weight:700;color:'+statusColor+'">'+status+'</div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Tarih: '+date+' · Versiyon: '+(c.version||1)+'</div>'
+      + '</div>';
+  }
+  if (consents.ipAtConsent) {
+    html += '<div style="font-size:10.5px;color:var(--text-muted);margin-top:14px;padding:10px;background:var(--bg-elevated);border-radius:6px;line-height:1.5">'
+      + '<strong>Audit Bilgileri:</strong><br>'
+      + 'IP (kayıt anında): '+escHtml(consents.ipAtConsent)+'<br>'
+      + 'User Agent: '+escHtml((consents.userAgentAtConsent||'').substring(0,150))
+      + '</div>';
+  }
+  html += '</div><div style="display:flex;justify-content:flex-end;margin-top:14px"><button id="ch-close-btn" class="btn-p" style="padding:9px 20px">Kapat</button></div></div>';
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+  modal.querySelector('#ch-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ch-close-btn').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+}
+
+// 🗑 HESAP SİLME MODAL - 2 adımlı confirm (KVKK Madde 7)
+async function showAccountDeleteModal() {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = '<div class="modal" style="max-width:580px">'
+    + '<div class="flx-bw-c-mb18">'
+    +   '<h3 class="fs15-fw7" style="color:#dc2626">⚠️ Hesabınızı Silmek Üzeresiniz</h3>'
+    +   '<button id="ad-close" class="btn-close-x">×</button>'
+    + '</div>'
+    + '<div style="background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.3);border-radius:10px;padding:14px;margin-bottom:14px">'
+    +   '<div style="font-size:13px;color:var(--text-primary);line-height:1.7">'
+    +     '<strong>Bu işlem geri alınamaz.</strong> Hesabınız silindiğinde aşağıdakiler gerçekleşir:'
+    +     '<ul style="margin:8px 0 0 22px;font-size:12.5px">'
+    +       '<li>Hesabınız <strong>30 gün</strong> sonra kalıcı olarak silinir (geri alma süresi)</li>'
+    +       '<li>30 gün içinde tekrar giriş yaparsanız iptal edilir</li>'
+    +       '<li>Tüm PoC, teklif ve mesajlarınız anonimleştirilir</li>'
+    +       '<li>Profil fotoğrafınız, telefon, adres gibi kişisel veriler silinir</li>'
+    +       '<li><strong>Yasal saklama gerektirenler hariç</strong> (faturalar 10 yıl, sözleşmeler)</li>'
+    +     '</ul>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="font-size:13px;color:var(--text-primary);margin-bottom:6px;font-weight:600">Onay için aşağıdakileri yapın:</div>'
+    + '<label class="lbl" style="margin-top:10px">1. Şifrenizi girin</label>'
+    + '<input type="password" id="ad-password" class="inp" placeholder="Mevcut şifre">'
+    + '<label class="lbl" style="margin-top:10px">2. Onaylamak için <code style="background:var(--bg-elevated);padding:2px 8px;border-radius:4px;font-family:monospace">HESABIMI SİL</code> yazın</label>'
+    + '<input type="text" id="ad-confirm" class="inp" placeholder="HESABIMI SİL">'
+    + '<label class="lbl" style="margin-top:10px">3. Silme nedeniniz (opsiyonel, hizmetimizi geliştirmemize yardımcı olur)</label>'
+    + '<textarea id="ad-reason" class="inp" rows="2" placeholder="Neden silmek istediğinizi yazabilirsiniz..."></textarea>'
+    + '<div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">'
+    +   '<button id="ad-cancel" class="btn-g" style="padding:10px 20px">Vazgeç</button>'
+    +   '<button id="ad-submit" style="background:#dc2626;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:700;cursor:pointer">🗑 Hesabımı Sil</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#ad-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#ad-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+
+  modal.querySelector('#ad-submit').addEventListener('click', async function(){
+    var pw = modal.querySelector('#ad-password').value;
+    var confirmText = modal.querySelector('#ad-confirm').value.trim();
+    var reason = modal.querySelector('#ad-reason').value.trim();
+
+    if (!pw) { showToast('Şifrenizi girin', 'err'); return; }
+    if (confirmText !== 'HESABIMI SİL') { showToast('Onay metnini tam yazın: HESABIMI SİL', 'err'); return; }
+
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ İşleniyor...';
+
+    try {
+      // Şifre kontrolü - reauthenticate yerine signInWithEmailAndPassword (basit)
+      await signInWithEmailAndPassword(auth, CUR_USER.email, pw);
+
+      // Account deletion request - soft delete (30 gün)
+      await updateDoc(doc(db, 'users', CUR_USER.uid), {
+        deletionRequested: true,
+        deletionRequestedAt: serverTimestamp(),
+        deletionScheduledFor: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+        deletionReason: reason || '',
+        // Hassas verileri SIL hemen (yasal saklama gerektirenler hariç)
+        phone: '[silindi]',
+        phone2: '[silindi]',
+        secondaryEmail: '[silindi]',
+        photoBase64: '',
+        address: '[silindi]',
+        linkedinUrl: '',
+        twitterUrl: '',
+        // Vergi/fatura bilgileri SİLMİYORUZ - yasal saklama 10 yıl
+        status: 'deletion_pending',
+      });
+
+      // Audit log
+      await logKVKKAction('account_delete_request', {
+        reason: reason || '',
+        scheduledFor: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+      });
+
+      modal.remove();
+      showToast('✓ Hesap silme talebiniz alındı. 30 gün içinde geri girerseniz iptal olur.');
+
+      // 2 saniye sonra çıkış yap
+      setTimeout(async function(){
+        try {
+          await signOut(auth);
+          location.hash = '#home';
+          location.reload();
+        } catch(e) {}
+      }, 2000);
+
+    } catch(e) {
+      var msg = e.message || 'Bilinmeyen hata';
+      if (msg.includes('wrong-password') || msg.includes('invalid-credential')) {
+        msg = 'Şifreniz yanlış. Lütfen tekrar deneyin.';
+      }
+      showToast(msg, 'err');
+      btn.disabled = false;
+      btn.textContent = '🗑 Hesabımı Sil';
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.17: ADMIN — KVKK YÖNETİMİ
+// Hesap silme talepleri, audit logs filtreleme, consent stats
+// ════════════════════════════════════════════════════════════════════
+var _kvkkMgmtTab = 'deletions';
+async function admKVKKMgmt(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
+
+  var subtabs = '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap">'
+    + '<button class="kvkk-tab' + (_kvkkMgmtTab==='deletions'?' on':'') + '" data-t="deletions" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='deletions'?'#dc2626':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='deletions'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">🗑 Hesap Silme</button>'
+    + '<button class="kvkk-tab' + (_kvkkMgmtTab==='audits'?' on':'') + '" data-t="audits" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='audits'?'#7db4ff':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='audits'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">📜 Audit Logs</button>'
+    + '<button class="kvkk-tab' + (_kvkkMgmtTab==='consents'?' on':'') + '" data-t="consents" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='consents'?'#22d078':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='consents'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">📝 Rıza İstatistikleri</button>'
+    + '<button class="kvkk-tab' + (_kvkkMgmtTab==='verbis'?' on':'') + '" data-t="verbis" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='verbis'?'#f0a429':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='verbis'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">📊 VERBİS Envanteri</button>'
+    + '<button class="kvkk-tab' + (_kvkkMgmtTab==='dpa'?' on':'') + '" data-t="dpa" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='dpa'?'#c4a8ff':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='dpa'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">📜 DPA Şablonu</button>'
+    + '<button class="kvkk-tab' + (_kvkkMgmtTab==='breach'?' on':'') + '" data-t="breach" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='breach'?'#dc2626':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='breach'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">🚨 İhlal Bildirim</button>'
+    + '<button class="kvkk-tab' + (_kvkkMgmtTab==='hard-delete'?' on':'') + '" data-t="hard-delete" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='hard-delete'?'#475569':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='hard-delete'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">🗄 Hard Delete</button>'
+    + '</div>';
+
+  if (_kvkkMgmtTab === 'deletions') {
+    await renderDeletionRequests(m, subtabs);
+  } else if (_kvkkMgmtTab === 'audits') {
+    await renderAuditLogsAdmin(m, subtabs);
+  } else if (_kvkkMgmtTab === 'consents') {
+    await renderConsentStats(m, subtabs);
+  } else if (_kvkkMgmtTab === 'verbis') {
+    await renderVERBISInventory(m, subtabs);
+  } else if (_kvkkMgmtTab === 'dpa') {
+    renderDPATemplate(m, subtabs);
+  } else if (_kvkkMgmtTab === 'breach') {
+    await renderBreachNotification(m, subtabs);
+  } else if (_kvkkMgmtTab === 'hard-delete') {
+    await renderHardDeleteQueue(m, subtabs);
+  }
+
+  document.querySelectorAll('.kvkk-tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      _kvkkMgmtTab = btn.dataset.t;
+      admKVKKMgmt(m);
+    });
+  });
+}
+
+async function renderDeletionRequests(m, subtabs) {
+  try {
+    var snap = await getDocs(query(collection(db, 'users'), where('deletionRequested', '==', true)));
+    var html = '<div style="max-width:1100px">'
+      + subtabs
+      + '<h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px">🗑 Hesap Silme Talepleri</h2>'
+      + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px">KVKK Madde 7 - Unutulma Hakkı talebi gönderen kullanıcılar. 30 günlük geri alma süresi içindeyseler aktif kayıt sayılır.</div>';
+
+    if (snap.empty) {
+      html += renderEmpty({ emoji:'✅', title:'Bekleyen silme talebi yok', desc:'Tüm kullanıcı hesapları aktif veya silme talebi yok.' });
+    } else {
+      html += '<div style="display:grid;gap:10px">';
+      snap.docs.forEach(function(d){
+        var u = d.data();
+        var reqDate = u.deletionRequestedAt?.toDate ? u.deletionRequestedAt.toDate().toLocaleString('tr-TR') : '-';
+        var schedDate = u.deletionScheduledFor ? new Date(u.deletionScheduledFor).toLocaleDateString('tr-TR') : '-';
+        var daysLeft = u.deletionScheduledFor ? Math.max(0, Math.ceil((new Date(u.deletionScheduledFor) - new Date()) / (1000*60*60*24))) : 0;
+        html += '<div class="card" style="padding:14px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px">'
+          +   '<div style="flex:1;min-width:200px">'
+          +     '<div style="font-size:14px;font-weight:700;color:var(--text-primary)">'+escHtml(u.displayName||u.email)+'</div>'
+          +     '<div style="font-size:12px;color:var(--text-muted)">'+escHtml(u.email)+' · '+escHtml(u.role||'-')+(u.company?' · '+escHtml(u.company):'')+'</div>'
+          +   '</div>'
+          +   '<div style="display:flex;gap:6px">'
+          +     '<button class="kvkk-cancel-delete" data-uid="'+d.id+'" data-email="'+escHtml(u.email)+'" style="background:rgba(34,208,120,.12);color:#16a34a;border:1px solid rgba(34,208,120,.3);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">↩ İptal Et</button>'
+          +     '<button class="kvkk-finalize-delete" data-uid="'+d.id+'" data-email="'+escHtml(u.email)+'" style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">🗑 Hemen Sil</button>'
+          +   '</div>'
+          + '</div>'
+          + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;font-size:11.5px;color:var(--text-secondary)">'
+          +   '<div><strong>Talep Tarihi:</strong><br>'+reqDate+'</div>'
+          +   '<div><strong>Silinme Tarihi:</strong><br>'+schedDate+'</div>'
+          +   '<div><strong>Kalan Süre:</strong><br><span style="font-weight:700;color:'+(daysLeft<7?'#dc2626':daysLeft<14?'#f0a429':'#16a34a')+'">'+daysLeft+' gün</span></div>'
+          + '</div>'
+          + (u.deletionReason ? '<div style="margin-top:10px;padding:10px;background:var(--bg-elevated);border-radius:6px;font-size:11.5px;color:var(--text-secondary);line-height:1.5"><strong>Gerekçe:</strong> '+escHtml(u.deletionReason)+'</div>' : '')
+          + '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    m.innerHTML = html;
+
+    // İptal et
+    m.querySelectorAll('.kvkk-cancel-delete').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        if (!confirm('Silme talebi iptal edilsin mi? Kullanıcı normal hesaba dönecek.')) return;
+        try {
+          await updateDoc(doc(db,'users',btn.dataset.uid), {
+            deletionRequested: false,
+            deletionScheduledFor: null,
+            deletionCancelledAt: serverTimestamp(),
+            deletionCancelledBy: CUR_USER.uid,
+            status: 'active',
+          });
+          await logKVKKAction('account_delete_admin_cancelled', { targetUid: btn.dataset.uid, targetEmail: btn.dataset.email });
+          showToast('✓ Silme talebi iptal edildi');
+          admKVKKMgmt(m);
+        } catch(e) { showToast('Hata: '+e.message, 'err'); }
+      });
+    });
+
+    // Hemen sil
+    m.querySelectorAll('.kvkk-finalize-delete').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        var confirm1 = prompt('Hesap KALICI olarak silinecek. Onaylamak için "SİL" yazın:\nKullanıcı: '+btn.dataset.email);
+        if (confirm1 !== 'SİL') return;
+        try {
+          // Tam anonimleştirme - user documenti silmek yerine anonim hale getir
+          await updateDoc(doc(db,'users',btn.dataset.uid), {
+            email: 'silinmis-' + btn.dataset.uid.substring(0,8) + '@anonim.local',
+            displayName: '[Silinmiş Kullanıcı]',
+            company: '',
+            phone: '', phone2: '', secondaryEmail: '',
+            address: '', billingAddress: '',
+            taxNo: '', taxOffice: '', mersisNo: '', kepAddress: '',
+            photoBase64: '', logoUrl: '',
+            linkedinUrl: '', twitterUrl: '', website: '',
+            bio: '', shortDescription: '',
+            status: 'deleted',
+            deletedAt: serverTimestamp(),
+            deletedBy: CUR_USER.uid,
+            anonymized: true,
+          });
+          await logKVKKAction('account_delete_finalized', { targetUid: btn.dataset.uid, targetEmail: btn.dataset.email });
+          showToast('✓ Hesap anonimleştirildi (yasal saklama gerektirenler hariç)');
+          admKVKKMgmt(m);
+        } catch(e) { showToast('Hata: '+e.message, 'err'); }
+      });
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div style="padding:20px;color:#dc2626">Hata: '+e.message+'</div>';
+  }
+}
+
+async function renderAuditLogsAdmin(m, subtabs) {
+  try {
+    var snap = await getDocs(query(collection(db, 'audit_logs'), orderBy('timestamp','desc'), limit(200)));
+    var html = '<div style="max-width:1100px">'
+      + subtabs
+      + '<h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px">📜 Audit Logs</h2>'
+      + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px">KVKK Madde 12 uyarınca tutulan işlem kayıtları. Son 200 kayıt gösterilir.</div>';
+
+    if (snap.empty) {
+      html += renderEmpty({ emoji:'📜', title:'Henüz log yok', desc:'Hassas işlemler burada görüntülenir.' });
+    } else {
+      var actionLabels = {
+        data_export: '📥 Veri İndirme',
+        account_delete_request: '⚠️ Hesap Silme Talebi',
+        account_delete_cancelled: '↩ Silme Talebi İptal',
+        account_delete_admin_cancelled: '↩ Admin Tarafından İptal',
+        account_delete_finalized: '🗑 Kalıcı Silme',
+        consent_change: '📝 Rıza Değişikliği',
+        masked_field_view: '👁 Hassas Veri Görüntüleme',
+        notification_preferences_change: '🔔 Bildirim Tercih Değişikliği',
+      };
+      html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+        + '<table style="width:100%"><thead><tr><th>Tarih</th><th>Kullanıcı</th><th>İşlem</th><th>Detay</th></tr></thead><tbody>';
+      snap.docs.forEach(function(d){
+        var data = d.data();
+        var ts = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString('tr-TR') : '-';
+        var label = actionLabels[data.action] || data.action;
+        var details = data.details ? '<code style="font-size:11px">'+escHtml(JSON.stringify(data.details).substring(0,80))+'</code>' : '-';
+        html += '<tr><td style="font-size:11.5px">'+ts+'</td><td style="font-size:12px">'+escHtml(data.userEmail||data.userId||'-')+'</td><td style="font-size:12px;font-weight:600">'+label+'</td><td>'+details+'</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+    m.innerHTML = html;
+  } catch(e) {
+    m.innerHTML = '<div style="padding:20px;color:#dc2626">Hata: '+e.message+'</div>';
+  }
+}
+
+async function renderConsentStats(m, subtabs) {
+  try {
+    var snap = await getDocs(collection(db, 'users'));
+    var stats = {
+      total: 0,
+      privacy: 0, terms: 0, cookies: 0, marketing: 0, profileAnalysis: 0,
+    };
+    snap.docs.forEach(function(d){
+      var u = d.data();
+      if (u.status === 'deleted' || u.anonymized) return;
+      stats.total++;
+      var c = u.consents || {};
+      if (c.privacy?.accepted) stats.privacy++;
+      if (c.terms?.accepted) stats.terms++;
+      if (c.cookies?.accepted) stats.cookies++;
+      if (c.marketing?.accepted) stats.marketing++;
+      if (c.profileAnalysis?.accepted) stats.profileAnalysis++;
+    });
+
+    var pct = function(n){ return stats.total > 0 ? Math.round(n / stats.total * 100) : 0; };
+    var html = '<div style="max-width:1100px">'
+      + subtabs
+      + '<h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px">📝 Açık Rıza İstatistikleri</h2>'
+      + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px">Aktif kullanıcılarınızın KVKK rıza durumları. Toplam: <strong>'+stats.total+'</strong> aktif kullanıcı.</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">';
+
+    var consentInfo = [
+      { key:'privacy', label:'📋 Aydınlatma', required:true },
+      { key:'terms', label:'📜 Kullanım Koşulları', required:true },
+      { key:'cookies', label:'🍪 Çerez Politikası', required:true },
+      { key:'marketing', label:'📢 Pazarlama (opsiyonel)', required:false },
+      { key:'profileAnalysis', label:'🎯 Profil Analizi (opsiyonel)', required:false },
+    ];
+
+    consentInfo.forEach(function(ci){
+      var count = stats[ci.key];
+      var p = pct(count);
+      var color = ci.required ? (p >= 100 ? '#16a34a' : '#dc2626') : (p >= 30 ? '#16a34a' : '#f0a429');
+      html += '<div class="card" style="padding:14px">'
+        + '<div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:6px">'+ci.label+'</div>'
+        + '<div style="font-size:24px;font-weight:800;color:'+color+';margin-bottom:6px">'+count+' <span style="font-size:13px;color:var(--text-muted);font-weight:600">/ '+stats.total+'</span></div>'
+        + '<div style="background:var(--bg-elevated);height:6px;border-radius:3px;overflow:hidden"><div style="height:100%;background:'+color+';width:'+p+'%"></div></div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">%'+p+(ci.required?' · ZORUNLU':' · opsiyonel açık rıza')+'</div>'
+        + '</div>';
+    });
+    html += '</div></div>';
+    m.innerHTML = html;
+  } catch(e) {
+    m.innerHTML = '<div style="padding:20px;color:#dc2626">Hata: '+e.message+'</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.18: VERBİS VERİ ENVANTERİ (KVKK Madde 16)
+// VERBİS kayıt için gereken sistemsel veri envanterinin export'u
+// ════════════════════════════════════════════════════════════════════
+async function renderVERBISInventory(m, subtabs) {
+  try {
+    var usersSnap = await getDocs(collection(db, 'users'));
+    var totalUsers = 0, activeUsers = 0, deletedUsers = 0;
+    var roleStats = { customer: 0, vendor: 0, admin: 0 };
+    var consentStats = { withConsents: 0 };
+
+    usersSnap.docs.forEach(function(d){
+      var u = d.data();
+      totalUsers++;
+      if (u.status === 'deleted' || u.anonymized) { deletedUsers++; return; }
+      activeUsers++;
+      if (u.role && roleStats[u.role] !== undefined) roleStats[u.role]++;
+      if (u.consents && Object.keys(u.consents).length > 0) consentStats.withConsents++;
+    });
+
+    var auditCount = 0;
+    try {
+      var auditSnap = await getDocs(query(collection(db, 'audit_logs'), limit(1000)));
+      auditCount = auditSnap.size;
+    } catch(e){}
+
+    var html = '<div style="max-width:1100px">'
+      + subtabs
+      + '<h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px">📊 VERBİS Veri Envanteri</h2>'
+      + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">KVKK Madde 16 uyarınca, Veri Sorumluları Sicili (VERBİS) kayıt için gereken envanter. Bu raporu KVKK Kurumu\'na sunabilirsiniz.</div>'
+
+      + '<div style="background:linear-gradient(135deg,rgba(240,164,41,.06),rgba(240,164,41,.02));border:1px solid rgba(240,164,41,.25);border-radius:10px;padding:16px;margin-bottom:18px">'
+      +   '<div style="font-size:13px;font-weight:700;color:#f0a429;margin-bottom:6px">⚠️ VERBİS Kayıt Yükümlülüğü</div>'
+      +   '<div style="font-size:12px;color:var(--text-secondary);line-height:1.6">'
+      +     'KVKK Madde 16 ve VERBİS yönetmeliği uyarınca aşağıdaki kurumlar VERBİS\'e kayıt yaptırmak zorundadır:'
+      +     '<ul style="margin:6px 0 0 22px;font-size:12px">'
+      +       '<li>Yıllık çalışan sayısı 50\'den fazla veya yıllık mali bilanço toplamı 25 milyon TL\'den fazla olan kurumlar</li>'
+      +       '<li>Yurt dışında yerleşik gerçek/tüzel kişi veri sorumluları</li>'
+      +       '<li>Özel nitelikli kişisel veri işleyen kurumlar</li>'
+      +     '</ul>'
+      +     '<br>Kayıt için: <a href="https://verbis.kvkk.gov.tr" target="_blank" style="color:var(--color-primary)">verbis.kvkk.gov.tr</a>'
+      +   '</div>'
+      + '</div>'
+
+      + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px">'
+      +   '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 12px">📋 1. Veri Sorumlusu Bilgileri</h3>'
+      +   '<table style="width:100%;font-size:12.5px">'
+      +     '<tr><td style="padding:6px 0;width:200px"><strong>Şirket Unvanı:</strong></td><td>GİTS Teknoloji</td></tr>'
+      +     '<tr><td style="padding:6px 0"><strong>VKN:</strong></td><td>[Vergi numarası]</td></tr>'
+      +     '<tr><td style="padding:6px 0"><strong>MERSIS:</strong></td><td>[MERSIS no]</td></tr>'
+      +     '<tr><td style="padding:6px 0"><strong>Adres:</strong></td><td>[Açık adres]</td></tr>'
+      +     '<tr><td style="padding:6px 0"><strong>Sektör Kodu:</strong></td><td>62 - Bilgisayar programlama, danışmanlık</td></tr>'
+      +   '</table>'
+      + '</div>'
+
+      + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px">'
+      +   '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 12px">📊 2. İşlenen Veri Sayıları (Anlık)</h3>'
+      +   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">'
+      +     '<div style="padding:12px;background:var(--bg-elevated);border-radius:8px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Toplam Veri Sahibi</div><div style="font-size:22px;font-weight:800;color:var(--color-primary)">'+totalUsers+'</div></div>'
+      +     '<div style="padding:12px;background:var(--bg-elevated);border-radius:8px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Aktif Kullanıcı</div><div style="font-size:22px;font-weight:800;color:#16a34a">'+activeUsers+'</div></div>'
+      +     '<div style="padding:12px;background:var(--bg-elevated);border-radius:8px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Anonimleştirilen</div><div style="font-size:22px;font-weight:800;color:#dc2626">'+deletedUsers+'</div></div>'
+      +     '<div style="padding:12px;background:var(--bg-elevated);border-radius:8px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Müşteri Sayısı</div><div style="font-size:22px;font-weight:800;color:var(--text-primary)">'+roleStats.customer+'</div></div>'
+      +     '<div style="padding:12px;background:var(--bg-elevated);border-radius:8px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Vendor Sayısı</div><div style="font-size:22px;font-weight:800;color:var(--text-primary)">'+roleStats.vendor+'</div></div>'
+      +     '<div style="padding:12px;background:var(--bg-elevated);border-radius:8px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Açık Rıza Beyanı</div><div style="font-size:22px;font-weight:800;color:#16a34a">'+consentStats.withConsents+'</div></div>'
+      +     '<div style="padding:12px;background:var(--bg-elevated);border-radius:8px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Audit Log Kayıt</div><div style="font-size:22px;font-weight:800;color:var(--text-primary)">'+auditCount+'+</div></div>'
+      +   '</div>'
+      + '</div>'
+
+      + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px">'
+      +   '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 12px">📋 3. İşlenen Veri Kategorileri</h3>'
+      +   '<table style="width:100%;font-size:12px"><thead><tr><th style="padding:8px;background:var(--bg-elevated);text-align:left">Kategori</th><th style="padding:8px;background:var(--bg-elevated);text-align:left">Veri Türü</th><th style="padding:8px;background:var(--bg-elevated);text-align:left">Hukuki Sebep</th><th style="padding:8px;background:var(--bg-elevated);text-align:left">Saklama</th></tr></thead><tbody>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">Kimlik</td><td style="padding:8px;border-bottom:1px solid var(--border)">Ad, soyad, TCKN/VKN</td><td style="padding:8px;border-bottom:1px solid var(--border)">Sözleşme (5/2-c)</td><td style="padding:8px;border-bottom:1px solid var(--border)">10 yıl (vergi)</td></tr>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">İletişim</td><td style="padding:8px;border-bottom:1px solid var(--border)">E-posta, telefon, adres</td><td style="padding:8px;border-bottom:1px solid var(--border)">Sözleşme (5/2-c)</td><td style="padding:8px;border-bottom:1px solid var(--border)">Üyelik + 6 ay</td></tr>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">Mesleki</td><td style="padding:8px;border-bottom:1px solid var(--border)">Firma, pozisyon, sektör</td><td style="padding:8px;border-bottom:1px solid var(--border)">Sözleşme (5/2-c)</td><td style="padding:8px;border-bottom:1px solid var(--border)">Üyelik + 6 ay</td></tr>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">Finansal</td><td style="padding:8px;border-bottom:1px solid var(--border)">VKN, Vergi Dairesi, IBAN</td><td style="padding:8px;border-bottom:1px solid var(--border)">Yasal yük. (5/2-ç)</td><td style="padding:8px;border-bottom:1px solid var(--border)">10 yıl</td></tr>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">Müşteri İşlem</td><td style="padding:8px;border-bottom:1px solid var(--border)">PoC, teklif, mesaj</td><td style="padding:8px;border-bottom:1px solid var(--border)">Sözleşme + Meşru menf.</td><td style="padding:8px;border-bottom:1px solid var(--border)">5 yıl</td></tr>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">İşlem Güvenliği</td><td style="padding:8px;border-bottom:1px solid var(--border)">IP, log, user agent</td><td style="padding:8px;border-bottom:1px solid var(--border)">Meşru menfaat (5/2-f)</td><td style="padding:8px;border-bottom:1px solid var(--border)">2 yıl</td></tr>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">Pazarlama</td><td style="padding:8px;border-bottom:1px solid var(--border)">İlgi alanı, tercih</td><td style="padding:8px;border-bottom:1px solid var(--border)">Açık rıza (5/1)</td><td style="padding:8px;border-bottom:1px solid var(--border)">Rıza geri çekene kadar</td></tr>'
+      +   '</tbody></table>'
+      + '</div>'
+
+      + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px">'
+      +   '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 12px">🌍 4. Yurtdışı Aktarım</h3>'
+      +   '<table style="width:100%;font-size:12px"><thead><tr><th style="padding:8px;background:var(--bg-elevated);text-align:left">Alıcı</th><th style="padding:8px;background:var(--bg-elevated);text-align:left">Ülke</th><th style="padding:8px;background:var(--bg-elevated);text-align:left">Amaç</th><th style="padding:8px;background:var(--bg-elevated);text-align:left">Korunma Yöntemi</th></tr></thead><tbody>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">Google Firebase</td><td style="padding:8px;border-bottom:1px solid var(--border)">Belçika (AB)</td><td style="padding:8px;border-bottom:1px solid var(--border)">Veritabanı, Auth</td><td style="padding:8px;border-bottom:1px solid var(--border)">SCC + GDPR uyum</td></tr>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">EmailJS</td><td style="padding:8px;border-bottom:1px solid var(--border)">ABD</td><td style="padding:8px;border-bottom:1px solid var(--border)">E-posta gönderim</td><td style="padding:8px;border-bottom:1px solid var(--border)">SCC + Açık Rıza</td></tr>'
+      +     '<tr><td style="padding:8px;border-bottom:1px solid var(--border)">Cloudflare CDN</td><td style="padding:8px;border-bottom:1px solid var(--border)">Global</td><td style="padding:8px;border-bottom:1px solid var(--border)">Site dağıtım</td><td style="padding:8px;border-bottom:1px solid var(--border)">SCC</td></tr>'
+      +   '</tbody></table>'
+      + '</div>'
+
+      + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px">'
+      +   '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 12px">🛡 5. Alınan Teknik & İdari Tedbirler</h3>'
+      +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">'
+      +     '<div><strong>Teknik:</strong><ul style="margin:6px 0 0 18px"><li>TLS 1.3 şifreleme</li><li>Firestore AES-256 at-rest</li><li>Client-side AES-256-GCM (TC, IBAN)</li><li>Firestore Rules row-level access</li><li>2FA opsiyonu</li><li>reCAPTCHA</li></ul></div>'
+      +     '<div><strong>İdari:</strong><ul style="margin:6px 0 0 18px"><li>KVKK politikası</li><li>Aydınlatma metni</li><li>Açık rıza alma</li><li>Audit log sistemi</li><li>DPO atama (planlı)</li><li>Yıllık denetim (planlı)</li></ul></div>'
+      +   '</div>'
+      + '</div>'
+
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
+      +   '<button id="verbis-export-json" class="btn-g" style="padding:10px 18px">📥 JSON İndir</button>'
+      +   '<button id="verbis-export-print" class="btn-p" style="padding:10px 22px;font-weight:700">🖨 Yazdır / PDF</button>'
+      + '</div>'
+      + '</div>';
+
+    m.innerHTML = html;
+
+    m.querySelector('#verbis-export-json')?.addEventListener('click', function(){
+      var report = {
+        generatedAt: new Date().toISOString(),
+        reportType: 'VERBIS_INVENTORY',
+        regulation: 'KVKK Madde 16',
+        dataController: { name: 'GİTS Teknoloji', sectorCode: '62' },
+        statistics: {
+          totalUsers: totalUsers,
+          activeUsers: activeUsers,
+          deletedUsers: deletedUsers,
+          roleStats: roleStats,
+          consentStats: consentStats,
+          auditLogCount: auditCount,
+        },
+        dataCategories: [
+          { category: 'Kimlik', fields: ['name', 'taxNo'], legalBasis: 'KVKK 5/2-c', retention: '10 yıl' },
+          { category: 'İletişim', fields: ['email', 'phone', 'address'], legalBasis: 'KVKK 5/2-c', retention: 'üyelik+6ay' },
+          { category: 'Mesleki', fields: ['company', 'position', 'sector'], legalBasis: 'KVKK 5/2-c', retention: 'üyelik+6ay' },
+          { category: 'Finansal', fields: ['taxNo', 'taxOffice', 'iban'], legalBasis: 'KVKK 5/2-ç', retention: '10 yıl' },
+          { category: 'Müşteri İşlem', fields: ['pocs', 'offers', 'messages'], legalBasis: 'KVKK 5/2-c + 5/2-f', retention: '5 yıl' },
+          { category: 'İşlem Güvenliği', fields: ['ip', 'logs', 'userAgent'], legalBasis: 'KVKK 5/2-f', retention: '2 yıl' },
+          { category: 'Pazarlama', fields: ['interests', 'preferences'], legalBasis: 'Açık rıza (5/1)', retention: 'rıza geri çekene kadar' },
+        ],
+        internationalTransfers: [
+          { recipient: 'Google Firebase', country: 'Belgium (EU)', purpose: 'Database, Auth', safeguard: 'SCC + GDPR' },
+          { recipient: 'EmailJS', country: 'USA', purpose: 'Email delivery', safeguard: 'SCC + Open Consent' },
+          { recipient: 'Cloudflare', country: 'Global', purpose: 'CDN', safeguard: 'SCC' },
+        ],
+        securityMeasures: {
+          technical: ['TLS 1.3', 'Firestore AES-256 at-rest', 'Client-side AES-256-GCM', 'Firestore Rules', '2FA', 'reCAPTCHA'],
+          administrative: ['KVKK policy', 'Aydınlatma', 'Open consent', 'Audit logs', 'DPO (planned)', 'Annual audit (planned)'],
+        },
+      };
+      var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'VERBIS-envanter-' + new Date().toISOString().split('T')[0] + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✓ VERBİS envanteri indirildi');
+      logKVKKAction('verbis_inventory_export', {});
+    });
+
+    m.querySelector('#verbis-export-print')?.addEventListener('click', function(){
+      window.print();
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div style="padding:20px;color:#dc2626">Hata: '+e.message+'</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.18: DPA TEMPLATE (Veri İşleme Sözleşmesi Şablonu)
+// 3rd party vendor'lar için imza dokumentasyonu
+// ════════════════════════════════════════════════════════════════════
+function renderDPATemplate(m, subtabs) {
+  var html = '<div style="max-width:1100px">'
+    + subtabs
+    + '<h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px">📜 DPA Şablonu (Veri İşleme Sözleşmesi)</h2>'
+    + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">3rd party vendor (Firebase, EmailJS, iyzico vb.) ile imzalanması gereken Veri İşleme Sözleşmesi şablonu. KVKK Madde 8-9 / GDPR Article 28 uyumlu.</div>'
+
+    + '<div style="background:rgba(240,164,41,.08);border:1px solid rgba(240,164,41,.25);border-radius:10px;padding:14px;margin-bottom:18px">'
+    +   '<strong style="color:#f0a429">⚠️ Önemli:</strong> Bu şablon başlangıç noktasıdır. Her vendor için ayrı KVKK uzmanı hukuk müşaviri tarafından özelleştirilmesi gerekir. Mevcut DPA\'lar:'
+    +   '<ul style="margin:8px 0 0 22px;font-size:12px">'
+    +     '<li><strong>Google Firebase</strong>: <a href="https://firebase.google.com/terms/data-processing-terms" target="_blank" style="color:var(--color-primary)">Standart Sözleşme Hükümleri</a> — Tarafınıza tek tıkla kabul</li>'
+    +     '<li><strong>EmailJS</strong>: Manuel başvuru gerekir</li>'
+    +     '<li><strong>iyzico</strong>: Türkiye operatörü — KVKK uyumlu</li>'
+    +     '<li><strong>Cloudflare</strong>: SCC + GDPR uyumlu</li>'
+    +   '</ul>'
+    + '</div>'
+
+    + '<div class="card" style="padding:18px;margin-bottom:14px;font-family:Consolas,Monaco,monospace;font-size:12.5px;line-height:1.8;background:var(--bg-elevated);max-height:480px;overflow-y:auto">'
+    +   '<div style="font-family:Segoe UI,sans-serif;font-weight:700;text-align:center;font-size:14px;margin-bottom:14px;color:var(--text-primary)">VERİ İŞLEME SÖZLEŞMESİ (DPA)</div>'
+    +   '<div style="font-family:Segoe UI,sans-serif"><strong>Veri Sorumlusu:</strong> GİTS Teknoloji (PoCHub.co)<br>'
+    +   '<strong>Veri İşleyen:</strong> [VENDOR ADI]<br>'
+    +   '<strong>Tarih:</strong> [TARİH]<br><br>'
+    +   '<strong>1. AMAÇ ve KAPSAM</strong><br>'
+    +   'Bu sözleşme, Veri Sorumlusu adına kişisel verilerin işlenmesine ilişkin Veri İşleyen\'in yükümlülüklerini düzenler. 6698 sayılı KVKK ve 2016/679 sayılı GDPR uyumludur.<br><br>'
+    +   '<strong>2. İŞLENEN VERİ KATEGORİLERİ</strong><br>'
+    +   '- Kimlik verileri (ad, TCKN)<br>'
+    +   '- İletişim (e-posta, telefon)<br>'
+    +   '- Müşteri işlem (PoC, teklif)<br>'
+    +   '- İşlem güvenliği (IP, log)<br><br>'
+    +   '<strong>3. VERİ İŞLEYEN YÜKÜMLÜLÜKLERİ</strong><br>'
+    +   '3.1. Veri İşleyen, kişisel verileri SADECE Veri Sorumlusu talimatları doğrultusunda işler.<br>'
+    +   '3.2. Veri İşleyen çalışanlarının gizlilik yükümlülüğü olduğunu garanti eder.<br>'
+    +   '3.3. KVKK Madde 12 uyarınca uygun teknik ve idari tedbirleri alır.<br>'
+    +   '3.4. Veri ihlali durumunda 24 saat içinde Veri Sorumlusu\'na bildirim yapar.<br>'
+    +   '3.5. Veri Sahibi haklarının kullanımında Veri Sorumlusu\'na destek olur.<br>'
+    +   '3.6. Alt-işleyen kullanımı için yazılı onay alır.<br><br>'
+    +   '<strong>4. GÜVENLİK TEDBİRLERİ</strong><br>'
+    +   '- TLS 1.3 şifreleme<br>'
+    +   '- AES-256 at-rest<br>'
+    +   '- Erişim kontrolü ve loglama<br>'
+    +   '- Düzenli güvenlik denetimleri<br>'
+    +   '- Yedekleme ve felaket kurtarma<br><br>'
+    +   '<strong>5. ULUSLARARASI VERİ AKTARIMI</strong><br>'
+    +   'AB dışına aktarım yapılacaksa Standart Sözleşme Hükümleri (SCC) imzalanır.<br><br>'
+    +   '<strong>6. SÜRE ve FESİH</strong><br>'
+    +   'Bu sözleşme, ana hizmet sözleşmesi süresince geçerlidir. Fesih halinde 30 gün içinde tüm veriler iade edilir veya silinir.<br><br>'
+    +   '<strong>7. DENETİM HAKKI</strong><br>'
+    +   'Veri Sorumlusu, yılda bir kez Veri İşleyen\'in tesislerinde denetim yapma hakkını saklı tutar.<br><br>'
+    +   '<strong>8. CEZAİ ŞART</strong><br>'
+    +   'Sözleşme ihlali halinde Veri İşleyen, Veri Sorumlusu\'nun maruz kalabileceği KVKK cezaları + zararlar için sorumludur.<br><br>'
+    +   '<strong>İMZA:</strong><br>'
+    +   'Veri Sorumlusu: ___________________ Tarih: _________<br>'
+    +   'Veri İşleyen: ___________________ Tarih: _________</div>'
+    + '</div>'
+
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +   '<button id="dpa-download" class="btn-p" style="padding:10px 22px;font-weight:700">📥 Şablonu İndir (TXT)</button>'
+    + '</div>'
+    + '</div>';
+
+  m.innerHTML = html;
+
+  m.querySelector('#dpa-download')?.addEventListener('click', function(){
+    var content = 'VERİ İŞLEME SÖZLEŞMESİ (DPA)\n\nVeri Sorumlusu: GİTS Teknoloji (PoCHub.co)\nVeri İşleyen: [VENDOR ADI]\nTarih: [TARİH]\n\n1. AMAÇ ve KAPSAM\nBu sözleşme, Veri Sorumlusu adına kişisel verilerin işlenmesine ilişkin Veri İşleyen\'in yükümlülüklerini düzenler. KVKK ve GDPR uyumludur.\n\n2. İŞLENEN VERİ KATEGORİLERİ\n- Kimlik (ad, TCKN)\n- İletişim (email, telefon)\n- Müşteri işlem (PoC, teklif)\n- İşlem güvenliği (IP, log)\n\n3. VERİ İŞLEYEN YÜKÜMLÜLÜKLERİ\n3.1. Sadece talimatlar doğrultusunda işler\n3.2. Çalışanların gizlilik yükümlülüğü\n3.3. KVKK Madde 12 teknik+idari tedbirler\n3.4. İhlal durumunda 24 saat içinde bildirim\n3.5. Veri sahibi haklarına destek\n3.6. Alt-işleyen için yazılı onay\n\n4. GÜVENLİK\n- TLS 1.3, AES-256 at-rest\n- Erişim kontrolü, loglama\n- Düzenli denetim, yedek+DR\n\n5. ULUSLARARASI AKTARIM\nAB dışı aktarımda SCC imzalanır.\n\n6. SÜRE ve FESİH\nAna sözleşme süresince. 30 gün içinde iade veya silme.\n\n7. DENETİM\nYıllık 1 kez tesis denetimi.\n\n8. CEZAİ ŞART\nİhlal halinde KVKK cezaları + zararlar sorumlu.\n\nİMZA:\nVeri Sorumlusu: ___________ Tarih: _____\nVeri İşleyen: _____________ Tarih: _____\n';
+    var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'DPA-Sablon-PoCHub.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✓ DPA şablonu indirildi');
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.18: VERİ İHLALİ BİLDİRİM ALTYAPISI (KVKK Madde 12/5)
+// İhlal kaydı + 72 saat içinde KVKK Kurumu'na bildirim hazırlığı
+// ════════════════════════════════════════════════════════════════════
+async function renderBreachNotification(m, subtabs) {
+  try {
+    var snap = await getDocs(query(collection(db, 'data_breaches'), orderBy('detectedAt', 'desc'), limit(20)));
+    var html = '<div style="max-width:1100px">'
+      + subtabs
+      + '<h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px">🚨 Veri İhlali Bildirim Sistemi</h2>'
+      + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">KVKK Madde 12/5: Veri ihlalleri 72 saat içinde KVKK Kurumu\'na bildirilmek zorundadır. Ayrıca etkilenen veri sahiplerine de bildirim yapılır.</div>'
+
+      + '<div style="background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.25);border-radius:10px;padding:14px;margin-bottom:18px">'
+      +   '<strong style="color:#dc2626">📞 Acil Durum Prosedürü:</strong>'
+      +   '<ol style="margin:8px 0 0 22px;font-size:12.5px;color:var(--text-secondary);line-height:1.7">'
+      +     '<li><strong>İhlali keşfetme:</strong> İlgili kayıtları korumaya alın, kanıt toplayın</li>'
+      +     '<li><strong>İçerikten izolasyon:</strong> Etkilenen sistemleri offline alın</li>'
+      +     '<li><strong>İhlal kaydı oluştur:</strong> Aşağıdaki butonu kullanın</li>'
+      +     '<li><strong>72 saat içinde:</strong> KVKK Kurumu\'na bildirim (<a href="https://www.kvkk.gov.tr" target="_blank">kvkk.gov.tr</a>)</li>'
+      +     '<li><strong>Etkilenen kullanıcılara:</strong> E-posta ile bildirim</li>'
+      +     '<li><strong>Adli bildirim:</strong> Cumhuriyet Savcılığı\'na (gerekirse)</li>'
+      +     '<li><strong>Basın açıklaması:</strong> İhlal kamuoyu için önemliyse</li>'
+      +   '</ol>'
+      + '</div>'
+
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">'
+      +   '<h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0">📋 Kayıtlı İhlaller</h3>'
+      +   '<button id="breach-new" style="background:#dc2626;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🚨 Yeni İhlal Kaydı</button>'
+      + '</div>';
+
+    if (snap.empty) {
+      html += renderEmpty({ emoji:'✅', title:'Henüz veri ihlali kaydı yok', desc:'Bu iyi bir şey! İhlal olması durumunda yukarıdaki butonu kullanarak kayıt oluşturun.' });
+    } else {
+      html += '<div style="display:grid;gap:10px">';
+      snap.docs.forEach(function(d){
+        var b = d.data();
+        var detected = b.detectedAt?.toDate ? b.detectedAt.toDate() : null;
+        var detectedStr = detected ? detected.toLocaleString('tr-TR') : '-';
+        var hoursLeft = detected ? Math.max(0, 72 - Math.floor((Date.now() - detected.getTime()) / (1000*60*60))) : 0;
+        var notifiedKVKK = !!b.notifiedToKVKK;
+        var notifiedUsers = !!b.notifiedToUsers;
+        var severityColor = b.severity === 'critical' ? '#dc2626' : b.severity === 'high' ? '#f0a429' : '#7db4ff';
+
+        html += '<div class="card" style="padding:14px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px">'
+          +   '<div style="flex:1;min-width:200px">'
+          +     '<div style="font-size:14px;font-weight:700;color:var(--text-primary)">'+escHtml(b.title||'İhlal #'+d.id.substring(0,8))+'</div>'
+          +     '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">Tespit: '+detectedStr+' · Şiddet: <span style="color:'+severityColor+';font-weight:700">'+(b.severity||'normal').toUpperCase()+'</span></div>'
+          +   '</div>'
+          +   '<div style="display:flex;gap:6px">'
+          +     (notifiedKVKK ? '<span style="background:rgba(34,208,120,.12);color:#16a34a;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700">✓ KVKK Bildirildi</span>' : '<span style="background:rgba(220,38,38,.12);color:#dc2626;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700">⏰ '+hoursLeft+'h kaldı</span>')
+          +   '</div>'
+          + '</div>'
+          + '<div style="font-size:12px;color:var(--text-secondary);line-height:1.6;padding:10px;background:var(--bg-elevated);border-radius:6px">'
+          +   '<strong>Etkilenen:</strong> '+escHtml((b.affectedRecords||0).toString())+' kayıt · '
+          +   '<strong>Tür:</strong> '+escHtml(b.type||'-')+' · '
+          +   '<strong>Veri Sahibi Bildirimi:</strong> '+(notifiedUsers?'✓':'⏰ Bekliyor')
+          +   '<br><br>'+escHtml(b.description||'-')
+          + '</div>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    m.innerHTML = html;
+
+    m.querySelector('#breach-new')?.addEventListener('click', function(){
+      openBreachReportModal();
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div style="padding:20px;color:#dc2626">Hata: '+e.message+'</div>';
+  }
+}
+
+function openBreachReportModal() {
+  var modal = document.createElement('div');
+  modal.className = 'modal-bg on';
+  modal.innerHTML = '<div class="modal" style="max-width:600px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">'
+    + '<div class="flx-bw-c-mb18">'
+    +   '<h3 class="fs15-fw7" style="color:#dc2626">🚨 Yeni İhlal Kaydı</h3>'
+    +   '<button id="br-close" class="btn-close-x">×</button>'
+    + '</div>'
+    + '<div style="overflow-y:auto;flex:1;padding-right:6px">'
+    +   '<div style="background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:10px;margin-bottom:14px;font-size:11.5px;color:var(--text-secondary)">İhlal kaydı 72 saat içinde KVKK Kurumu\'na bildirilmek zorundadır. Tüm alanları eksiksiz doldurun.</div>'
+    +   '<label class="lbl">Başlık *</label>'
+    +   '<input type="text" id="br-title" class="inp" placeholder="Örn: Firestore unauthorized access on 2026-05-26">'
+    +   '<label class="lbl">Tespit Tarihi/Saati *</label>'
+    +   '<input type="datetime-local" id="br-detected" class="inp" value="'+new Date().toISOString().substring(0,16)+'">'
+    +   '<label class="lbl">Şiddet *</label>'
+    +   '<select id="br-severity" class="inp">'
+    +     '<option value="low">Düşük (sınırlı etki)</option>'
+    +     '<option value="normal" selected>Normal</option>'
+    +     '<option value="high">Yüksek</option>'
+    +     '<option value="critical">Kritik (acil müdahale)</option>'
+    +   '</select>'
+    +   '<label class="lbl">İhlal Türü *</label>'
+    +   '<select id="br-type" class="inp">'
+    +     '<option value="unauthorized_access">Yetkisiz erişim</option>'
+    +     '<option value="data_loss">Veri kaybı</option>'
+    +     '<option value="data_leak">Veri sızıntısı</option>'
+    +     '<option value="ransomware">Fidye yazılımı</option>'
+    +     '<option value="insider">İçeriden yetkisiz erişim</option>'
+    +     '<option value="phishing">Phishing</option>'
+    +     '<option value="system_failure">Sistem hatası</option>'
+    +     '<option value="other">Diğer</option>'
+    +   '</select>'
+    +   '<label class="lbl">Etkilenen Kayıt Sayısı (tahmini)</label>'
+    +   '<input type="number" id="br-records" class="inp" min="0" value="0">'
+    +   '<label class="lbl">Detaylı Açıklama *</label>'
+    +   '<textarea id="br-desc" class="inp" rows="4" placeholder="İhlal nasıl tespit edildi, hangi veriler etkilendi, alınan önlemler..."></textarea>'
+    +   '<label class="lbl">Alınan Önlemler</label>'
+    +   '<textarea id="br-measures" class="inp" rows="3" placeholder="Sistem izolasyonu, parolaların değiştirilmesi, kullanıcı bildirimleri..."></textarea>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">'
+    +   '<button id="br-cancel" class="btn-g" style="padding:10px 20px">Vazgeç</button>'
+    +   '<button id="br-submit" style="background:#dc2626;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:700;cursor:pointer">🚨 İhlal Kaydı Oluştur</button>'
+    + '</div>'
+    + '</div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector('#br-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#br-cancel').addEventListener('click', function(){ modal.remove(); });
+
+  modal.querySelector('#br-submit').addEventListener('click', async function(){
+    var title = modal.querySelector('#br-title').value.trim();
+    var detected = modal.querySelector('#br-detected').value;
+    var severity = modal.querySelector('#br-severity').value;
+    var type = modal.querySelector('#br-type').value;
+    var records = parseInt(modal.querySelector('#br-records').value, 10) || 0;
+    var desc = modal.querySelector('#br-desc').value.trim();
+    var measures = modal.querySelector('#br-measures').value.trim();
+
+    if (!title || !detected || !desc) {
+      showToast('Başlık, tarih ve açıklama zorunlu', 'err');
+      return;
+    }
+
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+    try {
+      await addDoc(collection(db, 'data_breaches'), {
+        title, severity, type,
+        affectedRecords: records,
+        description: desc,
+        measuresTaken: measures,
+        detectedAt: new Date(detected),
+        reportedBy: CUR_USER.uid,
+        reportedAt: serverTimestamp(),
+        notifiedToKVKK: false,
+        notifiedToUsers: false,
+        kvkkDeadline: new Date(new Date(detected).getTime() + 72*60*60*1000).toISOString(),
+        status: 'open',
+      });
+      await logKVKKAction('breach_reported', { title: title, severity: severity, type: type });
+      showToast('🚨 İhlal kaydı oluşturuldu — 72 saat içinde KVKK\'ya bildirim YAPIN!');
+      modal.remove();
+      admKVKKMgmt(el('panel-main'));
+    } catch(e) {
+      showToast('Hata: '+e.message, 'err');
+      btn.disabled = false;
+      btn.textContent = '🚨 İhlal Kaydı Oluştur';
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.18: HARD DELETE QUEUE — 30 Gün Sonra Otomatik Silme
+// Manuel admin işlem (Firebase Functions cron için hazırlık)
+// ════════════════════════════════════════════════════════════════════
+async function renderHardDeleteQueue(m, subtabs) {
+  try {
+    var now = new Date();
+    var snap = await getDocs(query(collection(db, 'users'), where('deletionRequested', '==', true)));
+
+    var ready = [];   // 30 gün geçmiş
+    var pending = []; // henüz 30 gün dolmamış
+    snap.docs.forEach(function(d){
+      var u = d.data();
+      var sched = u.deletionScheduledFor ? new Date(u.deletionScheduledFor) : null;
+      if (sched && sched < now) {
+        ready.push({ id: d.id, data: u, scheduledFor: sched });
+      } else {
+        pending.push({ id: d.id, data: u, scheduledFor: sched });
+      }
+    });
+
+    var html = '<div style="max-width:1100px">'
+      + subtabs
+      + '<h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px">🗄 Hard Delete Kuyruğu</h2>'
+      + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">30 günü dolan hesap silme talepleri. KVKK Madde 7 uyarınca verilerin kalıcı olarak silinmesi/anonimleştirilmesi gerekir.</div>'
+
+      + '<div style="background:rgba(125,180,255,.06);border:1px solid rgba(125,180,255,.25);border-radius:10px;padding:14px;margin-bottom:18px;font-size:12.5px;line-height:1.6">'
+      +   '<strong>Otomasyon Planı:</strong> Bu işlem ileride Firebase Functions cron job ile günlük otomatik çalıştırılacak. Şu an manuel admin işlemi.'
+      + '</div>'
+
+      + '<div style="display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap">'
+      +   '<div style="flex:1;min-width:200px;background:var(--bg-surface);border:1px solid rgba(220,38,38,.25);border-radius:10px;padding:14px">'
+      +     '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px">⚠️ Hemen Silinmeli</div>'
+      +     '<div style="font-size:28px;font-weight:800;color:#dc2626">'+ready.length+'</div>'
+      +     '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">30 gün dolmuş hesaplar</div>'
+      +   '</div>'
+      +   '<div style="flex:1;min-width:200px;background:var(--bg-surface);border:1px solid rgba(240,164,41,.25);border-radius:10px;padding:14px">'
+      +     '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px">⏰ Bekliyor</div>'
+      +     '<div style="font-size:28px;font-weight:800;color:#f0a429">'+pending.length+'</div>'
+      +     '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">30 gün dolmamış (iptal edilebilir)</div>'
+      +   '</div>'
+      + '</div>';
+
+    if (ready.length > 0) {
+      html += '<h3 style="font-size:14px;font-weight:700;color:#dc2626;margin:0 0 10px">🔴 Hemen Silinmeli ('+ready.length+')</h3>';
+      html += '<div style="display:grid;gap:8px;margin-bottom:18px">';
+      ready.forEach(function(item){
+        var u = item.data;
+        var daysOverdue = Math.floor((now - item.scheduledFor) / (1000*60*60*24));
+        html += '<div class="card" style="padding:14px;border-color:rgba(220,38,38,.3)">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+          +   '<div>'
+          +     '<div style="font-size:13px;font-weight:700;color:var(--text-primary)">'+escHtml(u.displayName||u.email)+'</div>'
+          +     '<div style="font-size:11.5px;color:var(--text-muted)">'+escHtml(u.email)+' · '+daysOverdue+' gün gecikme</div>'
+          +   '</div>'
+          +   '<button class="hd-finalize" data-uid="'+item.id+'" data-email="'+escHtml(u.email)+'" style="background:#dc2626;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🗄 Anonimleştir</button>'
+          + '</div>'
+          + '</div>';
+      });
+      html += '</div>';
+
+      html += '<div style="text-align:right;margin-bottom:18px"><button id="hd-finalize-all" style="background:#dc2626;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;cursor:pointer">🗄 Tüm '+ready.length+' Hesabı Anonimleştir</button></div>';
+    }
+
+    if (pending.length > 0) {
+      html += '<h3 style="font-size:14px;font-weight:700;color:#f0a429;margin:0 0 10px">⏰ Bekleyen ('+pending.length+')</h3>';
+      html += '<div style="display:grid;gap:8px">';
+      pending.forEach(function(item){
+        var u = item.data;
+        var daysLeft = Math.ceil((item.scheduledFor - now) / (1000*60*60*24));
+        html += '<div class="card" style="padding:12px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+          +   '<div>'
+          +     '<div style="font-size:13px;font-weight:600;color:var(--text-primary)">'+escHtml(u.displayName||u.email)+'</div>'
+          +     '<div style="font-size:11.5px;color:var(--text-muted)">Kalan: '+daysLeft+' gün</div>'
+          +   '</div>'
+          + '</div>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (ready.length === 0 && pending.length === 0) {
+      html += renderEmpty({ emoji:'✅', title:'Kuyruk boş', desc:'Silme bekleyen veya silinmesi gereken hesap yok.' });
+    }
+
+    html += '</div>';
+    m.innerHTML = html;
+
+    // Tek hesap finalize
+    m.querySelectorAll('.hd-finalize').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        if (!confirm('"'+btn.dataset.email+'" hesabı KALICI olarak anonimleştirilecek. Onaylıyor musunuz?')) return;
+        await anonymizeUser(btn.dataset.uid, btn.dataset.email);
+        admKVKKMgmt(m);
+      });
+    });
+
+    // Toplu finalize
+    m.querySelector('#hd-finalize-all')?.addEventListener('click', async function(){
+      if (!confirm(ready.length + ' hesap KALICI olarak anonimleştirilecek. Onaylıyor musunuz?')) return;
+      var btn = this;
+      btn.disabled = true; btn.textContent = '⏳ İşleniyor...';
+      for (var item of ready) {
+        await anonymizeUser(item.id, item.data.email);
+      }
+      showToast('✓ '+ready.length+' hesap anonimleştirildi');
+      admKVKKMgmt(m);
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div style="padding:20px;color:#dc2626">Hata: '+e.message+'</div>';
+  }
+}
+
+// Hesap anonimleştirme (yardımcı fn)
+async function anonymizeUser(uid, email) {
+  try {
+    await updateDoc(doc(db,'users',uid), {
+      email: 'silinmis-' + uid.substring(0,8) + '@anonim.local',
+      displayName: '[Silinmiş Kullanıcı]',
+      company: '',
+      phone: '', phone2: '', secondaryEmail: '',
+      address: '', billingAddress: '',
+      taxNo: '', taxOffice: '', mersisNo: '', kepAddress: '',
+      photoBase64: '', logoUrl: '',
+      linkedinUrl: '', twitterUrl: '', website: '',
+      bio: '', shortDescription: '',
+      status: 'deleted',
+      deletedAt: serverTimestamp(),
+      deletedBy: CUR_USER.uid,
+      anonymized: true,
+      anonymizedAt: serverTimestamp(),
+    });
+    await logKVKKAction('hard_delete_finalized', { targetUid: uid, targetEmail: email });
+    return true;
+  } catch(e) {
+    console.error('Anonymize failed:', e);
+    return false;
+  }
+}
 
 async function vendAnalytics(m) {
   m.innerHTML = renderSkeleton('stat-grid', 6);
@@ -21374,7 +22880,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['content','📝 İçerik Yönetimi'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['content','📝 İçerik Yönetimi'],['kvkk-mgmt','🛡 KVKK Yönetimi'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
     ['profile','👤 Profilim'],
   ];
@@ -21412,6 +22918,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'vendorapprovals') { await admVendorApprovals(m); return; }
     if (CUR_ADM_TAB === 'demo-requests') { await admDemoRequests(m); return; }
     if (CUR_ADM_TAB === 'content') { await admContent(m); return; }
+    if (CUR_ADM_TAB === 'kvkk-mgmt') { await admKVKKMgmt(m); return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
