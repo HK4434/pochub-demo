@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.18 | pochub.co -->
+<!-- PoCHub v5.19 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -591,6 +591,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <div class="scr" id="scr-vendor-public"></div>
 <div class="scr" id="scr-demo"></div>
 <div class="scr" id="scr-help"></div>
+<div class="scr" id="scr-legal"></div>
 
 <!-- AUTH MODAL -->
 <div class="modal-bg" id="auth-modal">
@@ -678,7 +679,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.18';
+const VERSION = 'v5.19';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -913,6 +914,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.19': ['HOTFIX: Footer yasal linkler tiklayinca bos sayfa - hashchange listener eksikti + renderLegalPage layout duzeltmesi (nav header korunur, scroll calisir).'],
   'v5.18': ['MAJOR: KVKK/GDPR Faz 3 - Guvenlik & sureic (client-side AES sifreleme, VERBIS envanter export, DPA template, ihlal bildirim, hard delete, Firestore rules dok).'],
   'v5.17': ['MAJOR: KVKK/GDPR Faz 2 - Kullanici haklari (Verilerimi Indir JSON export, Hesabimi Sil right-to-be-forgotten, audit logs, veri masking, bildirim tercihleri).'],
   'v5.16': ['MAJOR: KVKK/GDPR Faz 1 - Aydinlatma Metni, Kullanim Kosullari, Cerez Politikasi, Cookie Consent Banner, kayit onaylari, footer linkleri.'],
@@ -31582,14 +31584,15 @@ function parseAndNavigate(hash) {
 // v5.16: LEGAL PAGE RENDER — Aydınlatma, Terms, Cookie, KVKK, İletişim
 // ════════════════════════════════════════════════════════════════════
 async function renderLegalPage(type) {
-  // Önce mevcut ekranı gizle, legal container oluştur veya yeniden kullan
+  // Önce mevcut ekranı gizle
   document.querySelectorAll('.scr').forEach(function(s){ s.classList.remove('on'); });
   var container = document.getElementById('scr-legal');
   if (!container) {
+    // Fallback - eğer HTML'de yoksa oluştur
     container = document.createElement('div');
     container.id = 'scr-legal';
     container.className = 'scr';
-    document.querySelector('.wrap')?.appendChild(container);
+    document.body.appendChild(container);
   }
   container.classList.add('on');
   container.innerHTML = '<div class="legal-page"><div class="loading"><div class="spinner"></div>Yükleniyor...</div></div>';
@@ -31838,6 +31841,8 @@ function getDefaultContact() {
   + '<p>Başvurularınız <strong>30 gün içinde</strong> yanıtlanır.</p>';
 }
 window.addEventListener('popstate', function() { parseAndNavigate(location.hash); });
+// v5.19: hashchange listener - location.hash programatik set edilse de fire eder
+window.addEventListener('hashchange', function() { parseAndNavigate(location.hash); });
 if (location.hash && location.hash.length > 1) {
   window.addEventListener('load', function() {
     setTimeout(function() { parseAndNavigate(location.hash); }, 1000);
@@ -31954,14 +31959,24 @@ window.openCookieSettings = function() {
 
 // ════════════════════════════════════════════════════════════════════
 // v5.16: LEGAL LINKS — Footer linklerine click handler
+// v5.19: Event delegation - dinamik olarak eklenen linkler için (auth form vb.)
 // ════════════════════════════════════════════════════════════════════
 function initLegalLinks() {
-  document.querySelectorAll('[data-legal]').forEach(function(link){
-    link.addEventListener('click', function(e){
-      e.preventDefault();
-      var type = link.dataset.legal;
+  // Sadece bir kere bağla - document seviyesinde delegation
+  if (window._legalLinksBound) return;
+  window._legalLinksBound = true;
+  document.addEventListener('click', function(e){
+    var link = e.target.closest('[data-legal]');
+    if (!link) return;
+    e.preventDefault();
+    var type = link.dataset.legal;
+    // Hash güncelle + direkt çağır (hashchange listener da yedek)
+    if (location.hash !== '#legal/' + type) {
       location.hash = 'legal/' + type;
-    });
+    } else {
+      // Hash zaten doğru ama sayfa render edilmemiş - direkt çağır
+      renderLegalPage(type);
+    }
   });
 }
 
