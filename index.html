@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.19 | pochub.co -->
+<!-- PoCHub v5.20 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -679,7 +679,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.19';
+const VERSION = 'v5.20';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -914,6 +914,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.20': ['UX: KVKK Yonetimi tab\'ina "Yasal Sayfa Icerikleri" alt tabi eklendi - tum KVKK islevleri tek menude. Icerik Yonetimi\'ndeki versiyon korundu.'],
   'v5.19': ['HOTFIX: Footer yasal linkler tiklayinca bos sayfa - hashchange listener eksikti + renderLegalPage layout duzeltmesi (nav header korunur, scroll calisir).'],
   'v5.18': ['MAJOR: KVKK/GDPR Faz 3 - Guvenlik & sureic (client-side AES sifreleme, VERBIS envanter export, DPA template, ihlal bildirim, hard delete, Firestore rules dok).'],
   'v5.17': ['MAJOR: KVKK/GDPR Faz 2 - Kullanici haklari (Verilerimi Indir JSON export, Hesabimi Sil right-to-be-forgotten, audit logs, veri masking, bildirim tercihleri).'],
@@ -17304,11 +17305,12 @@ async function showAccountDeleteModal() {
 // v5.17: ADMIN — KVKK YÖNETİMİ
 // Hesap silme talepleri, audit logs filtreleme, consent stats
 // ════════════════════════════════════════════════════════════════════
-var _kvkkMgmtTab = 'deletions';
+var _kvkkMgmtTab = 'legal-content';
 async function admKVKKMgmt(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
 
   var subtabs = '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap">'
+    + '<button class="kvkk-tab' + (_kvkkMgmtTab==='legal-content'?' on':'') + '" data-t="legal-content" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='legal-content'?'#3b82f6':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='legal-content'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">📝 Yasal Sayfa İçerikleri</button>'
     + '<button class="kvkk-tab' + (_kvkkMgmtTab==='deletions'?' on':'') + '" data-t="deletions" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='deletions'?'#dc2626':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='deletions'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">🗑 Hesap Silme</button>'
     + '<button class="kvkk-tab' + (_kvkkMgmtTab==='audits'?' on':'') + '" data-t="audits" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='audits'?'#7db4ff':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='audits'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">📜 Audit Logs</button>'
     + '<button class="kvkk-tab' + (_kvkkMgmtTab==='consents'?' on':'') + '" data-t="consents" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='consents'?'#22d078':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='consents'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">📝 Rıza İstatistikleri</button>'
@@ -17318,7 +17320,9 @@ async function admKVKKMgmt(m) {
     + '<button class="kvkk-tab' + (_kvkkMgmtTab==='hard-delete'?' on':'') + '" data-t="hard-delete" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:' + (_kvkkMgmtTab==='hard-delete'?'#475569':'var(--bg-surface)') + ';color:' + (_kvkkMgmtTab==='hard-delete'?'#fff':'var(--text-primary)') + ';font-size:13px;font-weight:600;cursor:pointer">🗄 Hard Delete</button>'
     + '</div>';
 
-  if (_kvkkMgmtTab === 'deletions') {
+  if (_kvkkMgmtTab === 'legal-content') {
+    await renderLegalAdmin(m, subtabs);
+  } else if (_kvkkMgmtTab === 'deletions') {
     await renderDeletionRequests(m, subtabs);
   } else if (_kvkkMgmtTab === 'audits') {
     await renderAuditLogsAdmin(m, subtabs);
@@ -22882,7 +22886,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['content','📝 İçerik Yönetimi'],['kvkk-mgmt','🛡 KVKK Yönetimi'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['content','📝 İçerik Yönetimi'],['kvkk-mgmt','🛡 KVKK & Yasal Sayfalar'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
     ['profile','👤 Profilim'],
   ];
@@ -29164,7 +29168,12 @@ async function openLegalEditModal(docId, title) {
       }, { merge: true });
       showToast('✓ "'+title+'" başarıyla kaydedildi');
       modal.remove();
-      admContent(el('panel-main'));
+      // v5.20: Hangi panelden açıldıysa onu tazele
+      if (CUR_ADM_TAB === 'kvkk-mgmt') {
+        admKVKKMgmt(el('panel-main'));
+      } else {
+        admContent(el('panel-main'));
+      }
     } catch(e) {
       showToast('Hata: '+e.message, 'err');
       btn.disabled = false; btn.textContent = '💾 Kaydet & Yayınla';
