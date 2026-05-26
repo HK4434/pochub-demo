@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.14 | pochub.co -->
+<!-- PoCHub v5.15 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -566,7 +566,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.14';
+const VERSION = 'v5.15';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -801,6 +801,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.15': ['CRITICAL FIX: Admin Onayla buton bulunamiyordu - needsApproval kosulundan status active hariç tutmasi kaldirildi. publishStatus awaiting_admin tek kosul.'],
   'v5.14': ['MAJOR: Profil genişlet (vergi no/dairesi, KEP, fatura bilgileri, vendor: cal.sayisi/kurulus/sektor/sertifikalar, customer: sektor/sirket buyuklugu/karar verici), admin urun onayi filtre empty state ipucu.'],
   'v5.13': ['MAJOR: Production hazirlik final - Demo data temizleme araci, sitemap update, PWA manifest, kalan loading state skeletonlari, landing CTA optimization.'],
   'v5.12': ['MAJOR: UX polish - empty state illustrations, loading skeletons (shimmer), toast queue management, tooltip helper.'],
@@ -21800,10 +21801,16 @@ async function admUsers(m) {
 
 async function openAdmProdEditModal(prodId, name, cat, desc, country) {
   var cats = await getCategories();
+  // v5.15: Ürünün mevcut durumunu çek (onay butonu göstermek için)
+  var prodSnap = await getDoc(doc(db,'products',prodId));
+  var prod = prodSnap.exists() ? prodSnap.data() : {};
+  var needsAdminApproval = (prod.publishStatus||'awaiting_admin') === 'awaiting_admin' &&
+    prod.status !== 'rejected' && prod.status !== 'archived';
+
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.innerHTML =
-    '<div class="modal" style="max-width:440px">' +
+    '<div class="modal" style="max-width:480px">' +
     '<div class="flx-bw-c-mb18">' +
     '<h3 class="fs15-fw7">Ürün Düzenle</h3>' +
     '<button id="ape-close" class="btn-close-x">×</button>' +
@@ -21819,23 +21826,102 @@ async function openAdmProdEditModal(prodId, name, cat, desc, country) {
     '<label class="lbl">Açıklama</label>' +
     '<textarea class="inp" id="ape-desc" rows="3" style="resize:none">'+( desc||'')+'</textarea>' +
     '<div id="ape-err" class="mt10"></div>' +
+    '<div id="ape-chain" style="margin-top:14px;padding:10px;background:var(--bg-elevated);border-radius:6px;font-size:12px;color:var(--text-secondary)">Zincir bilgisi yükleniyor...</div>' +
+    // v5.15: Admin onay kararı bölümü
+    (needsAdminApproval ?
+      '<div style="margin-top:14px;padding:14px;background:linear-gradient(135deg,rgba(125,180,255,.08),rgba(125,180,255,.02));border:1px solid rgba(125,180,255,.25);border-radius:8px">' +
+        '<div style="font-size:12.5px;font-weight:700;color:#2563eb;margin-bottom:8px">🔍 Admin Onayı Bekliyor</div>' +
+        '<div style="font-size:11.5px;color:var(--text-secondary);line-height:1.5;margin-bottom:10px">Bu ürün katalogda yayınlanmadan önce admin onayı bekliyor. Aşağıdan karar verebilirsiniz:</div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<button id="ape-approve" style="flex:1;background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer">✓ Onayla</button>' +
+          '<button id="ape-reject" style="flex:1;background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer">✕ Reddet</button>' +
+        '</div>' +
+      '</div>'
+      : '') +
     '<div style="display:flex;gap:8px;margin-top:16px">' +
-    '<div id="ape-chain" style="margin-bottom:12px;padding:10px;background:var(--bg-elevated);border-radius:6px;font-size:12px;color:var(--text-secondary)">Zincir bilgisi yükleniyor...</div>' +
     '<button class="btn-g" id="ape-cancel" style="flex:1;padding:10px">Vazgeç</button>' +
-    '<button class="btn-p" id="ape-save" style="flex:2;padding:10px">Kaydet</button>' +
+    '<button class="btn-p" id="ape-save" style="flex:2;padding:10px">💾 Kaydet</button>' +
     '</div></div>';
 
   document.body.appendChild(modal);
   modal.querySelector('#ape-close').addEventListener('click',()=>modal.remove());
+
+  // v5.15: Onayla butonu handler
+  modal.querySelector('#ape-approve')?.addEventListener('click', async function(){
+    if (!confirm('"'+name+'" ürününü onaylamak istiyor musunuz? Onaylanan ürün katalogda görünür hale gelecek.')) return;
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Onaylanıyor...';
+    try {
+      await updateDoc(doc(db, 'products', prodId), {
+        status: 'active',
+        publishStatus: 'ready',
+        approvedAt: serverTimestamp(),
+        approvedBy: CUR_USER.uid,
+      });
+      // Vendor bildirimi
+      if (prod.vendorId) {
+        await addDoc(collection(db,'notifications'), {
+          userId: prod.vendorId, type:'product_approved',
+          title:'Ürününüz Onaylandı 🎉',
+          message:'"'+name+'" ürününüz incelendi ve PoCHub kataloğunda yayınlandı!',
+          productId: prodId, productName: name,
+          senderId: CUR_USER.uid,
+          senderName: CUR_PROFILE?.displayName||'PoCHub Admin',
+          senderEmail: CUR_USER.email || '',
+          senderPhoto: CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl || '',
+          read:false, createdAt:serverTimestamp(),
+        });
+      }
+      showToast('✓ Ürün onaylandı, vendora bildirim gönderildi');
+      modal.remove();
+      // Listeyi tazele
+      if (typeof admProducts === 'function') admProducts(el('panel-main'));
+    } catch(e) {
+      showToast('Hata: '+e.message, 'err');
+      btn.disabled = false; btn.textContent = '✓ Onayla';
+    }
+  });
+
+  modal.querySelector('#ape-reject')?.addEventListener('click', async function(){
+    var reason = prompt('Reddetme gerekçesi (vendora gösterilecek):');
+    if (reason === null) return;
+    var btn = this;
+    btn.disabled = true; btn.textContent = '⏳ Reddediliyor...';
+    try {
+      await updateDoc(doc(db, 'products', prodId), {
+        status: 'rejected',
+        rejectionReason: reason || '',
+        rejectedAt: serverTimestamp(),
+        rejectedBy: CUR_USER.uid,
+      });
+      if (prod.vendorId) {
+        await addDoc(collection(db,'notifications'), {
+          userId: prod.vendorId, type:'product_rejected',
+          title:'Ürün Başvurusu Hakkında',
+          message:'"'+name+'" ürününüz şu an için onaylanamadı.'+(reason?' Gerekçe: '+reason:''),
+          productId: prodId, productName: name,
+          senderId: CUR_USER.uid,
+          senderName: CUR_PROFILE?.displayName||'PoCHub Admin',
+          senderEmail: CUR_USER.email || '',
+          senderPhoto: CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl || '',
+          read:false, createdAt:serverTimestamp(),
+        });
+      }
+      showToast('✕ Ürün reddedildi, vendora bildirim gönderildi');
+      modal.remove();
+      if (typeof admProducts === 'function') admProducts(el('panel-main'));
+    } catch(e) {
+      showToast('Hata: '+e.message, 'err');
+      btn.disabled = false; btn.textContent = '✕ Reddet';
+    }
+  });
 
   // Zincir bilgisi yükle
   (async function() {
     var chainEl = modal.querySelector('#ape-chain');
     if (!chainEl) return;
     try {
-      var pSnap = await getDoc(doc(db,'products',prodId));
-      if (!pSnap.exists()) { chainEl.textContent='Ürün bulunamadı.'; return; }
-      var pd = pSnap.data();
+      var pd = prod; // Zaten yukarıda çekildi
       var origin = pd.origin||'domestic';
       var dists  = pd.distributors||[];
       var ints   = pd.integrators||[];
@@ -21978,24 +22064,26 @@ async function admProducts(m) {
       var rejectBtn  = '';
       var archiveBtn = '';
 
-      // Onay gerekli: publishStatus awaiting_admin VE status aktif değil
-      // v5.07 FIX: status='active' ise zaten onaylanmış, onay butonu gösterme
+      // v5.15 CRITICAL FIX: Onay kararı SADECE publishStatus'a gore verilmeli
+      // Eski v5.07 fix yanlisti: status='active' ürünleri de eğer publishStatus='awaiting_admin' ise onay bekliyor
+      // status: vendor portföyü icin (active/archived/rejected)
+      // publishStatus: yayın için (awaiting_admin/awaiting_integrator/ready)
+      // Bu iki ALAN BAĞIMSIZ - status=active iken bile publishStatus=awaiting_admin olabilir
       var needsApproval = (p.publishStatus||'awaiting_admin') === 'awaiting_admin' &&
-        p.status !== 'rejected' && p.status !== 'archived' && p.status !== 'active';
+        p.status !== 'rejected' && p.status !== 'archived';
       if (needsApproval) {
-        if ((p.publishStatus||'awaiting_admin') === 'awaiting_integrator') {
-          approveBtn = '<button class="btn-sm" data-id="'+p.id+'" data-ps="awaiting_integrator" style="background:rgba(255,112,112,.08);color:#ff7070;border:1px solid rgba(255,112,112,.2);border-radius:4px;padding:4px 8px;font-size:11px;cursor:default" title="Entegratör ataması bekleniyor">⛔ Zincir Eksik</button>';
-        } else {
-          // v5.07 FIX: Onayla ve Reddet butonları DOĞRU rollere
-          approveBtn = '<button class="ap-appr" data-id="'+p.id+
-            '" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+
-            '" data-pn="'+p.name+'" data-vid="'+(p.vendorId||'')+
-            '" style="background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">✓ Onayla</button>';
-          rejectBtn = '<button class="ap-rej" data-id="'+p.id+
-            '" data-pn="'+p.name+'" data-vid="'+(p.vendorId||'')+
-            '" style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-left:6px">✕ Reddet</button>';
-        }
-      } else if (p.status === 'active') {
+        // Onayla ve Reddet butonları
+        approveBtn = '<button class="ap-appr" data-id="'+p.id+
+          '" data-ve="'+(p.vendorEmail||'')+'" data-vn="'+(p.vendorName||'')+
+          '" data-pn="'+p.name+'" data-vid="'+(p.vendorId||'')+
+          '" style="background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">✓ Onayla</button>';
+        rejectBtn = '<button class="ap-rej" data-id="'+p.id+
+          '" data-pn="'+p.name+'" data-vid="'+(p.vendorId||'')+
+          '" style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-left:6px">✕ Reddet</button>';
+      } else if ((p.publishStatus||'') === 'awaiting_integrator') {
+        // Entegrator bekleyen - sadece bilgi
+        approveBtn = '<button class="btn-sm" data-id="'+p.id+'" data-ps="awaiting_integrator" style="background:rgba(255,112,112,.08);color:#ff7070;border:1px solid rgba(255,112,112,.2);border-radius:4px;padding:4px 8px;font-size:11px;cursor:default" title="Entegratör ataması bekleniyor">⛔ Zincir Eksik</button>';
+      } else if (p.status === 'active' && (p.publishStatus||'') === 'ready') {
         archiveBtn = '<button class="ap-arc" data-id="'+p.id+'" style="background:rgba(15,23,42,.04);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">📦 Arşivle</button>';
       }
 
