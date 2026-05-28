@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.30 | pochub.co -->
+<!-- PoCHub v5.31 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.30';
+const VERSION = 'v5.31';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.31': ['FEATURE: Test kullanici email-verify bypass + Admin manuel email dogrulama mudahalesi (Spark uyumlu, Firestore flag).'],
   'v5.30': ['UI: Tema temizligi tamamlama - kalan dark theme kalintilari taranip duzeltildi + test framework genisletildi (19->28 test).'],
   'v5.29': ['HOTFIX: Etkinlikler sayfasi ve PoC Talebi modal hala koyu temalı idi - light theme uygulandi + yeni test framework testleri.'],
   'v5.28': ['INFRA: Seed Test Framework v1.0 - etkilesimli otomatik testler, iframe DOM inspection, pass/fail raporu.'],
@@ -5071,7 +5072,7 @@ async function renderHome() {
     listEl.querySelectorAll('.ev-reg-home').forEach(b => b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       if (!CUR_USER) { openAuthModal('customer',''); return; }
-      if (!CUR_USER.emailVerified && !CUR_PROFILE?.emailVerified) { showToast('Lütfen önce e-postanızı doğrulayın.','err'); return; }
+      if (!isTestAccount() && !CUR_USER.emailVerified && !CUR_PROFILE?.emailVerified && CUR_PROFILE?.emailVerifiedByAdmin !== true) { showToast('Lütfen önce e-postanızı doğrulayın.','err'); return; }
       registerForEvent(b.dataset.id, b, b.dataset.vendorEmail, b.dataset.vendorName, b.dataset.title);
     }));
   }
@@ -6469,7 +6470,7 @@ async function openEventDetail(eventId) {
     if (regBtn) {
       regBtn.addEventListener('click', () => {
         if (!CUR_USER) { modal.remove(); openAuthModal('customer',''); return; }
-        if (!CUR_USER.emailVerified && !CUR_PROFILE?.emailVerified) { showToast('Lütfen önce e-postanızı doğrulayın.','err'); return; }
+        if (!isTestAccount() && !CUR_USER.emailVerified && !CUR_PROFILE?.emailVerified && CUR_PROFILE?.emailVerifiedByAdmin !== true) { showToast('Lütfen önce e-postanızı doğrulayın.','err'); return; }
         registerForEvent(eventId, regBtn, e.vendorEmail, e.vendorName, e.title);
       });
     }
@@ -8633,7 +8634,7 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       modal.querySelector('#poc-err').innerHTML='<div class="alert alert-err">Başlık zorunludur.</div>';
       return;
     }
-    const isVerifiedForPoc = CUR_USER?.emailVerified || CUR_PROFILE?.emailVerified === true;
+    const isVerifiedForPoc = isTestAccount() || CUR_USER?.emailVerified || CUR_PROFILE?.emailVerified === true || CUR_PROFILE?.emailVerifiedByAdmin === true;
     if (!isVerifiedForPoc) {
       modal.querySelector('#poc-err').innerHTML='<div class="alert alert-err">PoC talebi oluşturmadan önce e-posta doğrulaması gereklidir.</div>';
       return;
@@ -23272,6 +23273,66 @@ async function openAdmUserEditModal(userId, name, email, company, role, phone) {
   });
 }
 
+// v5.31: Admin manuel e-posta doğrulama müdahalesi
+// Spark plan uyumlu - Firestore flag günceller (Firebase Auth'a dokunmaz)
+// Mail problemi yaşayan müşteriler için manuel çözüm
+async function adminSetEmailVerified(userId, userEmail, verify) {
+  var actionLabel = verify ? 'doğrulanmış olarak işaretle' : 'doğrulamasını kaldır';
+  var confirmMsg = verify
+    ? '"' + userEmail + '" kullanıcısının e-postasını manuel olarak DOĞRULANMIŞ işaretlemek istediğinizden emin misiniz?\n\nBu işlem, kullanıcının mail problemi (spam, kurumsal blok vb.) yaşadığı durumlar içindir. Kullanıcı bundan sonra PoC talebi ve diğer kritik işlemleri yapabilir.'
+    : '"' + userEmail + '" kullanıcısının e-posta doğrulamasını KALDIRMAK istediğinizden emin misiniz?\n\nKullanıcı tekrar doğrulama yapana kadar kritik işlemleri yapamayacak.';
+
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    var updateData = verify
+      ? {
+          emailVerified: true,
+          emailVerifiedByAdmin: true,
+          emailVerifiedAt: serverTimestamp(),
+          emailVerifiedByAdminUid: CUR_USER.uid,
+          emailVerifiedByAdminAt: serverTimestamp(),
+        }
+      : {
+          emailVerified: false,
+          emailVerifiedByAdmin: false,
+          emailUnverifiedByAdminUid: CUR_USER.uid,
+          emailUnverifiedByAdminAt: serverTimestamp(),
+        };
+
+    await updateDoc(doc(db, 'users', userId), updateData);
+
+    // Audit log
+    try {
+      await addDoc(collection(db, 'auditLogs'), {
+        action: verify ? 'admin_email_verify' : 'admin_email_unverify',
+        targetUserId: userId,
+        targetEmail: userEmail,
+        adminUid: CUR_USER.uid,
+        adminEmail: CUR_USER.email,
+        timestamp: serverTimestamp(),
+      });
+    } catch(e) { console.warn('Audit log yazılamadı:', e); }
+
+    showToast(verify
+      ? '✓ ' + userEmail + ' manuel doğrulandı'
+      : '⤴ ' + userEmail + ' doğrulaması kaldırıldı', verify ? 'success' : 'warn');
+
+    // Eğer doğrulanan kullanıcı şu an giriş yapmış olan kullanıcı ise profili güncelle
+    if (CUR_USER && CUR_USER.uid === userId && CUR_PROFILE) {
+      CUR_PROFILE.emailVerified = verify;
+      CUR_PROFILE.emailVerifiedByAdmin = verify;
+    }
+
+    // Tabloyu yenile
+    var main = el('panel-main');
+    if (main) admUsers(main);
+  } catch(e) {
+    console.error('adminSetEmailVerified error:', e);
+    showToast('Hata: ' + (e.message || 'İşlem başarısız'), 'err');
+  }
+}
+
 async function admUsers(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Kullanıcılar yükleniyor...</div>';
   const snap = await getDocs(collection(db,'users'));
@@ -23365,13 +23426,26 @@ async function admUsers(m) {
         '<td class="fs11-muted">'+dateStr+'</td>'+
         '<td class="fs11-muted">'+lastSeen+'</td>'+
         '<td class="fs11-muted">'+
-          (u.emailVerified ? '<span style="color:#16a34a">✓ Doğrulı</span>' : '<span class="t-red">✗</span>')+
+          (u.emailVerified
+            ? '<span style="color:#16a34a;font-weight:600">✓ Doğrulı</span>' + (u.emailVerifiedByAdmin ? '<div style="font-size:9px;color:#d97706;font-weight:700;margin-top:2px">👤 Admin</div>' : '')
+            : '<span style="color:#dc2626;font-weight:600">✗ Bekliyor</span>')+
         '</td>'+
         '<td style="white-space:nowrap">'+
           '<button class="btn-g btn-sm u-view fs11" data-id="'+u.id+'">Detay</button>'+
+          (u.emailVerified
+            ? '<button class="u-unverify fs11" data-id="'+u.id+'" data-email="'+escHtml(u.email||'')+'" style="margin-left:4px;background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.30);color:#d97706;padding:4px 9px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer" title="E-posta doğrulamasını kaldır">⤴ Kaldır</button>'
+            : '<button class="u-verify fs11" data-id="'+u.id+'" data-email="'+escHtml(u.email||'')+'" style="margin-left:4px;background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.30);color:#16a34a;padding:4px 9px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer" title="E-postayı manuel doğrula">✓ Doğrula</button>')+
         '</td>'+
         '</tr>';
     }).join('');
+
+    // v5.31: Manuel e-posta doğrulama (Admin müdahalesi)
+    tbody.querySelectorAll('.u-verify').forEach(function(b) {
+      b.addEventListener('click', function() { adminSetEmailVerified(b.dataset.id, b.dataset.email, true); });
+    });
+    tbody.querySelectorAll('.u-unverify').forEach(function(b) {
+      b.addEventListener('click', function() { adminSetEmailVerified(b.dataset.id, b.dataset.email, false); });
+    });
 
     tbody.querySelectorAll('.u-view').forEach(function(b) {
       b.addEventListener('click', function() {
@@ -23396,6 +23470,19 @@ async function admUsers(m) {
           '<div class="bg-elev-pad10"><div class="lbl-mini">Telefon</div>'+(u.phone||'—')+'</div>' +
           '<div class="bg-elev-pad10"><div class="lbl-mini">Kayıt Tarihi</div>'+dateStr2+'</div>' +
           '<div class="bg-elev-pad10"><div class="lbl-mini">Premium</div>'+(u.premium?'⭐ Evet':'Hayır')+'</div>' +
+          '<div style="background:'+(u.emailVerified?'rgba(22,163,74,.06)':'rgba(217,119,6,.06)')+';border:1px solid '+(u.emailVerified?'rgba(22,163,74,.20)':'rgba(217,119,6,.20)')+';border-radius:8px;padding:10px;grid-column:1/-1">'+
+            '<div class="lbl-mini">E-posta Doğrulama Durumu</div>'+
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px">'+
+              '<div>'+
+                (u.emailVerified
+                  ? '<b style="color:#16a34a">✓ Doğrulanmış</b>' + (u.emailVerifiedByAdmin ? ' <span style="font-size:11px;color:#d97706;font-weight:700">(👤 Admin tarafından)</span>' : ' <span style="font-size:11px;color:var(--text-muted)">(otomatik)</span>')
+                  : '<b style="color:#d97706">⏳ Doğrulanmamış</b> <span style="font-size:11px;color:var(--text-muted)">(mail problemi olabilir)</span>')+
+              '</div>'+
+              (u.emailVerified
+                ? '<button id="u-modal-unverify" style="background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.30);color:#d97706;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⤴ Kaldır</button>'
+                : '<button id="u-modal-verify" style="background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.30);color:#16a34a;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">✓ Manuel Doğrula</button>')+
+            '</div>'+
+          '</div>' +
           '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;grid-column:1/-1"><div class="lbl-mini">UID</div><code class="fs11">'+u.id+'</code></div>' +
           '</div>' +
           '<button id="u-modal-close2" class="btn-g" style="width:100%;margin-top:16px">Kapat</button>' +
@@ -23404,6 +23491,11 @@ async function admUsers(m) {
         modal.querySelector('#u-modal-close').onclick  = function(){ modal.remove(); };
         modal.querySelector('#u-modal-close2').onclick = function(){ modal.remove(); };
         modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+        // v5.31: Detay modalından manuel doğrulama
+        var verifyBtn = modal.querySelector('#u-modal-verify');
+        if (verifyBtn) verifyBtn.onclick = function(){ modal.remove(); adminSetEmailVerified(u.id, u.email||'', true); };
+        var unverifyBtn = modal.querySelector('#u-modal-unverify');
+        if (unverifyBtn) unverifyBtn.onclick = function(){ modal.remove(); adminSetEmailVerified(u.id, u.email||'', false); };
       });
     });
   }
@@ -26787,9 +26879,29 @@ function shouldBlockAction(actionKey) {
 // requireEmailVerified — kritik aksiyon öncesi kontrol
 // Eğer email doğrulanmamışsa modal gösterir, false döner
 // Doğrulanmışsa true döner ve aksiyon devam eder
+// Test kullanıcısı mı? (email-verify bypass için)
+function isTestAccount() {
+  if (!CUR_USER) return false;
+  var email = (CUR_USER.email || '').toLowerCase();
+  // Test e-posta paternleri VEYA profilde manuel test işareti
+  return email.includes('test') ||
+         email.includes('demo') ||
+         email.includes('@testpochub.') ||
+         (CUR_PROFILE && CUR_PROFILE.isTestRecord === true);
+}
+
 async function requireEmailVerified(actionKey, actionLabel) {
   if (!CUR_USER) return true; // logout için kontrol etmiyoruz (signup vs.)
   if (!shouldBlockAction(actionKey)) return true;
+
+  // v5.31: Test kullanıcıları email-verify kontrolünden muaf
+  if (isTestAccount()) return true;
+
+  // v5.31: Admin manuel doğrulama yaptıysa Firestore flag'ine güven (Spark uyumlu)
+  // emailVerifiedByAdmin: true ise Firebase Auth reload'a gerek yok
+  if (CUR_PROFILE && (CUR_PROFILE.emailVerifiedByAdmin === true || CUR_PROFILE.emailVerified === true)) {
+    return true;
+  }
 
   // Önce fresh status check (Firebase'den)
   try {
