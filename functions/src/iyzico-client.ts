@@ -86,6 +86,8 @@ export interface CheckoutRetrieveResponse {
   errorMessage?: string;
   paymentStatus?: "SUCCESS" | "FAILURE" | "INIT_THREEDS" | "CALLBACK_THREEDS";
   paymentId?: string;
+  price?: string;      // iyzico'nun döndürdüğü baz tutar (merchant)
+  paidPrice?: string;  // buyer'ın ödediği (taksit komisyonu dahil olabilir)
   paymentItems?: Array<{
     itemId: string;
     paymentTransactionId: string;

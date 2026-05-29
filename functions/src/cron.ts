@@ -124,7 +124,7 @@ export const dailyMaintenanceCron = onSchedule(
       // ─── 1. Süresi dolan vendor_subscriptions ───
       console.log("[dailyCron] Step 1: expired subscriptions");
       const expiredSnap = await db.collection("vendor_subscriptions")
-        .where("status", "==", "active")
+        .where("status", "in", ["active", "grace_period"])
         .where("endDate", "<", now)
         .limit(500)
         .get();
@@ -239,7 +239,7 @@ export const dailyMaintenanceCron = onSchedule(
           // Vendor'ın 1 ürününü featured'a ekle
           const prodSnap = await db.collection("products")
             .where("vendorId", "==", v.vendorId)
-            .where("isActive", "==", true)
+            .where("status", "==", "active")
             .limit(1)
             .get();
           if (!prodSnap.empty) {
@@ -387,7 +387,7 @@ export const hourlyBillingCheckCron = onSchedule(
         // Quota durumu — pochub_packages'tan tier limitini, kullanımı vendor_billing'ten
         if (!sub.currentTier || sub.currentTier === "free") continue;
 
-        const pkgDoc = await db.collection("pochub_packages").doc(sub.currentTier).get();
+        const pkgDoc = await db.collection("pochub_packages").doc(sub.currentPackageId || sub.currentTier).get();
         const pkg = pkgDoc.data();
         const monthlyQuota = pkg?.monthlyPocQuota || 0;
         if (!monthlyQuota) continue;
@@ -479,7 +479,7 @@ export const weeklyDigestCron = onSchedule(
       for (const sub of activeSubsSnap.docs) {
         const s = sub.data();
         if (s.currentTier === "free" || s.isTrial) continue;
-        const pkgDoc = await db.collection("pochub_packages").doc(s.currentTier).get();
+        const pkgDoc = await db.collection("pochub_packages").doc(s.currentPackageId || s.currentTier).get();
         const pkg = pkgDoc.data();
         stats.mrr += pkg?.monthlyPrice || 0;
       }

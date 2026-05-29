@@ -179,6 +179,7 @@ export const iyzicoCheckoutInit = onCall(
         vendorName: user?.company || user?.email || "Vendor",
         packageId: packageId,
         packageName: pkg?.name || "Paket",
+        tier: pkg?.tier || null,
         action: "purchase",
         fromPackageId: null,
         toPackageId: packageId,
@@ -253,7 +254,7 @@ export const iyzicoCallback = onRequest(
 
       const db = admin.firestore();
 
-      // 2. subscription_history kaydını bul
+      // 2. subscription_history pending kaydını token ile bul
       const histSnap = await db.collection("subscription_history")
         .where("iyzicoToken", "==", token)
         .limit(1)
@@ -265,111 +266,168 @@ export const iyzicoCallback = onRequest(
         return;
       }
 
-      const histDoc = histSnap.docs[0];
-      const histData = histDoc.data();
-      const vendorId = histData.vendorId;
-      const packageId = histData.packageId;
-      const durationDays = histData.durationDays || 30;
-
-      // 3. Ödeme sonucunu kontrol et
+      const histRef = histSnap.docs[0].ref;
       const isSuccess = detail.status === "success" && detail.paymentStatus === "SUCCESS";
 
-      if (isSuccess) {
-        // Başarılı — kayıtları güncelle
-        const updates: any = {
-          status: "paid",
-          paidAt: admin.firestore.FieldValue.serverTimestamp(),
-          iyzicoPaymentId: detail.paymentId,
-          cardLast4: detail.lastFourDigits,
-          cardBrand: detail.cardAssociation,
-          installment: detail.installment || 1,
-          binNumber: detail.binNumber,
-        };
-        await histDoc.ref.update(updates);
+      // 3. Aktivasyonun TAMAMI tek transaction içinde:
+      //    #1 idempotency  → zaten paid/failed ise tekrar işlenmez (iyzico retry /
+      //                      replay POST aboneliği uzatamaz)
+      //    #3 atomicity     → history + sub + user + card tek atomik commit
+      //    #2 tier          → currentTier = tier ADI, currentPackageId = doc id
+      //    #7 doğrulama     → tutar + conversationId yeniden kontrol
+      const txResult = await db.runTransaction(async (tx) => {
+        // ── Tüm okumalar önce (Firestore: reads-before-writes) ──
+        const histDoc = await tx.get(histRef);
+        const h: any = histDoc.data() || {};
+        const vendorId = h.vendorId as string;
+        if (!vendorId) return {outcome: "no_vendor"};
 
-        // vendor_subscriptions güncelle
         const subRef = db.collection("vendor_subscriptions").doc(vendorId);
-        const subSnap = await subRef.get();
-        const now = admin.firestore.Timestamp.now();
-        const endDate = admin.firestore.Timestamp.fromMillis(
-          Date.now() + durationDays * 86400000
-        );
+        const userRef = db.collection("users").doc(vendorId);
+        const subDoc = await tx.get(subRef);
 
-        if (subSnap.exists) {
-          await subRef.update({
-            currentTier: packageId,
-            status: "active",
-            startDate: now,
-            endDate: endDate,
-            autoRenew: histData.autoRenew || false,
-            lastPaymentAt: now,
-            isSuspendedDueToBilling: false,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        // ── #1 İDEMPOTENCY: zaten işlenmişse hiçbir şey yapma ──
+        if (h.status === "paid") return {outcome: "already_paid", vendorId};
+        if (h.status === "failed") return {outcome: "already_failed", vendorId};
+
+        const packageId = h.packageId;
+        const tier = h.tier || packageId; // init'te tier saklandı; yoksa fallback
+        const durationDays = h.durationDays || 30;
+        const now = admin.firestore.Timestamp.now();
+        const sts = admin.firestore.FieldValue.serverTimestamp();
+
+        // ── Başarısız ödeme ──
+        if (!isSuccess) {
+          tx.update(histRef, {
+            status: "failed",
+            failedAt: sts,
+            failReason: detail.errorMessage || `paymentStatus: ${detail.paymentStatus}`,
+            iyzicoErrorCode: detail.errorCode || null,
           });
-        } else {
-          await subRef.set({
-            vendorId: vendorId,
-            currentTier: packageId,
-            status: "active",
-            startDate: now,
-            endDate: endDate,
-            autoRenew: histData.autoRenew || false,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            lastPaymentAt: now,
-            isTrial: false,
-          });
+          return {outcome: "failed", vendorId, errorMessage: detail.errorMessage};
         }
 
-        // users tablosunu da güncelle (denormalized)
-        await db.collection("users").doc(vendorId).update({
-          subscriptionTier: packageId,
-          hasActiveSubscription: true,
-          isSuspendedDueToBilling: false,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        // ── #7 Defense-in-depth: baz tutar + conversation yeniden doğrula ──
+        // (paidPrice taksit komisyonu içerebilir; merchant bazı 'price' ile karşılaştır)
+        const basePrice = parseFloat(detail.price || "0");
+        const expectedAmount = Number(h.amount || 0);
+        if (expectedAmount > 0 && basePrice > 0 &&
+            Math.abs(basePrice - expectedAmount) / expectedAmount > 0.02) {
+          tx.update(histRef, {
+            status: "failed", failedAt: sts,
+            failReason: `Tutar uyumsuz: beklenen ${expectedAmount}, iyzico ${basePrice}`,
+          });
+          return {outcome: "amount_mismatch", vendorId};
+        }
+        if (h.iyzicoConversationId && detail.conversationId &&
+            h.iyzicoConversationId !== detail.conversationId) {
+          tx.update(histRef, {
+            status: "failed", failedAt: sts, failReason: "conversationId uyumsuz",
+          });
+          return {outcome: "conversation_mismatch", vendorId};
+        }
+
+        // ── Başarılı: history → paid ──
+        tx.update(histRef, {
+          status: "paid",
+          paidAt: sts,
+          iyzicoPaymentId: detail.paymentId || null,
+          cardLast4: detail.lastFourDigits || null,
+          cardBrand: detail.cardAssociation || null,
+          installment: detail.installment || 1,
+          binNumber: detail.binNumber || null,
         });
 
-        // Kart kaydet (eğer istenmişse)
-        if (histData.saveCardOnSuccess && detail.lastFourDigits) {
-          await db.collection("payment_methods").doc(vendorId).set({
+        // ── vendor_subscriptions aktive et (#2 tier doğru, yeni dönem kota sıfır) ──
+        const endDate = admin.firestore.Timestamp.fromMillis(Date.now() + durationDays * 86400000);
+        const subBase: any = {
+          vendorId: vendorId,
+          currentPackageId: packageId, // #2 doc id
+          currentTier: tier,           // #2 tier adı (badge/featured/gating bunu okur)
+          status: "active",
+          startDate: now,
+          endDate: endDate,
+          autoRenew: h.autoRenew || false,
+          lastPaymentAt: now,
+          isSuspendedDueToBilling: false,
+          pocUsedThisCycle: 0,         // yeni dönem: kotaları sıfırla
+          inviteUsedThisCycle: 0,
+          cycleStartedAt: now,
+          updatedAt: sts,
+        };
+        if (subDoc.exists) {
+          tx.update(subRef, subBase);
+        } else {
+          tx.set(subRef, {...subBase, isTrial: false, createdAt: sts});
+        }
+
+        // ── users (denormalized) — set+merge: doc yoksa bile güvenli ──
+        tx.set(userRef, {
+          subscriptionTier: tier, // #2 tier adı
+          hasActiveSubscription: true,
+          isSuspendedDueToBilling: false,
+          updatedAt: sts,
+        }, {merge: true});
+
+        // ── Kart kaydet (istenmişse) ──
+        if (h.saveCardOnSuccess && detail.lastFourDigits) {
+          tx.set(db.collection("payment_methods").doc(vendorId), {
             vendorId: vendorId,
             preferredMethod: "iyzico",
             iyzico: {
               last4: detail.lastFourDigits,
-              cardBrand: detail.cardAssociation,
-              binNumber: detail.binNumber,
-              cardFamily: detail.cardFamily,
-              addedAt: admin.firestore.FieldValue.serverTimestamp(),
+              cardBrand: detail.cardAssociation || null,
+              binNumber: detail.binNumber || null,
+              cardFamily: detail.cardFamily || null,
+              addedAt: sts,
             },
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: sts,
           }, {merge: true});
         }
 
-        await auditLog(vendorId, "iyzico_payment_success", {
-          token,
-          paymentId: detail.paymentId,
-          amount: histData.amount,
-        });
+        return {outcome: "activated", vendorId, paymentId: detail.paymentId, amount: h.amount, tier};
+      });
 
-        res.status(200).send(callbackHtml("✅ Ödeme başarılı! Paketiniz aktive edildi.", true));
-      } else {
-        // Başarısız
-        await histDoc.ref.update({
-          status: "failed",
-          failedAt: admin.firestore.FieldValue.serverTimestamp(),
-          failReason: detail.errorMessage || `paymentStatus: ${detail.paymentStatus}`,
-          iyzicoErrorCode: detail.errorCode,
-        });
-
-        await auditLog(vendorId, "iyzico_payment_failed", {
-          token,
-          errorCode: detail.errorCode,
-          errorMessage: detail.errorMessage,
-        });
-
-        res.status(200).send(callbackHtml(
-          `❌ Ödeme başarısız: ${detail.errorMessage || "Bilinmeyen hata"}`,
-          false
-        ));
+      // 4. Transaction SONRASI yan etkiler (audit + notification + HTML response)
+      const vId = (txResult as any).vendorId || "unknown";
+      switch (txResult.outcome) {
+        case "activated":
+          await auditLog(vId, "iyzico_payment_success", {
+            token, paymentId: (txResult as any).paymentId,
+            amount: (txResult as any).amount, tier: (txResult as any).tier,
+          });
+          await db.collection("notifications").add({
+            recipientId: vId, userId: vId,
+            type: "subscription_purchased",
+            title: "🎉 Paketin Aktive Edildi",
+            message: "Ödemen başarıyla alındı ve paketin aktif edildi.",
+            read: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          res.status(200).send(callbackHtml("✅ Ödeme başarılı! Paketiniz aktive edildi.", true));
+          break;
+        case "already_paid":
+          // İdempotent: tekrar gelen callback — hiçbir şey değiştirilmedi
+          res.status(200).send(callbackHtml("✅ Bu ödeme zaten işlenmiş. Paketiniz aktif.", true));
+          break;
+        case "already_failed":
+          res.status(200).send(callbackHtml("Bu işlem daha önce başarısız olarak kaydedilmiş.", false));
+          break;
+        case "amount_mismatch":
+        case "conversation_mismatch":
+          await auditLog(vId, "iyzico_callback_rejected", {token, reason: txResult.outcome});
+          res.status(200).send(callbackHtml("Ödeme doğrulanamadı (tutar/işlem uyumsuz). Destek ile iletişime geçin.", false));
+          break;
+        case "no_vendor":
+          res.status(200).send(callbackHtml("İşlem kaydı hatalı (vendor yok).", false));
+          break;
+        default: // "failed"
+          await auditLog(vId, "iyzico_payment_failed", {
+            token, errorCode: detail.errorCode, errorMessage: detail.errorMessage,
+          });
+          res.status(200).send(callbackHtml(
+            `❌ Ödeme başarısız: ${detail.errorMessage || "Bilinmeyen hata"}`, false
+          ));
       }
     } catch (e: any) {
       console.error("iyzicoCallback error:", e);

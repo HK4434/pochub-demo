@@ -113,7 +113,7 @@ async function checkRateLimit(uid: string, limit: number = 10): Promise<RateLimi
   const db = admin.firestore();
   const oneHourAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 3600 * 1000);
 
-  const snap = await db.collection("audit_log")
+  const snap = await db.collection("audit_logs")
     .where("uid", "==", uid)
     .where("action", "==", "email_sent")
     .where("timestamp", ">=", oneHourAgo)

@@ -113,8 +113,12 @@ export async function auditLog(
 ): Promise<void> {
   try {
     const db = admin.firestore();
-    await db.collection("audit_log").add({
-      uid,
+    // v5.x: 'audit_logs' (client GDPR görünümü + firestore.rules ile aynı koleksiyon).
+    // userId alanı eklendi: rules self-read (resource.data.userId == auth.uid) ve
+    // client "Aktivite Log" sorgusu where('userId','==',uid) bu kayıtları görebilsin.
+    await db.collection("audit_logs").add({
+      userId: uid,
+      uid, // geriye dönük uyumluluk
       action,
       details,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
