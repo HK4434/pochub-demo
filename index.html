@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.37 | pochub.co -->
+<!-- PoCHub v5.38 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.37';
+const VERSION = 'v5.38';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.38': ['DATA-MODEL AUDIT: registrations dokumanina vendorId eklendi (vendor panel where vendorId==uid sorgusu calisir → katilimcilar gorunur). vendAnalytics yanlis koleksiyon sorguluyordu: events→public_events, event_registrations→registrations. renderVendorPublic (public profil) etkinlikleri events→public_events. Tum dashboard query alanlari yazilan alanlarla eslesti. Not: eski (v5.38 oncesi) kayitlarda vendorId yok — demo temizligi sonrasi sorun degil.'],
   'v5.37': ['CRITICAL FIX: increment() import edilmemisti → anasayfa userCount/pocCount counter\'lari sessizce hata alip hep 0 kaliyordu (import eklendi). recalcGlobalStats() backfill + admin panel butonu + admin home self-heal (gercek sayilar). Chat: onSnapshot orderBy kaldirildi (composite index yoksa fallback non-live oluyordu) → gonderilen mesaj artik aninda gorunur, kapat/ac gerekmiyor.'],
   'v5.36': ['PERMISSION AUDIT: Global safeQuery/safeDoc helper (tek denial Promise.all\'i cokertmez) - musteri/vendor dashboard + urun-stat graceful. Public vendor profil tier rozeti users.subscriptionTier\'den okunur (vendor_subscriptions denied fix). RULES: audit_logs self-read (GDPR Verilerimi Indir + aktivite log).'],
   'v5.35': ['DEEP AUDIT: Tum query/write rules ile uyumlu hale getirildi - anasayfa stats gercek sayilar, kalan permission hatalari.'],
@@ -6675,19 +6676,25 @@ async function registerForEvent(eventId, btn, vendorEmail, vendorName, eventTitl
     const regSnap = await getDocs(query(collection(db,'registrations'), where('eventId','==',eventId), where('userId','==',CUR_USER.uid)));
     if (!regSnap.empty) { showToast('Bu etkinliğe zaten kayıtlısınız.','err'); btn.disabled=false; btn.textContent='Kayıtlısınız'; return; }
 
+    // v5.38: Etkinliği ÖNCE çek — vendorId'yi kayda yazabilmek için. Vendor panelinde
+    //   katılımcıların görünmesi 'registrations where vendorId==uid' sorgusuna bağlı;
+    //   önceden kayda vendorId yazılmadığı için vendor hep 0 katılımcı görüyordu.
+    const evRef = doc(db,'public_events',eventId);
+    const evSnap = await getDoc(evRef);
+    const evData = evSnap.exists() ? evSnap.data() : {};
+
     await addDoc(collection(db,'registrations'), {
       eventId, userId: CUR_USER.uid,
+      vendorId: evData.vendorId || '',
       userEmail: CUR_USER.email,
       userName: CUR_PROFILE?.displayName||CUR_USER.email,
       userCompany: CUR_PROFILE?.company||'',
       status: 'registered',
       createdAt: serverTimestamp()
     });
-    // Kayıt sayısını artır
-    const evRef = doc(db,'public_events',eventId);
-    const evSnap = await getDoc(evRef);
+    // Kayıt sayısını artır (aynı snap'i kullan)
     if (evSnap.exists()) {
-      await updateDoc(evRef, {registeredCount: (evSnap.data().registeredCount||0)+1});
+      await updateDoc(evRef, {registeredCount: (evData.registeredCount||0)+1});
     }
     btn.textContent = '✓ Kayıtlısınız';
     btn.style.background = '#15803d';
@@ -18275,8 +18282,8 @@ async function vendAnalytics(m) {
     var [pocSnap, offSnap, evSnap, regSnap, subSnap2] = await Promise.all([
       getDocs(query(collection(db, 'poc_requests'), where('vendorId', '==', CUR_USER.uid))),
       getDocs(query(collection(db, 'offers'), where('vendorId', '==', CUR_USER.uid))),
-      getDocs(query(collection(db, 'events'), where('vendorId', '==', CUR_USER.uid))),
-      getDocs(query(collection(db, 'event_registrations'), where('vendorId', '==', CUR_USER.uid))),
+      getDocs(query(collection(db, 'public_events'), where('vendorId', '==', CUR_USER.uid))),
+      getDocs(query(collection(db, 'registrations'), where('vendorId', '==', CUR_USER.uid))),
       getDoc(doc(db, 'vendor_subscriptions', CUR_USER.uid)),
     ]);
 
@@ -30893,7 +30900,7 @@ async function renderVendorPublic(slug) {
     var events = [];
     try {
       var now = new Date();
-      var eSnap = await getDocs(query(collection(db,'events'), where('vendorId','==',vendor.uid), limit(5)));
+      var eSnap = await getDocs(query(collection(db,'public_events'), where('vendorId','==',vendor.uid), limit(5)));
       events = eSnap.docs.map(function(d){ return { ...d.data(), id:d.id }; });
       events = events.filter(function(ev){
         var d = ev.date?.toDate ? ev.date.toDate() : new Date(ev.date);
