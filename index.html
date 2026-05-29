@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.34 | pochub.co -->
+<!-- PoCHub v5.35 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.34';
+const VERSION = 'v5.35';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.35': ['DEEP AUDIT: Tum query/write rules ile uyumlu hale getirildi - anasayfa stats gercek sayilar, kalan permission hatalari.'],
   'v5.34': ['HOTFIX-2: Sistematik rules audit - tum permission hatalari (events, poc_invites accept, anasayfa stats, vb.).'],
   'v5.33': ['HOTFIX: Rules-kod uyumsuzluklari (analytics, customer dashboard, davetler, teklifler).'],
   'v5.32': ['SECURITY: Firestore Security Rules v1.0 - tum collectionlar icin sıkı erisim kontrolu (Yaklasim 1: Full Rules).'],
@@ -4630,6 +4631,15 @@ async function handleAuth() {
         createdAt: serverTimestamp()
       });
 
+      // v5.35: Global stats counter increment (anasayfa public stats için)
+      // pochub_config/global_stats — public read, signed-in user yazabilir (counter only)
+      try {
+        await setDoc(doc(db, 'pochub_config', 'global_stats'), {
+          userCount: increment(1),
+          lastUpdated: serverTimestamp(),
+        }, { merge: true });
+      } catch(_e){ /* counter best-effort, hata atma */ }
+
       // v4.88: Referral bonus ver - davet edene +1 PoC kotası
       // v4.91: Müşteri davet ediyorsa customerReferralCount arttır + rozet hesapla
       if (referredByUid) {
@@ -4893,22 +4903,24 @@ async function renderHome() {
 
   // Stats yükle
   try {
-    // v5.34: Stats best-effort - permission yoksa 0 goster, hata firlatma
-    // Anonim kullanıcılar bazı collection'lara erişemez (privacy)
-    // Admin pochub_config/global_stats dokumanini guncelleyebilir (cache)
+    // v5.35: Gercek sayilar - users/poc_requests collection list privacy nedeniyle
+    // engelleniyor. Cache pattern: pochub_config/global_stats dokumani.
+    // - userCount: signup'ta increment(1)
+    // - pocCount: PoC submit'te increment(N)
+    // - public_events ve products: public read OK, dogrudan say
     var safeGetDocs = function(q){
       return getDocs(q).then(function(s){ return s.size; }).catch(function(){ return 0; });
     };
     var safeGetDoc = function(d){
       return getDoc(d).then(function(s){ return s.exists() ? s.data() : null; }).catch(function(){ return null; });
     };
-    var [evCount, userCountData, pocCount, prodCount] = await Promise.all([
+    var [evCount, statsData, prodCount] = await Promise.all([
       safeGetDocs(query(collection(db,'public_events'), where('status','==','published'))),
       safeGetDoc(doc(db,'pochub_config','global_stats')),
-      safeGetDocs(collection(db,'poc_requests')),
       safeGetDocs(query(collection(db,'products'), where('status','==','active'))),
     ]);
-    var userCount = (userCountData && userCountData.userCount) || 0;
+    var userCount = (statsData && statsData.userCount) || 0;
+    var pocCount = (statsData && statsData.pocCount) || 0;
     var vals = [evCount, userCount, pocCount, prodCount];
     el('home-stats')?.querySelectorAll('.stat-num').forEach((x,i)=>{
       x.textContent = vals[i];
@@ -5934,8 +5946,13 @@ async function loadTopCustomers() {
   var wrap = el('home-top-customers');
   if (!wrap) return;
   try {
-    // customerReferralCount > 0 olan müşterileri çek
-    var snap = await getDocs(query(collection(db,'users'), where('role','==','customer'), limit(50)));
+    // v5.35: customerReferralCount > 0 olan müşterileri çek (rules public read için zorunlu)
+    var snap = await getDocs(query(
+      collection(db,'users'),
+      where('role','==','customer'),
+      where('customerReferralCount','>',0),
+      limit(50)
+    )).catch(function(){ return { empty: true, docs: [] }; });
     if (snap.empty) { wrap.innerHTML = ''; return; }
 
     var customers = snap.docs.map(function(d){ return { ...d.data(), uid:d.id }; });
@@ -7344,6 +7361,13 @@ function openCustomPoCModal() {
         isCustomProduct: true,
         createdAt:       serverTimestamp(),
       });
+      // v5.35: Global counter
+      try {
+        await setDoc(doc(db, 'pochub_config', 'global_stats'), {
+          pocCount: increment(1),
+          lastUpdated: serverTimestamp(),
+        }, { merge: true });
+      } catch(_e){}
       try {
         await emailjs.send('service_k3gfuw2','template_bavhw8b',{
           to_email: CUR_USER.email,
@@ -7399,6 +7423,13 @@ async function submitCustomPoC() {
       isCustomProduct: true,
       createdAt:     serverTimestamp(),
     });
+    // v5.35: Global counter
+    try {
+      await setDoc(doc(db, 'pochub_config', 'global_stats'), {
+        pocCount: increment(1),
+        lastUpdated: serverTimestamp(),
+      }, { merge: true });
+    } catch(_e){}
 
     // EmailJS bildirimi
     try {
@@ -8734,6 +8765,14 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
 
       modal.remove();
       showToast(`${batchResults.length} vendor'a PoC talebi gönderildi!`);
+
+      // v5.35: Global stats counter increment (anasayfa public stats)
+      try {
+        await setDoc(doc(db, 'pochub_config', 'global_stats'), {
+          pocCount: increment(batchResults.length),
+          lastUpdated: serverTimestamp(),
+        }, { merge: true });
+      } catch(_e){ /* best-effort */ }
 
       if (conflicts.length > 0) {
         setTimeout(() => {
@@ -16257,19 +16296,21 @@ async function openOverrideRequestModal(pocId, pocData, check, onAccepted) {
           packageId: check.package?.id || null,
           createdAt: serverTimestamp(),
         });
-        // Admin bildirimleri (tüm admin'lere)
-        const adminSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
-        for (const ad of adminSnap.docs) {
-          await addDoc(collection(db,'notifications'), {
-            userId: ad.id,
-            type: 'admin_override_request',
-            title: '⚡ Yeni Override Talebi',
-            message: (CUR_PROFILE?.company || CUR_USER.email) + ' "' + (pocData?.productName||'PoC') + '" için acil onay istiyor (₺' + overrideAmount.toLocaleString('tr-TR') + ').',
-            relatedId: pocId,
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-        }
+        // v5.35: Admin bildirimleri best-effort (rules anonim admin listesi engelleyebilir)
+        try {
+          const adminSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
+          for (const ad of adminSnap.docs) {
+            await addDoc(collection(db,'notifications'), {
+              userId: ad.id,
+              type: 'admin_override_request',
+              title: '⚡ Yeni Override Talebi',
+              message: (CUR_PROFILE?.company || CUR_USER.email) + ' "' + (pocData?.productName||'PoC') + '" için acil onay istiyor (₺' + overrideAmount.toLocaleString('tr-TR') + ').',
+              relatedId: pocId,
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+          }
+        } catch(_e){ console.warn('Admin bildirim atlandi (rules):', _e.message); }
         showToast('✅ Acil onay talebin gönderildi. Admin yanıtladığında bildirim alacaksın.');
         modal.remove();
       } catch(e) { showToast('Hata: '+e.message,'err'); }
@@ -19053,19 +19094,21 @@ function openBillingPaymentModal(chargeIds, amount, mode) {
           paymentRequestedAt: serverTimestamp(),
         });
       }
-      // Admin bildirim
-      const adminSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
-      for (const ad of adminSnap.docs) {
-        await addDoc(collection(db,'notifications'), {
-          userId: ad.id,
-          type: 'manual_transfer_pending',
-          title: '🏦 Borç Ödeme Talebi',
-          message: (CUR_PROFILE?.company || CUR_USER.email) + ' ' + chargeIds.length + ' borç için ₺' + amount.toLocaleString('tr-TR') + ' ödeme talebi gönderdi.',
-          relatedId: CUR_USER.uid,
-          read: false,
-          createdAt: serverTimestamp(),
-        });
-      }
+      // Admin bildirim (v5.35: best-effort, rules engelleyebilir)
+      try {
+        const adminSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
+        for (const ad of adminSnap.docs) {
+          await addDoc(collection(db,'notifications'), {
+            userId: ad.id,
+            type: 'manual_transfer_pending',
+            title: '🏦 Borç Ödeme Talebi',
+            message: (CUR_PROFILE?.company || CUR_USER.email) + ' ' + chargeIds.length + ' borç için ₺' + amount.toLocaleString('tr-TR') + ' ödeme talebi gönderdi.',
+            relatedId: CUR_USER.uid,
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+      } catch(_e){ console.warn('Admin bildirim atlandi:', _e.message); }
       showToast('✅ Ödeme talebin gönderildi. Admin onayından sonra borçlar kapanacak.');
       modal.remove();
       loadVendTab();
@@ -25772,23 +25815,19 @@ async function preloadVendorBadges(vendorIds) {
   });
   if (toFetch.length === 0) return;
 
-  // Firestore'dan paralel çek (subscription + user vendorStatus)
+  // v5.35: Sadece users dokumanindan tier oku (vendor_subscriptions private).
+  // users.subscriptionTier ve users.hasActiveSubscription zaten signup'ta set.
   await Promise.all(toFetch.map(async function(id){
     try {
-      // İki paralel okuma
-      var [subSnap, userSnap] = await Promise.all([
-        getDoc(doc(db, 'vendor_subscriptions', id)),
-        getDoc(doc(db, 'users', id)),
-      ]);
-      var sub = subSnap.exists() ? subSnap.data() : null;
+      var userSnap = await getDoc(doc(db, 'users', id));
       var user = userSnap.exists() ? userSnap.data() : null;
+      var tier = user?.subscriptionTier || 'free';
+      var hasActive = user?.hasActiveSubscription === true;
       window._vendorBadgeCache[id] = {
-        tier: sub?.currentTier || 'free',
-        status: sub?.status || 'no_subscription',
-        isTrial: sub?.isTrial || false,
-        // v4.82: vendorStatus eklendi
+        tier: tier,
+        status: hasActive ? 'active' : 'no_subscription',
+        isTrial: false,
         vendorStatus: user?.vendorStatus || 'auto_approved',
-        // v5.10: avatar bilgisi
         photoBase64: user?.photoBase64 || '',
         logoUrl: user?.logoUrl || '',
         company: user?.company || '',
