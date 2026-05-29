@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.36 | pochub.co -->
+<!-- PoCHub v5.37 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -679,11 +679,11 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, PhoneAuthProvider } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp, increment } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.36';
+const VERSION = 'v5.37';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.37': ['CRITICAL FIX: increment() import edilmemisti → anasayfa userCount/pocCount counter\'lari sessizce hata alip hep 0 kaliyordu (import eklendi). recalcGlobalStats() backfill + admin panel butonu + admin home self-heal (gercek sayilar). Chat: onSnapshot orderBy kaldirildi (composite index yoksa fallback non-live oluyordu) → gonderilen mesaj artik aninda gorunur, kapat/ac gerekmiyor.'],
   'v5.36': ['PERMISSION AUDIT: Global safeQuery/safeDoc helper (tek denial Promise.all\'i cokertmez) - musteri/vendor dashboard + urun-stat graceful. Public vendor profil tier rozeti users.subscriptionTier\'den okunur (vendor_subscriptions denied fix). RULES: audit_logs self-read (GDPR Verilerimi Indir + aktivite log).'],
   'v5.35': ['DEEP AUDIT: Tum query/write rules ile uyumlu hale getirildi - anasayfa stats gercek sayilar, kalan permission hatalari.'],
   'v5.34': ['HOTFIX-2: Sistematik rules audit - tum permission hatalari (events, poc_invites accept, anasayfa stats, vb.).'],
@@ -2972,10 +2973,14 @@ function openChatModal(pocId, pocTitle, otherName) {
 
   // Realtime mesaj dinleyici
   const msgsEl = modal.querySelector('#chat-messages');
+  // v5.37: orderBy KALDIRILDI. (where pocId==X + orderBy createdAt) bir composite
+  //   index gerektiriyordu; index yoksa onSnapshot 'failed-precondition' hatasi
+  //   verip CANLI listener yerine tek-seferlik getDocs fallback'ine dusuyordu.
+  //   Sonuc: gonderilen mesaj ekrana gelmiyor, modal kapat/ac gerekiyordu.
+  //   Sadece equality filtresi auto-index'li → listener canli kalir; siralama client-side.
   const msgQuery = query(
     collection(db, 'poc_messages'),
-    where('pocId','==',pocId),
-    orderBy('createdAt','asc')
+    where('pocId','==',pocId)
   );
 
   ACTIVE_CHAT_UNSUB = onSnapshot(msgQuery, snap => {
@@ -2983,15 +2988,19 @@ function openChatModal(pocId, pocTitle, otherName) {
       msgsEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted);font-size:13px">💬 Henüz mesaj yok.<br>İlk mesajı gönderin.</div>';
       return;
     }
+    // v5.37: createdAt'e gore client-side sirala (orderBy yok)
+    var sortedDocs = snap.docs.slice().sort(function(a,b){
+      return ((a.data().createdAt && a.data().createdAt.seconds) || 0) - ((b.data().createdAt && b.data().createdAt.seconds) || 0);
+    });
     // Okunmamış mesajları arka planda okundu işaretle (kullanıcıyı readBy'a ekle)
-    snap.docs.forEach(function(d){
+    sortedDocs.forEach(function(d){
       var msg = d.data();
       var rb = msg.readBy || [];
       if (msg.senderId !== CUR_USER?.uid && !rb.includes(CUR_USER.uid)) {
         updateDoc(d.ref, { readBy: [...rb, CUR_USER.uid] }).catch(function(){});
       }
     });
-    msgsEl.innerHTML = snap.docs.map(d => {
+    msgsEl.innerHTML = sortedDocs.map(d => {
       const msg = d.data();
       const isMine = msg.senderId === CUR_USER?.uid;
       const time = msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -3096,6 +3105,29 @@ async function ACTIVE_CHAT_UNSUB2(pocId, msgsEl) {
     msgsEl.scrollTop = msgsEl.scrollHeight;
   } catch(e) { msgsEl.innerHTML='<div class="empty">Mesajlar yüklenemedi.</div>'; }
 }
+
+// v5.37: global_stats counter'ini GERCEK sayilarla yeniden hesapla (backfill).
+//   Iki sorun vardi: (1) increment import edilmemisti → counter yazimlari
+//   sessizce hata aliyordu (try/catch ile yutulmus) → userCount/pocCount hep 0.
+//   (2) Counter sadece YENI kayitlarda artiyordu → mevcut/gecmis veriler haric.
+//   Admin tum users + poc_requests'i listeleyebildigi (rules: isAdmin) icin
+//   gercek sayilari hesaplayip global_stats'a yazariz. SADECE admin cagirmali.
+//   Donus: {userCount, pocCount}.
+async function recalcGlobalStats() {
+  const [uSnap, pSnap] = await Promise.all([
+    getDocs(collection(db, 'users')),
+    getDocs(collection(db, 'poc_requests')),
+  ]);
+  const userCount = uSnap.size;
+  const pocCount = pSnap.size;
+  await setDoc(doc(db, 'pochub_config', 'global_stats'), {
+    userCount: userCount,
+    pocCount: pocCount,
+    lastUpdated: serverTimestamp(),
+  }, { merge: true });
+  return { userCount: userCount, pocCount: pocCount };
+}
+window.recalcGlobalStats = recalcGlobalStats;
 
 /* ── ÜLKE ARAMA ── */
 
@@ -4950,6 +4982,12 @@ async function renderHome() {
     ]);
     var userCount = (statsData && statsData.userCount) || 0;
     var pocCount = (statsData && statsData.pocCount) || 0;
+    // v5.37: Admin anasayfayi acinca counter'i gercek sayilarla self-heal et
+    //   (gecmis veri backfill + increment-import fix sonrasi senkron).
+    if (CUR_PROFILE && CUR_PROFILE.role === 'admin') {
+      try { var _rs = await recalcGlobalStats(); userCount = _rs.userCount; pocCount = _rs.pocCount; }
+      catch(_e){ console.debug('[stats] self-heal skip:', _e && _e.message); }
+    }
     var vals = [evCount, userCount, pocCount, prodCount];
     el('home-stats')?.querySelectorAll('.stat-num').forEach((x,i)=>{
       x.textContent = vals[i];
@@ -24561,6 +24599,42 @@ async function admDataHealth(m) {
         '<button id="demo-cancel-btn" class="btn-g btn-sm" style="padding:8px 14px;display:none">İptal</button>' +
       '</div>';
     m.appendChild(demoSection);
+
+    // v5.37: ═══ ANASAYFA STATS SAYAÇLARI — Yeniden Hesapla (backfill) ═══
+    var statsSection = document.createElement('div');
+    statsSection.style.cssText = 'background:linear-gradient(135deg,rgba(37,99,235,.05),rgba(37,99,235,.01));border:1px solid rgba(37,99,235,.25);border-radius:12px;padding:18px;margin-top:18px';
+    statsSection.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
+        '<div style="font-size:18px">📊</div>' +
+        '<div style="font-size:14px;font-weight:700;color:#2563eb">Anasayfa Stats Sayaçları — Yeniden Hesapla</div>' +
+      '</div>' +
+      '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">' +
+        'Anasayfadaki <strong>Toplam Kullanıcı</strong> ve <strong>PoC Talebi</strong> sayıları <code>pochub_config/global_stats</code> sayaç dokümanından okunur. ' +
+        'Bu sayaç yalnızca yeni kayıt/PoC eklendiğinde artar; mevcut (geçmiş) kayıtlar dahil değildir. ' +
+        'Aşağıdaki buton tüm <code>users</code> ve <code>poc_requests</code> kayıtlarını sayıp sayacı gerçek değerlerle günceller. ' +
+        '(Admin anasayfayı her açtığında bu otomatik de çalışır.)' +
+      '</div>' +
+      '<div id="stats-recalc-result" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--text-muted);min-height:36px;display:none"></div>' +
+      '<button id="stats-recalc-btn" class="btn-p btn-sm" style="padding:8px 14px">🔄 Sayaçları Yeniden Hesapla</button>';
+    m.appendChild(statsSection);
+    var statsRecalcBtn = m.querySelector('#stats-recalc-btn');
+    var statsResultEl = m.querySelector('#stats-recalc-result');
+    statsRecalcBtn?.addEventListener('click', async function(){
+      statsRecalcBtn.disabled = true; statsRecalcBtn.textContent = '⏳ Hesaplanıyor...';
+      try {
+        var rs = await recalcGlobalStats();
+        statsResultEl.style.display = 'block';
+        statsResultEl.innerHTML =
+          '<div style="color:#16a34a;font-weight:700">✓ Sayaçlar güncellendi</div>' +
+          '<div style="margin-top:6px">👥 Toplam Kullanıcı: <strong>'+rs.userCount+'</strong> &nbsp;·&nbsp; 📋 PoC Talebi: <strong>'+rs.pocCount+'</strong></div>' +
+          '<div style="margin-top:4px;color:var(--text-muted)">Anasayfa artık bu değerleri gösterecek.</div>';
+        showToast('Stats güncellendi: '+rs.userCount+' kullanıcı · '+rs.pocCount+' PoC', 'ok');
+      } catch(e) {
+        statsResultEl.style.display = 'block';
+        statsResultEl.innerHTML = '<div style="color:#dc2626">Hata: '+(e && e.message)+'</div>';
+      }
+      statsRecalcBtn.disabled = false; statsRecalcBtn.textContent = '🔄 Sayaçları Yeniden Hesapla';
+    });
 
     // Tara butonu
     var scanBtn = m.querySelector('#demo-scan-btn');
