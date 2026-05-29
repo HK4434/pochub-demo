@@ -13,7 +13,7 @@
  */
 
 import * as admin from "firebase-admin";
-import {onCall, onRequest} from "firebase-functions/v2/https";
+import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import {requireAuth, requireFields, requireNumber, ok, handleError, auditLog} from "./helpers";
 import {
@@ -91,14 +91,30 @@ export const iyzicoCheckoutInit = onCall(
         throw new Error(`Fiyat uyumsuz. Beklenen: ${serverAmount}, gelen: ${requestedAmount}`);
       }
 
-      // 3. Vendor profili
+      // 3. Vendor profili (tek okuma — hem rol kontrolü hem buyer verisi için)
       const userDoc = await db.collection("users").doc(uid).get();
       if (!userDoc.exists) {
-        throw new Error("Kullanıcı profili bulunamadı");
+        throw new HttpsError("not-found", "Kullanıcı profili bulunamadı");
       }
       const user = userDoc.data();
       if (user?.role !== "vendor") {
-        throw new Error("Sadece vendor'lar ödeme yapabilir");
+        // requireVendor helper'ı yerine burada manuel kontrol: user dokümanını
+        // zaten buyer bilgisi için okuduğumuzdan ikinci bir okuma yapmıyoruz.
+        throw new HttpsError("permission-denied", "Sadece vendor'lar ödeme yapabilir");
+      }
+
+      // v5.x: Production iyzico (sandbox DEĞİL) geçerli TC/VKN ister. Sandbox
+      //   "11111111111"i kabul eder ama production reddeder → kullanıcıya kriptik
+      //   iyzico hatası yerine net "fatura bilgini tamamla" mesajı verelim.
+      const baseUrl = IYZICO_BASE_URL.value() || "https://sandbox-api.iyzipay.com";
+      const isProdIyzico = !baseUrl.includes("sandbox");
+      const taxNo = String(user?.invoiceTaxNumber || "").replace(/\D/g, "");
+      if (isProdIyzico && !/^[0-9]{10,11}$/.test(taxNo)) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Ödeme için fatura bilgilerin eksik. Profil → Fatura Bilgileri'nden " +
+          "10 haneli (VKN) veya 11 haneli (TCKN) vergi numaranı gir."
+        );
       }
 
       // 4. subscription_history pending kaydı
@@ -112,7 +128,7 @@ export const iyzicoCheckoutInit = onCall(
       const iyzicoConfig: IyzicoConfig = {
         apiKey: IYZICO_API_KEY.value(),
         secretKey: IYZICO_SECRET_KEY.value(),
-        baseUrl: IYZICO_BASE_URL.value() || "https://sandbox-api.iyzipay.com",
+        baseUrl: baseUrl,
       };
 
       const buyerName = (user?.displayName || user?.company || user?.email || "PoCHub Vendor").split(" ");
@@ -134,7 +150,7 @@ export const iyzicoCheckoutInit = onCall(
           surname: lastName,
           gsmNumber: user?.phone || "+905555555555",
           email: user?.email || "noreply@pochub.co",
-          identityNumber: user?.invoiceTaxNumber || "11111111111",
+          identityNumber: taxNo || "11111111111",
           registrationAddress: user?.invoiceAddress || "İstanbul, Türkiye",
           ip: (request.rawRequest?.ip as string) || "127.0.0.1",
           city: user?.city || "İstanbul",

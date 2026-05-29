@@ -380,22 +380,33 @@ export const hourlyBillingCheckCron = onSchedule(
         .limit(500)
         .get();
 
+      // Paket dokümanlarını cache'le (her vendor için tekrar okumamak adına)
+      const pkgCache = new Map<string, any>();
+      const getPkg = async (id: string) => {
+        if (pkgCache.has(id)) return pkgCache.get(id);
+        const d = await db.collection("pochub_packages").doc(id).get();
+        const v = d.exists ? d.data() : null;
+        pkgCache.set(id, v);
+        return v;
+      };
+
       for (const subDoc of activeSubsSnap.docs) {
         const sub = subDoc.data();
         const vendorId = subDoc.id;
 
-        // Quota durumu — pochub_packages'tan tier limitini, kullanımı vendor_billing'ten
+        // v5.x: Kota modeli client ile AYNI olmalı:
+        //   kullanım  = vendor_subscriptions.pocUsedThisCycle  (otorite sayaç)
+        //   limit     = pochub_packages.pocQuota               (monthlyPocQuota DEĞİL)
+        // Eski kod vendor_billing.currentMonthPocCount + pkg.monthlyPocQuota okuyordu;
+        // client bu alanları hiç yazmadığı için kota uyarıları hiç tetiklenmiyordu.
         if (!sub.currentTier || sub.currentTier === "free") continue;
 
-        const pkgDoc = await db.collection("pochub_packages").doc(sub.currentPackageId || sub.currentTier).get();
-        const pkg = pkgDoc.data();
-        const monthlyQuota = pkg?.monthlyPocQuota || 0;
-        if (!monthlyQuota) continue;
+        const pkg = await getPkg(sub.currentPackageId || sub.currentTier);
+        const quota = pkg?.pocQuota || 0;
+        if (!quota || quota === -1) continue; // -1 = sınırsız (enterprise), 0 = tanımsız → atla
 
-        const billDoc = await db.collection("vendor_billing").doc(vendorId).get();
-        const bill = billDoc.data();
-        const used = bill?.currentMonthPocCount || 0;
-        const usagePercent = (used / monthlyQuota) * 100;
+        const used = sub.pocUsedThisCycle || 0;
+        const usagePercent = (used / quota) * 100;
 
         for (const threshold of quotaThresholds) {
           if (usagePercent >= threshold) {
@@ -410,7 +421,7 @@ export const hourlyBillingCheckCron = onSchedule(
               recipientId: vendorId,
               type: "quota_warning",
               title: `Kotanın %${threshold}'una ulaştın`,
-              message: `Bu ay ${used}/${monthlyQuota} PoC talebi kullandın (%${Math.round(usagePercent)}).`,
+              message: `Bu ay ${used}/${quota} PoC talebi kullandın (%${Math.round(usagePercent)}).`,
               read: false,
               urgency: threshold >= 100 ? "high" : "normal",
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
