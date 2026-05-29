@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.38 | pochub.co -->
+<!-- PoCHub v5.39 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -678,12 +678,12 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <!-- FIREBASE + EMAILJS -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, PhoneAuthProvider } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp, increment } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, PhoneAuthProvider, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp, increment, connectFirestoreEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 // v4.75: Firebase Functions client SDK
-import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.38';
+const VERSION = 'v5.39';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.39': ['EMULATOR BRIDGE: Client localhost'+chr(39)+'ta local Firebase Emulator'+chr(39)+'a baglanir (connectFunctionsEmulator/Auth/Firestore) → v4.76-v4.97 Functions kodu (iyzico/EmailJS/Cron) Blaze ACMADAN test edilebilir. EMULATOR_CONFIG ile secilebilir; production (pochub.co) etkilenmez (sadece localhost gate). Functions kodu zaten yazili/test edili — bu eksik client koprusuydu.'],
   'v5.38': ['DATA-MODEL AUDIT: registrations dokumanina vendorId eklendi (vendor panel where vendorId==uid sorgusu calisir → katilimcilar gorunur). vendAnalytics yanlis koleksiyon sorguluyordu: events→public_events, event_registrations→registrations. renderVendorPublic (public profil) etkinlikleri events→public_events. Tum dashboard query alanlari yazilan alanlarla eslesti. Not: eski (v5.38 oncesi) kayitlarda vendorId yok — demo temizligi sonrasi sorun degil.'],
   'v5.37': ['CRITICAL FIX: increment() import edilmemisti → anasayfa userCount/pocCount counter\'lari sessizce hata alip hep 0 kaliyordu (import eklendi). recalcGlobalStats() backfill + admin panel butonu + admin home self-heal (gercek sayilar). Chat: onSnapshot orderBy kaldirildi (composite index yoksa fallback non-live oluyordu) → gonderilen mesaj artik aninda gorunur, kapat/ac gerekmiyor.'],
   'v5.36': ['PERMISSION AUDIT: Global safeQuery/safeDoc helper (tek denial Promise.all\'i cokertmez) - musteri/vendor dashboard + urun-stat graceful. Public vendor profil tier rozeti users.subscriptionTier\'den okunur (vendor_subscriptions denied fix). RULES: audit_logs self-read (GDPR Verilerimi Indir + aktivite log).'],
@@ -1909,6 +1910,44 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 // v4.75: Firebase Functions client (europe-west1 region)
 const fns = getFunctions(app, 'europe-west1');
+
+// ════════════════════════════════════════════════════════════════════
+// v5.39: LOCAL FIREBASE EMULATOR BAĞLANTISI
+// ════════════════════════════════════════════════════════════════════
+// SADECE localhost'ta çalışır → Production (pochub.co / GitHub Pages) ASLA etkilenmez.
+// Amaç: v4.76–v4.97'de yazılmış Functions kodunu (iyzico, EmailJS, Cron) Blaze
+//   planı AÇMADAN local emulator'da test etmek.
+//
+// Kullanım:
+//   1) cd functions && npm run build
+//   2) firebase emulators:start           (Functions:5001, Auth:9099, Firestore:8080)
+//   3) Proje kökünde:  npx serve . -p 3000
+//   4) http://localhost:3000 → Admin Settings → "helloWorld test" butonu
+//
+// Hangi emulator'lere bağlanılacağını buradan seç. Emulator'ı çalıştırmadığın
+// servisi 'false' bırak (yoksa o servise giden çağrılar bağlantı hatası verir).
+//   - firestore:true  → Functions emulator Firestore'u kullanır (BOŞ başlar, seed gerekebilir;
+//                        production verisine DOKUNMAZ — izole test için en güvenlisi).
+//   - firestore:false → app production Firestore'u kullanır (gerçek veriyle test; dikkatli ol).
+const EMULATOR_CONFIG = { functions: true, auth: true, firestore: false };
+(function connectEmulators(){
+  var h = location.hostname;
+  var isLocal = (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0');
+  if (!isLocal) return;
+  if (EMULATOR_CONFIG.functions) {
+    try { connectFunctionsEmulator(fns, '127.0.0.1', 5001); console.info('[emulator] Functions → 127.0.0.1:5001'); }
+    catch(e){ console.warn('[emulator] Functions bağlanamadı:', e.message); }
+  }
+  if (EMULATOR_CONFIG.auth) {
+    try { connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true }); console.info('[emulator] Auth → 127.0.0.1:9099'); }
+    catch(e){ console.warn('[emulator] Auth bağlanamadı:', e.message); }
+  }
+  if (EMULATOR_CONFIG.firestore) {
+    try { connectFirestoreEmulator(db, '127.0.0.1', 8080); console.info('[emulator] Firestore → 127.0.0.1:8080'); }
+    catch(e){ console.warn('[emulator] Firestore bağlanamadı:', e.message); }
+  }
+  console.info('%c[PoCHub] LOCAL EMULATOR MODU AKTİF', 'color:#a855f7;font-weight:700');
+})();
 
 // ════════════════════════════════════════════════════════════════════
 // v4.88: REFERRAL CAPTURE - URL'den ?ref=... yakala
