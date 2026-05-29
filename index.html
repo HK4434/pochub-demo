@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.35 | pochub.co -->
+<!-- PoCHub v5.36 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.35';
+const VERSION = 'v5.36';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.36': ['PERMISSION AUDIT: Global safeQuery/safeDoc helper (tek denial Promise.all\'i cokertmez) - musteri/vendor dashboard + urun-stat graceful. Public vendor profil tier rozeti users.subscriptionTier\'den okunur (vendor_subscriptions denied fix). RULES: audit_logs self-read (GDPR Verilerimi Indir + aktivite log).'],
   'v5.35': ['DEEP AUDIT: Tum query/write rules ile uyumlu hale getirildi - anasayfa stats gercek sayilar, kalan permission hatalari.'],
   'v5.34': ['HOTFIX-2: Sistematik rules audit - tum permission hatalari (events, poc_invites accept, anasayfa stats, vb.).'],
   'v5.33': ['HOTFIX: Rules-kod uyumsuzluklari (analytics, customer dashboard, davetler, teklifler).'],
@@ -3185,6 +3186,34 @@ function showToast(msg, type='ok') {
   }, 3500);
 }
 window.showToast = showToast;
+
+/* ══════════════════════════════════════
+   v5.36: GÜVENLİ FIRESTORE OKUMA HELPER'LARI
+   Strict Security Rules altında tek bir query/doc 'permission-denied'
+   alsa bile Promise.all komple reject olup paneli çökertmesin diye:
+   safeQuery → her zaman snapshot-benzeri ({docs,size,empty,forEach}) döner
+   safeDoc   → her zaman docSnap-benzeri ({exists(),data(),id}) döner
+   Hata olursa sessizce boş döner + tek satır debug log (gürültü yapmaz).
+══════════════════════════════════════ */
+const _EMPTY_SNAP = { docs: [], size: 0, empty: true, forEach: function(){}, _denied: true };
+async function safeQuery(q){
+  try { return await getDocs(q); }
+  catch(e){
+    if (e && e.code === 'permission-denied') console.debug('[safeQuery] permission-denied (graceful empty):', e.message);
+    else console.debug('[safeQuery] error (graceful empty):', e && e.message);
+    return _EMPTY_SNAP;
+  }
+}
+async function safeDoc(d){
+  try { return await getDoc(d); }
+  catch(e){
+    if (e && e.code === 'permission-denied') console.debug('[safeDoc] permission-denied (graceful null):', e.message);
+    else console.debug('[safeDoc] error (graceful null):', e && e.message);
+    return { exists: function(){ return false; }, data: function(){ return null; }, id: (d && d.id) || null, _denied: true };
+  }
+}
+window.safeQuery = safeQuery;
+window.safeDoc = safeDoc;
 
 /* ══════════════════════════════════════
    DURUM
@@ -9300,11 +9329,11 @@ async function loadCustTab() {
       + renderSkeleton('stat-grid', 8);
 
     const [pocSnap, offSnapUID, offSnapEmail, invSnap, regSnap] = await Promise.all([
-      getDocs(query(collection(db,'poc_requests'),  where('customerId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'offers'),         where('customerId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'offers'),         where('customerEmail','==',CUR_USER.email))),
-      getDocs(query(collection(db,'poc_invites'),    where('customerEmail','==',CUR_USER.email))),
-      getDocs(query(collection(db,'registrations'),  where('userId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'poc_requests'),  where('customerId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'offers'),         where('customerId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'offers'),         where('customerEmail','==',CUR_USER.email))),
+      safeQuery(query(collection(db,'poc_invites'),    where('customerEmail','==',CUR_USER.email))),
+      safeQuery(query(collection(db,'registrations'),  where('userId','==',CUR_USER.uid))),
     ]);
 
     var seenOff = {};
@@ -10322,9 +10351,9 @@ async function loadOffersWithComparison(m) {
   m.innerHTML = renderSkeleton('card-list', 4);
   try {
     const [pocSnap, snapByUid, snapByEmail] = await Promise.all([
-      getDocs(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'offers'), where('customerId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'offers'), where('customerEmail','==',CUR_USER.email))),
+      safeQuery(query(collection(db,'poc_requests'), where('customerId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'offers'), where('customerId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'offers'), where('customerEmail','==',CUR_USER.email))),
     ]);
 
     var seenIds = {};
@@ -11015,12 +11044,12 @@ async function loadVendTab() {
       + renderSkeleton('stat-grid', 8);
 
     const [pocSnap, evSnap, offSnap, prodSnap, invSnap, regSnap] = await Promise.all([
-      getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'public_events'),where('vendorId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'offers'),       where('vendorId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'products'),     where('vendorId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'poc_invites'),  where('vendorId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'registrations'),where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'public_events'),where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'offers'),       where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'products'),     where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'poc_invites'),  where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'registrations'),where('vendorId','==',CUR_USER.uid))),
     ]);
 
     var pocs  = pocSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
@@ -11806,9 +11835,9 @@ async function loadVendTab() {
     var now      = new Date();
 
     const [pocSnap, evSnap, regSnap] = await Promise.all([
-      getDocs(query(collection(db,'poc_requests'),  where('vendorId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid))),
-      getDocs(query(collection(db,'registrations'), where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'poc_requests'),  where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'public_events'), where('vendorId','==',CUR_USER.uid))),
+      safeQuery(query(collection(db,'registrations'), where('vendorId','==',CUR_USER.uid))),
     ]);
 
     var pocs = pocSnap.docs.map(function(d){ return {...d.data(),id:d.id,_type:'poc'}; });
@@ -17154,7 +17183,7 @@ async function exportUserData() {
     }
 
     // Audit log (kendi kullanım geçmişi)
-    var auditSnap = await getDocs(query(collection(db, 'audit_logs'), where('userId', '==', CUR_USER.uid), limit(100)));
+    var auditSnap = await safeQuery(query(collection(db, 'audit_logs'), where('userId', '==', CUR_USER.uid), limit(100)));
     exportData.auditLogs = auditSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
 
     // PoC'lara ait mesajlar (uzun olabilir - sadece kullanıcının attığı/aldığı)
@@ -17205,7 +17234,7 @@ async function showAuditLogModal() {
   modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
 
   try {
-    var snap = await getDocs(query(collection(db, 'audit_logs'), where('userId', '==', CUR_USER.uid), orderBy('timestamp','desc'), limit(100)));
+    var snap = await safeQuery(query(collection(db, 'audit_logs'), where('userId', '==', CUR_USER.uid), orderBy('timestamp','desc'), limit(100)));
     var listEl = modal.querySelector('#al-list');
     if (snap.empty) {
       listEl.innerHTML = renderEmpty({
@@ -21384,16 +21413,18 @@ async function vendPortfolio(m) {
       if (vtype === 'ureticid') {
         // Üretici: kendi vendor'lığında olan PoC ve teklifler
         var _r = await Promise.all([
-          getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
-          getDocs(query(collection(db,'offers'),       where('vendorId','==',CUR_USER.uid))),
+          safeQuery(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
+          safeQuery(query(collection(db,'offers'),       where('vendorId','==',CUR_USER.uid))),
         ]);
         _pocSnapAll = _r[0]; _offSnapAll = _r[1];
       } else {
         // Distribütör/entegratör: tüm PoC ve offer'lar (kendi rolüyle eşleşen ürünler için zaten filtrelenmiş items)
-        // Performans: sadece items'taki ürünlere bağlı kayıtlar
+        // v5.36 NOT: Bu kısıtsız okuma strict rules altında non-admin için 'permission-denied' verir
+        //   → safeQuery ile boş döner (stats 0), sayfa çökmez. Doğru çözüm: sunucu-taraflı
+        //   agregasyon (Cloud Function) veya products->vendorId üzerinden dolaylı sayım. Blaze sonrası.
         var _r = await Promise.all([
-          getDocs(collection(db,'poc_requests')),
-          getDocs(collection(db,'offers')),
+          safeQuery(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))),
+          safeQuery(query(collection(db,'offers'),       where('vendorId','==',CUR_USER.uid))),
         ]);
         _pocSnapAll = _r[0]; _offSnapAll = _r[1];
       }
@@ -30729,12 +30760,10 @@ async function renderVendorPublic(slug) {
       : '';
 
     // Subscription tier (Pro/Business/Enterprise rozet)
-    var subSnap = null;
-    try {
-      var sSnap = await getDoc(doc(db,'vendor_subscriptions',vendor.uid));
-      if (sSnap.exists()) subSnap = sSnap.data();
-    } catch(e) {}
-    var tier = subSnap?.currentTier || 'free';
+    // v5.36: vendor_subscriptions private → anonim/müşteri görüntülemesinde 'permission-denied'
+    //   verip rozet hiç görünmüyordu. Tier'i public users dokümanından oku
+    //   (v5.35 badge migrasyonu users.subscriptionTier'i güncel tutuyor).
+    var tier = vendor.subscriptionTier || 'free';
     var tierBadge = '';
     if (tier === 'professional') tierBadge = '<span style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px">PRO</span>';
     else if (tier === 'business') tierBadge = '<span style="background:linear-gradient(135deg,#d97706,#d18420);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:12px;margin-left:6px">BUSINESS</span>';
