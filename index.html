@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.32 | pochub.co -->
+<!-- PoCHub v5.33 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.32';
+const VERSION = 'v5.33';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.33': ['HOTFIX: Rules-kod uyumsuzluklari (analytics, customer dashboard, davetler, teklifler).'],
   'v5.32': ['SECURITY: Firestore Security Rules v1.0 - tum collectionlar icin sıkı erisim kontrolu (Yaklasim 1: Full Rules).'],
   'v5.31': ['FEATURE: Test kullanici email-verify bypass + Admin manuel email dogrulama mudahalesi (Spark uyumlu, Firestore flag).'],
   'v5.30': ['UI: Tema temizligi tamamlama - kalan dark theme kalintilari taranip duzeltildi + test framework genisletildi (19->28 test).'],
@@ -17082,9 +17083,14 @@ async function exportUserData() {
     var notifsSnap = await getDocs(query(collection(db, 'notifications'), where('userId', '==', CUR_USER.uid)));
     exportData.notifications = notifsSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
 
-    // Davetler (verilen ve alınan)
-    var invitesGiven = await getDocs(query(collection(db, 'poc_invites'), where('inviterUid', '==', CUR_USER.uid)));
-    exportData.invites = invitesGiven.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+    // Davetler (verilen ve alınan) - v5.33: customerId/vendorId field
+    var invitesGiven = await getDocs(query(collection(db, 'poc_invites'), where('customerId', '==', CUR_USER.uid)));
+    var invitesReceived = await getDocs(query(collection(db, 'poc_invites'), where('vendorId', '==', CUR_USER.uid)));
+    var allInvites = [...invitesGiven.docs, ...invitesReceived.docs];
+    var seenInv = {};
+    exportData.invites = allInvites
+      .filter(function(d){ if(seenInv[d.id]) return false; seenInv[d.id]=true; return true; })
+      .map(function(d){ return { id: d.id, ...d.data() }; });
 
     // Kayıtlar
     var regsSnap = await getDocs(query(collection(db, 'registrations'), where('userId', '==', CUR_USER.uid)));
@@ -18147,8 +18153,9 @@ async function vendAnalytics(m) {
     }
 
     // ─── VERİ ÇEK ───
+    // v5.33: poc_requests vendorId (tek field) - eski vendorIds array yanlıştı
     var [pocSnap, offSnap, evSnap, regSnap, subSnap2] = await Promise.all([
-      getDocs(query(collection(db, 'poc_requests'), where('vendorIds', 'array-contains', CUR_USER.uid))),
+      getDocs(query(collection(db, 'poc_requests'), where('vendorId', '==', CUR_USER.uid))),
       getDocs(query(collection(db, 'offers'), where('vendorId', '==', CUR_USER.uid))),
       getDocs(query(collection(db, 'events'), where('vendorId', '==', CUR_USER.uid))),
       getDocs(query(collection(db, 'event_registrations'), where('vendorId', '==', CUR_USER.uid))),
@@ -18165,27 +18172,22 @@ async function vendAnalytics(m) {
     var nowMs = Date.now();
     var thirtyDaysAgo = nowMs - 30 * 86400 * 1000;
 
-    // Bu vendor için PoC durumu
+    // Bu vendor için PoC durumu (v5.33: tek vendor modeli - p.status direkt)
     var totalReceived = pocs.length;
     var acceptedPocs = pocs.filter(function(p){
-      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
-      return resp.status === 'accepted' || resp.status === 'in_progress' || resp.status === 'completed';
+      return p.status === 'accepted' || p.status === 'in_progress' || p.status === 'completed';
     });
     var rejectedPocs = pocs.filter(function(p){
-      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
-      return resp.status === 'rejected';
+      return p.status === 'rejected';
     });
     var pendingPocs = pocs.filter(function(p){
-      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
-      return !resp.status || resp.status === 'pending';
+      return !p.status || p.status === 'pending';
     });
     var completedPocs = pocs.filter(function(p){
-      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
-      return resp.status === 'completed';
+      return p.status === 'completed';
     });
     var activePocs = acceptedPocs.filter(function(p){
-      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
-      return resp.status === 'accepted' || resp.status === 'in_progress';
+      return p.status === 'accepted' || p.status === 'in_progress';
     });
 
     var acceptanceRate = totalReceived > 0
@@ -18194,18 +18196,16 @@ async function vendAnalytics(m) {
 
     var successRate = (acceptedPocs.length + completedPocs.length) > 0 && completedPocs.length > 0
       ? Math.round((completedPocs.filter(function(p){
-          var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
-          return resp.outcome === 'success' || resp.outcome === 'won';
+          return p.outcome === 'success' || p.outcome === 'won';
         }).length / completedPocs.length) * 100)
       : 0;
 
-    // Ortalama cevap süresi (saat)
+    // Ortalama cevap süresi (saat) - v5.33: tek vendor modeli
     var totalResponseHours = 0;
     var responseCount = 0;
     acceptedPocs.concat(rejectedPocs).forEach(function(p){
-      var resp = (p.vendorResponses && p.vendorResponses[CUR_USER.uid]) || {};
       var createdMs = p.createdAt?.toMillis ? p.createdAt.toMillis() : null;
-      var respMs = resp.respondedAt?.toMillis ? resp.respondedAt.toMillis() : null;
+      var respMs = p.respondedAt?.toMillis ? p.respondedAt.toMillis() : (p.updatedAt?.toMillis ? p.updatedAt.toMillis() : null);
       if (createdMs && respMs && respMs > createdMs) {
         totalResponseHours += (respMs - createdMs) / 3600000;
         responseCount++;
