@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.41 | pochub.co -->
+<!-- PoCHub v5.42 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.41';
+const VERSION = 'v5.42';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.42': ['KVKK EXPORT dayanikli+seffaf: Verilerimi Indir artik her sorguyu xq() ile sarar - tek yetki reddi tum export\'u cokertmez. Cikti _uyarilar bolumu + exportInfo.eksiksizMi/uyariNotu ile neyin tam alinamadigini ACIKCA belirtir (eskiden try/catch ile sessizce yutuluyordu - KVKK uyumluluk riski). Mesajlar iki asamali: gonderdiklerim senderId==uid ile TAM yakalanir, alinanlar PoC-katilimci best-effort + reddedilirse uyariya yazilir. RULES (v5.42): poc_requests read vendorId dali isVendor() gate kaldirildi -> isOwner(vendorId) (musterinin export\'taki bos-donen vendorId sorgusu artik reddedilmiyor).'],
   'v5.41': ['SEED: Otomatik test cercevesi v2 (state-farkinda, fonksiyonel+yapisal+kozmetik kategorili, false-fail kaldirildi, kendi listesini render eden runner). Platform KODU DEGISMEDI; surum seed ile lockstep icin yukseltildi.'],
   'v5.40': ['HOTFIX: v5.39 CHANGELOG satirinda Python uretim-scripti artefakti (kacissiz apostrof) literal kalmis, JS modul yuklenirken ReferenceError (chr is not defined) firlatip TUM uygulamayi cokertiyordu (bos ekran). Apostrofsuz temiz metinle duzeltildi. CHANGELOG runtime-eval ile dogrulandi. Emulator bridge (v5.39) aynen calisir.'],
   'v5.39': ['EMULATOR BRIDGE: Client localhost ortaminda local Firebase Emulator baglanir (connectFunctionsEmulator/Auth/Firestore). v4.76-v4.97 Functions kodu (iyzico/EmailJS/Cron) Blaze ACMADAN test edilebilir. EMULATOR_CONFIG ile secilebilir; production (pochub.co) etkilenmez (sadece localhost gate). Functions kodu zaten yazili/test edili, eksik olan client koprusuydu.'],
@@ -17195,10 +17196,25 @@ window.renderUserProfile = renderUserProfile;
 async function exportUserData() {
   if (!CUR_USER?.uid) throw new Error('Giriş yapılmamış');
 
+  var warnings = [];
+  // v5.42: Yetki/erişim hatasını YUTMADAN kaydeden yardımcı.
+  // KVKK şeffaflık: tek bir red tüm export'u çökertmesin VE sessiz eksiklik olmasın.
+  async function xq(label, q) {
+    try { return await getDocs(q); }
+    catch (e) {
+      warnings.push({
+        bolum: label,
+        sorun: (e && e.code === 'permission-denied') ? 'Yetki reddedildi' : ((e && e.message) || 'bilinmeyen hata'),
+      });
+      console.debug('[export] "' + label + '" alınamadı:', e && e.message);
+      return { docs: [] };
+    }
+  }
+
   var exportData = {
     exportInfo: {
       generatedAt: new Date().toISOString(),
-      exportVersion: '1.0',
+      exportVersion: '1.1',
       regulation: 'KVKK Madde 11 / GDPR Article 20',
       userId: CUR_USER.uid,
       userEmail: CUR_USER.email,
@@ -17214,79 +17230,91 @@ async function exportUserData() {
     products: [],  // vendor için
     consents: {},
     auditLogs: [],
+    _uyarilar: [],  // tam çekilemeyen bölümler (varsa)
   };
 
-  try {
-    // Profil
-    var userSnap = await getDoc(doc(db, 'users', CUR_USER.uid));
-    if (userSnap.exists()) {
-      var pData = userSnap.data();
-      // v5.18: Şifreli alanları decrypt et (kullanıcının kendi verisi)
-      if (pData.taxNoEncrypted && isEncrypted(pData.taxNo)) {
-        try { pData.taxNo = await decryptValue(pData.taxNo); } catch(e){}
-      }
-      exportData.profile = pData;
-      exportData.consents = pData.consents || {};
+  // Profil (safeDoc reddi _denied ile bildirir → yutmuyoruz)
+  var userSnap = await safeDoc(doc(db, 'users', CUR_USER.uid));
+  if (userSnap && userSnap._denied) {
+    warnings.push({ bolum: 'Profil', sorun: 'Yetki reddedildi' });
+  } else if (userSnap && userSnap.exists()) {
+    var pData = userSnap.data();
+    // v5.18: Şifreli alanları decrypt et (kullanıcının kendi verisi)
+    if (pData.taxNoEncrypted && isEncrypted(pData.taxNo)) {
+      try { pData.taxNo = await decryptValue(pData.taxNo); } catch(e){}
     }
-
-    // PoC talepleri (customer veya vendor olarak)
-    var pocsAsCustomer = await getDocs(query(collection(db, 'poc_requests'), where('customerId', '==', CUR_USER.uid)));
-    var pocsAsVendor   = await getDocs(query(collection(db, 'poc_requests'), where('vendorId', '==', CUR_USER.uid)));
-    exportData.pocs = [
-      ...pocsAsCustomer.docs.map(function(d){ return { id: d.id, role: 'customer', ...d.data() }; }),
-      ...pocsAsVendor.docs.map(function(d){ return { id: d.id, role: 'vendor', ...d.data() }; }),
-    ];
-
-    // Teklifler
-    var offersAsCustomer = await getDocs(query(collection(db, 'offers'), where('customerId', '==', CUR_USER.uid)));
-    var offersAsVendor = await getDocs(query(collection(db, 'offers'), where('vendorId', '==', CUR_USER.uid)));
-    exportData.offers = [
-      ...offersAsCustomer.docs.map(function(d){ return { id: d.id, role: 'customer', ...d.data() }; }),
-      ...offersAsVendor.docs.map(function(d){ return { id: d.id, role: 'vendor', ...d.data() }; }),
-    ];
-
-    // Bildirimler (kendisine gelen)
-    var notifsSnap = await getDocs(query(collection(db, 'notifications'), where('userId', '==', CUR_USER.uid)));
-    exportData.notifications = notifsSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
-
-    // Davetler (verilen ve alınan) - v5.33: customerId/vendorId field
-    var invitesGiven = await getDocs(query(collection(db, 'poc_invites'), where('customerId', '==', CUR_USER.uid)));
-    var invitesReceived = await getDocs(query(collection(db, 'poc_invites'), where('vendorId', '==', CUR_USER.uid)));
-    var allInvites = [...invitesGiven.docs, ...invitesReceived.docs];
-    var seenInv = {};
-    exportData.invites = allInvites
-      .filter(function(d){ if(seenInv[d.id]) return false; seenInv[d.id]=true; return true; })
-      .map(function(d){ return { id: d.id, ...d.data() }; });
-
-    // Kayıtlar
-    var regsSnap = await getDocs(query(collection(db, 'registrations'), where('userId', '==', CUR_USER.uid)));
-    exportData.registrations = regsSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
-
-    // Vendor ise ürünleri de
-    if (CUR_PROFILE?.role === 'vendor') {
-      var prodSnap = await getDocs(query(collection(db, 'products'), where('vendorId', '==', CUR_USER.uid)));
-      exportData.products = prodSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
-    }
-
-    // Audit log (kendi kullanım geçmişi)
-    var auditSnap = await safeQuery(query(collection(db, 'audit_logs'), where('userId', '==', CUR_USER.uid), limit(100)));
-    exportData.auditLogs = auditSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
-
-    // PoC'lara ait mesajlar (uzun olabilir - sadece kullanıcının attığı/aldığı)
-    if (exportData.pocs.length > 0 && exportData.pocs.length <= 20) {
-      for (var poc of exportData.pocs.slice(0, 20)) {
-        try {
-          var msgSnap = await getDocs(query(collection(db, 'poc_messages'), where('pocId', '==', poc.id)));
-          msgSnap.docs.forEach(function(d){
-            exportData.messages.push({ id: d.id, pocId: poc.id, ...d.data() });
-          });
-        } catch(e){}
-      }
-    }
-  } catch(e) {
-    console.error('Export error:', e);
-    throw new Error('Veri toplama sırasında hata: ' + e.message);
+    exportData.profile = pData;
+    exportData.consents = pData.consents || {};
   }
+
+  // PoC talepleri (customer veya vendor olarak)
+  var pocsAsCustomer = await xq('PoC talepleri (müşteri)', query(collection(db, 'poc_requests'), where('customerId', '==', CUR_USER.uid)));
+  var pocsAsVendor   = await xq('PoC talepleri (vendor)',  query(collection(db, 'poc_requests'), where('vendorId', '==', CUR_USER.uid)));
+  exportData.pocs = [
+    ...pocsAsCustomer.docs.map(function(d){ return { id: d.id, role: 'customer', ...d.data() }; }),
+    ...pocsAsVendor.docs.map(function(d){ return { id: d.id, role: 'vendor', ...d.data() }; }),
+  ];
+
+  // Teklifler
+  var offersAsCustomer = await xq('Teklifler (müşteri)', query(collection(db, 'offers'), where('customerId', '==', CUR_USER.uid)));
+  var offersAsVendor   = await xq('Teklifler (vendor)',  query(collection(db, 'offers'), where('vendorId', '==', CUR_USER.uid)));
+  exportData.offers = [
+    ...offersAsCustomer.docs.map(function(d){ return { id: d.id, role: 'customer', ...d.data() }; }),
+    ...offersAsVendor.docs.map(function(d){ return { id: d.id, role: 'vendor', ...d.data() }; }),
+  ];
+
+  // Bildirimler (kendisine gelen)
+  var notifsSnap = await xq('Bildirimler', query(collection(db, 'notifications'), where('userId', '==', CUR_USER.uid)));
+  exportData.notifications = notifsSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+
+  // Davetler (verilen ve alınan) - v5.33: customerId/vendorId field
+  var invitesGiven    = await xq('Davetler (verilen)', query(collection(db, 'poc_invites'), where('customerId', '==', CUR_USER.uid)));
+  var invitesReceived = await xq('Davetler (alınan)',  query(collection(db, 'poc_invites'), where('vendorId', '==', CUR_USER.uid)));
+  var allInvites = [...invitesGiven.docs, ...invitesReceived.docs];
+  var seenInv = {};
+  exportData.invites = allInvites
+    .filter(function(d){ if(seenInv[d.id]) return false; seenInv[d.id]=true; return true; })
+    .map(function(d){ return { id: d.id, ...d.data() }; });
+
+  // Kayıtlar
+  var regsSnap = await xq('Etkinlik kayıtları', query(collection(db, 'registrations'), where('userId', '==', CUR_USER.uid)));
+  exportData.registrations = regsSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+
+  // Vendor ise ürünleri de
+  if (CUR_PROFILE?.role === 'vendor') {
+    var prodSnap = await xq('Ürünler', query(collection(db, 'products'), where('vendorId', '==', CUR_USER.uid)));
+    exportData.products = prodSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+  }
+
+  // Audit log (kendi kullanım geçmişi)
+  var auditSnap = await xq('İşlem geçmişi (audit)', query(collection(db, 'audit_logs'), where('userId', '==', CUR_USER.uid), limit(100)));
+  exportData.auditLogs = auditSnap.docs.map(function(d){ return { id: d.id, ...d.data() }; });
+
+  // Mesajlar — iki aşamalı (v5.42):
+  //  1) Gönderdiğim (senderId==uid): kural her zaman izin verir → TAM yakalanır
+  //  2) Her PoC'nin tüm mesajları (katılımcı): alınanlar için best-effort.
+  //     poc_messages list sorgusu get()-participant kuralına bağlı; reddedilirse
+  //     _uyarilar'a yazılır (eskiden try/catch ile sessizce yutuluyordu).
+  var msgMap = {};
+  var sentMsgs = await xq('Gönderdiğim mesajlar', query(collection(db, 'poc_messages'), where('senderId', '==', CUR_USER.uid)));
+  sentMsgs.docs.forEach(function(d){ msgMap[d.id] = { id: d.id, ...d.data() }; });
+  if (exportData.pocs.length > 0 && exportData.pocs.length <= 30) {
+    for (var poc of exportData.pocs.slice(0, 30)) {
+      var msgSnap = await xq('Mesajlar (PoC: ' + (poc.title || poc.id) + ')', query(collection(db, 'poc_messages'), where('pocId', '==', poc.id)));
+      msgSnap.docs.forEach(function(d){ msgMap[d.id] = { id: d.id, pocId: poc.id, ...d.data() }; });
+    }
+  }
+  exportData.messages = Object.keys(msgMap).map(function(k){ return msgMap[k]; });
+
+  // v5.42: Şeffaflık — neyin tam alınamadığını açıkça belirt (KVKK: sessiz eksiklik yok)
+  exportData._uyarilar = warnings;
+  if (warnings.length) {
+    exportData.exportInfo.eksiksizMi = false;
+    exportData.exportInfo.uyariNotu = 'Bazı bölümler yetki/erişim nedeniyle tam alınamadı. Ayrıntı için _uyarilar bölümüne bakın; bu veriler için kvkk@gitsteknoloji.com ile iletişime geçebilirsiniz.';
+  } else {
+    exportData.exportInfo.eksiksizMi = true;
+  }
+
 
   // JSON olarak indir
   var jsonStr = JSON.stringify(exportData, null, 2);
