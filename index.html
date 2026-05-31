@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.49 | pochub.co -->
+<!-- PoCHub v5.50 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.49';
+const VERSION = 'v5.50';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.50': ['ACIL ONAY (OVERRIDE) bolumu gelistirildi: (1) Isim tutarliligi — admin tarafinda "Override Talepleri" → "Acil Onay Talepleri" (vendor tarafindaki "Acil Onay Talep Et" ile esit). (2) ARAMA: ekrana vendor/PoC/sebep/musteri araması eklendi (DOM-filtre, re-render yok, odak korunur). (3) ARSIV: her talepte Arsivle/Arsivden Cikar + yeni Arsiv sekmesi; arsivlenenler diger sekmelerden gizli; sekme sayaclari arsivsiz. (4) DASHBOARD: bekleyen Acil Onay sayisi hizli-eylem butonu + highlight kart (bekleyen adet + onayli override borc toplami), tikla→sekme. UI/mantik — rules degismedi.'],
   'v5.49': ['ADMIN: Override faturalandirmasi artik PAKET BAZINDA da ayarlanabilir. Paket duzenleme modaline "Override Fiyat Zammi (%)" alani eklendi; bos birakilirsa Sistem Ayarlari\'ndaki global zam kullanilir (paket-oncelikli fallback). override tutari = paketin Asan PoC Fiyati x (1 + zam%). Boylece her tier kendi override fiyatlandirmasina sahip olabilir (or. Enterprise dusuk/sifir, Free caydirici yuksek). Yeni paket sablonuna overrideMultiplier:null eklendi. UI/mantik — rules degismedi.'],
   'v5.48': ['FIX: Override Talepleri ekrani bastan ele alindi. (1) RULES: admin_overrides write:isAdmin idi → vendor ne talep olusturabiliyor ne limit-kontrolu icin kendi gecmisini okuyabiliyordu (talepler hic dusmuyordu). Yeni: create=isAdmin||kendi vendorId, read=isAdmin||kendi, update/delete=isAdmin. (2) HANDLER: Onayla/Reddet butonlari eksik/eski kayitlarda cokuyordu (undefined pocId/amount Firestore\'da hata firlatir). Onayla artik gecerli pocId+tutar yoksa engelliyor ve net mesaj veriyor; bildirimler best-effort; Reddet undefined-guvenli (relatedId||null, vendorId guard) → kayit her durumda temizlenir. (3) GOSTERIM: tier rozeti kosullu, reason yoksa "belirtilmemis". RULES degisti — Console re-deploy gerekir.'],
   'v5.47': ['UI: Vendor gelen-PoC-talebi karti profesyonellestirildi. Net hiyerarsi: PoC basligi belirgin, ayri urun chip\'i (📦), ayrismis musteri kimlik blogu (firma vurgulu + lead/telefon rozetleri + isim/zaman alt satiri), okunakli meta pill\'leri (lokasyon + HER IKI tercih tarihi + sure), durum-renkli sol kenarlik, gereksinim bossa bos gorunmek yerine yonlendirici placeholder, ince ayrac + vurgulu aksiyonlar (Kabul Et=yesil/genis, Reddet=kirmizi, Mesaj=notr; aktifte Teklif Gonder birincil). Tum data-* ve handler class\'lari (rq-acc/rej/msg/off/comp) korundu. UI-only — rules degismedi.'],
@@ -23151,7 +23152,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Override Talepleri'],['content','📝 İçerik Yönetimi'],['kvkk-mgmt','🛡 KVKK & Yasal Sayfalar'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Acil Onay Talepleri'],['content','📝 İçerik Yönetimi'],['kvkk-mgmt','🛡 KVKK & Yasal Sayfalar'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
     ['profile','👤 Profilim'],
   ];
@@ -23198,7 +23199,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'profile')    { await renderUserProfile(m, 'admin');  return; }
 
     // DASHBOARD - v5.06: Zenginleştirildi
-    const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap, subSnap, paymentsSnap, demoSnap] = await Promise.all([
+    const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap, subSnap, paymentsSnap, demoSnap, ovSnap] = await Promise.all([
       getDocs(collection(db,'users')),
       getDocs(collection(db,'products')),
       getDocs(collection(db,'poc_requests')),
@@ -23207,6 +23208,7 @@ async function loadAdmTab() {
       getDocs(collection(db,'vendor_subscriptions')).catch(()=>({docs:[]})),
       getDocs(collection(db,'payment_history')).catch(()=>({docs:[]})),
       getDocs(collection(db,'demo_requests')).catch(()=>({docs:[]})),
+      getDocs(collection(db,'admin_overrides')).catch(()=>({docs:[]})),
     ]);
     const users  = usersSnap.docs.map(d=>d.data());
     const prods  = prodsSnap.docs.map(d=>d.data());
@@ -23216,6 +23218,7 @@ async function loadAdmTab() {
     const subs = subSnap.docs.map(d=>d.data());
     const payments = paymentsSnap.docs.map(d=>d.data());
     const demos = demoSnap.docs.map(d=>d.data());
+    const ovs = ovSnap.docs.map(d=>d.data());
 
     // ─── Zaman hesapları ───
     var nowMs = Date.now();
@@ -23266,6 +23269,11 @@ async function loadAdmTab() {
     var activeProds     = prods.filter(function(p){ return p.status==='active'; }).length;
     var pendingVendors  = users.filter(u => u.role === 'vendor' && u.vendorStatus === 'pending_approval').length;
 
+    // v5.50: Acil Onay (override) rakamları
+    var ovActive  = ovs.filter(function(o){ return !o.archived; });
+    var ovPending = ovActive.filter(function(o){ return o.status === 'pending'; }).length;
+    var ovDebt    = ovActive.filter(function(o){ return o.status === 'approved'; }).reduce(function(s,o){ return s + (o.overrideAmount||0); }, 0);
+
     var html = '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:10px">';
     html += '<div>';
     html += '<h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0 0 4px">📊 Platform Dashboard</h2>';
@@ -23275,6 +23283,7 @@ async function loadAdmTab() {
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
     if (pendingVendors > 0) html += '<button class="adm-quick-act" data-tab="vendorapprovals" style="background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);color:#d97706;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✓ '+pendingVendors+' Vendor Onayı</button>';
     if (pendingProds > 0) html += '<button class="adm-quick-act" data-tab="products" style="background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.3);color:#2563eb;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔍 '+pendingProds+' Ürün Onayı</button>';
+    if (ovPending > 0) html += '<button class="adm-quick-act" data-tab="overrides" style="background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);color:#d97706;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⚡ '+ovPending+' Acil Onay</button>';
     html += '</div>';
     html += '</div>';
 
@@ -23285,6 +23294,12 @@ async function loadAdmTab() {
       + '<div style="font-size:11px;color:#16a34a;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">📈 MRR (Aylık Gelir)</div>'
       + '<div style="font-size:24px;font-weight:800;color:#16a34a;font-family:monospace">₺'+mrr.toLocaleString('tr-TR')+'</div>'
       + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">'+paidSubs+' aktif ücretli abonelik</div>'
+      + '</div>';
+    // v5.50: Acil Onay (Override) kartı
+    html += '<div style="background:linear-gradient(135deg,rgba(217,119,6,.08),rgba(217,119,6,.02));border:1px solid rgba(217,119,6,.25);border-radius:12px;padding:16px;cursor:pointer" class="adm-quick-act" data-tab="overrides">'
+      + '<div style="font-size:11px;color:#d97706;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">⚡ Acil Onay Talepleri</div>'
+      + '<div style="font-size:24px;font-weight:800;color:#d97706">'+ovPending+'<span style="font-size:13px;font-weight:600;color:var(--text-muted)"> bekleyen</span></div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Onaylı override borç: ₺'+ovDebt.toLocaleString('tr-TR')+'</div>'
       + '</div>';
     // Son 30 gün gelir
     html += '<div style="background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(37,99,235,.02));border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:16px">'
@@ -30090,17 +30105,28 @@ async function openVendorApprovalDetail(uid) {
 // v4.67: ADMIN — OVERRIDE TALEPLERİ
 // ════════════════════════════════════════════════════════════════════
 async function admOverrides(m) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Override talepleri yükleniyor...</div>';
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Acil Onay talepleri yükleniyor...</div>';
   try {
     const snap = await getDocs(collection(db,'admin_overrides'));
     var all = snap.docs.map(function(d){ return {...d.data(), id:d.id}; });
     all.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
-    var pending = all.filter(function(h){ return h.status === 'pending'; });
-    var approved = all.filter(function(h){ return h.status === 'approved'; });
-    var rejected = all.filter(function(h){ return h.status === 'rejected'; });
+    var visible  = all.filter(function(h){ return !h.archived; });
+    var archived = all.filter(function(h){ return h.archived; });
+    var pending  = visible.filter(function(h){ return h.status === 'pending'; });
+    var approved = visible.filter(function(h){ return h.status === 'approved'; });
+    var rejected = visible.filter(function(h){ return h.status === 'rejected'; });
+
+    function recompute(){
+      visible  = all.filter(function(h){ return !h.archived; });
+      archived = all.filter(function(h){ return h.archived; });
+      pending  = visible.filter(function(h){ return h.status === 'pending'; });
+      approved = visible.filter(function(h){ return h.status === 'approved'; });
+      rejected = visible.filter(function(h){ return h.status === 'rejected'; });
+    }
 
     var currentTab = 'pending';
+    var ovSearch = '';
 
     async function render() {
       m.innerHTML = '';
@@ -30108,7 +30134,7 @@ async function admOverrides(m) {
       var hdr = document.createElement('div');
       hdr.style.cssText = 'margin-bottom:14px';
       hdr.innerHTML =
-        '<h2 class="fs18-fw7">⚡ Override Talepleri</h2>'
+        '<h2 class="fs18-fw7">⚡ Acil Onay Talepleri</h2>'
         + '<div class="txt-muted-12-mt3">Vendor\'ların acil PoC kabul talepleri (sonradan faturalandırma)</div>';
       m.appendChild(hdr);
 
@@ -30132,7 +30158,7 @@ async function admOverrides(m) {
 
       var tabRow = document.createElement('div');
       tabRow.style.cssText = 'display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap';
-      [['pending','⏳ Bekleyen ('+pending.length+')'],['approved','✅ Onaylı'],['rejected','❌ Reddedilmiş'],['all','📋 Tümü']].forEach(function(t){
+      [['pending','⏳ Bekleyen ('+pending.length+')'],['approved','✅ Onaylı ('+approved.length+')'],['rejected','❌ Reddedilmiş ('+rejected.length+')'],['all','📋 Tümü ('+visible.length+')'],['archived','🗄 Arşiv ('+archived.length+')']].forEach(function(t){
         var b = document.createElement('button');
         b.className = 'btn-' + (currentTab===t[0]?'p':'g') + ' btn-sm';
         b.textContent = t[1];
@@ -30141,13 +30167,30 @@ async function admOverrides(m) {
       });
       m.appendChild(tabRow);
 
+      // v5.50: Arama (vendor / PoC / sebep / müşteri) — kartları DOM'da gizle/göster (re-render yok, odak korunur)
+      var searchWrap = document.createElement('div');
+      searchWrap.style.cssText = 'margin-bottom:12px';
+      searchWrap.innerHTML = '<input class="inp" id="ov-search" placeholder="🔍 Ara: vendor, PoC, sebep, müşteri..." value="'+(ovSearch||'').replace(/"/g,'&quot;')+'">';
+      m.appendChild(searchWrap);
+      function applyOvSearch(){
+        var q = (ovSearch||'').toLowerCase().trim();
+        m.querySelectorAll('[data-ov-search]').forEach(function(c){
+          c.style.display = (!q || c.dataset.ovSearch.indexOf(q) >= 0) ? '' : 'none';
+        });
+      }
+      searchWrap.querySelector('#ov-search').addEventListener('input', function(){ ovSearch = this.value; applyOvSearch(); });
+
       var items = currentTab === 'pending' ? pending
         : currentTab === 'approved' ? approved
         : currentTab === 'rejected' ? rejected
-        : all;
+        : currentTab === 'archived' ? archived
+        : visible;
 
       if (items.length === 0) {
-        m.innerHTML += '<div class="empty"><div class="empty-icon">⚡</div>Bu kategoride talep yok.</div>';
+        var emp = document.createElement('div');
+        emp.className = 'empty';
+        emp.innerHTML = '<div class="empty-icon">⚡</div>Bu kategoride talep yok.';
+        m.appendChild(emp);
         return;
       }
 
@@ -30184,9 +30227,18 @@ async function admOverrides(m) {
           + (o.status === 'pending' ? '<div style="margin-top:10px;display:flex;gap:6px"><button class="ov-approve btn-p btn-sm" data-id="'+o.id+'">✅ Onayla & Faturalandır</button><button class="ov-reject btn-red btn-sm" data-id="'+o.id+'">❌ Reddet</button></div>' : '')
           + (o.adminNote ? '<div style="margin-top:8px;font-size:11.5px;color:var(--text-muted);background:rgba(15,23,42,.02);padding:6px 8px;border-radius:6px"><strong>Admin notu:</strong> '+o.adminNote+'</div>' : '')
           + (o.approvedBy ? '<div style="margin-top:6px;font-size:10.5px;color:var(--text-muted);font-style:italic">'+(o.status==='approved'?'✅ Onaylayan: ':'❌ Reddeden: ')+o.approvedBy+'</div>' : '');
+        // v5.50: arama için aranabilir metin + arşiv butonu
+        card.dataset.ovSearch = ((o.vendorName||'')+' '+(o.pocTitle||'')+' '+(o.reason||'')+' '+(o.customerName||'')+' '+(o.tier||'')).toLowerCase();
+        var archRow = document.createElement('div');
+        archRow.style.cssText = 'margin-top:8px;display:flex;justify-content:flex-end';
+        archRow.innerHTML = o.archived
+          ? '<button class="ov-unarchive btn-g btn-sm" data-id="'+o.id+'" style="font-size:11px">📤 Arşivden Çıkar</button>'
+          : '<button class="ov-archive btn-g btn-sm" data-id="'+o.id+'" style="font-size:11px;color:var(--text-muted)">🗄 Arşivle</button>';
+        card.appendChild(archRow);
         list.appendChild(card);
       }
       m.appendChild(list);
+      applyOvSearch();
 
       // Onayla
       list.querySelectorAll('.ov-approve').forEach(function(b){
@@ -30310,6 +30362,21 @@ async function admOverrides(m) {
             showToast('Override reddedildi.');
             await admOverrides(m);
           } catch(e) { showToast('Hata: '+e.message,'err'); }
+        });
+      });
+
+      // v5.50: Arşivle / Arşivden çıkar
+      list.querySelectorAll('.ov-archive, .ov-unarchive').forEach(function(b){
+        b.addEventListener('click', async function(){
+          var arch = b.classList.contains('ov-archive');
+          try {
+            await updateDoc(doc(db,'admin_overrides', b.dataset.id), { archived: arch, archivedAt: arch ? serverTimestamp() : null });
+            var rec = all.find(function(x){ return x.id === b.dataset.id; });
+            if (rec) rec.archived = arch;
+            recompute();
+            showToast(arch ? 'Talep arşivlendi.' : 'Talep arşivden çıkarıldı.');
+            render();
+          } catch(e){ showToast('Hata: '+e.message,'err'); }
         });
       });
     }
