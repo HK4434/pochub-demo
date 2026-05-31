@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.47 | pochub.co -->
+<!-- PoCHub v5.48 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.47';
+const VERSION = 'v5.48';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.48': ['FIX: Override Talepleri ekrani bastan ele alindi. (1) RULES: admin_overrides write:isAdmin idi → vendor ne talep olusturabiliyor ne limit-kontrolu icin kendi gecmisini okuyabiliyordu (talepler hic dusmuyordu). Yeni: create=isAdmin||kendi vendorId, read=isAdmin||kendi, update/delete=isAdmin. (2) HANDLER: Onayla/Reddet butonlari eksik/eski kayitlarda cokuyordu (undefined pocId/amount Firestore\'da hata firlatir). Onayla artik gecerli pocId+tutar yoksa engelliyor ve net mesaj veriyor; bildirimler best-effort; Reddet undefined-guvenli (relatedId||null, vendorId guard) → kayit her durumda temizlenir. (3) GOSTERIM: tier rozeti kosullu, reason yoksa "belirtilmemis". RULES degisti — Console re-deploy gerekir.'],
   'v5.47': ['UI: Vendor gelen-PoC-talebi karti profesyonellestirildi. Net hiyerarsi: PoC basligi belirgin, ayri urun chip\'i (📦), ayrismis musteri kimlik blogu (firma vurgulu + lead/telefon rozetleri + isim/zaman alt satiri), okunakli meta pill\'leri (lokasyon + HER IKI tercih tarihi + sure), durum-renkli sol kenarlik, gereksinim bossa bos gorunmek yerine yonlendirici placeholder, ince ayrac + vurgulu aksiyonlar (Kabul Et=yesil/genis, Reddet=kirmizi, Mesaj=notr; aktifte Teklif Gonder birincil). Tum data-* ve handler class\'lari (rq-acc/rej/msg/off/comp) korundu. UI-only — rules degismedi.'],
   'v5.46': ['BUGFIX: musteri onayli urun icin PoC acarken "Missing or insufficient permissions". Kok neden: PoC modal cakisma-kontrolu, musterinin secilen vendor\'in TUM poc_requests\'lerini (baska musterilerin verisi) okumaya calisiyordu (where vendorId==vendorUid) — rules dogru sekilde reddediyordu; submit-anindaki sorgu (sarmasiz) hatayi firlatip PoC olusumunu engelliyordu. Iki musteri-tarafi cakisma okumasi (submit + tarih-degisim handler) kaldirildi; conflictNote=\'\' / activeVendorCount=0. Cakisma farkindaligi vendor tarafinda (kendi takvimini gorur). CLIENT-ONLY fix — rules degismedi. Not: public vendor profili tamamlanan-PoC sayisi non-owner\'a 0 gosterir (graceful, ayri ele alinacak).'],
   'v5.45': ['GUVENLIK KURAL DENETIMI + admin_inbox. Denetim: client list sorgulari vs read kurallari capraz kontrol edildi; cogu isOwner tabanli (guvenli). Bulunan tek islevsel acik: client admin\'lere bildirim icin users where role==admin sorguluyordu → non-admin/anonim tetiklerse rules reddediyor (admin\'ler bildirim almiyordu). COZUM: yeni admin_inbox koleksiyonu (create: signed-in, read/update: admin). notifyAdmins() helper\'i enumerasyon yapmadan tek dokuman yazar; 4 cagri (override/odeme/urun-onay/demo) buna tasindi. Admin bildirim zili artik notifications + admin_inbox merge eder; badge ikisini sayar; okundu dogru koleksiyona yazilir. Ayrica vendor_products read isVendor() gate -> isOwner(vendorId) (tutarlilik). RULES guncellendi.'],
@@ -30162,7 +30163,7 @@ async function admOverrides(m) {
           '<div class="flx-bw-s-mb10">'
           +   '<div class="flx1">'
           +     '<div class="fs13-fw7">'+(o.pocTitle||'PoC')+'</div>'
-          +     '<div class="txt-muted-12-mt2">🏢 '+o.vendorName+'<span style="background:rgba(37,99,235,.1);color:#2563eb;font-size:10px;padding:1px 6px;border-radius:6px;margin-left:6px">'+(TIER_LABELS[o.tier]||o.tier)+'</span></div>'
+          +     '<div class="txt-muted-12-mt2">🏢 '+(o.vendorName||'—')+(o.tier?'<span style="background:rgba(37,99,235,.1);color:#2563eb;font-size:10px;padding:1px 6px;border-radius:6px;margin-left:6px">'+(TIER_LABELS[o.tier]||o.tier)+'</span>':'')+'</div>'
           +     (o.customerName ? '<div class="txt-muted-12-mt2">👤 Müşteri: '+o.customerName+'</div>' : '')
           +     '<div class="txt-muted-12-mt2">📅 '+dt+(prevCount>0&&o.status!=='approved'?' · <span style="color:#d97706">⚠️ Bu vendor\'ın daha önce '+prevCount+' onaylı override\'ı var</span>':'')+'</div>'
           +   '</div>'
@@ -30173,7 +30174,7 @@ async function admOverrides(m) {
           +   '</div>'
           + '</div>'
           + '<div style="background:rgba(37,99,235,.05);border-left:3px solid rgba(37,99,235,.3);padding:8px 10px;font-size:12px;color:var(--text-secondary);margin-top:8px">'
-          +   '<strong>Sebep:</strong> '+o.reason
+          +   '<strong>Sebep:</strong> '+(o.reason||'<span style="color:var(--text-muted);font-style:italic">belirtilmemiş</span>')
           + '</div>'
           + (o.status === 'pending' ? '<div style="margin-top:10px;display:flex;gap:6px"><button class="ov-approve btn-p btn-sm" data-id="'+o.id+'">✅ Onayla & Faturalandır</button><button class="ov-reject btn-red btn-sm" data-id="'+o.id+'">❌ Reddet</button></div>' : '')
           + (o.adminNote ? '<div style="margin-top:8px;font-size:11.5px;color:var(--text-muted);background:rgba(15,23,42,.02);padding:6px 8px;border-radius:6px"><strong>Admin notu:</strong> '+o.adminNote+'</div>' : '')
@@ -30187,6 +30188,12 @@ async function admOverrides(m) {
         b.addEventListener('click', async function(){
           var item = items.find(function(x){ return x.id === b.dataset.id; });
           if (!item) return;
+          // v5.48: eksik/eski kayıt koruması — geçerli PoC ve tutar yoksa onaylanamaz
+          //   (aksi halde updateDoc(poc_requests, undefined) / amount:undefined Firestore'da çöker).
+          if (!item.pocId || !(Number(item.overrideAmount) > 0)) {
+            showToast('Bu kayıt eksik/eski veri (geçerli PoC veya tutar yok). Onaylanamaz — "❌ Reddet" ile temizleyebilirsiniz.', 'err');
+            return;
+          }
           var note = prompt('Admin notu (opsiyonel, vendor\'a gösterilir):', '');
           if (note === null) return;
 
@@ -30233,33 +30240,33 @@ async function admOverrides(m) {
               approvedAt: serverTimestamp(),
             });
 
-            // 6. Vendor bildirimi
-            await addDoc(collection(db,'notifications'), {
-              userId: item.vendorId,
-              type: 'admin_override_approved',
-              title: '✅ Acil Onayın Kabul Edildi',
-              message: '"'+item.pocTitle+'" PoC kabul edildi. ₺' + item.overrideAmount.toLocaleString('tr-TR') + ' cari hesabına işlendi.' + (note ? ' Admin notu: '+note : ''),
-              relatedId: item.pocId,
-              read: false,
-              createdAt: serverTimestamp(),
-            });
-
-            // 7. Müşteri bildirimi
-            if (item.customerId) {
+            // 6+7. Bildirimler (best-effort — çekirdek yazımlar tamamlandı, bildirim hatası akışı bozmasın)
+            try {
               await addDoc(collection(db,'notifications'), {
-                userId: item.customerId,
-                type: 'poc_accepted',
-                title: 'PoC Talebiniz Kabul Edildi',
-                message: item.vendorName + ' "' + item.pocTitle + '" talebinizi kabul etti.',
-                relatedId: item.pocId,
-                senderId: CUR_USER.uid,
-                senderName: CUR_PROFILE?.displayName||CUR_PROFILE?.company||'PoCHub Admin',
-                senderEmail: CUR_USER.email || '',
-                senderPhoto: CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl || '',
+                userId: item.vendorId,
+                type: 'admin_override_approved',
+                title: '✅ Acil Onayın Kabul Edildi',
+                message: '"'+(item.pocTitle||'PoC')+'" PoC kabul edildi. ₺' + Number(item.overrideAmount||0).toLocaleString('tr-TR') + ' cari hesabına işlendi.' + (note ? ' Admin notu: '+note : ''),
+                relatedId: item.pocId || null,
                 read: false,
                 createdAt: serverTimestamp(),
               });
-            }
+              if (item.customerId) {
+                await addDoc(collection(db,'notifications'), {
+                  userId: item.customerId,
+                  type: 'poc_accepted',
+                  title: 'PoC Talebiniz Kabul Edildi',
+                  message: (item.vendorName||'Vendor') + ' "' + (item.pocTitle||'PoC') + '" talebinizi kabul etti.',
+                  relatedId: item.pocId || null,
+                  senderId: CUR_USER.uid,
+                  senderName: CUR_PROFILE?.displayName||CUR_PROFILE?.company||'PoCHub Admin',
+                  senderEmail: CUR_USER.email || '',
+                  senderPhoto: CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl || '',
+                  read: false,
+                  createdAt: serverTimestamp(),
+                });
+              }
+            } catch(_n){ console.warn('Override onay bildirimi atlandi:', _n && _n.message); }
 
             showToast('✅ Override onaylandı. Vendor borçlandırıldı.');
             await admOverrides(m);
@@ -30281,15 +30288,20 @@ async function admOverrides(m) {
               approvedBy: CUR_PROFILE?.displayName || CUR_USER.email,
               approvedAt: serverTimestamp(),
             });
-            await addDoc(collection(db,'notifications'), {
-              userId: item.vendorId,
-              type: 'admin_override_rejected',
-              title: '❌ Acil Onay Reddedildi',
-              message: '"'+item.pocTitle+'" için acil onay reddedildi. Sebep: ' + reason,
-              relatedId: item.pocId,
-              read: false,
-              createdAt: serverTimestamp(),
-            });
+            // Bildirim best-effort (undefined alan Firestore'da çöker → guard + try/catch)
+            if (item.vendorId) {
+              try {
+                await addDoc(collection(db,'notifications'), {
+                  userId: item.vendorId,
+                  type: 'admin_override_rejected',
+                  title: '❌ Acil Onay Reddedildi',
+                  message: '"'+(item.pocTitle||'PoC')+'" için acil onay reddedildi. Sebep: ' + reason,
+                  relatedId: item.pocId || null,
+                  read: false,
+                  createdAt: serverTimestamp(),
+                });
+              } catch(_n){ console.warn('Override red bildirimi atlandi:', _n && _n.message); }
+            }
             showToast('Override reddedildi.');
             await admOverrides(m);
           } catch(e) { showToast('Hata: '+e.message,'err'); }
