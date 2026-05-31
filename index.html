@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.46 | pochub.co -->
+<!-- PoCHub v5.47 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.46';
+const VERSION = 'v5.47';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.47': ['UI: Vendor gelen-PoC-talebi karti profesyonellestirildi. Net hiyerarsi: PoC basligi belirgin, ayri urun chip\'i (📦), ayrismis musteri kimlik blogu (firma vurgulu + lead/telefon rozetleri + isim/zaman alt satiri), okunakli meta pill\'leri (lokasyon + HER IKI tercih tarihi + sure), durum-renkli sol kenarlik, gereksinim bossa bos gorunmek yerine yonlendirici placeholder, ince ayrac + vurgulu aksiyonlar (Kabul Et=yesil/genis, Reddet=kirmizi, Mesaj=notr; aktifte Teklif Gonder birincil). Tum data-* ve handler class\'lari (rq-acc/rej/msg/off/comp) korundu. UI-only — rules degismedi.'],
   'v5.46': ['BUGFIX: musteri onayli urun icin PoC acarken "Missing or insufficient permissions". Kok neden: PoC modal cakisma-kontrolu, musterinin secilen vendor\'in TUM poc_requests\'lerini (baska musterilerin verisi) okumaya calisiyordu (where vendorId==vendorUid) — rules dogru sekilde reddediyordu; submit-anindaki sorgu (sarmasiz) hatayi firlatip PoC olusumunu engelliyordu. Iki musteri-tarafi cakisma okumasi (submit + tarih-degisim handler) kaldirildi; conflictNote=\'\' / activeVendorCount=0. Cakisma farkindaligi vendor tarafinda (kendi takvimini gorur). CLIENT-ONLY fix — rules degismedi. Not: public vendor profili tamamlanan-PoC sayisi non-owner\'a 0 gosterir (graceful, ayri ele alinacak).'],
   'v5.45': ['GUVENLIK KURAL DENETIMI + admin_inbox. Denetim: client list sorgulari vs read kurallari capraz kontrol edildi; cogu isOwner tabanli (guvenli). Bulunan tek islevsel acik: client admin\'lere bildirim icin users where role==admin sorguluyordu → non-admin/anonim tetiklerse rules reddediyor (admin\'ler bildirim almiyordu). COZUM: yeni admin_inbox koleksiyonu (create: signed-in, read/update: admin). notifyAdmins() helper\'i enumerasyon yapmadan tek dokuman yazar; 4 cagri (override/odeme/urun-onay/demo) buna tasindi. Admin bildirim zili artik notifications + admin_inbox merge eder; badge ikisini sayar; okundu dogru koleksiyona yazilir. Ayrica vendor_products read isVendor() gate -> isOwner(vendorId) (tutarlilik). RULES guncellendi.'],
   'v5.44': ['ADMIN ARAC: registrations.vendorId backfill (Veri Sagligi sekmesi). v5.38 oncesi kayitlarda vendorId yoktu → vendorlar eski etkinlik katilimcilarini goremiyordu. Arac tum registrations\'i tarar, vendorId\'si eksik olanlari ait oldugu public_events.vendorId ile doldurur. Tara(onizleme)+Doldur akisi, idempotent (dolu olanlara dokunmaz, tekrar calistirabilir), sirali updateDoc + ilerleme. Admin update izni rules\'ta zaten var.'],
@@ -14822,6 +14823,11 @@ async function vendRequests(m) {
         var p1 = r.preferredDateTime1.toDate ? r.preferredDateTime1.toDate() : new Date(r.preferredDateTime1);
         if (!isNaN(p1.getTime())) pref = p1.toLocaleDateString('tr-TR') + ' ' + p1.toTimeString().slice(0,5);
       }
+      var pref2 = '';
+      if (r.preferredDateTime2) {
+        var p1b = r.preferredDateTime2.toDate ? r.preferredDateTime2.toDate() : new Date(r.preferredDateTime2);
+        if (!isNaN(p1b.getTime())) pref2 = p1b.toLocaleDateString('tr-TR') + ' ' + p1b.toTimeString().slice(0,5);
+      }
 
       // ── Performans rozeti + bekleme süresi badge'i ──
       var perfBadge = '';
@@ -14898,37 +14904,59 @@ async function vendRequests(m) {
         uid: r.customerId,
       }, 36);
 
+      // ── v5.47: Profesyonel gelen-talep kartı ──
+      var headline = r.title || r.productName || 'PoC Talebi';
+      var showProductChip = r.productName && r.productName !== headline;
+      var custPrimary = r.customerCompany || r.customerName || r.customerEmail || 'Müşteri';
+      var custBadges = '';
+      if (custData) {
+        var _cb = renderCustomerBadge(custData,'compact'); if (_cb) custBadges += ' '+_cb;
+        var _pb = renderPhoneBadge(custData,'compact');    if (_pb) custBadges += ' '+_pb;
+      }
+      var custSub = [];
+      if (r.customerCompany && (r.customerName||r.customerEmail)) custSub.push('👤 '+(r.customerName||r.customerEmail));
+      if (typeof ago2 !== 'undefined' && ago2) custSub.push('🕐 '+ago2);
+      var chipStyle = 'display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--text-secondary);background:var(--bg-elevated);border:1px solid var(--border);border-radius:7px;padding:5px 10px;white-space:nowrap';
+      var metaChips = '';
+      if (r.location) metaChips += '<span style="'+chipStyle+'">'+(locL[r.location]||r.location)+'</span>';
+      if (pref)       metaChips += '<span style="'+chipStyle+'">📅 1. tercih: '+pref+'</span>';
+      if (pref2)      metaChips += '<span style="'+chipStyle+'">📅 2. tercih: '+pref2+'</span>';
+      if (r.duration) metaChips += '<span style="'+chipStyle+'">⏱ '+r.duration+'</span>';
+      var accent = r.status==='pending'?'#d97706':r.status==='active'?'#2563eb':'rgba(15,23,42,.18)';
+
       var card = document.createElement('div');
-      card.style.cssText = 'background:var(--bg-surface);border:1px solid '+(r.status==='pending'?'rgba(217,119,6,.35)':r.status==='active'?'rgba(37,99,235,.3)':'var(--border)')+';border-radius:12px;padding:16px';
+      card.style.cssText = 'background:var(--bg-surface);border:1px solid '+(r.status==='pending'?'rgba(217,119,6,.35)':r.status==='active'?'rgba(37,99,235,.3)':'var(--border)')+';border-left:3px solid '+accent+';border-radius:12px;padding:16px 18px';
       card.innerHTML =
-        '<div class="flx-bw-s-mb10">'
-        + '<div class="flx1" style="display:flex;gap:12px;align-items:flex-start">'
-        +   '<div style="flex-shrink:0;margin-top:2px">'+custAvatar+'</div>'
-        +   '<div style="flex:1;min-width:0">'
-        +     '<div class="fs14-fw7">'+(r.productName||r.title||'--')+perfBadge+'</div>'
-        +     '<div class="txt-muted-12-mt2">'+custLine+'</div>'
-        +     waitBadge
-        +   '</div>'
+        // ── HEADER: avatar + başlık/müşteri kimliği + durum ──
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">'
+        +  '<div style="display:flex;gap:12px;align-items:flex-start;min-width:0;flex:1">'
+        +    '<div style="flex-shrink:0;margin-top:2px">'+custAvatar+'</div>'
+        +    '<div style="min-width:0;flex:1">'
+        +      '<div style="font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.3">'+headline+perfBadge+'</div>'
+        +      '<div style="font-size:12.5px;font-weight:600;color:var(--text-secondary);margin-top:3px">🏢 '+custPrimary+custBadges+'</div>'
+        +      (custSub.length?'<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">'+custSub.join('  ·  ')+'</div>':'')
+        +      waitBadge
+        +    '</div>'
+        +  '</div>'
+        +  '<span style="flex-shrink:0;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;color:'+sc+';background:'+sc+'18;white-space:nowrap">'+sl+'</span>'
         + '</div>'
-        + '<span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;color:'+sc+';background:'+sc+'18">'+sl+'</span>'
-        + '</div>'
-        + (r.scope?'<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;line-height:1.5">'+r.scope+'</div>':'')
-        + (r.requirements?'<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;line-height:1.5"><strong>Gereksinim:</strong> '+r.requirements+'</div>':'')
-        + '<div style="display:flex;gap:10px;font-size:11.5px;color:var(--text-muted);flex-wrap:wrap;margin-bottom:'+(r.status==='pending'||r.status==='active'?'10px':'0')+'">'
-        +   (r.location?'<span>'+(locL[r.location]||r.location)+'</span>':'')
-        +   (r.duration?'<span>⏱ '+r.duration+'</span>':'')
-        +   (pref?'<span>📅 '+pref+'</span>':'')
-        + '</div>'
-        + (r.status==='pending'?'<div class="flx-g8-wrap">'
-            + '<button class="rq-acc btn-p btn-sm" data-id="'+r.id+'">Kabul Et</button>'
+        // ── ÜRÜN chip + KAPSAM + GEREKSİNİMLER ──
+        + (showProductChip?'<div style="margin-bottom:10px"><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--color-primary);background:rgba(0,102,204,.08);border:1px solid rgba(0,102,204,.2);border-radius:7px;padding:5px 11px">📦 '+r.productName+'</span></div>':'')
+        + (r.scope?'<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;line-height:1.55"><strong style="color:var(--text-primary)">Kapsam:</strong> '+r.scope+'</div>':'')
+        + '<div style="font-size:12.5px;color:'+(r.requirements?'var(--text-secondary)':'var(--text-muted)')+';margin-bottom:12px;line-height:1.55"><strong style="color:var(--text-primary)">Gereksinimler:</strong> '+(r.requirements?r.requirements:'<span style="font-style:italic">Belirtilmemiş — müşteriyle mesajlaşarak detay isteyebilirsiniz.</span>')+'</div>'
+        // ── META pill'leri (lokasyon, tercih tarihleri, süre) ──
+        + (metaChips?'<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:'+(r.status==='pending'||r.status==='active'?'14px':'0')+'">'+metaChips+'</div>':'')
+        // ── AKSİYONLAR (ayraç + butonlar) ──
+        + (r.status==='pending'?'<div style="border-top:1px solid var(--border);padding-top:12px"><div class="flx-g8-wrap">'
+            + '<button class="rq-acc btn-gr btn-sm" data-id="'+r.id+'" style="flex:1;min-width:130px">✓ Kabul Et</button>'
             + '<button class="rq-rej btn-red btn-sm" data-id="'+r.id+'">Reddet</button>'
             + '<button class="rq-msg btn-g btn-sm" data-id="'+r.id+'" data-title="'+(r.productName||r.title||'').replace(/"/g,"'")+'" data-cn="'+(r.customerName||r.customerEmail||'').replace(/"/g,"'")+'">💬 Mesaj</button>'
-          + '</div>':'')
-        + (r.status==='active'?'<div class="flx-g8-wrap">'
+          + '</div></div>':'')
+        + (r.status==='active'?'<div style="border-top:1px solid var(--border);padding-top:12px"><div class="flx-g8-wrap">'
+            + '<button class="rq-off btn-p btn-sm" data-id="'+r.id+'" data-pn="'+(r.productName||r.title||'').replace(/"/g,"'")+'" data-ce="'+(r.customerEmail||'').replace(/"/g,"'")+'" data-cn="'+(r.customerName||'').replace(/"/g,"'")+'" data-ci="'+(r.customerId||'')+'" style="flex:1;min-width:140px">💰 Teklif Gönder</button>'
             + '<button class="rq-msg btn-g btn-sm" data-id="'+r.id+'" data-title="'+(r.productName||r.title||'').replace(/"/g,"'")+'" data-cn="'+(r.customerName||r.customerEmail||'').replace(/"/g,"'")+'">💬 Mesaj</button>'
-            + '<button class="rq-off btn-p btn-sm" data-id="'+r.id+'" data-pn="'+(r.productName||r.title||'').replace(/"/g,"'")+'" data-ce="'+(r.customerEmail||'').replace(/"/g,"'")+'" data-cn="'+(r.customerName||'').replace(/"/g,"'")+'" data-ci="'+(r.customerId||'')+'">💰 Teklif Gönder</button>'
-            + '<button class="rq-comp btn-g btn-sm" data-id="'+r.id+'">Tamamlandı İşaretle</button>'
-          + '</div>':'')
+            + '<button class="rq-comp btn-g btn-sm" data-id="'+r.id+'">✓ Tamamlandı İşaretle</button>'
+          + '</div></div>':'')
       ;
       lst.appendChild(card);
     });
