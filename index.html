@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.44 | pochub.co -->
+<!-- PoCHub v5.45 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.44';
+const VERSION = 'v5.45';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.45': ['GUVENLIK KURAL DENETIMI + admin_inbox. Denetim: client list sorgulari vs read kurallari capraz kontrol edildi; cogu isOwner tabanli (guvenli). Bulunan tek islevsel acik: client admin\'lere bildirim icin users where role==admin sorguluyordu → non-admin/anonim tetiklerse rules reddediyor (admin\'ler bildirim almiyordu). COZUM: yeni admin_inbox koleksiyonu (create: signed-in, read/update: admin). notifyAdmins() helper\'i enumerasyon yapmadan tek dokuman yazar; 4 cagri (override/odeme/urun-onay/demo) buna tasindi. Admin bildirim zili artik notifications + admin_inbox merge eder; badge ikisini sayar; okundu dogru koleksiyona yazilir. Ayrica vendor_products read isVendor() gate -> isOwner(vendorId) (tutarlilik). RULES guncellendi.'],
   'v5.44': ['ADMIN ARAC: registrations.vendorId backfill (Veri Sagligi sekmesi). v5.38 oncesi kayitlarda vendorId yoktu → vendorlar eski etkinlik katilimcilarini goremiyordu. Arac tum registrations\'i tarar, vendorId\'si eksik olanlari ait oldugu public_events.vendorId ile doldurur. Tara(onizleme)+Doldur akisi, idempotent (dolu olanlara dokunmaz, tekrar calistirabilir), sirali updateDoc + ilerleme. Admin update izni rules\'ta zaten var.'],
   'v5.43': ['SEED temizligi ile lockstep: manuel checklist\'lerdeki olu test butonlari soküldü (seed v5.43). Platform KODU DEGISMEDI; surum seed ile eslesik kalsin diye yukseltildi.'],
   'v5.42': ['KVKK EXPORT dayanikli+seffaf: Verilerimi Indir artik her sorguyu xq() ile sarar - tek yetki reddi tum export\'u cokertmez. Cikti _uyarilar bolumu + exportInfo.eksiksizMi/uyariNotu ile neyin tam alinamadigini ACIKCA belirtir (eskiden try/catch ile sessizce yutuluyordu - KVKK uyumluluk riski). Mesajlar iki asamali: gonderdiklerim senderId==uid ile TAM yakalanir, alinanlar PoC-katilimci best-effort + reddedilirse uyariya yazilir. RULES (v5.42): poc_requests read vendorId dali isVendor() gate kaldirildi -> isOwner(vendorId) (musterinin export\'taki bos-donen vendorId sorgusu artik reddedilmiyor).'],
@@ -3550,6 +3551,13 @@ async function openNotifPanel() {
       where('userId','==',CUR_USER.uid)
     ));
     var notifs = nSnap.docs.map(d=>({...d.data(),id:d.id}));
+    // v5.45: Admin ise ortak admin_inbox bildirimlerini de yükle (zilde görünür)
+    if (CUR_PROFILE?.role === 'admin') {
+      try {
+        var aSnap = await getDocs(collection(db,'admin_inbox'));
+        notifs = notifs.concat(aSnap.docs.map(d=>({...d.data(), id:d.id, _inbox:true})));
+      } catch(e) {}
+    }
     notifs.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
 
     var typeIcons = {
@@ -3601,7 +3609,7 @@ async function openNotifPanel() {
         } else {
           iconHtml = '<div style="font-size:20px;flex-shrink:0;margin-top:2px;width:36px;text-align:center">'+icon+'</div>';
         }
-        return '<div class="notif-item" data-id="'+n.id+'" data-type="'+n.type+'" data-poc-id="'+(n.pocId||'')+'" data-product-id="'+(n.productId||'')+'" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;background:'+(isRead?'transparent':'rgba(37,99,235,.05)')+';display:flex;gap:12px;align-items:start">' +
+        return '<div class="notif-item" data-id="'+n.id+'" data-inbox="'+(n._inbox?'1':'')+'" data-type="'+n.type+'" data-poc-id="'+(n.pocId||'')+'" data-product-id="'+(n.productId||'')+'" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;background:'+(isRead?'transparent':'rgba(37,99,235,.05)')+';display:flex;gap:12px;align-items:start">' +
           iconHtml +
           '<div class="flx1">' +
           '<div style="font-size:13px;font-weight:'+(isRead?'400':'700')+'">'+( n.title||'Bildirim')+'</div>' +
@@ -3619,8 +3627,9 @@ async function openNotifPanel() {
           var nType = item.dataset.type;
           var pocId = item.dataset.pocId;
 
-          // Okundu işaretle
-          await updateDoc(doc(db,'notifications',nId), {read:true});
+          // Okundu işaretle (admin_inbox ya da notifications)
+          var nColl = item.dataset.inbox ? 'admin_inbox' : 'notifications';
+          await updateDoc(doc(db,nColl,nId), {read:true});
           item.style.background = 'transparent';
           item.querySelector('[style*="border-radius:50%"]')?.remove();
           updateNotifBadge();
@@ -3664,7 +3673,7 @@ async function openNotifPanel() {
     panel.querySelector('#notif-mark-all').addEventListener('click', async function() {
       var unread = notifs.filter(n=>!n.read);
       for (var n of unread) {
-        await updateDoc(doc(db,'notifications',n.id), {read:true});
+        await updateDoc(doc(db, n._inbox?'admin_inbox':'notifications', n.id), {read:true});
       }
       listEl.querySelectorAll('.notif-item').forEach(function(item) {
         item.style.background='transparent';
@@ -3679,6 +3688,26 @@ async function openNotifPanel() {
   }
 }
 
+// v5.45: Admin'lere bildirim — user ENUMERASYONU YOK (admin_inbox'a tek doküman yazar).
+// Eski 'users where role==admin' + per-admin notification yöntemi, non-admin/anonim
+// tetiklediğinde rules'a takılıp sessizce yutuluyordu (admin'ler bildirim almıyordu).
+async function notifyAdmins(data) {
+  try {
+    await addDoc(collection(db,'admin_inbox'), {
+      type:        data.type || 'admin_notice',
+      title:       data.title || 'Bildirim',
+      message:     data.message || data.body || '',
+      relatedId:   data.relatedId || null,
+      productId:   data.productId || null,
+      productName: data.productName || null,
+      data:        data.data || null,
+      fromUserId:  (typeof CUR_USER !== 'undefined' && CUR_USER) ? CUR_USER.uid : null,
+      read:        false,
+      createdAt:   serverTimestamp(),
+    });
+  } catch(e) { console.warn('notifyAdmins atlandi:', e && e.message); }
+}
+
 async function updateNotifBadge() {
   const badge = document.getElementById('notif-badge');
   if (!badge) return;
@@ -3690,6 +3719,13 @@ async function updateNotifBadge() {
       where('read','==',false)
     ));
     NOTIF_COUNT = snap.size;
+    // v5.45: admin ise ortak admin_inbox okunmamışlarını da say
+    if (CUR_PROFILE?.role === 'admin') {
+      try {
+        var aSnap = await getDocs(query(collection(db,'admin_inbox'), where('read','==',false)));
+        NOTIF_COUNT += aSnap.size;
+      } catch(e) {}
+    }
     if (NOTIF_COUNT > 0) {
       badge.style.display = 'inline';
       badge.textContent = NOTIF_COUNT > 9 ? '9+' : NOTIF_COUNT;
@@ -16416,18 +16452,12 @@ async function openOverrideRequestModal(pocId, pocData, check, onAccepted) {
         });
         // v5.35: Admin bildirimleri best-effort (rules anonim admin listesi engelleyebilir)
         try {
-          const adminSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
-          for (const ad of adminSnap.docs) {
-            await addDoc(collection(db,'notifications'), {
-              userId: ad.id,
-              type: 'admin_override_request',
-              title: '⚡ Yeni Override Talebi',
-              message: (CUR_PROFILE?.company || CUR_USER.email) + ' "' + (pocData?.productName||'PoC') + '" için acil onay istiyor (₺' + overrideAmount.toLocaleString('tr-TR') + ').',
-              relatedId: pocId,
-              read: false,
-              createdAt: serverTimestamp(),
-            });
-          }
+          await notifyAdmins({
+            type: 'admin_override_request',
+            title: '⚡ Yeni Override Talebi',
+            message: (CUR_PROFILE?.company || CUR_USER.email) + ' "' + (pocData?.productName||'PoC') + '" için acil onay istiyor (₺' + overrideAmount.toLocaleString('tr-TR') + ').',
+            relatedId: pocId,
+          });
         } catch(_e){ console.warn('Admin bildirim atlandi (rules):', _e.message); }
         showToast('✅ Acil onay talebin gönderildi. Admin yanıtladığında bildirim alacaksın.');
         modal.remove();
@@ -19241,18 +19271,12 @@ function openBillingPaymentModal(chargeIds, amount, mode) {
       }
       // Admin bildirim (v5.35: best-effort, rules engelleyebilir)
       try {
-        const adminSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
-        for (const ad of adminSnap.docs) {
-          await addDoc(collection(db,'notifications'), {
-            userId: ad.id,
-            type: 'manual_transfer_pending',
-            title: '🏦 Borç Ödeme Talebi',
-            message: (CUR_PROFILE?.company || CUR_USER.email) + ' ' + chargeIds.length + ' borç için ₺' + amount.toLocaleString('tr-TR') + ' ödeme talebi gönderdi.',
-            relatedId: CUR_USER.uid,
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-        }
+        await notifyAdmins({
+          type: 'manual_transfer_pending',
+          title: '🏦 Borç Ödeme Talebi',
+          message: (CUR_PROFILE?.company || CUR_USER.email) + ' ' + chargeIds.length + ' borç için ₺' + amount.toLocaleString('tr-TR') + ' ödeme talebi gönderdi.',
+          relatedId: CUR_USER.uid,
+        });
       } catch(_e){ console.warn('Admin bildirim atlandi:', _e.message); }
       showToast('✅ Ödeme talebin gönderildi. Admin onayından sonra borçlar kapanacak.');
       modal.remove();
@@ -22843,21 +22867,14 @@ async function openAddProductModal(prefillCat) {
 
       // ── Admin'e yeni ürün bildirimi ─────────────────────────────────
       try {
-        // Admin kullanıcılarını bul
-        var admSnap = await getDocs(query(collection(db,'users'), where('role','==','admin')));
-        for (var admDoc of admSnap.docs) {
-          await addDoc(collection(db,'notifications'),{
-            userId:      admDoc.id,
-            type:        'admin_pending',
-            title:       'Yeni Ürün Onay Bekliyor',
-            message:     '"' + name + '" ürünü ' + (CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Bir üretici') + ' tarafından eklendi, onayınızı bekliyor.',
-            productId:   prodRef.id,
-            productName: name,
-            fromUserId:  CUR_USER.uid,
-            read:        false,
-            createdAt:   serverTimestamp(),
-          });
-        }
+        // Admin'e ürün onay bildirimi (admin_inbox — enumerasyon yok)
+        await notifyAdmins({
+          type:        'admin_pending',
+          title:       'Yeni Ürün Onay Bekliyor',
+          message:     '"' + name + '" ürünü ' + (CUR_PROFILE?.company||CUR_PROFILE?.displayName||'Bir üretici') + ' tarafından eklendi, onayınızı bekliyor.',
+          productId:   prodRef.id,
+          productName: name,
+        });
       } catch(e2) {}
       // ── Distribütörlere bildirim + mail ──────────────────────────────
       if (distributors.length > 0) {
@@ -31565,18 +31582,12 @@ async function renderDemoRequest() {
           // Admin'e bildirim (kayıtlı kullanıcıysa)
           try {
             // Hangi admin'e gidecek? Tüm admin'leri çek
-            var admSnap = await getDocs(query(collection(db,'users'), where('role','==','admin'), limit(5)));
-            for (var i=0; i<admSnap.docs.length; i++) {
-              await addDoc(collection(db,'notifications'), {
-                userId: admSnap.docs[i].id,
-                type: 'demo_booked',
-                title: '📅 Yeni Demo Randevusu Alındı',
-                message: 'Birisi PoCHub demo sayfasından 15dk randevu aldı. Calendly\'yi kontrol et.',
-                data: { demoRequestId: docId },
-                read: false,
-                createdAt: serverTimestamp()
-              });
-            }
+            await notifyAdmins({
+              type: 'demo_booked',
+              title: '📅 Yeni Demo Randevusu Alındı',
+              message: 'Birisi PoCHub demo sayfasından 15dk randevu aldı. Calendly\'yi kontrol et.',
+              data: { demoRequestId: docId },
+            });
           } catch(e){}
 
           // Kullanıcıya görsel feedback
