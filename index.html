@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.43 | pochub.co -->
+<!-- PoCHub v5.44 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.43';
+const VERSION = 'v5.44';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.44': ['ADMIN ARAC: registrations.vendorId backfill (Veri Sagligi sekmesi). v5.38 oncesi kayitlarda vendorId yoktu → vendorlar eski etkinlik katilimcilarini goremiyordu. Arac tum registrations\'i tarar, vendorId\'si eksik olanlari ait oldugu public_events.vendorId ile doldurur. Tara(onizleme)+Doldur akisi, idempotent (dolu olanlara dokunmaz, tekrar calistirabilir), sirali updateDoc + ilerleme. Admin update izni rules\'ta zaten var.'],
   'v5.43': ['SEED temizligi ile lockstep: manuel checklist\'lerdeki olu test butonlari soküldü (seed v5.43). Platform KODU DEGISMEDI; surum seed ile eslesik kalsin diye yukseltildi.'],
   'v5.42': ['KVKK EXPORT dayanikli+seffaf: Verilerimi Indir artik her sorguyu xq() ile sarar - tek yetki reddi tum export\'u cokertmez. Cikti _uyarilar bolumu + exportInfo.eksiksizMi/uyariNotu ile neyin tam alinamadigini ACIKCA belirtir (eskiden try/catch ile sessizce yutuluyordu - KVKK uyumluluk riski). Mesajlar iki asamali: gonderdiklerim senderId==uid ile TAM yakalanir, alinanlar PoC-katilimci best-effort + reddedilirse uyariya yazilir. RULES (v5.42): poc_requests read vendorId dali isVendor() gate kaldirildi -> isOwner(vendorId) (musterinin export\'taki bos-donen vendorId sorgusu artik reddedilmiyor).'],
   'v5.41': ['SEED: Otomatik test cercevesi v2 (state-farkinda, fonksiyonel+yapisal+kozmetik kategorili, false-fail kaldirildi, kendi listesini render eden runner). Platform KODU DEGISMEDI; surum seed ile lockstep icin yukseltildi.'],
@@ -24711,6 +24712,89 @@ async function admDataHealth(m) {
         statsResultEl.innerHTML = '<div style="color:#dc2626">Hata: '+(e && e.message)+'</div>';
       }
       statsRecalcBtn.disabled = false; statsRecalcBtn.textContent = '🔄 Sayaçları Yeniden Hesapla';
+    });
+
+    // ── v5.44: registrations.vendorId backfill (v5.38 öncesi eski kayıtlar) ──
+    var bfSection = document.createElement('div');
+    bfSection.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px';
+    bfSection.innerHTML =
+      '<div style="font-size:14px;font-weight:700;margin-bottom:8px">🔗 Etkinlik Kayıtları — vendorId Backfill</div>' +
+      '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">' +
+        'v5.38 öncesi oluşturulan <code>registrations</code> kayıtlarında <code>vendorId</code> alanı yok. ' +
+        'Vendorlar katılımcıları <code>registrations where vendorId==uid</code> ile gördüğünden, bu eski kayıtlar ' +
+        'ilgili vendor panelinde <strong>görünmez</strong>. Bu araç her kaydı tarar; <code>vendorId</code>\'si eksik ' +
+        'olanları ait olduğu <code>public_events</code> dokümanından bulup doldurur. <strong>İdempotent:</strong> dolu olanlara dokunmaz, defalarca çalıştırılabilir.' +
+      '</div>' +
+      '<div id="bf-reg-result" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--text-muted);min-height:36px;display:none"></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button id="bf-reg-scan" class="btn-g btn-sm" style="padding:8px 14px">🔍 Tara (önizleme)</button>' +
+        '<button id="bf-reg-apply" class="btn-p btn-sm" style="padding:8px 14px;display:none">✍️ Eksikleri Doldur</button>' +
+      '</div>';
+    m.appendChild(bfSection);
+
+    var bfScanBtn = bfSection.querySelector('#bf-reg-scan');
+    var bfApplyBtn = bfSection.querySelector('#bf-reg-apply');
+    var bfResult = bfSection.querySelector('#bf-reg-result');
+    var bfPending = null; // doldurulacaklar: {regId, vendorId}[]
+
+    async function bfResolveVendor(eventId, cache) {
+      if (!eventId) return '';
+      if (Object.prototype.hasOwnProperty.call(cache, eventId)) return cache[eventId];
+      var vid = '';
+      try { var es = await getDoc(doc(db,'public_events', eventId)); vid = es.exists() ? (es.data().vendorId || '') : ''; }
+      catch(e) { vid = ''; }
+      cache[eventId] = vid; return vid;
+    }
+
+    bfScanBtn?.addEventListener('click', async function(){
+      bfScanBtn.disabled = true; bfScanBtn.textContent = '⏳ Taranıyor...';
+      bfResult.style.display = 'block'; bfResult.innerHTML = 'Kayıtlar taranıyor...';
+      try {
+        var snap = await getDocs(collection(db,'registrations'));
+        var total = snap.size, missing = 0, fillable = 0, noEvent = 0, noVendor = 0;
+        var cache = {}; bfPending = [];
+        for (var d of snap.docs) {
+          var r = d.data();
+          if (r.vendorId) continue;            // zaten dolu → atla (idempotent)
+          missing++;
+          if (!r.eventId) { noEvent++; continue; }
+          var vid = await bfResolveVendor(r.eventId, cache);
+          if (!vid) { noVendor++; continue; }  // event yok ya da event'te vendorId yok
+          fillable++; bfPending.push({ regId: d.id, vendorId: vid });
+        }
+        bfResult.innerHTML =
+          '<div style="font-weight:700">Tarama tamamlandı</div>' +
+          '<div style="margin-top:6px;line-height:1.8">' +
+            '📋 Toplam kayıt: <strong>'+total+'</strong><br>' +
+            '⚠️ vendorId eksik: <strong>'+missing+'</strong><br>' +
+            '✅ Doldurulabilir: <strong style="color:#16a34a">'+fillable+'</strong>' +
+            (noEvent? '<br>➖ eventId\'siz (atlanır): '+noEvent : '') +
+            (noVendor? '<br>➖ Event yok / event\'te vendorId yok (atlanır): '+noVendor : '') +
+          '</div>';
+        if (fillable > 0) { bfApplyBtn.style.display = 'inline-block'; bfApplyBtn.textContent = '✍️ '+fillable+' Kaydı Doldur'; bfApplyBtn.disabled = false; }
+        else { bfApplyBtn.style.display = 'none'; }
+      } catch(e) {
+        bfResult.innerHTML = '<div style="color:#dc2626">Tarama hatası: '+(e && e.message)+'</div>';
+      }
+      bfScanBtn.disabled = false; bfScanBtn.textContent = '🔍 Tara (önizleme)';
+    });
+
+    bfApplyBtn?.addEventListener('click', async function(){
+      if (!bfPending || !bfPending.length) return;
+      if (!confirm(bfPending.length+' kaydın vendorId alanı doldurulacak. Devam edilsin mi?')) return;
+      bfApplyBtn.disabled = true;
+      var ok = 0, fail = 0;
+      for (var p of bfPending) {
+        try { await updateDoc(doc(db,'registrations', p.regId), { vendorId: p.vendorId }); ok++; }
+        catch(e) { fail++; }
+        if ((ok+fail) % 10 === 0 || (ok+fail) === bfPending.length) {
+          bfResult.innerHTML = '<div>Yazılıyor... '+(ok+fail)+'/'+bfPending.length+' (✓'+ok+(fail?' ✗'+fail:'')+')</div>';
+        }
+      }
+      bfResult.innerHTML = '<div style="color:'+(fail?'#d97706':'#16a34a')+';font-weight:700">✓ '+ok+' kayıt güncellendi'+(fail?' · '+fail+' başarısız':'')+'</div>' +
+        '<div style="margin-top:4px;color:var(--text-muted)">Vendorlar artık bu eski kayıtların katılımcılarını görebilir. Tekrar "Tara" ile doğrulayabilirsin.</div>';
+      showToast(ok+' kayıt backfill edildi'+(fail?', '+fail+' hata':''), fail?'err':'ok');
+      bfApplyBtn.style.display = 'none'; bfPending = [];
     });
 
     // Tara butonu
