@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.45 | pochub.co -->
+<!-- PoCHub v5.46 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.45';
+const VERSION = 'v5.46';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.46': ['BUGFIX: musteri onayli urun icin PoC acarken "Missing or insufficient permissions". Kok neden: PoC modal cakisma-kontrolu, musterinin secilen vendor\'in TUM poc_requests\'lerini (baska musterilerin verisi) okumaya calisiyordu (where vendorId==vendorUid) — rules dogru sekilde reddediyordu; submit-anindaki sorgu (sarmasiz) hatayi firlatip PoC olusumunu engelliyordu. Iki musteri-tarafi cakisma okumasi (submit + tarih-degisim handler) kaldirildi; conflictNote=\'\' / activeVendorCount=0. Cakisma farkindaligi vendor tarafinda (kendi takvimini gorur). CLIENT-ONLY fix — rules degismedi. Not: public vendor profili tamamlanan-PoC sayisi non-owner\'a 0 gosterir (graceful, ayri ele alinacak).'],
   'v5.45': ['GUVENLIK KURAL DENETIMI + admin_inbox. Denetim: client list sorgulari vs read kurallari capraz kontrol edildi; cogu isOwner tabanli (guvenli). Bulunan tek islevsel acik: client admin\'lere bildirim icin users where role==admin sorguluyordu → non-admin/anonim tetiklerse rules reddediyor (admin\'ler bildirim almiyordu). COZUM: yeni admin_inbox koleksiyonu (create: signed-in, read/update: admin). notifyAdmins() helper\'i enumerasyon yapmadan tek dokuman yazar; 4 cagri (override/odeme/urun-onay/demo) buna tasindi. Admin bildirim zili artik notifications + admin_inbox merge eder; badge ikisini sayar; okundu dogru koleksiyona yazilir. Ayrica vendor_products read isVendor() gate -> isOwner(vendorId) (tutarlilik). RULES guncellendi.'],
   'v5.44': ['ADMIN ARAC: registrations.vendorId backfill (Veri Sagligi sekmesi). v5.38 oncesi kayitlarda vendorId yoktu → vendorlar eski etkinlik katilimcilarini goremiyordu. Arac tum registrations\'i tarar, vendorId\'si eksik olanlari ait oldugu public_events.vendorId ile doldurur. Tara(onizleme)+Doldur akisi, idempotent (dolu olanlara dokunmaz, tekrar calistirabilir), sirali updateDoc + ilerleme. Admin update izni rules\'ta zaten var.'],
   'v5.43': ['SEED temizligi ile lockstep: manuel checklist\'lerdeki olu test butonlari soküldü (seed v5.43). Platform KODU DEGISMEDI; surum seed ile eslesik kalsin diye yukseltildi.'],
@@ -8805,24 +8806,10 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
     var warnEl = modal.querySelector('#poc-conflict-warn');
     if (!warnEl) return;
     if (!dateVal || !selectedVendors.length) { warnEl.style.display='none'; return; }
-    var conflicts = [];
-    for (var sv of selectedVendors) {
-      try {
-        var cSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',sv.vendorId)));
-        cSnap.docs.forEach(function(d) {
-          var pd = d.data();
-          if (!['pending','active','offer_sent'].includes(pd.status)) return;
-          if (pd.preferredDates && pd.preferredDates.includes(dateVal))
-            conflicts.push(sv.vendorName+': bu tarihte talep var');
-          if (pd.scheduledDate?.toDate && pd.scheduledDate.toDate().toISOString().split('T')[0]===dateVal)
-            conflicts.push(sv.vendorName+': '+dateVal+' tarihinde planlanmış PoC');
-        });
-      } catch(e) {}
-    }
-    if (conflicts.length) {
-      warnEl.style.display='block';
-      warnEl.innerHTML='⚠ <b>Çakışma Uyarısı</b><br>'+conflicts.join('<br>')+'<br><span class="fs11">Devam edebilirsiniz — vendor bu uyarıyı görecek.</span>';
-    } else { warnEl.style.display='none'; }
+    // v5.46: Müşteri-tarafı çakışma önizlemesi KALDIRILDI — müşteri bir vendor'ın
+    //   tüm taleplerini okuyamaz (gizlilik + rules; sessizce reddediliyordu). Çakışma
+    //   farkındalığı vendor tarafında (kendi takvimini görür).
+    warnEl.style.display='none';
   });
 
   modal.querySelector('#poc-submit')?.addEventListener('click', async () => {
@@ -8861,25 +8848,14 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       // Her vendor için ayrı poc_request oluştur
       const batchResults = [];
       for (const v of selectedVendors) {
-        // Çakışma kontrolü — aynı gün ±2 saat
-        const _pocSnap = await getDocs(query(collection(db,'poc_requests'), where('vendorId','==',v.vendorId)));
-        const activeSnap = {size: _pocSnap.docs.filter(d=>['pending','active'].includes(d.data().status)).length};
-        // Tarih çakışması kontrolü
-        var conflictWarning = '';
-        _pocSnap.docs.forEach(function(d) {
-          var pd = d.data();
-          if (!['pending','active','offer_sent'].includes(pd.status)) return;
-          if (!pd.preferredDates) return;
-          // Aynı tarihte PoC var mı?
-          if (pd.preferredDates.includes(date1)) {
-            conflictWarning = '⚠ Bu vendor '+date1+' tarihinde baska bir PoC talep alacak. Vendor uyari gorecek.';
-          }
-        });
-
+        // v5.46: Müşteri-tarafı çakışma okuması KALDIRILDI — müşteri bir vendor'ın
+        //   TÜM taleplerini (başka müşterilerin verisi) okuyamaz (gizlilik + rules
+        //   "Missing or insufficient permissions" hatası buradan geliyordu). Çakışma
+        //   farkındalığı vendor tarafında: vendor kendi takvimini/taleplerini görebilir.
         const docRef = await addDoc(collection(db,'poc_requests'), {
           customerId: CUR_USER.uid,
           customerEmail: CUR_USER.email,
-          conflictNote: conflictWarning||'',
+          conflictNote: '',
           preferredDateTime1: preferredDateTime1 ? Timestamp.fromDate(preferredDateTime1) : null,
           preferredDateTime2: preferredDateTime2 ? Timestamp.fromDate(preferredDateTime2) : null,
           customerName: CUR_PROFILE?.displayName||CUR_USER.email,
@@ -8892,10 +8868,10 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
           vendorType: v.vendorType,
           title, requirements, preferredDates, location,
           status: 'pending',
-          activeVendorCount: activeSnap.size, // bilgi amaçlı
+          activeVendorCount: 0,
           createdAt: serverTimestamp()
         });
-        batchResults.push({...v, docId: docRef.id, hadConflict: activeSnap.size >= 3});
+        batchResults.push({...v, docId: docRef.id, hadConflict: false});
 
         // Vendor'a mail
         if (v.vendorEmail) {
