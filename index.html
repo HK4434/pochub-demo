@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.48 | pochub.co -->
+<!-- PoCHub v5.49 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.48';
+const VERSION = 'v5.49';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.49': ['ADMIN: Override faturalandirmasi artik PAKET BAZINDA da ayarlanabilir. Paket duzenleme modaline "Override Fiyat Zammi (%)" alani eklendi; bos birakilirsa Sistem Ayarlari\'ndaki global zam kullanilir (paket-oncelikli fallback). override tutari = paketin Asan PoC Fiyati x (1 + zam%). Boylece her tier kendi override fiyatlandirmasina sahip olabilir (or. Enterprise dusuk/sifir, Free caydirici yuksek). Yeni paket sablonuna overrideMultiplier:null eklendi. UI/mantik — rules degismedi.'],
   'v5.48': ['FIX: Override Talepleri ekrani bastan ele alindi. (1) RULES: admin_overrides write:isAdmin idi → vendor ne talep olusturabiliyor ne limit-kontrolu icin kendi gecmisini okuyabiliyordu (talepler hic dusmuyordu). Yeni: create=isAdmin||kendi vendorId, read=isAdmin||kendi, update/delete=isAdmin. (2) HANDLER: Onayla/Reddet butonlari eksik/eski kayitlarda cokuyordu (undefined pocId/amount Firestore\'da hata firlatir). Onayla artik gecerli pocId+tutar yoksa engelliyor ve net mesaj veriyor; bildirimler best-effort; Reddet undefined-guvenli (relatedId||null, vendorId guard) → kayit her durumda temizlenir. (3) GOSTERIM: tier rozeti kosullu, reason yoksa "belirtilmemis". RULES degisti — Console re-deploy gerekir.'],
   'v5.47': ['UI: Vendor gelen-PoC-talebi karti profesyonellestirildi. Net hiyerarsi: PoC basligi belirgin, ayri urun chip\'i (📦), ayrismis musteri kimlik blogu (firma vurgulu + lead/telefon rozetleri + isim/zaman alt satiri), okunakli meta pill\'leri (lokasyon + HER IKI tercih tarihi + sure), durum-renkli sol kenarlik, gereksinim bossa bos gorunmek yerine yonlendirici placeholder, ince ayrac + vurgulu aksiyonlar (Kabul Et=yesil/genis, Reddet=kirmizi, Mesaj=notr; aktifte Teklif Gonder birincil). Tum data-* ve handler class\'lari (rq-acc/rej/msg/off/comp) korundu. UI-only — rules degismedi.'],
   'v5.46': ['BUGFIX: musteri onayli urun icin PoC acarken "Missing or insufficient permissions". Kok neden: PoC modal cakisma-kontrolu, musterinin secilen vendor\'in TUM poc_requests\'lerini (baska musterilerin verisi) okumaya calisiyordu (where vendorId==vendorUid) — rules dogru sekilde reddediyordu; submit-anindaki sorgu (sarmasiz) hatayi firlatip PoC olusumunu engelliyordu. Iki musteri-tarafi cakisma okumasi (submit + tarih-degisim handler) kaldirildi; conflictNote=\'\' / activeVendorCount=0. Cakisma farkindaligi vendor tarafinda (kendi takvimini gorur). CLIENT-ONLY fix — rules degismedi. Not: public vendor profili tamamlanan-PoC sayisi non-owner\'a 0 gosterir (graceful, ayri ele alinacak).'],
@@ -16369,7 +16370,9 @@ async function openOverrideRequestModal(pocId, pocData, check, onAccepted) {
   // Override fiyat zammı config'den
   const cfgSnap = await getDoc(doc(db,'pochub_config','system'));
   const cfg = cfgSnap.exists() ? cfgSnap.data() : {};
-  var multiplier = cfg.overrideSettings?.overridePriceMultiplier || 1.5;
+  var multiplier = (check.package?.overrideMultiplier && check.package.overrideMultiplier > 1)
+    ? check.package.overrideMultiplier
+    : (cfg.overrideSettings?.overridePriceMultiplier || 1.5);
   var overrideAmount = Math.round(basePrice * multiplier);
 
   // Önceki override taleplerini kontrol et (aylık limit)
@@ -28062,7 +28065,7 @@ async function admPackages(m) {
 function openPackageEditor(pkgId, allPackages) {
   const isNew = !pkgId;
   const pkg = isNew
-    ? {id:'', name:'', tier:'starter', duration:30, price:0, yearlyPrice:0, currency:'TRY', pocQuota:0, pocOverflowPrice:0, productLimit:0, inviteQuotaPerMonth:0, overrideLimit:0, featuredDaysPerWeek:0, continuousFeatured:false, features:[], recommendedFor:[], isActive:true, isVisible:true, displayOrder:99}
+    ? {id:'', name:'', tier:'starter', duration:30, price:0, yearlyPrice:0, currency:'TRY', pocQuota:0, pocOverflowPrice:0, productLimit:0, inviteQuotaPerMonth:0, overrideLimit:0, overrideMultiplier:null, featuredDaysPerWeek:0, continuousFeatured:false, features:[], recommendedFor:[], isActive:true, isVisible:true, displayOrder:99}
     : allPackages.find(p => p.id === pkgId);
   if (!pkg) { showToast('Paket bulunamadı','err'); return; }
 
@@ -28095,6 +28098,7 @@ function openPackageEditor(pkgId, allPackages) {
     + '<div><label class="lbl-mini">Davet/Ay Limiti (-1 = ∞)</label><input class="inp" type="number" id="pe-invite" value="'+pkg.inviteQuotaPerMonth+'"></div>'
     + '<div><label class="lbl-mini">Override Hakkı/Ay (-1 = ∞)</label><input class="inp" type="number" id="pe-override" value="'+pkg.overrideLimit+'"></div>'
     + '</div>'
+    + '<div><label class="lbl-mini">Override Fiyat Zammı (% — boş = Sistem Ayarları\'ndaki global zam)</label><input class="inp" type="number" id="pe-override-markup" placeholder="Global zammı kullan" value="'+((pkg.overrideMultiplier && pkg.overrideMultiplier>1)?Math.round((pkg.overrideMultiplier-1)*100):'')+'"><div class="lbl-mini" style="margin-top:4px;color:var(--text-muted)">Override tutarı = Aşan PoC Fiyatı × (1 + zam%). Bu pakete özel zam için doldur; boş bırakırsan global ayar geçerli olur.</div></div>'
     + '<div class="g2">'
     + '<div><label class="lbl-mini">Featured Gün/Hafta (0-7)</label><input class="inp" type="number" id="pe-featured" min="0" max="7" value="'+pkg.featuredDaysPerWeek+'"></div>'
     + '<div><label class="lbl-mini">Sürekli Featured</label><select class="inp" id="pe-continuous"><option value="false"'+(!pkg.continuousFeatured?' selected':'')+'>Hayır</option><option value="true"'+(pkg.continuousFeatured?' selected':'')+'>Evet</option></select></div>'
@@ -28127,6 +28131,7 @@ function openPackageEditor(pkgId, allPackages) {
       productLimit: parseInt(modal.querySelector('#pe-prod').value),
       inviteQuotaPerMonth: parseInt(modal.querySelector('#pe-invite').value),
       overrideLimit: parseInt(modal.querySelector('#pe-override').value),
+      overrideMultiplier: (function(){ var v = parseInt(modal.querySelector('#pe-override-markup').value); return (v > 0) ? (1 + v/100) : null; })(),
       featuredDaysPerWeek: parseInt(modal.querySelector('#pe-featured').value) || 0,
       continuousFeatured: modal.querySelector('#pe-continuous').value === 'true',
       features: modal.querySelector('#pe-features').value.split('\n').map(function(s){return s.trim();}).filter(function(s){return s;}),
