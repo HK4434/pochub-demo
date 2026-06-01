@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.55 | pochub.co -->
+<!-- PoCHub v5.56 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.55';
+const VERSION = 'v5.56';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.56': ['ADMIN Kullanici Detayi zenginlestirildi. Vendor icin async "💰 Kazancimiz (PoCHub geliri)" paneli: Yasam Boyu (LTV) = abonelik (subscription_history paid) + override PoC + one cikan reklam (poc_charges paid) + acik bakiye/suspend (vendor_billing). "📊 Aktivite": urun (aktif/toplam), aldigi PoC, teklif kabul orani, aktif one cikan yerlesim, paket adi. Musteri icin PoC/Demo talep sayisi. "📄 Tam Profil" butonu (kategoriler/markalar/bolgeler/vergi/web/referanslar) ve "🔍 Tum Alanlar" ile user dokumaninin ham alanlari toggle. Salt-okunur admin gorunumu — rules degismedi.'],
   'v5.55': ['REKLAM duzeltme: (1) Urunlerim listesinde one cikan urune "📢 One Cikan" rozeti (featured & suresi gecmemis; tarih ipucu). (2) Featured satin alma artik CARI HESABA islenir: autoActivate alimda + admin onayinda poc_charges (source:featured, status:pending_invoice, aciklama) + updateVendorBilling olusur; boylece vendor Cari Hesap sayfasinda, admin vendor-abonelik tablosu unpaidBalance kolonunda ve odeme-onay akisinda gorunur. KRITIK: featured borcu deltaCount=0 ile islenir — PoC-suspend sayacina (3+) GIRMEZ, yanlis askiyi onler. Cari Hesap sayfasi featured-uyumlu: pocId yoksa aciklama+"📢 One cikan reklam" etiketi, PoC sayaci ile toplam borc ayrildi. Admin iptal (fl-cancel) odenmemis featured borcunu iptal eder + bakiyeyi duser. Odeme onayinda sayac geri alimi featured haric. UI/mantik — rules degismedi.'],
   'v5.54': ['REKLAM Faz 1d (son): analitik & ROI. Carousel\'de gercek reklamlara tiklamada featured_events (tip click, oturum-tekilli) yazilir. Featured\'dan acilan PoC\'ye source:featured + featuredProductId atifi (poc_requests). Admin ledger\'da her kayitta urun-bazli metrik (Tik + Featured PoC). Yeni uretici sekmesi "Reklamlarim": ozet (aktif yerlesim, toplam harcama, toplam tik, featured PoC) + yerlesim kartlari + metrikler (ROI gorunumu). NOT: tik metrigi client-tarafi ve YAKLASIK (bot/adblock/cihaz farki); PoC-source sayisi guvenilir gercek donusum. RULES: featured_events eklendi (anon create, read admin+vendor-own) → Console re-deploy gerekir. poc_requests create kuralinda alan whitelist olmadigi icin ek degisiklik yok. Faz 1 (1a-1d) tamamlandi.'],
   'v5.53': ['REKLAM Faz 1c: admin "Reklam / One Cikan" bolumu detaylandi. Iki alt-sekme: Islemler (ledger) + Ayarlar (1a config). Islemler: ozet kartlari (aktif yerlesim, bu ay/toplam gelir, onay bekleyen) + En Cok Harcayanlar (top 5) + filtre sekmeleri (Aktif/Suresi Dolmus/Onay Bekleyen/Iptal/Tumu/Arsiv, sayacli) + ARAMA (uretici/urun, DOM-filtre) + kayit basina aksiyonlar: pending icin Onayla&Yayinla / Reddet, aktif icin Iptal Et / Arsivle, digerleri Arsivle/Arsivden Cikar. Onayla urunu featured yapar + vendora bildirim; iptal urunu featuredan kaldirir. Dashboard: Reklam highlight karti (aktif yerlesim + bu ay gelir) tikla->bolum + pending varsa hizli-eylem butonu. UI/mantik — rules degismedi.'],
@@ -23794,12 +23795,35 @@ async function admUsers(m) {
           '</div>' +
           '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;grid-column:1/-1"><div class="lbl-mini">UID</div><code class="fs11">'+u.id+'</code></div>' +
           '</div>' +
-          '<button id="u-modal-close2" class="btn-g" style="width:100%;margin-top:16px">Kapat</button>' +
+          '<div id="u-extra"></div>' +
+          '<div id="u-rawwrap"></div>' +
+          '<div style="display:flex;gap:8px;margin-top:14px">' +
+            (u.role==='vendor' ? '<button id="u-fullprofile" class="btn-g" style="flex:1">📄 Tam Profil</button>' : '') +
+            '<button id="u-rawtoggle" class="btn-g" style="flex:1">🔍 Tüm Alanlar</button>' +
+          '</div>' +
+          '<button id="u-modal-close2" class="btn-g" style="width:100%;margin-top:8px">Kapat</button>' +
           '</div>';
         document.body.appendChild(modal);
         modal.querySelector('#u-modal-close').onclick  = function(){ modal.remove(); };
         modal.querySelector('#u-modal-close2').onclick = function(){ modal.remove(); };
         modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+        // v5.56: kazanç/aktivite özeti + tam profil + ham alanlar
+        loadUserDetailExtras(u, modal.querySelector('#u-extra'));
+        var fpBtn = modal.querySelector('#u-fullprofile');
+        if (fpBtn) fpBtn.onclick = function(){ openVendorDetailModal(u); };
+        var rtBtn = modal.querySelector('#u-rawtoggle');
+        var rwBox = modal.querySelector('#u-rawwrap');
+        if (rtBtn) rtBtn.onclick = function(){
+          if (rwBox.innerHTML) { rwBox.innerHTML=''; rtBtn.textContent='🔍 Tüm Alanlar'; return; }
+          var rows = Object.keys(u).sort().map(function(k){
+            var val = u[k];
+            if (val && val.toDate) { try { val = val.toDate().toLocaleString('tr-TR'); } catch(e){} }
+            else if (val && typeof val==='object') { try { val = JSON.stringify(val); } catch(e){ val='[object]'; } }
+            return '<div style="display:grid;grid-template-columns:150px 1fr;gap:8px;padding:4px 0;border-bottom:1px solid rgba(15,23,42,.06);font-size:11.5px"><code class="t-muted">'+k+'</code><div style="word-break:break-word">'+(val===undefined||val===null||val===''?'—':String(val))+'</div></div>';
+          }).join('');
+          rwBox.innerHTML = '<div style="margin-top:12px;max-height:280px;overflow-y:auto;background:var(--bg-elevated);border-radius:8px;padding:10px">'+rows+'</div>';
+          rtBtn.textContent='🔼 Alanları Gizle';
+        };
         // v5.31: Detay modalından manuel doğrulama
         var verifyBtn = modal.querySelector('#u-modal-verify');
         if (verifyBtn) verifyBtn.onclick = function(){ modal.remove(); adminSetEmailVerified(u.id, u.email||'', true); };
@@ -28007,6 +28031,88 @@ async function admVendorVerify(m) {
 }
 
 // v4.82: Vendor detay modal (admVendorVerify'dan açılır)
+// ════════════════════════════════════════════════════════════════════
+// v5.56: Kullanıcı Detayı — kazanç & aktivite özeti (admin)
+// ════════════════════════════════════════════════════════════════════
+async function loadUserDetailExtras(u, host) {
+  if (!host) return;
+  host.innerHTML = '<div class="t-muted fs12" style="padding:10px 0;border-top:1px solid var(--border);margin-top:14px">Özet yükleniyor…</div>';
+  function card(label,val,color){ return '<div style="background:'+color+'12;border:1px solid '+color+'25;border-radius:8px;padding:8px;text-align:center"><div style="font-size:15px;font-weight:800;color:'+color+'">'+val+'</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px">'+label+'</div></div>'; }
+  try {
+    if (u.role === 'vendor') {
+      var R = await Promise.all([
+        getDocs(query(collection(db,'poc_charges'), where('vendorId','==',u.id))).catch(function(){return {docs:[]};}),
+        getDocs(query(collection(db,'subscription_history'), where('vendorId','==',u.id))).catch(function(){return {docs:[]};}),
+        getDoc(doc(db,'vendor_billing',u.id)).catch(function(){return null;}),
+        getDocs(query(collection(db,'products'), where('vendorId','==',u.id))).catch(function(){return {docs:[]};}),
+        getDocs(query(collection(db,'poc_requests'), where('vendorId','==',u.id))).catch(function(){return {docs:[]};}),
+        getDocs(query(collection(db,'offers'), where('vendorId','==',u.id))).catch(function(){return {docs:[]};}),
+        getDocs(query(collection(db,'featured_purchases'), where('vendorId','==',u.id))).catch(function(){return {docs:[]};}),
+      ]);
+      var charges = R[0].docs.map(function(d){return d.data();});
+      var subs    = R[1].docs.map(function(d){return d.data();});
+      var billing = (R[2] && R[2].exists()) ? R[2].data() : {};
+      var prods   = R[3].docs.map(function(d){return d.data();});
+      var pocs    = R[4].docs.length;
+      var offers  = R[5].docs.map(function(d){return d.data();});
+      var feats   = R[6].docs.map(function(d){return d.data();});
+
+      var paidCh = charges.filter(function(c){return c.status==='paid';});
+      var sum = function(arr,f){ return arr.reduce(function(s,x){return s+(f(x)||0);},0); };
+      var revOverride = sum(paidCh.filter(function(c){return c.source==='admin_override';}), function(c){return c.amount;});
+      var revFeatured = sum(paidCh.filter(function(c){return c.source==='featured';}), function(c){return c.amount;});
+      var revOtherCh  = sum(paidCh.filter(function(c){return c.source!=='admin_override'&&c.source!=='featured';}), function(c){return c.amount;});
+      var revSub      = sum(subs.filter(function(h){return h.status==='paid';}), function(h){return h.amount;});
+      var ltv = revSub + revOverride + revFeatured + revOtherCh;
+      var openBal = billing.unpaidBalance || 0;
+      var suspended = !!billing.isSuspended;
+
+      var now=Date.now();
+      var activeProds = prods.filter(function(p){return p.status==='active';}).length;
+      var activeFeat = feats.filter(function(f){ if(f.status!=='active')return false; var e=f.endAt?.toMillis?f.endAt.toMillis():(f.endAt?.seconds?f.endAt.seconds*1000:0); return !e||e>=now; }).length;
+      var offTotal = offers.length, offAcc = offers.filter(function(o){return o.status==='accepted';}).length;
+      var accRate = offTotal? Math.round(offAcc/offTotal*100):0;
+      var latestSub = subs.slice().sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);})[0];
+      var pkgName = latestSub?.packageName || u.packageName || u.packageTier || u.tier || '—';
+
+      host.innerHTML =
+        '<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">'
+        + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">💰 Kazancımız (PoCHub geliri)</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+        +   card('Yaşam Boyu (LTV)','₺'+ltv.toLocaleString('tr-TR'),'#16a34a')
+        +   card(suspended?'Açık Bakiye ⛔':'Açık Bakiye','₺'+openBal.toLocaleString('tr-TR'),openBal>0?'#dc2626':'#64748b')
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);line-height:1.8;margin-bottom:6px">'
+        +   '• Abonelik: <b>₺'+revSub.toLocaleString('tr-TR')+'</b> · Override PoC: <b>₺'+revOverride.toLocaleString('tr-TR')+'</b> · Öne Çıkan: <b>₺'+revFeatured.toLocaleString('tr-TR')+'</b>'+(revOtherCh?' · Diğer: <b>₺'+revOtherCh.toLocaleString('tr-TR')+'</b>':'')
+        + '</div>'
+        + '<div style="font-size:12px;font-weight:700;margin:12px 0 8px">📊 Aktivite · Paket: '+pkgName+'</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+        +   card('Ürün (aktif/top)', activeProds+'/'+prods.length,'#2563eb')
+        +   card('Aldığı PoC', String(pocs),'#7c3aed')
+        +   card('Teklif (kabul)', offAcc+'/'+offTotal+' · %'+accRate,'#d97706')
+        + '</div>'
+        + (activeFeat?'<div style="font-size:11px;color:#7c3aed;margin-top:8px">📢 '+activeFeat+' aktif öne çıkan yerleşim</div>':'')
+        + '</div>';
+    } else if (u.role === 'customer') {
+      var C = await Promise.all([
+        getDocs(query(collection(db,'poc_requests'), where('customerId','==',u.id))).catch(function(){return {docs:[]};}),
+        getDocs(query(collection(db,'demo_requests'), where('customerId','==',u.id))).catch(function(){return {docs:[]};}),
+      ]);
+      host.innerHTML =
+        '<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">'
+        + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">📊 Aktivite</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+        +   card('PoC Talebi', String(C[0].docs.length),'#7c3aed')
+        +   card('Demo Talebi', String(C[1].docs.length),'#2563eb')
+        + '</div></div>';
+    } else {
+      host.innerHTML = '';
+    }
+  } catch(e) {
+    host.innerHTML = '<div class="t-muted fs12" style="padding:8px 0;border-top:1px solid var(--border);margin-top:14px">Özet yüklenemedi: '+e.message+'</div>';
+  }
+}
+
 function openVendorDetailModal(v) {
   var modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
