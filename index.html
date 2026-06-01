@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.61 | pochub.co -->
+<!-- PoCHub v5.62 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.61';
+const VERSION = 'v5.62';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.62': ['KATALOG Faz A3b (taksonomi admin-yonetilir): sektor ve dagitim listeleri artik HARDCODE degil — pochub_config/system.taxonomy\'den okunur, kod yalniz varsayilan/seed (TAXONOMY_DEFAULTS). applyTaxonomy yerinde mutasyonla SECTORS/TAX_DEPLOYMENTS/CAT_FACETS gunceller; ensureTaxonomy bir kez yukler (boot fire-and-forget + renderCatalog/openAddProductModal/admSettings await). normalizeDeployment artik config match anahtarlarini kullanir. Sistem Ayarlari > "🏷 Taksonomi" bolumu + Taksonomi Editoru modali (sektor/dagitim ekle-duzenle-sil, dagitim match kelimeleri, Varsayilana Don). Kayit setDoc merge taxonomy. config write admin / read public oldugundan RULES degismedi. Faz A tamam.'],
   'v5.61': ['KATALOG kart zenginlestirme (gorsel profesyonellik): katalog urun kartina aciklamanin altinda etiket satiri — SEKTOR chipleri (ilk 3 + sayac), DAGITIM rozeti (Cloud/On-Prem/Hybrid/Yonetilen, normalizeDeployment), KOKEN (Yerli/Yabanci). Mevcut verified/tier rozeti ve puan zaten vardi. Duz listeden cozum-keyfi kartina dogru gorsel sicrama. UI — rules degismedi.'],
   'v5.60': ['KATALOG Faz A2: cok-gruplu faceted filtre sistemi. Tek-sektor filtre, generic CAT_FACETS yapisina donusturuldu — gruplar: Sektor, Dagitim (deployment; catFields.deployment_model/deployment serbest metni normalizeDeployment ile cloud/on_premise/hybrid/managed/other kovalarina indirgenir), Koken (Yerli/Yabanci, p.origin), Dogrulama (vendor admin_verified; _vendorBadgeCache erken preload). Her grup ic-OR / gruplar-arasi AND. Proper faceting: her grubun sayaci DIGER gruplara gore hesaplanir (facetFiltered exceptKey). Tum secimler chip + URL query-param (deep-link) + Tumunu temizle. Lisans modeli bilincli ertelendi (kategori-ozel cok dagimik; A3b admin normalizasyonunda). UI — rules degismedi.'],
   'v5.59': ['KATALOG Faz A3 (veri modeli): SEKTOR artik URUN duzeyinde. Onceden sector yalnizca vendor profilindeydi; urunlerde yoktu — bu yuzden A1 sektor faceti bostu. Simdi urun ekleme (openAddProductModal) ve vendor urun duzenleme (openEditProd) formlarina COKLU sektor pill secimi eklendi; products dokumanina sectors[] yazilir. Katalog faceti/filtresi sectors[] dizisini okur (tekil eski sector alanina geri-uyumlu). Ortak yardimcilar sectorPillsHtml/wireSectorPills/readSectorPills. products owner-update sectors yazabildigi icin RULES degismedi. NOT: eski urunler bos gelir — vendor Urunlerim>Duzenle ile sektor atayinca facete dusserler. A2 (deployment/lisans/dogrulanmis/origin facet) + A3b (admin taksonomi editoru) sirada.'],
@@ -3327,6 +3328,7 @@ let CUR_ADM_TAB = 'dashboard';
 ══════════════════════════════════════ */
 onAuthStateChanged(auth, async user => {
   window._authResolved = true;
+  try { ensureTaxonomy(); } catch(e){} // v5.62: taksonomiyi erken yükle (edit formu senkron)
   CUR_USER = user;
   if (user) {
     const snap = await getDoc(doc(db, 'users', user.uid));
@@ -6840,33 +6842,61 @@ async function registerForEvent(eventId, btn, vendorEmail, vendorName, eventTitl
 // ════════════════════════════════════════════════════════════════════
 // v5.58 (Faz A1): Katalog — sektör faceted filtre + chip + deep-link
 // ════════════════════════════════════════════════════════════════════
-var SECTORS = [
-  ['finance','🏦 Finans / Bankacılık'],['healthcare','🏥 Sağlık'],['education','🎓 Eğitim'],
-  ['manufacturing','🏭 Üretim / Sanayi'],['retail','🛒 Perakende'],['telecom','📡 Telekom'],
-  ['government','🏛 Kamu'],['energy','⚡ Enerji'],['logistics','🚚 Lojistik'],
-  ['media','📺 Medya'],['tech','💻 Teknoloji'],['other','🌐 Diğer']
-];
-var SECTOR_LABEL = {}; SECTORS.forEach(function(s){ SECTOR_LABEL[s[0]] = s[1]; });
-var CAT_FILTERS = { sector:[], deployment:[], origin:[], verified:[] }; // v5.60: çok-gruplu facet seçimleri
+// v5.62 (Faz A3b): Taksonomi config-tabanlı (admin yönetilir) — kod yalnızca varsayılan/seed
+var TAXONOMY_DEFAULTS = {
+  sectors: [
+    {value:'finance',label:'🏦 Finans / Bankacılık'},{value:'healthcare',label:'🏥 Sağlık'},{value:'education',label:'🎓 Eğitim'},
+    {value:'manufacturing',label:'🏭 Üretim / Sanayi'},{value:'retail',label:'🛒 Perakende'},{value:'telecom',label:'📡 Telekom'},
+    {value:'government',label:'🏛 Kamu'},{value:'energy',label:'⚡ Enerji'},{value:'logistics',label:'🚚 Lojistik'},
+    {value:'media',label:'📺 Medya'},{value:'tech',label:'💻 Teknoloji'},{value:'other',label:'🌐 Diğer'}
+  ],
+  deployments: [
+    {value:'hybrid',label:'🔀 Hybrid',match:['hybrid','hibrit']},
+    {value:'managed',label:'🛡 Yönetilen',match:['mssp','mdr','yönet','managed']},
+    {value:'on_premise',label:'🏢 On-Premise',match:['on-prem','on prem','premise','yerinde','self-managed']},
+    {value:'cloud',label:'☁️ Cloud/SaaS',match:['saas','cloud','bulut','serverless','dbaas']},
+    {value:'other',label:'📦 Diğer',match:[]}
+  ]
+};
+var SECTORS = TAXONOMY_DEFAULTS.sectors.map(function(s){ return [s.value, s.label]; });
+var SECTOR_LABEL = {}; function _rebuildSectorLabel(){ SECTOR_LABEL={}; SECTORS.forEach(function(s){ SECTOR_LABEL[s[0]]=s[1]; }); } _rebuildSectorLabel();
+var TAX_DEPLOYMENTS = TAXONOMY_DEFAULTS.deployments.map(function(d){ return {value:d.value,label:d.label,match:(d.match||[]).slice()}; });
+var CAT_FILTERS = { sector:[], deployment:[], origin:[], verified:[] }; // çok-gruplu facet seçimleri
 
-// v5.60 (Faz A2): deployment normalizasyonu — kategori-özel serbest metinleri tek kovaya indir
+// deployment normalizasyonu — config'deki match anahtarlarıyla tek kovaya indir
 function normalizeDeployment(p){
   var raw = ((p.catFields && (p.catFields.deployment_model || p.catFields.deployment)) || '').toString().toLowerCase();
   if (!raw) return '';
-  if (raw.indexOf('hybrid')>=0 || raw.indexOf('hibrit')>=0) return 'hybrid';
-  if (raw.indexOf('mssp')>=0 || raw.indexOf('mdr')>=0 || raw.indexOf('yönet')>=0 || raw.indexOf('managed')>=0) return 'managed';
-  if (raw.indexOf('on-prem')>=0 || raw.indexOf('on prem')>=0 || raw.indexOf('premise')>=0 || raw.indexOf('yerinde')>=0 || raw.indexOf('self-managed')>=0) return 'on_premise';
-  if (raw.indexOf('saas')>=0 || raw.indexOf('cloud')>=0 || raw.indexOf('bulut')>=0 || raw.indexOf('serverless')>=0 || raw.indexOf('dbaas')>=0) return 'cloud';
-  return 'other';
+  for (var i=0;i<TAX_DEPLOYMENTS.length;i++){ var d=TAX_DEPLOYMENTS[i]; if(d.match&&d.match.length&&d.match.some(function(k){return raw.indexOf(k)>=0;})) return d.value; }
+  var other = TAX_DEPLOYMENTS.filter(function(d){return !d.match||!d.match.length;})[0];
+  return other ? other.value : 'other';
 }
-// Generic facet grupları (her biri: çoklu seçim, OR içi / AND gruplar arası)
+// Generic facet grupları (içi-OR / gruplar-AND)
 var CAT_FACETS = [
   { key:'sector', label:'Sektör', options: SECTORS, get:function(p){ return (p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]); } },
-  { key:'deployment', label:'Dağıtım', options:[['cloud','☁️ Cloud/SaaS'],['on_premise','🏢 On-Premise'],['hybrid','🔀 Hybrid'],['managed','🛡 Yönetilen'],['other','📦 Diğer']], get:function(p){ var d=normalizeDeployment(p); return d?[d]:[]; } },
+  { key:'deployment', label:'Dağıtım', options: TAX_DEPLOYMENTS.map(function(d){return [d.value,d.label];}), get:function(p){ var d=normalizeDeployment(p); return d?[d]:[]; } },
   { key:'origin', label:'Köken', options:[['domestic','🇹🇷 Yerli'],['foreign','🌍 Yabancı']], get:function(p){ return p.origin?[p.origin]:[]; } },
   { key:'verified', label:'Doğrulama', options:[['verified','✓ Doğrulanmış']], get:function(p){ return (window._vendorBadgeCache && window._vendorBadgeCache[p.vendorId] && window._vendorBadgeCache[p.vendorId].vendorStatus==='admin_verified')?['verified']:[]; } },
 ];
-var CAT_FACET_LABEL = {}; CAT_FACETS.forEach(function(f){ CAT_FACET_LABEL[f.key]={}; f.options.forEach(function(o){ CAT_FACET_LABEL[f.key][o[0]]=o[1]; }); });
+var CAT_FACET_LABEL = {}; function _rebuildFacetLabel(){ CAT_FACET_LABEL={}; CAT_FACETS.forEach(function(f){ CAT_FACET_LABEL[f.key]={}; f.options.forEach(function(o){ CAT_FACET_LABEL[f.key][o[0]]=o[1]; }); }); } _rebuildFacetLabel();
+
+// Config'den gelen taksonomiyi uygula (yerinde mutasyon — referanslar korunur)
+function applyTaxonomy(tax){
+  if (tax && Array.isArray(tax.sectors) && tax.sectors.length){
+    SECTORS.length=0; tax.sectors.forEach(function(s){ if(s&&s.value) SECTORS.push([s.value, s.label||s.value]); }); _rebuildSectorLabel();
+  }
+  if (tax && Array.isArray(tax.deployments) && tax.deployments.length){
+    TAX_DEPLOYMENTS = tax.deployments.map(function(d){ return {value:d.value,label:d.label||d.value,match:(d.match||[]).map(function(x){return (x||'').toString().toLowerCase();})}; });
+    var dep = CAT_FACETS.filter(function(f){return f.key==='deployment';})[0]; if(dep) dep.options = TAX_DEPLOYMENTS.map(function(d){return [d.value,d.label];});
+  }
+  _rebuildFacetLabel();
+}
+var _taxLoaded = false;
+async function ensureTaxonomy(force){
+  if (_taxLoaded && !force) return;
+  try { var cs = await getDoc(doc(db,'pochub_config','system')); var t = cs.exists() && cs.data().taxonomy; if (t) applyTaxonomy(t); } catch(e){}
+  _taxLoaded = true;
+}
 
 // v5.59 (Faz A3): ürün formu — çoklu sektör pill yardımcıları
 function sectorPillsHtml(selected){
@@ -6965,6 +6995,7 @@ function updateCatalogFacetsAndChips(allBase){
 }
 
 async function renderCatalog() {
+  await ensureTaxonomy();
   const wrap = el('scr-catalog');
   wrap.innerHTML = `<div class="wrap">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
@@ -22735,6 +22766,7 @@ async function openEditEventModal(evId, evData) {
 }
 
 async function openAddProductModal(prefillCat) {
+  await ensureTaxonomy();
   var cats = await getCategories();
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -28566,7 +28598,81 @@ function openPackageEditor(pkgId, allPackages) {
 }
 
 // Admin: Sistem Ayarları Sayfası
+// ════════════════════════════════════════════════════════════════════
+// v5.62 (Faz A3b): Admin — Taksonomi Editörü (sektör & dağıtım)
+// ════════════════════════════════════════════════════════════════════
+function openTaxonomyEditorModal(){
+  var modal=document.createElement('div'); modal.className='modal-overlay';
+  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:660px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;position:relative">'
+    + '<button id="tax-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+    + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">🏷 Taksonomi Yönetimi</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Katalog filtreleri ve ürün formunda kullanılır. Etiketlerde emoji kullanabilirsin. "kod" değeri kayıtlı ürünlerle eşleşmeyi korur; değiştirme.</div>'
+    + '<div style="font-size:13px;font-weight:700;margin-bottom:8px">Sektörler</div>'
+    + '<div id="tax-sec-list"></div>'
+    + '<button id="tax-sec-add" class="btn-g btn-sm" style="margin-top:6px">+ Sektör Ekle</button>'
+    + '<div style="font-size:13px;font-weight:700;margin:18px 0 8px">Dağıtım Türleri <span style="font-weight:400;color:var(--text-muted);font-size:11px">(eşleşme: ürünün dağıtım metnini bu anahtar kelimelerle kovaya atar; virgülle ayır, boş = "diğer" kovası)</span></div>'
+    + '<div id="tax-dep-list"></div>'
+    + '<button id="tax-dep-add" class="btn-g btn-sm" style="margin-top:6px">+ Dağıtım Ekle</button>'
+    + '<div style="display:flex;gap:8px;margin-top:20px"><button class="btn-p" id="tax-save" style="flex:1">💾 Kaydet</button><button class="btn-g" id="tax-reset">↺ Varsayılana Dön</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+  var secList=modal.querySelector('#tax-sec-list'), depList=modal.querySelector('#tax-dep-list');
+  function esc(s){ return (s||'').toString().replace(/"/g,'&quot;'); }
+  function rowSec(r){
+    var row=document.createElement('div'); row.className='tax-srow'; row.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:center';
+    row.innerHTML='<input class="inp tax-sec-label" placeholder="Etiket (örn. 🏥 Sağlık)" value="'+esc(r.label)+'" style="flex:1"><input class="inp tax-sec-value" placeholder="kod" value="'+esc(r.value)+'" style="width:120px"><button class="btn-g btn-sm tax-del" title="Sil">🗑</button>';
+    row.querySelector('.tax-del').addEventListener('click', function(){ row.remove(); });
+    secList.appendChild(row);
+  }
+  function rowDep(r){
+    var row=document.createElement('div'); row.className='tax-drow'; row.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:center';
+    row.innerHTML='<input class="inp tax-dep-label" placeholder="Etiket" value="'+esc(r.label)+'" style="width:150px"><input class="inp tax-dep-value" placeholder="kod" value="'+esc(r.value)+'" style="width:110px"><input class="inp tax-dep-match" placeholder="eşleşme: saas, cloud..." value="'+esc(r.match)+'" style="flex:1"><button class="btn-g btn-sm tax-del" title="Sil">🗑</button>';
+    row.querySelector('.tax-del').addEventListener('click', function(){ row.remove(); });
+    depList.appendChild(row);
+  }
+  SECTORS.forEach(function(s){ rowSec({value:s[0], label:s[1]}); });
+  TAX_DEPLOYMENTS.forEach(function(d){ rowDep({value:d.value, label:d.label, match:(d.match||[]).join(', ')}); });
+  modal.querySelector('#tax-sec-add').addEventListener('click', function(){ rowSec({value:'',label:''}); });
+  modal.querySelector('#tax-dep-add').addEventListener('click', function(){ rowDep({value:'',label:'',match:''}); });
+  modal.querySelector('#tax-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  function slug(s){ return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30) || ('x'+(Date.now()%100000)); }
+  modal.querySelector('#tax-reset').addEventListener('click', function(){
+    if(!confirm('Kod varsayılanlarına dönülsün mü? (Kaydedince geçerli olur)')) return;
+    secList.innerHTML=''; depList.innerHTML='';
+    TAXONOMY_DEFAULTS.sectors.forEach(function(s){ rowSec({value:s.value,label:s.label}); });
+    TAXONOMY_DEFAULTS.deployments.forEach(function(d){ rowDep({value:d.value,label:d.label,match:(d.match||[]).join(', ')}); });
+  });
+  modal.querySelector('#tax-save').addEventListener('click', async function(){
+    var btn=this; btn.disabled=true; btn.textContent='⏳ Kaydediliyor...';
+    var sectors=[], usedS={};
+    [].slice.call(secList.querySelectorAll('.tax-srow')).forEach(function(row){
+      var label=(row.querySelector('.tax-sec-label').value||'').trim(); if(!label) return;
+      var value=((row.querySelector('.tax-sec-value').value||'').trim())||slug(label);
+      while(usedS[value]) value=value+'_2'; usedS[value]=1;
+      sectors.push({value:value, label:label});
+    });
+    var deployments=[], usedD={};
+    [].slice.call(depList.querySelectorAll('.tax-drow')).forEach(function(row){
+      var label=(row.querySelector('.tax-dep-label').value||'').trim(); if(!label) return;
+      var value=((row.querySelector('.tax-dep-value').value||'').trim())||slug(label);
+      while(usedD[value]) value=value+'_2'; usedD[value]=1;
+      var match=(row.querySelector('.tax-dep-match').value||'').split(',').map(function(x){return x.trim().toLowerCase();}).filter(Boolean);
+      deployments.push({value:value, label:label, match:match});
+    });
+    if(!sectors.length){ showToast('En az bir sektör gerekli.','err'); btn.disabled=false; btn.textContent='💾 Kaydet'; return; }
+    try {
+      await setDoc(doc(db,'pochub_config','system'), { taxonomy: {sectors:sectors, deployments:deployments} }, {merge:true});
+      applyTaxonomy({sectors:sectors, deployments:deployments}); _taxLoaded=true;
+      showToast('Taksonomi kaydedildi.');
+      modal.remove();
+      var mm=el('adm-main'); if(mm) admSettings(mm);
+    } catch(e){ showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='💾 Kaydet'; }
+  });
+}
+
 async function admSettings(m) {
+  await ensureTaxonomy();
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Ayarlar yükleniyor...</div>';
   try {
     const seeded = await seedDefaultConfigIfNeeded();
@@ -28754,6 +28860,16 @@ async function admSettings(m) {
     var s3 = section('⚡ Override Sistemi', '#d97706');
     s3.appendChild(field('Override Fiyat Zammı (% - caydırıcı)', 'cfg-ov-mult', 'number', Math.round(((cfg.overrideSettings?.overridePriceMultiplier ?? 1.5) - 1) * 100), 'Override yapılan PoC için normal fiyat üzerine zam'));
     m.appendChild(s3);
+
+    // v5.62: Taksonomi (sektör & dağıtım) — katalog/form için admin-yönetilir
+    var sTax = section('🏷 Taksonomi (Sektör & Dağıtım)', '#2563eb');
+    var taxInfo = document.createElement('div'); taxInfo.style.cssText='font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6';
+    taxInfo.innerHTML = 'Katalog filtreleri ve ürün formundaki sektör ('+SECTORS.length+') ve dağıtım ('+TAX_DEPLOYMENTS.length+') listelerini düzenle. Boş bırakılırsa kod varsayılanları kullanılır.';
+    sTax.appendChild(taxInfo);
+    var taxBtn = document.createElement('button'); taxBtn.className='btn-g'; taxBtn.textContent='🏷 Taksonomiyi Düzenle';
+    taxBtn.addEventListener('click', function(){ openTaxonomyEditorModal(); });
+    sTax.appendChild(taxBtn);
+    m.appendChild(sTax);
 
     // Suspend
     var s4 = section('⚠️ Suspend Kuralları', '#dc2626');
