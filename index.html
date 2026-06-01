@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.53 | pochub.co -->
+<!-- PoCHub v5.54 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.53';
+const VERSION = 'v5.54';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.54': ['REKLAM Faz 1d (son): analitik & ROI. Carousel\'de gercek reklamlara tiklamada featured_events (tip click, oturum-tekilli) yazilir. Featured\'dan acilan PoC\'ye source:featured + featuredProductId atifi (poc_requests). Admin ledger\'da her kayitta urun-bazli metrik (Tik + Featured PoC). Yeni uretici sekmesi "Reklamlarim": ozet (aktif yerlesim, toplam harcama, toplam tik, featured PoC) + yerlesim kartlari + metrikler (ROI gorunumu). NOT: tik metrigi client-tarafi ve YAKLASIK (bot/adblock/cihaz farki); PoC-source sayisi guvenilir gercek donusum. RULES: featured_events eklendi (anon create, read admin+vendor-own) → Console re-deploy gerekir. poc_requests create kuralinda alan whitelist olmadigi icin ek degisiklik yok. Faz 1 (1a-1d) tamamlandi.'],
   'v5.53': ['REKLAM Faz 1c: admin "Reklam / One Cikan" bolumu detaylandi. Iki alt-sekme: Islemler (ledger) + Ayarlar (1a config). Islemler: ozet kartlari (aktif yerlesim, bu ay/toplam gelir, onay bekleyen) + En Cok Harcayanlar (top 5) + filtre sekmeleri (Aktif/Suresi Dolmus/Onay Bekleyen/Iptal/Tumu/Arsiv, sayacli) + ARAMA (uretici/urun, DOM-filtre) + kayit basina aksiyonlar: pending icin Onayla&Yayinla / Reddet, aktif icin Iptal Et / Arsivle, digerleri Arsivle/Arsivden Cikar. Onayla urunu featured yapar + vendora bildirim; iptal urunu featuredan kaldirir. Dashboard: Reklam highlight karti (aktif yerlesim + bu ay gelir) tikla->bolum + pending varsa hizli-eylem butonu. UI/mantik — rules degismedi.'],
   'v5.52': ['REKLAM Faz 1b: uretici Featured Boost satin alma akisi. Urunlerim\'de aktif urune "Reklam" butonu (📢) → modal: plan (haftalik/aylik) + sure secimi, canli fiyat/bitis onizlemesi, mevcut featured durumu. Onayda: featured_purchases ledger kaydi (amount/plan/periods/startAt/endAt/status/source) + (autoActivate ise) urun.featured=true & featuredUntil=bitis + admin_inbox bildirimi. autoActivate kapaliysa status=pending_approval (admin onayi 1c). Tutar cari hesaba islenecek borc olarak featured_purchases kaydidir. RULES: featured_purchases eklendi (vendor create/read-own, admin all) → Console re-deploy gerekir. products update kurali sahibe featured yazdirdigi icin ek degisiklik yok.'],
   'v5.51': ['REKLAM/ONE CIKAN Faz 1a: monetizasyon altyapisi. Yeni admin sekmesi "Reklam / One Cikan" — fiyatlandirma & slot ayarlari (program aktif, slot sayisi, haftalik/aylik fiyat, azami sure, Sponsorlu etiketi, otomatik/onayli aktivasyon) + canli durum kartlari. Config pochub_config/system.featuredAds (public-read). Ana sayfa carousel artik: master-switch ile gizlenebilir, slot sayisiyla SINIRLI (kitlik), ve gercek one-cikanlar "Sponsorlu" etiketli (fallback dolgu urunler reklam degil, etiketlenmez). Faz 1b-1d (satin alma, ledger+arama+arsiv, metrikler) sirada. UI/config — rules degismedi.'],
@@ -3694,6 +3695,20 @@ async function openNotifPanel() {
   } catch(e) {
     panel.querySelector('#notif-list').innerHTML = '<div style="padding:24px;color:#dc2626;font-size:13px">Yükleme hatası: '+e.message+'</div>';
   }
+}
+
+// v5.54 (Faz 1d): Öne Çıkan reklam etkileşimi — oturum-tekilli, yaklaşık metrik.
+//   (Kesin/bot-dayanıklı ölçüm ideal olarak sunucuya taşınır; bu client-tarafı yönlendirici.)
+async function logFeaturedEvent(type, productId, vendorId) {
+  if (!productId) return;
+  try {
+    var key = 'fe_' + type + '_' + productId;
+    if (sessionStorage.getItem(key)) return; // oturumda tekille (yazma + abuse sınırı)
+    sessionStorage.setItem(key, '1');
+    await addDoc(collection(db,'featured_events'), {
+      type: type, productId: productId, vendorId: vendorId || null, ts: serverTimestamp(),
+    });
+  } catch(e) { /* sessiz — analitik kritik değil */ }
 }
 
 // v5.45: Admin'lere bildirim — user ENUMERASYONU YOK (admin_inbox'a tek doküman yazar).
@@ -6513,6 +6528,7 @@ async function loadFeaturedProducts() {
       if (card) {
         card.addEventListener('click', function(e) {
           if (e.target.closest('.feat-poc-btn') || e.target.closest('.feat-dot')) return;
+          if (p._isAd) logFeaturedEvent('click', p.id, p.vendorId);
           openProductDetailModal(card.dataset.pid);
         });
       }
@@ -6524,6 +6540,7 @@ async function loadFeaturedProducts() {
           if (!CUR_USER) { openAuthModal('customer',''); return; }
           if (CUR_PROFILE?.role === 'vendor') { showToast('PoC talebi müşteri hesabıyla oluşturulur.','err'); return; }
           var c2 = pocBtn.closest('.featured-card');
+          if (p._isAd) { logFeaturedEvent('click', p.id, p.vendorId); window._pocFromFeatured = p.id; }
           openMultiVendorPocModal(c2.dataset.pid);
         });
       }
@@ -8587,6 +8604,7 @@ async function openPocTimeline(poc) {
 }
 
 async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
+  var _pocSrc = window._pocFromFeatured || null; window._pocFromFeatured = null; // v5.54: featured atıf
   // v4.93: Email verify kontrolü (kritik aksiyon)
   if (!(await requireEmailVerified('create_poc', 'PoC talebi açma'))) return;
 
@@ -8883,6 +8901,8 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
           title, requirements, preferredDates, location,
           status: 'pending',
           activeVendorCount: 0,
+          source: _pocSrc ? 'featured' : 'catalog',
+          featuredProductId: _pocSrc || null,
           createdAt: serverTimestamp()
         });
         batchResults.push({...v, docId: docRef.id, hadConflict: false});
@@ -11108,7 +11128,7 @@ function renderVendor() {
     ['dashboard','Dashboard'],
     ...analyticsTab,
     ['requests','PoC Talepleri'],['calendar','Takvim'],
-    ['products','Ürünlerim'],['portfolio','Portföyüm'],
+    ['products','Ürünlerim'],['portfolio','Portföyüm'],['featured','📢 Reklamlarım'],
     ['events','Etkinliklerim'],['invites','Davetlerim'],['offers-sent','💰 Tekliflerim'],['messages','💬 Mesajlar'],
     ['referrals','🎁 Davet Et'],
     ['subscription','💎 Aboneliğim'],['billing','💳 Cari Hesap'],
@@ -11152,6 +11172,7 @@ async function loadVendTab() {
   if (CUR_VEND_TAB === 'billing') { await vendBilling(m); return; }
   if (CUR_VEND_TAB === 'referrals') { await vendReferrals(m); return; }
   if (CUR_VEND_TAB === 'analytics') { await vendAnalytics(m); return; }
+  if (CUR_VEND_TAB === 'featured')  { await vendFeatured(m); return; }
   if (CUR_VEND_TAB === 'profile') { await renderUserProfile(m, 'vendor'); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     // v5.12: Skeleton loader
@@ -30245,6 +30266,69 @@ async function openFeaturedBoostModal(pid, pname, product) {
   });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// v5.54 (Faz 1d): ÜRETİCİ — REKLAMLARIM (yerleşimler + ROI metrikleri)
+// ════════════════════════════════════════════════════════════════════
+async function vendFeatured(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Reklam verileri yükleniyor...</div>';
+  try {
+    var results = await Promise.all([
+      getDocs(query(collection(db,'featured_purchases'), where('vendorId','==',CUR_USER.uid))).catch(function(){return {docs:[]};}),
+      getDocs(query(collection(db,'featured_events'), where('vendorId','==',CUR_USER.uid))).catch(function(){return {docs:[]};}),
+      getDocs(query(collection(db,'poc_requests'), where('vendorId','==',CUR_USER.uid))).catch(function(){return {docs:[]};}),
+    ]);
+    var purchases = results[0].docs.map(function(d){ return {...d.data(), id:d.id}; });
+    purchases.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+    var clickByProd = {}; results[1].docs.forEach(function(d){ var e=d.data(); if(e.type==='click'&&e.productId) clickByProd[e.productId]=(clickByProd[e.productId]||0)+1; });
+    var pocByProd = {}; results[2].docs.forEach(function(d){ var r=d.data(); if(r.source==='featured'&&r.productId) pocByProd[r.productId]=(pocByProd[r.productId]||0)+1; });
+
+    var now=Date.now();
+    function endMs(o){ return o.endAt?.toMillis?o.endAt.toMillis():(o.endAt?.seconds?o.endAt.seconds*1000:0); }
+    var activeCount = purchases.filter(function(o){ return o.status==='active' && (!endMs(o)||endMs(o)>=now); }).length;
+    var totalSpend = purchases.filter(function(o){ return o.status==='active'; }).reduce(function(s,o){return s+(o.amount||0);},0);
+    var totalClicks = Object.keys(clickByProd).reduce(function(s,k){return s+clickByProd[k];},0);
+    var totalPocs = Object.keys(pocByProd).reduce(function(s,k){return s+pocByProd[k];},0);
+
+    m.innerHTML='';
+    var hdr=document.createElement('div'); hdr.style.cssText='margin-bottom:14px';
+    hdr.innerHTML='<h2 class="fs18-fw7">📢 Reklamlarım</h2><div class="txt-muted-12-mt3">Öne çıkan ürün yerleşimlerin ve performansı</div>';
+    m.appendChild(hdr);
+
+    var stats=document.createElement('div');
+    stats.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px';
+    [['Aktif Yerleşim',String(activeCount),'#16a34a'],['Toplam Harcama','₺'+totalSpend.toLocaleString('tr-TR'),'#7c3aed'],['Toplam Tık',String(totalClicks),'#2563eb'],['Featured PoC',String(totalPocs),'#d97706']].forEach(function(s){
+      var c=document.createElement('div'); c.style.cssText='background:'+s[2]+'15;border:1px solid '+s[2]+'30;border-radius:8px;padding:10px;text-align:center';
+      c.innerHTML='<div style="font-size:'+(s[1].length>8?'15px':'20px')+';font-weight:800;color:'+s[2]+'">'+s[1]+'</div><div class="fs11-mt2-muted">'+s[0]+'</div>'; stats.appendChild(c);
+    });
+    m.appendChild(stats);
+
+    if (!purchases.length) {
+      var e=document.createElement('div'); e.className='empty';
+      e.innerHTML='<div class="empty-icon">📢</div>Henüz öne çıkan yerleşimin yok.<div style="margin-top:8px;font-size:12.5px;color:var(--text-muted)">Ürünlerim sekmesinde bir ürünün 📢 butonuyla ürününü ana sayfada öne çıkarabilirsin.</div>';
+      m.appendChild(e); return;
+    }
+    var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:10px';
+    var lbl={active:'Aktif',pending_approval:'Onay Bekliyor',cancelled:'İptal'};
+    purchases.forEach(function(o){
+      var ended = o.status==='active' && endMs(o) && endMs(o)<now;
+      var st = ended?'Süresi Dolmuş':(lbl[o.status]||o.status);
+      var sc = o.status==='active'?(ended?'#64748b':'#16a34a'):o.status==='pending_approval'?'#d97706':'#dc2626';
+      var sa=o.startAt?.toDate?o.startAt.toDate().toLocaleDateString('tr-TR'):'—';
+      var ea=o.endAt?.toDate?o.endAt.toDate().toLocaleDateString('tr-TR'):'—';
+      var card=document.createElement('div');
+      card.style.cssText='background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid '+sc+';border-radius:8px;padding:14px';
+      card.innerHTML='<div class="flx-bw-s-mb10"><div class="flx1"><div class="fs13-fw7">'+(o.productName||'Ürün')+'</div>'
+        +'<div class="txt-muted-12-mt2">'+(o.periods||1)+' '+(o.plan==='monthly'?'ay':'hafta')+' · '+sa+' → '+ea+'</div>'
+        +'<div class="txt-muted-12-mt2">👁 Tık: <strong>'+(clickByProd[o.productId]||0)+'</strong> · 📨 Featured PoC: <strong>'+(pocByProd[o.productId]||0)+'</strong></div>'
+        +'</div><div class="t-rgt"><div style="font-size:15px;font-weight:800">₺'+(o.amount||0).toLocaleString('tr-TR')+'</div><div style="font-size:11px;font-weight:700;color:'+sc+';margin-top:4px">'+st+'</div></div></div>';
+      list.appendChild(card);
+    });
+    m.appendChild(list);
+  } catch(e) {
+    m.innerHTML='<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
+}
+
 var FEAT_SUBTAB = 'ledger';
 
 // ════════════════════════════════════════════════════════════════════
@@ -30290,6 +30374,17 @@ async function renderFeaturedLedger(m) {
       return o.status || 'active';
     }
     all.forEach(function(o){ o._eff = eff(o); });
+
+    // v5.54: ürün-bazlı metrikler — tık (featured_events) + featured-kaynaklı PoC
+    var clickByProd = {}, pocByProd = {};
+    try {
+      var evSnap = await getDocs(collection(db,'featured_events'));
+      evSnap.docs.forEach(function(d){ var e=d.data(); if(e.type==='click'&&e.productId) clickByProd[e.productId]=(clickByProd[e.productId]||0)+1; });
+    } catch(e){}
+    try {
+      var fpocSnap = await getDocs(query(collection(db,'poc_requests'), where('source','==','featured')));
+      fpocSnap.docs.forEach(function(d){ var r=d.data(); if(r.productId) pocByProd[r.productId]=(pocByProd[r.productId]||0)+1; });
+    } catch(e){}
 
     var visible = all.filter(function(o){ return !o.archived; });
     var archived = all.filter(function(o){ return o.archived; });
@@ -30370,6 +30465,7 @@ async function renderFeaturedLedger(m) {
           + '<div class="fs13-fw7">'+(o.productName||'Ürün')+'</div>'
           + '<div class="txt-muted-12-mt2">🏢 '+(o.vendorName||'—')+'</div>'
           + '<div class="txt-muted-12-mt2">'+(o.periods||1)+' '+(o.plan==='monthly'?'ay':'hafta')+' · '+sa+' → '+ea+'</div>'
+          + '<div class="txt-muted-12-mt2">👁 Tık: <strong>'+(clickByProd[o.productId]||0)+'</strong> · 📨 Featured PoC: <strong>'+(pocByProd[o.productId]||0)+'</strong></div>'
           + '</div><div class="t-rgt">'
           + '<div style="font-size:16px;font-weight:800;color:#16a34a">₺'+(o.amount||0).toLocaleString('tr-TR')+'</div>'
           + '<div style="font-size:11px;font-weight:700;color:'+sc+';margin-top:4px">'+(effLabels[o._eff]||o._eff)+'</div>'
