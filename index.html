@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.52 | pochub.co -->
+<!-- PoCHub v5.53 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.52';
+const VERSION = 'v5.53';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.53': ['REKLAM Faz 1c: admin "Reklam / One Cikan" bolumu detaylandi. Iki alt-sekme: Islemler (ledger) + Ayarlar (1a config). Islemler: ozet kartlari (aktif yerlesim, bu ay/toplam gelir, onay bekleyen) + En Cok Harcayanlar (top 5) + filtre sekmeleri (Aktif/Suresi Dolmus/Onay Bekleyen/Iptal/Tumu/Arsiv, sayacli) + ARAMA (uretici/urun, DOM-filtre) + kayit basina aksiyonlar: pending icin Onayla&Yayinla / Reddet, aktif icin Iptal Et / Arsivle, digerleri Arsivle/Arsivden Cikar. Onayla urunu featured yapar + vendora bildirim; iptal urunu featuredan kaldirir. Dashboard: Reklam highlight karti (aktif yerlesim + bu ay gelir) tikla->bolum + pending varsa hizli-eylem butonu. UI/mantik — rules degismedi.'],
   'v5.52': ['REKLAM Faz 1b: uretici Featured Boost satin alma akisi. Urunlerim\'de aktif urune "Reklam" butonu (📢) → modal: plan (haftalik/aylik) + sure secimi, canli fiyat/bitis onizlemesi, mevcut featured durumu. Onayda: featured_purchases ledger kaydi (amount/plan/periods/startAt/endAt/status/source) + (autoActivate ise) urun.featured=true & featuredUntil=bitis + admin_inbox bildirimi. autoActivate kapaliysa status=pending_approval (admin onayi 1c). Tutar cari hesaba islenecek borc olarak featured_purchases kaydidir. RULES: featured_purchases eklendi (vendor create/read-own, admin all) → Console re-deploy gerekir. products update kurali sahibe featured yazdirdigi icin ek degisiklik yok.'],
   'v5.51': ['REKLAM/ONE CIKAN Faz 1a: monetizasyon altyapisi. Yeni admin sekmesi "Reklam / One Cikan" — fiyatlandirma & slot ayarlari (program aktif, slot sayisi, haftalik/aylik fiyat, azami sure, Sponsorlu etiketi, otomatik/onayli aktivasyon) + canli durum kartlari. Config pochub_config/system.featuredAds (public-read). Ana sayfa carousel artik: master-switch ile gizlenebilir, slot sayisiyla SINIRLI (kitlik), ve gercek one-cikanlar "Sponsorlu" etiketli (fallback dolgu urunler reklam degil, etiketlenmez). Faz 1b-1d (satin alma, ledger+arama+arsiv, metrikler) sirada. UI/config — rules degismedi.'],
   'v5.50': ['ACIL ONAY (OVERRIDE) bolumu gelistirildi: (1) Isim tutarliligi — admin tarafinda "Override Talepleri" → "Acil Onay Talepleri" (vendor tarafindaki "Acil Onay Talep Et" ile esit). (2) ARAMA: ekrana vendor/PoC/sebep/musteri araması eklendi (DOM-filtre, re-render yok, odak korunur). (3) ARSIV: her talepte Arsivle/Arsivden Cikar + yeni Arsiv sekmesi; arsivlenenler diger sekmelerden gizli; sekme sayaclari arsivsiz. (4) DASHBOARD: bekleyen Acil Onay sayisi hizli-eylem butonu + highlight kart (bekleyen adet + onayli override borc toplami), tikla→sekme. UI/mantik — rules degismedi.'],
@@ -23216,7 +23217,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'profile')    { await renderUserProfile(m, 'admin');  return; }
 
     // DASHBOARD - v5.06: Zenginleştirildi
-    const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap, subSnap, paymentsSnap, demoSnap, ovSnap] = await Promise.all([
+    const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap, subSnap, paymentsSnap, demoSnap, ovSnap, fpSnap] = await Promise.all([
       getDocs(collection(db,'users')),
       getDocs(collection(db,'products')),
       getDocs(collection(db,'poc_requests')),
@@ -23226,6 +23227,7 @@ async function loadAdmTab() {
       getDocs(collection(db,'payment_history')).catch(()=>({docs:[]})),
       getDocs(collection(db,'demo_requests')).catch(()=>({docs:[]})),
       getDocs(collection(db,'admin_overrides')).catch(()=>({docs:[]})),
+      getDocs(collection(db,'featured_purchases')).catch(()=>({docs:[]})),
     ]);
     const users  = usersSnap.docs.map(d=>d.data());
     const prods  = prodsSnap.docs.map(d=>d.data());
@@ -23291,6 +23293,12 @@ async function loadAdmTab() {
     var ovPending = ovActive.filter(function(o){ return o.status === 'pending'; }).length;
     var ovDebt    = ovActive.filter(function(o){ return o.status === 'approved'; }).reduce(function(s,o){ return s + (o.overrideAmount||0); }, 0);
 
+    // v5.53: Reklam / Öne Çıkan rakamları
+    var fps = fpSnap.docs.map(d=>d.data());
+    var fpActive  = fps.filter(function(f){ if(f.status!=='active')return false; var e=f.endAt?.toMillis?f.endAt.toMillis():(f.endAt?.seconds?f.endAt.seconds*1000:0); return !e || e>=Date.now(); }).length;
+    var fpPending = fps.filter(function(f){ return f.status==='pending_approval'; }).length;
+    var fpMonthRev= fps.filter(function(f){ if(f.status!=='active')return false; var t=f.createdAt?.toMillis?f.createdAt.toMillis():(f.createdAt?.seconds?f.createdAt.seconds*1000:0); return t>=(Date.now()-30*86400000); }).reduce(function(s,f){ return s+(f.amount||0); }, 0);
+
     var html = '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:10px">';
     html += '<div>';
     html += '<h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0 0 4px">📊 Platform Dashboard</h2>';
@@ -23301,6 +23309,7 @@ async function loadAdmTab() {
     if (pendingVendors > 0) html += '<button class="adm-quick-act" data-tab="vendorapprovals" style="background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);color:#d97706;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✓ '+pendingVendors+' Vendor Onayı</button>';
     if (pendingProds > 0) html += '<button class="adm-quick-act" data-tab="products" style="background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.3);color:#2563eb;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔍 '+pendingProds+' Ürün Onayı</button>';
     if (ovPending > 0) html += '<button class="adm-quick-act" data-tab="overrides" style="background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);color:#d97706;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⚡ '+ovPending+' Acil Onay</button>';
+    if (fpPending > 0) html += '<button class="adm-quick-act" data-tab="featured" style="background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.3);color:#7c3aed;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📢 '+fpPending+' Reklam Onayı</button>';
     html += '</div>';
     html += '</div>';
 
@@ -23317,6 +23326,12 @@ async function loadAdmTab() {
       + '<div style="font-size:11px;color:#d97706;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">⚡ Acil Onay Talepleri</div>'
       + '<div style="font-size:24px;font-weight:800;color:#d97706">'+ovPending+'<span style="font-size:13px;font-weight:600;color:var(--text-muted)"> bekleyen</span></div>'
       + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Onaylı override borç: ₺'+ovDebt.toLocaleString('tr-TR')+'</div>'
+      + '</div>';
+    // v5.53: Reklam / Öne Çıkan kartı
+    html += '<div style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.25);border-radius:12px;padding:16px;cursor:pointer" class="adm-quick-act" data-tab="featured">'
+      + '<div style="font-size:11px;color:#7c3aed;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">📢 Reklam / Öne Çıkan</div>'
+      + '<div style="font-size:24px;font-weight:800;color:#7c3aed">'+fpActive+'<span style="font-size:13px;font-weight:600;color:var(--text-muted)"> aktif yerleşim</span></div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Bu ay reklam geliri: ₺'+fpMonthRev.toLocaleString('tr-TR')+(fpPending?' · '+fpPending+' onay bekliyor':'')+'</div>'
       + '</div>';
     // Son 30 gün gelir
     html += '<div style="background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(37,99,235,.02));border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:16px">'
@@ -30230,10 +30245,197 @@ async function openFeaturedBoostModal(pid, pname, product) {
   });
 }
 
+var FEAT_SUBTAB = 'ledger';
+
+// ════════════════════════════════════════════════════════════════════
+// v5.53 (Faz 1c): ADMIN — REKLAM / ÖNE ÇIKAN (wrapper: İşlemler + Ayarlar)
+// ════════════════════════════════════════════════════════════════════
+async function admFeaturedAds(m) {
+  m.innerHTML = '';
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'margin-bottom:14px';
+  hdr.innerHTML = '<h2 class="fs18-fw7">📢 Reklam / Öne Çıkan Yönetimi</h2>'
+    + '<div class="txt-muted-12-mt3">Satın alımlar, gelir ve program ayarları</div>';
+  m.appendChild(hdr);
+  var nav = document.createElement('div');
+  nav.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
+  [['ledger','📊 İşlemler'],['settings','⚙️ Ayarlar']].forEach(function(t){
+    var b = document.createElement('button');
+    b.className = 'btn-' + (FEAT_SUBTAB===t[0]?'p':'g') + ' btn-sm';
+    b.textContent = t[1];
+    b.addEventListener('click', function(){ FEAT_SUBTAB = t[0]; admFeaturedAds(m); });
+    nav.appendChild(b);
+  });
+  m.appendChild(nav);
+  var content = document.createElement('div');
+  m.appendChild(content);
+  if (FEAT_SUBTAB === 'settings') renderFeaturedSettings(content);
+  else renderFeaturedLedger(content);
+}
+
+async function renderFeaturedLedger(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>İşlemler yükleniyor...</div>';
+  try {
+    var snap = await getDocs(collection(db,'featured_purchases'));
+    var all = snap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+    all.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
+    var now = Date.now();
+    function endMs(o){ return o.endAt?.toMillis ? o.endAt.toMillis() : (o.endAt?.seconds ? o.endAt.seconds*1000 : 0); }
+    function eff(o){
+      if (o.archived) return 'archived';
+      if (o.status === 'pending_approval') return 'pending';
+      if (o.status === 'cancelled') return 'cancelled';
+      if (o.status === 'active' && endMs(o) && endMs(o) < now) return 'expired';
+      if (o.status === 'active') return 'active';
+      return o.status || 'active';
+    }
+    all.forEach(function(o){ o._eff = eff(o); });
+
+    var visible = all.filter(function(o){ return !o.archived; });
+    var archived = all.filter(function(o){ return o.archived; });
+    var byEff = function(e){ return visible.filter(function(o){ return o._eff===e; }); };
+    var fActive=byEff('active'), fExpired=byEff('expired'), fPending=byEff('pending'), fCancelled=byEff('cancelled');
+
+    var billed = all.filter(function(o){ return o.status==='active'; }); // faturalanan (süresi dolmuş dahil)
+    var totalRev = billed.reduce(function(s,o){ return s+(o.amount||0); }, 0);
+    var monthAgo = now - 30*86400000;
+    var monthRev = billed.filter(function(o){ var t=o.createdAt?.toMillis?o.createdAt.toMillis():(o.createdAt?.seconds?o.createdAt.seconds*1000:0); return t>=monthAgo; }).reduce(function(s,o){ return s+(o.amount||0); }, 0);
+    var spendMap = {};
+    billed.forEach(function(o){ var k=o.vendorName||o.vendorId||'—'; spendMap[k]=(spendMap[k]||0)+(o.amount||0); });
+    var topSpenders = Object.keys(spendMap).map(function(k){ return [k, spendMap[k]]; }).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+
+    var currentTab = 'active';
+    var search = '';
+
+    function render() {
+      m.innerHTML = '';
+
+      var stats = document.createElement('div');
+      stats.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px';
+      [['Aktif Yerleşim', String(fActive.length), '#16a34a'],
+       ['Bu Ay Gelir', '₺'+monthRev.toLocaleString('tr-TR'), '#2563eb'],
+       ['Toplam Gelir', '₺'+totalRev.toLocaleString('tr-TR'), '#7c3aed'],
+       ['Onay Bekleyen', String(fPending.length), fPending.length?'#d97706':'#64748b']
+      ].forEach(function(s){
+        var c=document.createElement('div');
+        c.style.cssText='background:'+s[2]+'15;border:1px solid '+s[2]+'30;border-radius:8px;padding:10px;text-align:center';
+        c.innerHTML='<div style="font-size:'+(s[1].length>8?'15px':'20px')+';font-weight:800;color:'+s[2]+'">'+s[1]+'</div><div class="fs11-mt2-muted">'+s[0]+'</div>';
+        stats.appendChild(c);
+      });
+      m.appendChild(stats);
+
+      if (topSpenders.length) {
+        var ts=document.createElement('div');
+        ts.style.cssText='background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px';
+        ts.innerHTML='<div style="font-size:12px;font-weight:700;margin-bottom:8px">🏆 En Çok Harcayan Üreticiler</div>'
+          + topSpenders.map(function(t,i){ return '<div class="flx-bw-c" style="font-size:12.5px;padding:3px 0"><span>'+(i+1)+'. '+t[0]+'</span><strong>₺'+t[1].toLocaleString('tr-TR')+'</strong></div>'; }).join('');
+        m.appendChild(ts);
+      }
+
+      var tabRow=document.createElement('div');
+      tabRow.style.cssText='display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap';
+      [['active','✅ Aktif ('+fActive.length+')'],['expired','⌛ Süresi Dolmuş ('+fExpired.length+')'],['pending','⏳ Onay Bekleyen ('+fPending.length+')'],['cancelled','🛑 İptal ('+fCancelled.length+')'],['all','📋 Tümü ('+visible.length+')'],['archived','🗄 Arşiv ('+archived.length+')']].forEach(function(t){
+        var b=document.createElement('button');
+        b.className='btn-'+(currentTab===t[0]?'p':'g')+' btn-sm';
+        b.textContent=t[1];
+        b.addEventListener('click',function(){ currentTab=t[0]; render(); });
+        tabRow.appendChild(b);
+      });
+      m.appendChild(tabRow);
+
+      var sw=document.createElement('div'); sw.style.cssText='margin-bottom:12px';
+      sw.innerHTML='<input class="inp" id="fl-search" placeholder="🔍 Ara: üretici, ürün..." value="'+(search||'').replace(/"/g,'&quot;')+'">';
+      m.appendChild(sw);
+      function applySearch(){
+        var q=(search||'').toLowerCase().trim();
+        m.querySelectorAll('[data-fl-search]').forEach(function(c){ c.style.display=(!q||c.dataset.flSearch.indexOf(q)>=0)?'':'none'; });
+      }
+      sw.querySelector('#fl-search').addEventListener('input',function(){ search=this.value; applySearch(); });
+
+      var items = currentTab==='active'?fActive : currentTab==='expired'?fExpired : currentTab==='pending'?fPending : currentTab==='cancelled'?fCancelled : currentTab==='archived'?archived : visible;
+      if (!items.length){ var e=document.createElement('div'); e.className='empty'; e.innerHTML='<div class="empty-icon">📢</div>Bu kategoride kayıt yok.'; m.appendChild(e); return; }
+
+      var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:10px';
+      var effColors={active:'#16a34a',expired:'#64748b',pending:'#d97706',cancelled:'#dc2626',archived:'#64748b'};
+      var effLabels={active:'Aktif',expired:'Süresi Dolmuş',pending:'Onay Bekliyor',cancelled:'İptal',archived:'Arşiv'};
+      items.forEach(function(o){
+        var sc=effColors[o._eff]||'#64748b';
+        var sa=o.startAt?.toDate?o.startAt.toDate().toLocaleDateString('tr-TR'):'—';
+        var ea=o.endAt?.toDate?o.endAt.toDate().toLocaleDateString('tr-TR'):'—';
+        var card=document.createElement('div');
+        card.style.cssText='background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid '+sc+';border-radius:8px;padding:14px';
+        card.dataset.flSearch=((o.vendorName||'')+' '+(o.productName||'')).toLowerCase();
+        card.innerHTML=
+          '<div class="flx-bw-s-mb10"><div class="flx1">'
+          + '<div class="fs13-fw7">'+(o.productName||'Ürün')+'</div>'
+          + '<div class="txt-muted-12-mt2">🏢 '+(o.vendorName||'—')+'</div>'
+          + '<div class="txt-muted-12-mt2">'+(o.periods||1)+' '+(o.plan==='monthly'?'ay':'hafta')+' · '+sa+' → '+ea+'</div>'
+          + '</div><div class="t-rgt">'
+          + '<div style="font-size:16px;font-weight:800;color:#16a34a">₺'+(o.amount||0).toLocaleString('tr-TR')+'</div>'
+          + '<div style="font-size:11px;font-weight:700;color:'+sc+';margin-top:4px">'+(effLabels[o._eff]||o._eff)+'</div>'
+          + '</div></div>';
+        var act=document.createElement('div'); act.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;justify-content:flex-end';
+        if (o._eff==='pending') {
+          act.innerHTML='<button class="fl-approve btn-gr btn-sm" data-id="'+o.id+'">✅ Onayla & Yayınla</button><button class="fl-reject btn-red btn-sm" data-id="'+o.id+'">❌ Reddet</button>';
+        } else if (o._eff==='active') {
+          act.innerHTML='<button class="fl-cancel btn-red btn-sm" data-id="'+o.id+'" style="font-size:11px">🛑 İptal Et</button><button class="fl-archive btn-g btn-sm" data-id="'+o.id+'" style="font-size:11px;color:var(--text-muted)">🗄 Arşivle</button>';
+        } else if (o._eff==='archived') {
+          act.innerHTML='<button class="fl-unarchive btn-g btn-sm" data-id="'+o.id+'" style="font-size:11px">📤 Arşivden Çıkar</button>';
+        } else {
+          act.innerHTML='<button class="fl-archive btn-g btn-sm" data-id="'+o.id+'" style="font-size:11px;color:var(--text-muted)">🗄 Arşivle</button>';
+        }
+        card.appendChild(act);
+        list.appendChild(card);
+      });
+      m.appendChild(list);
+      applySearch();
+
+      function refresh(){ renderFeaturedLedger(m); }
+      list.querySelectorAll('.fl-approve').forEach(function(b){ b.addEventListener('click', async function(){
+        var o=all.find(function(x){return x.id===b.dataset.id;}); if(!o)return;
+        try {
+          await updateDoc(doc(db,'featured_purchases',o.id), { status:'active' });
+          if (o.productId) await updateDoc(doc(db,'products',o.productId), { featured:true, featuredUntil:o.endAt||null });
+          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_approved', title:'📢 Reklam Onaylandı', message:'"'+(o.productName||'ürün')+'" öne çıkan yayını onaylandı.', read:false, createdAt:serverTimestamp() }); }catch(_e){} }
+          showToast('Onaylandı & yayınlandı.'); refresh();
+        } catch(e){ showToast('Hata: '+e.message,'err'); }
+      }); });
+      list.querySelectorAll('.fl-reject').forEach(function(b){ b.addEventListener('click', async function(){
+        var o=all.find(function(x){return x.id===b.dataset.id;}); if(!o)return;
+        var rs=prompt('Red sebebi (opsiyonel):',''); if(rs===null)return;
+        try {
+          await updateDoc(doc(db,'featured_purchases',o.id), { status:'cancelled', adminNote:rs });
+          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_rejected', title:'📢 Reklam Talebi Reddedildi', message:'"'+(o.productName||'ürün')+'" öne çıkan talebi reddedildi.'+(rs?' Sebep: '+rs:''), read:false, createdAt:serverTimestamp() }); }catch(_e){} }
+          showToast('Reddedildi.'); refresh();
+        } catch(e){ showToast('Hata: '+e.message,'err'); }
+      }); });
+      list.querySelectorAll('.fl-cancel').forEach(function(b){ b.addEventListener('click', async function(){
+        var o=all.find(function(x){return x.id===b.dataset.id;}); if(!o)return;
+        if(!confirm('Bu yerleşim iptal edilsin mi? Ürün öne çıkandan kaldırılır.'))return;
+        try {
+          await updateDoc(doc(db,'featured_purchases',o.id), { status:'cancelled' });
+          if (o.productId) { try{ await updateDoc(doc(db,'products',o.productId), { featured:false, featuredUntil:null }); }catch(_e){} }
+          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_cancelled', title:'📢 Reklam İptal Edildi', message:'"'+(o.productName||'ürün')+'" öne çıkan yayını iptal edildi.', read:false, createdAt:serverTimestamp() }); }catch(_e){} }
+          showToast('İptal edildi.'); refresh();
+        } catch(e){ showToast('Hata: '+e.message,'err'); }
+      }); });
+      list.querySelectorAll('.fl-archive, .fl-unarchive').forEach(function(b){ b.addEventListener('click', async function(){
+        var arch=b.classList.contains('fl-archive');
+        try { await updateDoc(doc(db,'featured_purchases',b.dataset.id), { archived:arch, archivedAt: arch?serverTimestamp():null }); showToast(arch?'Arşivlendi.':'Arşivden çıkarıldı.'); refresh(); }
+        catch(e){ showToast('Hata: '+e.message,'err'); }
+      }); });
+    }
+
+    render();
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════
 // v5.51: ADMIN — REKLAM / ÖNE ÇIKAN (Faz 1a: config + slot + Sponsorlu)
 // ════════════════════════════════════════════════════════════════════
-async function admFeaturedAds(m) {
+async function renderFeaturedSettings(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>Reklam ayarları yükleniyor...</div>';
   try {
     var cfgSnap = await getDoc(doc(db,'pochub_config','system'));
@@ -30262,12 +30464,6 @@ async function admFeaturedAds(m) {
     } catch(e){}
 
     m.innerHTML = '';
-
-    var hdr = document.createElement('div');
-    hdr.style.cssText = 'margin-bottom:14px';
-    hdr.innerHTML = '<h2 class="fs18-fw7">📢 Reklam / Öne Çıkan Yönetimi</h2>'
-      + '<div class="txt-muted-12-mt3">Ana sayfa "Öne Çıkan Ürün" reklam programı — fiyatlandırma, slot ve görünüm ayarları</div>';
-    m.appendChild(hdr);
 
     var statRow = document.createElement('div');
     statRow.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px';
@@ -30325,7 +30521,7 @@ async function admFeaturedAds(m) {
       try {
         await setDoc(doc(db,'pochub_config','system'), { featuredAds: data }, { merge: true });
         showToast('Reklam ayarları kaydedildi.');
-        admFeaturedAds(m);
+        renderFeaturedSettings(m);
       } catch(e) {
         showToast('Hata: '+e.message,'err');
         btn.disabled = false; btn.textContent = '💾 Kaydet';
