@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.57 | pochub.co -->
+<!-- PoCHub v5.58 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.57';
+const VERSION = 'v5.58';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.58': ['KATALOG Faz A1: sektor faceted filtre. Urunun mevcut sector alani artik katalogda CANLI — sayacli, cok-secimli pill satiri (Saglik/Finans/Sanayi...). Aktif filtre CHIP\'leri (arama/kategori/sektor/TR; tek tek veya tumunu temizle). Facet sayaclari diger filtrelere gore guncellenir. Filtreler URL query-param\'a yazilir (paylasilabilir/derin-link, hash router\'a dokunmadan replaceState ile). Eski hasFilter bug fix (category->cat) + bos-sonuc sifirlama sektoru de temizler. UI — rules degismedi. A2 (deployment/lisans/dogrulanmis/origin facet) + A3 (coklu-sektor + admin taksonomi) sirada.'],
   'v5.57': ['ADMIN Kullanici Detayi tamamlandi (oneri 2-6): vendor panelinde RISK rozetleri (askida/acik borc/60g+ hareketsiz/urun yok/dusuk kabul), SON aktivite (PoC+teklif+urun guncel zamani), 6 AYLIK gelir trendi (mini bar grafik), ve acik borc varsa modaldan "Borclari Sifirla" hizli aksiyonu (poc_charges paid + vendor_billing reset). Musteri panelinde PoC durum dagilimi + son talep. Salt-okunur/admin aksiyonu — rules degismedi.'],
   'v5.56': ['ADMIN Kullanici Detayi zenginlestirildi. Vendor icin async "💰 Kazancimiz (PoCHub geliri)" paneli: Yasam Boyu (LTV) = abonelik (subscription_history paid) + override PoC + one cikan reklam (poc_charges paid) + acik bakiye/suspend (vendor_billing). "📊 Aktivite": urun (aktif/toplam), aldigi PoC, teklif kabul orani, aktif one cikan yerlesim, paket adi. Musteri icin PoC/Demo talep sayisi. "📄 Tam Profil" butonu (kategoriler/markalar/bolgeler/vergi/web/referanslar) ve "🔍 Tum Alanlar" ile user dokumaninin ham alanlari toggle. Salt-okunur admin gorunumu — rules degismedi.'],
   'v5.55': ['REKLAM duzeltme: (1) Urunlerim listesinde one cikan urune "📢 One Cikan" rozeti (featured & suresi gecmemis; tarih ipucu). (2) Featured satin alma artik CARI HESABA islenir: autoActivate alimda + admin onayinda poc_charges (source:featured, status:pending_invoice, aciklama) + updateVendorBilling olusur; boylece vendor Cari Hesap sayfasinda, admin vendor-abonelik tablosu unpaidBalance kolonunda ve odeme-onay akisinda gorunur. KRITIK: featured borcu deltaCount=0 ile islenir — PoC-suspend sayacina (3+) GIRMEZ, yanlis askiyi onler. Cari Hesap sayfasi featured-uyumlu: pocId yoksa aciklama+"📢 One cikan reklam" etiketi, PoC sayaci ile toplam borc ayrildi. Admin iptal (fl-cancel) odenmemis featured borcunu iptal eder + bakiyeyi duser. Odeme onayinda sayac geri alimi featured haric. UI/mantik — rules degismedi.'],
@@ -6833,6 +6834,76 @@ async function registerForEvent(eventId, btn, vendorEmail, vendorName, eventTitl
 /* ══════════════════════════════════════
    KATALOG
 ══════════════════════════════════════ */
+// ════════════════════════════════════════════════════════════════════
+// v5.58 (Faz A1): Katalog — sektör faceted filtre + chip + deep-link
+// ════════════════════════════════════════════════════════════════════
+var SECTORS = [
+  ['finance','🏦 Finans / Bankacılık'],['healthcare','🏥 Sağlık'],['education','🎓 Eğitim'],
+  ['manufacturing','🏭 Üretim / Sanayi'],['retail','🛒 Perakende'],['telecom','📡 Telekom'],
+  ['government','🏛 Kamu'],['energy','⚡ Enerji'],['logistics','🚚 Lojistik'],
+  ['media','📺 Medya'],['tech','💻 Teknoloji'],['other','🌐 Diğer']
+];
+var SECTOR_LABEL = {}; SECTORS.forEach(function(s){ SECTOR_LABEL[s[0]] = s[1]; });
+var CAT_SECTORS = []; // seçili sektörler (çoklu)
+
+function syncCatalogURL(){
+  try {
+    var params = new URLSearchParams();
+    var q = el('cat-search')?.value||''; if(q) params.set('q', q);
+    var c = el('cat-category')?.value||''; if(c) params.set('cat', c);
+    if (CAT_SECTORS.length) params.set('sector', CAT_SECTORS.join(','));
+    var s = el('cat-sort')?.value; if(s && s!=='rating') params.set('sort', s);
+    if (el('cat-tr')?.checked) params.set('tr','1');
+    var newUrl = window.location.pathname + (params.toString()?'?'+params.toString():'') + '#catalog';
+    history.replaceState(null, '', newUrl);
+  } catch(e){}
+}
+function readCatalogURL(){
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var q=params.get('q'); if(q && el('cat-search')) el('cat-search').value=q;
+    var c=params.get('cat'); if(c && el('cat-category')) el('cat-category').value=c;
+    var sec=params.get('sector'); CAT_SECTORS = sec ? sec.split(',').filter(Boolean) : [];
+    var s=params.get('sort'); if(s && el('cat-sort')) el('cat-sort').value=s;
+    if(params.get('tr')==='1' && el('cat-tr')) el('cat-tr').checked=true;
+  } catch(e){ CAT_SECTORS = []; }
+}
+function toggleCatSector(v){ var i=CAT_SECTORS.indexOf(v); if(i>=0) CAT_SECTORS.splice(i,1); else CAT_SECTORS.push(v); loadCatalog(); }
+function clearCatFilter(kind, val){
+  if(kind==='search'){ var s=el('cat-search'); if(s)s.value=''; }
+  else if(kind==='category'){ var c=el('cat-category'); if(c)c.value=''; }
+  else if(kind==='tr'){ var t=el('cat-tr'); if(t)t.checked=false; }
+  else if(kind==='sector'){ var i=CAT_SECTORS.indexOf(val); if(i>=0) CAT_SECTORS.splice(i,1); }
+  else if(kind==='all'){ var s2=el('cat-search'); if(s2)s2.value=''; var c2=el('cat-category'); if(c2)c2.value=''; var t2=el('cat-tr'); if(t2)t2.checked=false; CAT_SECTORS=[]; }
+  loadCatalog();
+}
+function updateCatalogFacetsAndChips(base){
+  var fc = el('cat-facets'), ch = el('cat-chips');
+  if (fc) {
+    var counts = {}; base.forEach(function(p){ var s=p.sector||'other'; counts[s]=(counts[s]||0)+1; });
+    var pills = SECTORS.filter(function(s){ return counts[s[0]] || CAT_SECTORS.indexOf(s[0])>=0; }).map(function(s){
+      var sel = CAT_SECTORS.indexOf(s[0])>=0;
+      return '<button class="cat-sec-pill" data-sec="'+s[0]+'" style="font-size:12px;font-weight:600;padding:5px 11px;border-radius:18px;cursor:pointer;border:1px solid '+(sel?'#2563eb':'var(--border)')+';background:'+(sel?'#2563eb':'transparent')+';color:'+(sel?'#fff':'var(--text-secondary)')+'">'+s[1]+' <span style="opacity:.7">'+(counts[s[0]]||0)+'</span></button>';
+    }).join('');
+    fc.innerHTML = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Sektör:</span>'+(pills||'<span class="t-muted" style="font-size:12px">veri yok</span>')+'</div>';
+    fc.querySelectorAll('.cat-sec-pill').forEach(function(b){ b.addEventListener('click', function(){ toggleCatSector(b.dataset.sec); }); });
+  }
+  if (ch) {
+    var chips = [];
+    var q = el('cat-search')?.value||''; if(q) chips.push(['search','','🔍 "'+q+'"']);
+    var c = el('cat-category')?.value||''; if(c) chips.push(['category','','Kategori: '+c]);
+    CAT_SECTORS.forEach(function(s){ chips.push(['sector',s,(SECTOR_LABEL[s]||s)]); });
+    if (el('cat-tr')?.checked) chips.push(['tr','','🇹🇷 TR Önce']);
+    if (!chips.length) { ch.innerHTML=''; return; }
+    ch.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+      + chips.map(function(c){ return '<span class="cat-chip" data-kind="'+c[0]+'" data-val="'+c[1]+'" style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 6px 3px 10px;border-radius:14px;background:rgba(37,99,235,.10);color:#2563eb;cursor:pointer">'+c[2]+' <span style="font-size:14px;line-height:1">×</span></span>'; }).join('')
+      + '<button class="cat-clear-all" style="font-size:11.5px;font-weight:600;color:var(--text-muted);background:none;border:none;cursor:pointer;text-decoration:underline">Tümünü temizle</button>'
+      + '</div>';
+    ch.querySelectorAll('.cat-chip').forEach(function(b){ b.addEventListener('click', function(){ clearCatFilter(b.dataset.kind, b.dataset.val); }); });
+    var ca = ch.querySelector('.cat-clear-all'); if (ca) ca.addEventListener('click', function(){ clearCatFilter('all'); });
+  }
+}
+
 async function renderCatalog() {
   const wrap = el('scr-catalog');
   wrap.innerHTML = `<div class="wrap">
@@ -6859,6 +6930,8 @@ async function renderCatalog() {
         <input type="checkbox" id="cat-tr"> 🇹🇷 TR Önce
       </label>
     </div>
+    <div id="cat-facets" style="margin-bottom:10px"></div>
+    <div id="cat-chips" style="margin-bottom:12px"></div>
     <div id="catalog-grid"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${renderSkeleton('card-list', 6)}</div></div>
   </div>`;
 
@@ -6872,8 +6945,9 @@ async function renderCatalog() {
   getCategories().then(function(cats){
     var sel=el('cat-category');
     if(sel) sel.innerHTML='<option value="">Tüm Kategoriler</option>'+cats.map(function(cat){return '<option value="'+cat.name+'">'+cat.name+'</option>';}).join('');
-  });
-  loadCatalog();
+    readCatalogURL();
+    loadCatalog();
+  }).catch(function(){ readCatalogURL(); loadCatalog(); });
 }
 
 async function loadCatalog() {
@@ -6894,6 +6968,11 @@ async function loadCatalog() {
     const trFirst = el('cat-tr')?.checked||false;
     if (search) prods = prods.filter(p => p.name?.toLowerCase().includes(search)||p.vendorName?.toLowerCase().includes(search)||p.category?.toLowerCase().includes(search));
     if (cat) prods = prods.filter(p => p.category===cat);
+    // v5.58: sektör facet — base (sektör öncesi) sayaçlar için, sonra sektör filtresi (çoklu/OR)
+    var base = prods.slice();
+    if (CAT_SECTORS.length) prods = prods.filter(p => p.sector && CAT_SECTORS.indexOf(p.sector) >= 0);
+    updateCatalogFacetsAndChips(base);
+    syncCatalogURL();
     var sortBy = el('cat-sort')?.value || 'rating';
     prods.sort(function(a, b) {
       if (sortBy === 'rating') {
@@ -6918,7 +6997,7 @@ async function loadCatalog() {
 
     if (!prods.length) {
       // v5.12: Filtre var mı kontrol
-      var hasFilter = !!(search || category || trFirst);
+      var hasFilter = !!(search || cat || trFirst || CAT_SECTORS.length);
       if (hasFilter) {
         gridEl.innerHTML = renderEmpty({
           emoji: '🔍',
@@ -6930,6 +7009,7 @@ async function loadCatalog() {
           var s = el('cat-search'); if (s) s.value = '';
           var c = el('cat-category'); if (c) c.value = '';
           var t = el('cat-tr'); if (t) t.checked = false;
+          CAT_SECTORS = [];
           loadCatalog();
         });
       } else {
