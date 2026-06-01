@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.59 | pochub.co -->
+<!-- PoCHub v5.60 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.59';
+const VERSION = 'v5.60';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.60': ['KATALOG Faz A2: cok-gruplu faceted filtre sistemi. Tek-sektor filtre, generic CAT_FACETS yapisina donusturuldu — gruplar: Sektor, Dagitim (deployment; catFields.deployment_model/deployment serbest metni normalizeDeployment ile cloud/on_premise/hybrid/managed/other kovalarina indirgenir), Koken (Yerli/Yabanci, p.origin), Dogrulama (vendor admin_verified; _vendorBadgeCache erken preload). Her grup ic-OR / gruplar-arasi AND. Proper faceting: her grubun sayaci DIGER gruplara gore hesaplanir (facetFiltered exceptKey). Tum secimler chip + URL query-param (deep-link) + Tumunu temizle. Lisans modeli bilincli ertelendi (kategori-ozel cok dagimik; A3b admin normalizasyonunda). UI — rules degismedi.'],
   'v5.59': ['KATALOG Faz A3 (veri modeli): SEKTOR artik URUN duzeyinde. Onceden sector yalnizca vendor profilindeydi; urunlerde yoktu — bu yuzden A1 sektor faceti bostu. Simdi urun ekleme (openAddProductModal) ve vendor urun duzenleme (openEditProd) formlarina COKLU sektor pill secimi eklendi; products dokumanina sectors[] yazilir. Katalog faceti/filtresi sectors[] dizisini okur (tekil eski sector alanina geri-uyumlu). Ortak yardimcilar sectorPillsHtml/wireSectorPills/readSectorPills. products owner-update sectors yazabildigi icin RULES degismedi. NOT: eski urunler bos gelir — vendor Urunlerim>Duzenle ile sektor atayinca facete dusserler. A2 (deployment/lisans/dogrulanmis/origin facet) + A3b (admin taksonomi editoru) sirada.'],
   'v5.58': ['KATALOG Faz A1: sektor faceted filtre. Urunun mevcut sector alani artik katalogda CANLI — sayacli, cok-secimli pill satiri (Saglik/Finans/Sanayi...). Aktif filtre CHIP\'leri (arama/kategori/sektor/TR; tek tek veya tumunu temizle). Facet sayaclari diger filtrelere gore guncellenir. Filtreler URL query-param\'a yazilir (paylasilabilir/derin-link, hash router\'a dokunmadan replaceState ile). Eski hasFilter bug fix (category->cat) + bos-sonuc sifirlama sektoru de temizler. UI — rules degismedi. A2 (deployment/lisans/dogrulanmis/origin facet) + A3 (coklu-sektor + admin taksonomi) sirada.'],
   'v5.57': ['ADMIN Kullanici Detayi tamamlandi (oneri 2-6): vendor panelinde RISK rozetleri (askida/acik borc/60g+ hareketsiz/urun yok/dusuk kabul), SON aktivite (PoC+teklif+urun guncel zamani), 6 AYLIK gelir trendi (mini bar grafik), ve acik borc varsa modaldan "Borclari Sifirla" hizli aksiyonu (poc_charges paid + vendor_billing reset). Musteri panelinde PoC durum dagilimi + son talep. Salt-okunur/admin aksiyonu — rules degismedi.'],
@@ -6845,7 +6846,26 @@ var SECTORS = [
   ['media','📺 Medya'],['tech','💻 Teknoloji'],['other','🌐 Diğer']
 ];
 var SECTOR_LABEL = {}; SECTORS.forEach(function(s){ SECTOR_LABEL[s[0]] = s[1]; });
-var CAT_SECTORS = []; // seçili sektörler (çoklu)
+var CAT_FILTERS = { sector:[], deployment:[], origin:[], verified:[] }; // v5.60: çok-gruplu facet seçimleri
+
+// v5.60 (Faz A2): deployment normalizasyonu — kategori-özel serbest metinleri tek kovaya indir
+function normalizeDeployment(p){
+  var raw = ((p.catFields && (p.catFields.deployment_model || p.catFields.deployment)) || '').toString().toLowerCase();
+  if (!raw) return '';
+  if (raw.indexOf('hybrid')>=0 || raw.indexOf('hibrit')>=0) return 'hybrid';
+  if (raw.indexOf('mssp')>=0 || raw.indexOf('mdr')>=0 || raw.indexOf('yönet')>=0 || raw.indexOf('managed')>=0) return 'managed';
+  if (raw.indexOf('on-prem')>=0 || raw.indexOf('on prem')>=0 || raw.indexOf('premise')>=0 || raw.indexOf('yerinde')>=0 || raw.indexOf('self-managed')>=0) return 'on_premise';
+  if (raw.indexOf('saas')>=0 || raw.indexOf('cloud')>=0 || raw.indexOf('bulut')>=0 || raw.indexOf('serverless')>=0 || raw.indexOf('dbaas')>=0) return 'cloud';
+  return 'other';
+}
+// Generic facet grupları (her biri: çoklu seçim, OR içi / AND gruplar arası)
+var CAT_FACETS = [
+  { key:'sector', label:'Sektör', options: SECTORS, get:function(p){ return (p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]); } },
+  { key:'deployment', label:'Dağıtım', options:[['cloud','☁️ Cloud/SaaS'],['on_premise','🏢 On-Premise'],['hybrid','🔀 Hybrid'],['managed','🛡 Yönetilen'],['other','📦 Diğer']], get:function(p){ var d=normalizeDeployment(p); return d?[d]:[]; } },
+  { key:'origin', label:'Köken', options:[['domestic','🇹🇷 Yerli'],['foreign','🌍 Yabancı']], get:function(p){ return p.origin?[p.origin]:[]; } },
+  { key:'verified', label:'Doğrulama', options:[['verified','✓ Doğrulanmış']], get:function(p){ return (window._vendorBadgeCache && window._vendorBadgeCache[p.vendorId] && window._vendorBadgeCache[p.vendorId].vendorStatus==='admin_verified')?['verified']:[]; } },
+];
+var CAT_FACET_LABEL = {}; CAT_FACETS.forEach(function(f){ CAT_FACET_LABEL[f.key]={}; f.options.forEach(function(o){ CAT_FACET_LABEL[f.key][o[0]]=o[1]; }); });
 
 // v5.59 (Faz A3): ürün formu — çoklu sektör pill yardımcıları
 function sectorPillsHtml(selected){
@@ -6868,12 +6888,13 @@ function wireSectorPills(root){
 }
 function readSectorPills(root){ return root ? [].slice.call(root.querySelectorAll('.pr-sec-pill.on')).map(function(b){return b.dataset.sec;}) : []; }
 
+function anyCatFacet(){ return CAT_FACETS.some(function(f){ return CAT_FILTERS[f.key].length; }); }
 function syncCatalogURL(){
   try {
     var params = new URLSearchParams();
     var q = el('cat-search')?.value||''; if(q) params.set('q', q);
     var c = el('cat-category')?.value||''; if(c) params.set('cat', c);
-    if (CAT_SECTORS.length) params.set('sector', CAT_SECTORS.join(','));
+    CAT_FACETS.forEach(function(f){ if(CAT_FILTERS[f.key].length) params.set(f.key, CAT_FILTERS[f.key].join(',')); });
     var s = el('cat-sort')?.value; if(s && s!=='rating') params.set('sort', s);
     if (el('cat-tr')?.checked) params.set('tr','1');
     var newUrl = window.location.pathname + (params.toString()?'?'+params.toString():'') + '#catalog';
@@ -6885,36 +6906,52 @@ function readCatalogURL(){
     var params = new URLSearchParams(window.location.search);
     var q=params.get('q'); if(q && el('cat-search')) el('cat-search').value=q;
     var c=params.get('cat'); if(c && el('cat-category')) el('cat-category').value=c;
-    var sec=params.get('sector'); CAT_SECTORS = sec ? sec.split(',').filter(Boolean) : [];
+    CAT_FACETS.forEach(function(f){ var v=params.get(f.key); CAT_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
     var s=params.get('sort'); if(s && el('cat-sort')) el('cat-sort').value=s;
     if(params.get('tr')==='1' && el('cat-tr')) el('cat-tr').checked=true;
-  } catch(e){ CAT_SECTORS = []; }
+  } catch(e){ CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key]=[]; }); }
 }
-function toggleCatSector(v){ var i=CAT_SECTORS.indexOf(v); if(i>=0) CAT_SECTORS.splice(i,1); else CAT_SECTORS.push(v); loadCatalog(); }
+function toggleCatFacet(key, v){ var a=CAT_FILTERS[key]; if(!a) return; var i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); loadCatalog(); }
 function clearCatFilter(kind, val){
   if(kind==='search'){ var s=el('cat-search'); if(s)s.value=''; }
   else if(kind==='category'){ var c=el('cat-category'); if(c)c.value=''; }
   else if(kind==='tr'){ var t=el('cat-tr'); if(t)t.checked=false; }
-  else if(kind==='sector'){ var i=CAT_SECTORS.indexOf(val); if(i>=0) CAT_SECTORS.splice(i,1); }
-  else if(kind==='all'){ var s2=el('cat-search'); if(s2)s2.value=''; var c2=el('cat-category'); if(c2)c2.value=''; var t2=el('cat-tr'); if(t2)t2.checked=false; CAT_SECTORS=[]; }
+  else if(kind==='all'){ var s2=el('cat-search'); if(s2)s2.value=''; var c2=el('cat-category'); if(c2)c2.value=''; var t2=el('cat-tr'); if(t2)t2.checked=false; CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key]=[]; }); }
+  else if(CAT_FILTERS[kind]){ var i=CAT_FILTERS[kind].indexOf(val); if(i>=0) CAT_FILTERS[kind].splice(i,1); }
   loadCatalog();
 }
-function updateCatalogFacetsAndChips(base){
+// Bir grup HARİÇ diğer grupları uygula (proper faceting: her grubun sayacı diğer filtrelere göre)
+function facetFiltered(list, exceptKey){
+  return list.filter(function(p){
+    return CAT_FACETS.every(function(f){
+      if(f.key===exceptKey) return true;
+      var sel=CAT_FILTERS[f.key]; if(!sel.length) return true;
+      return f.get(p).some(function(v){ return sel.indexOf(v)>=0; });
+    });
+  });
+}
+function updateCatalogFacetsAndChips(allBase){
   var fc = el('cat-facets'), ch = el('cat-chips');
   if (fc) {
-    var counts = {}; base.forEach(function(p){ var arr=(p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:['other']); arr.forEach(function(s){ counts[s]=(counts[s]||0)+1; }); });
-    var pills = SECTORS.filter(function(s){ return counts[s[0]] || CAT_SECTORS.indexOf(s[0])>=0; }).map(function(s){
-      var sel = CAT_SECTORS.indexOf(s[0])>=0;
-      return '<button class="cat-sec-pill" data-sec="'+s[0]+'" style="font-size:12px;font-weight:600;padding:5px 11px;border-radius:18px;cursor:pointer;border:1px solid '+(sel?'#2563eb':'var(--border)')+';background:'+(sel?'#2563eb':'transparent')+';color:'+(sel?'#fff':'var(--text-secondary)')+'">'+s[1]+' <span style="opacity:.7">'+(counts[s[0]]||0)+'</span></button>';
-    }).join('');
-    fc.innerHTML = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Sektör:</span>'+(pills||'<span class="t-muted" style="font-size:12px">veri yok</span>')+'</div>';
-    fc.querySelectorAll('.cat-sec-pill').forEach(function(b){ b.addEventListener('click', function(){ toggleCatSector(b.dataset.sec); }); });
+    var groupsHtml = CAT_FACETS.map(function(f){
+      var fb = facetFiltered(allBase, f.key);
+      var counts = {}; fb.forEach(function(p){ f.get(p).forEach(function(v){ counts[v]=(counts[v]||0)+1; }); });
+      var sel = CAT_FILTERS[f.key];
+      var pills = f.options.filter(function(o){ return counts[o[0]] || sel.indexOf(o[0])>=0; }).map(function(o){
+        var on = sel.indexOf(o[0])>=0;
+        return '<button class="cat-facet-pill" data-fk="'+f.key+'" data-fv="'+o[0]+'" style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:16px;cursor:pointer;border:1px solid '+(on?'#2563eb':'var(--border)')+';background:'+(on?'#2563eb':'transparent')+';color:'+(on?'#fff':'var(--text-secondary)')+'">'+o[1]+' <span style="opacity:.7">'+(counts[o[0]]||0)+'</span></button>';
+      }).join('');
+      if (!pills) return '';
+      return '<div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap"><span style="font-size:11.5px;font-weight:700;color:var(--text-secondary);min-width:62px;padding-top:5px">'+f.label+':</span><div style="display:flex;gap:6px;flex-wrap:wrap;flex:1">'+pills+'</div></div>';
+    }).filter(Boolean).join('');
+    fc.innerHTML = '<div style="display:flex;flex-direction:column;gap:9px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:12px">'+(groupsHtml||'<span class="t-muted" style="font-size:12px">Filtre için veri yok</span>')+'</div>';
+    fc.querySelectorAll('.cat-facet-pill').forEach(function(b){ b.addEventListener('click', function(){ toggleCatFacet(b.dataset.fk, b.dataset.fv); }); });
   }
   if (ch) {
     var chips = [];
     var q = el('cat-search')?.value||''; if(q) chips.push(['search','','🔍 "'+q+'"']);
     var c = el('cat-category')?.value||''; if(c) chips.push(['category','','Kategori: '+c]);
-    CAT_SECTORS.forEach(function(s){ chips.push(['sector',s,(SECTOR_LABEL[s]||s)]); });
+    CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key].forEach(function(v){ chips.push([f.key, v, (CAT_FACET_LABEL[f.key][v]||v)]); }); });
     if (el('cat-tr')?.checked) chips.push(['tr','','🇹🇷 TR Önce']);
     if (!chips.length) { ch.innerHTML=''; return; }
     ch.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
@@ -6990,11 +7027,12 @@ async function loadCatalog() {
     const trFirst = el('cat-tr')?.checked||false;
     if (search) prods = prods.filter(p => p.name?.toLowerCase().includes(search)||p.vendorName?.toLowerCase().includes(search)||p.category?.toLowerCase().includes(search));
     if (cat) prods = prods.filter(p => p.category===cat);
-    // v5.58: sektör facet — base (sektör öncesi) sayaçlar için, sonra sektör filtresi (çoklu/OR)
-    var base = prods.slice();
-    if (CAT_SECTORS.length) prods = prods.filter(function(p){ var arr=(p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]); return arr.some(function(s){ return CAT_SECTORS.indexOf(s)>=0; }); });
-    updateCatalogFacetsAndChips(base);
+    // v5.60: çok-gruplu facet — allBase (arama+kategori sonrası); verified faceti için rozetleri ÖNCE yükle
+    var allBase = prods.slice();
+    try { await preloadVendorBadges([...new Set(allBase.map(function(p){return p.vendorId;}).filter(Boolean))]); } catch(e){}
+    updateCatalogFacetsAndChips(allBase);
     syncCatalogURL();
+    prods = facetFiltered(allBase, null);
     var sortBy = el('cat-sort')?.value || 'rating';
     prods.sort(function(a, b) {
       if (sortBy === 'rating') {
@@ -7019,7 +7057,7 @@ async function loadCatalog() {
 
     if (!prods.length) {
       // v5.12: Filtre var mı kontrol
-      var hasFilter = !!(search || cat || trFirst || CAT_SECTORS.length);
+      var hasFilter = !!(search || cat || trFirst || anyCatFacet());
       if (hasFilter) {
         gridEl.innerHTML = renderEmpty({
           emoji: '🔍',
@@ -7031,7 +7069,7 @@ async function loadCatalog() {
           var s = el('cat-search'); if (s) s.value = '';
           var c = el('cat-category'); if (c) c.value = '';
           var t = el('cat-tr'); if (t) t.checked = false;
-          CAT_SECTORS = [];
+          CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key]=[]; });
           loadCatalog();
         });
       } else {
