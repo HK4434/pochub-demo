@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.50 | pochub.co -->
+<!-- PoCHub v5.51 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.50';
+const VERSION = 'v5.51';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.51': ['REKLAM/ONE CIKAN Faz 1a: monetizasyon altyapisi. Yeni admin sekmesi "Reklam / One Cikan" — fiyatlandirma & slot ayarlari (program aktif, slot sayisi, haftalik/aylik fiyat, azami sure, Sponsorlu etiketi, otomatik/onayli aktivasyon) + canli durum kartlari. Config pochub_config/system.featuredAds (public-read). Ana sayfa carousel artik: master-switch ile gizlenebilir, slot sayisiyla SINIRLI (kitlik), ve gercek one-cikanlar "Sponsorlu" etiketli (fallback dolgu urunler reklam degil, etiketlenmez). Faz 1b-1d (satin alma, ledger+arama+arsiv, metrikler) sirada. UI/config — rules degismedi.'],
   'v5.50': ['ACIL ONAY (OVERRIDE) bolumu gelistirildi: (1) Isim tutarliligi — admin tarafinda "Override Talepleri" → "Acil Onay Talepleri" (vendor tarafindaki "Acil Onay Talep Et" ile esit). (2) ARAMA: ekrana vendor/PoC/sebep/musteri araması eklendi (DOM-filtre, re-render yok, odak korunur). (3) ARSIV: her talepte Arsivle/Arsivden Cikar + yeni Arsiv sekmesi; arsivlenenler diger sekmelerden gizli; sekme sayaclari arsivsiz. (4) DASHBOARD: bekleyen Acil Onay sayisi hizli-eylem butonu + highlight kart (bekleyen adet + onayli override borc toplami), tikla→sekme. UI/mantik — rules degismedi.'],
   'v5.49': ['ADMIN: Override faturalandirmasi artik PAKET BAZINDA da ayarlanabilir. Paket duzenleme modaline "Override Fiyat Zammi (%)" alani eklendi; bos birakilirsa Sistem Ayarlari\'ndaki global zam kullanilir (paket-oncelikli fallback). override tutari = paketin Asan PoC Fiyati x (1 + zam%). Boylece her tier kendi override fiyatlandirmasina sahip olabilir (or. Enterprise dusuk/sifir, Free caydirici yuksek). Yeni paket sablonuna overrideMultiplier:null eklendi. UI/mantik — rules degismedi.'],
   'v5.48': ['FIX: Override Talepleri ekrani bastan ele alindi. (1) RULES: admin_overrides write:isAdmin idi → vendor ne talep olusturabiliyor ne limit-kontrolu icin kendi gecmisini okuyabiliyordu (talepler hic dusmuyordu). Yeni: create=isAdmin||kendi vendorId, read=isAdmin||kendi, update/delete=isAdmin. (2) HANDLER: Onayla/Reddet butonlari eksik/eski kayitlarda cokuyordu (undefined pocId/amount Firestore\'da hata firlatir). Onayla artik gecerli pocId+tutar yoksa engelliyor ve net mesaj veriyor; bildirimler best-effort; Reddet undefined-guvenli (relatedId||null, vendorId guard) → kayit her durumda temizlenir. (3) GOSTERIM: tier rozeti kosullu, reason yoksa "belirtilmemis". RULES degisti — Console re-deploy gerekir.'],
@@ -6376,6 +6377,12 @@ async function loadFeaturedProducts() {
   var section = el('featured-carousel-section');
   if (!section) return;
   try {
+    // v5.51: Reklam config (master switch + slot-cap + Sponsorlu etiketi)
+    var faCfg = {};
+    try { var _cs = await getDoc(doc(db,'pochub_config','system')); faCfg = (_cs.exists() && _cs.data().featuredAds) || {}; } catch(_e){}
+    if (faCfg.enabled === false) { section.innerHTML = ''; return; }
+    var slotCount = Math.max(1, faCfg.slotCount || 3);
+    var sponsored = faCfg.sponsoredLabel !== false;
     var snap = await getDocs(query(
       collection(db,'products'),
       where('status','==','active'),
@@ -6387,18 +6394,19 @@ async function loadFeaturedProducts() {
       var until = p.featuredUntil.toDate ? p.featuredUntil.toDate() : new Date(p.featuredUntil);
       return until >= now;
     });
+    featured.forEach(function(p){ p._isAd = true; }); // gerçek öne çıkanlar = reklam
     if (!featured.length) {
-      // Fallback: onaylı ürünlerden ilk 3'ü göster (featured yokken)
+      // Fallback: onaylı ürünlerden birkaçını göster (featured yokken) — reklam DEĞİL
       var fallSnap = await getDocs(query(
         collection(db,'products'),
         where('status','==','active')
       ));
       var fallDocs = fallSnap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
       if (!fallDocs.length) { section.innerHTML = ''; return; }
-      // Max 3 ürün, karışık sıra
-      featured = fallDocs.sort(function(){ return Math.random()-.5; }).slice(0,3);
-      featured.forEach(function(p){ p.featuredBadge = 'Öne Çıkan Ürün'; });
+      featured = fallDocs.sort(function(){ return Math.random()-.5; }).slice(0, slotCount);
+      featured.forEach(function(p){ p.featuredBadge = 'Öne Çıkan Ürün'; p._isAd = false; });
     }
+    featured = featured.slice(0, slotCount); // v5.51: kıtlık — slot sayısıyla sınırla
 
     var cur = 0;
     var total = featured.length;
@@ -6430,7 +6438,7 @@ async function loadFeaturedProducts() {
       var catIcon = catIconMap[p.category] || '📦';
       var color = CAT_COLORS[p.category] || '#3b7bff';
       var rgb = hexRgb(color);
-      var badge = p.featuredBadge || 'Öne Çıkan Ürün';
+      var badge = (p._isAd && sponsored) ? 'Sponsorlu' : (p.featuredBadge || 'Öne Çıkan Ürün');
       var slogan = p.description || '';
       if (slogan.length > 110) slogan = slogan.slice(0,107) + '...';
 
@@ -23152,7 +23160,7 @@ function renderAdmin() {
     ['requests','PoC Talepleri'],
     ['events','Etkinlikler'],
     ...(_rp.canViewAll?[['offers','Teklifler']]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Acil Onay Talepleri'],['content','📝 İçerik Yönetimi'],['kvkk-mgmt','🛡 KVKK & Yasal Sayfalar'],['settings','🔧 Sistem Ayarları']]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue','📈 Gelir'],['vendorsubs','💼 Vendor Abonelikler'],['vendorapprovals','✓ Vendor Onayları'],['demo-requests','📅 Demo Talepleri'],['packages','💎 Paketler'],['payments','💳 Ödeme Onayları'],['overrides','⚡ Acil Onay Talepleri'],['featured','📢 Reklam / Öne Çıkan'],['content','📝 İçerik Yönetimi'],['kvkk-mgmt','🛡 KVKK & Yasal Sayfalar'],['settings','🔧 Sistem Ayarları']]:[]),
     ...(_rp.canViewAll?[['health','🩺 Veri Sağlığı']]:[]),
     ['profile','👤 Profilim'],
   ];
@@ -23194,6 +23202,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
+    if (CUR_ADM_TAB === 'featured')   { await admFeaturedAds(m); return; }
     if (CUR_ADM_TAB === 'settings')   { await admSettings(m);   return; }
   if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
     if (CUR_ADM_TAB === 'profile')    { await renderUserProfile(m, 'admin');  return; }
@@ -26917,6 +26926,16 @@ const DEFAULT_CONFIG = {
   overrideSettings: {
     overridePriceMultiplier: 1.5,
   },
+  // v5.51: Öne Çıkan / Reklam (Featured Ads) — Faz 1a
+  featuredAds: {
+    enabled: true,            // Program aktif mi
+    slotCount: 3,             // Ana sayfa carousel'inde dönecek azami ürün (kıtlık)
+    sponsoredLabel: true,     // "Sponsorlu" etiketi gösterilsin mi
+    autoActivate: true,       // true: cari hesaba işlenir + hemen yayında; false: admin onayı
+    weeklyPrice: 2500,        // Haftalık slot ücreti (TRY)
+    monthlyPrice: 8000,       // Aylık slot ücreti (TRY)
+    maxWeeks: 12,             // Tek alımda azami süre (hafta)
+  },
   suspend: {
     unpaidPocThreshold: 3,
     gracePeriodDays: 7,
@@ -30099,6 +30118,113 @@ async function openVendorApprovalDetail(uid) {
     modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
     modal.querySelector('#vad-close').addEventListener('click', function(){ modal.remove(); });
   } catch(e) { showToast('Hata: '+e.message,'err'); }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.51: ADMIN — REKLAM / ÖNE ÇIKAN (Faz 1a: config + slot + Sponsorlu)
+// ════════════════════════════════════════════════════════════════════
+async function admFeaturedAds(m) {
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>Reklam ayarları yükleniyor...</div>';
+  try {
+    var cfgSnap = await getDoc(doc(db,'pochub_config','system'));
+    var cfg = cfgSnap.exists() ? cfgSnap.data() : {};
+    var fa = cfg.featuredAds || {};
+    var v = {
+      enabled:        fa.enabled !== false,
+      slotCount:      fa.slotCount ?? 3,
+      sponsoredLabel: fa.sponsoredLabel !== false,
+      autoActivate:   fa.autoActivate !== false,
+      weeklyPrice:    fa.weeklyPrice ?? 2500,
+      monthlyPrice:   fa.monthlyPrice ?? 8000,
+      maxWeeks:       fa.maxWeeks ?? 12,
+    };
+
+    // Canlı durum: şu an kaç ürün öne çıkıyor
+    var activeFeatured = 0;
+    try {
+      var fsnap = await getDocs(query(collection(db,'products'), where('status','==','active'), where('featured','==',true)));
+      var now = new Date();
+      activeFeatured = fsnap.docs.map(function(d){ return d.data(); }).filter(function(p){
+        if (!p.featuredUntil) return true;
+        var u = p.featuredUntil.toDate ? p.featuredUntil.toDate() : new Date(p.featuredUntil);
+        return u >= now;
+      }).length;
+    } catch(e){}
+
+    m.innerHTML = '';
+
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'margin-bottom:14px';
+    hdr.innerHTML = '<h2 class="fs18-fw7">📢 Reklam / Öne Çıkan Yönetimi</h2>'
+      + '<div class="txt-muted-12-mt3">Ana sayfa "Öne Çıkan Ürün" reklam programı — fiyatlandırma, slot ve görünüm ayarları</div>';
+    m.appendChild(hdr);
+
+    var statRow = document.createElement('div');
+    statRow.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px';
+    [['Program', v.enabled?'Aktif':'Kapalı', v.enabled?'#16a34a':'#64748b'],
+     ['Slot Sayısı', String(v.slotCount), '#2563eb'],
+     ['Şu An Öne Çıkan', activeFeatured + ' / ' + v.slotCount, activeFeatured>v.slotCount?'#d97706':'#16a34a'],
+     ['Haftalık / Aylık', '₺'+Number(v.weeklyPrice).toLocaleString('tr-TR')+' / ₺'+Number(v.monthlyPrice).toLocaleString('tr-TR'), '#7c3aed']
+    ].forEach(function(s){
+      var c = document.createElement('div');
+      c.style.cssText = 'background:'+s[2]+'15;border:1px solid '+s[2]+'30;border-radius:8px;padding:10px;text-align:center';
+      c.innerHTML = '<div style="font-size:'+(s[1].length>8?'14px':'20px')+';font-weight:800;color:'+s[2]+'">'+s[1]+'</div><div class="fs11-mt2-muted">'+s[0]+'</div>';
+      statRow.appendChild(c);
+    });
+    m.appendChild(statRow);
+
+    if (activeFeatured > v.slotCount) {
+      var warn = document.createElement('div');
+      warn.style.cssText = 'background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);color:#92400e;border-radius:8px;padding:10px 12px;font-size:12.5px;margin-bottom:14px';
+      warn.innerHTML = '⚠️ Şu an '+activeFeatured+' ürün öne çıkıyor ama slot sayısı '+v.slotCount+'. Carousel ilk '+v.slotCount+' tanesini döndürür; gerisi gösterilmez. Slot sayısını artırabilir ya da satın alımları yönetebilirsin (Faz 1c).';
+      m.appendChild(warn);
+    }
+
+    var form = document.createElement('div');
+    form.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:640px';
+    form.innerHTML =
+      '<div style="font-size:14px;font-weight:700;margin-bottom:14px">⚙️ Fiyatlandırma & Slot Ayarları</div>'
+      + '<div class="g2">'
+      +   '<div><label class="lbl-mini">Program Aktif</label><select class="inp" id="fa-enabled"><option value="true"'+(v.enabled?' selected':'')+'>Evet</option><option value="false"'+(!v.enabled?' selected':'')+'>Hayır (carousel gizlenir)</option></select></div>'
+      +   '<div><label class="lbl-mini">Ana Sayfa Slot Sayısı</label><input class="inp" type="number" id="fa-slots" min="1" max="12" value="'+v.slotCount+'"></div>'
+      + '</div>'
+      + '<div class="g2">'
+      +   '<div><label class="lbl-mini">Haftalık Fiyat (TRY)</label><input class="inp" type="number" id="fa-weekly" value="'+v.weeklyPrice+'"></div>'
+      +   '<div><label class="lbl-mini">Aylık Fiyat (TRY)</label><input class="inp" type="number" id="fa-monthly" value="'+v.monthlyPrice+'"></div>'
+      + '</div>'
+      + '<div class="g2">'
+      +   '<div><label class="lbl-mini">Azami Süre (hafta)</label><input class="inp" type="number" id="fa-maxweeks" min="1" value="'+v.maxWeeks+'"></div>'
+      +   '<div><label class="lbl-mini">"Sponsorlu" Etiketi</label><select class="inp" id="fa-sponsored"><option value="true"'+(v.sponsoredLabel?' selected':'')+'>Göster</option><option value="false"'+(!v.sponsoredLabel?' selected':'')+'>Gizle</option></select></div>'
+      + '</div>'
+      + '<div><label class="lbl-mini">Satın Alma Aktivasyonu</label><select class="inp" id="fa-auto"><option value="true"'+(v.autoActivate?' selected':'')+'>Otomatik (cari hesaba işlenir, hemen yayında)</option><option value="false"'+(!v.autoActivate?' selected':'')+'>Admin onayı bekler</option></select></div>'
+      + '<div style="margin-top:14px"><button class="btn-p" id="fa-save">💾 Kaydet</button></div>'
+      + '<div class="lbl-mini" style="margin-top:14px;color:var(--text-muted);line-height:1.6">İşlem kayıtları, üreticinin satın alma akışı ve detaylı raporlar/metrikler sonraki adımlarda (Faz 1b–1d) bu bölüme eklenecek.</div>';
+    m.appendChild(form);
+
+    form.querySelector('#fa-save').addEventListener('click', async function(){
+      var btn = this; btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+      var data = {
+        enabled:        form.querySelector('#fa-enabled').value === 'true',
+        slotCount:      Math.max(1, parseInt(form.querySelector('#fa-slots').value)||3),
+        sponsoredLabel: form.querySelector('#fa-sponsored').value === 'true',
+        autoActivate:   form.querySelector('#fa-auto').value === 'true',
+        weeklyPrice:    parseInt(form.querySelector('#fa-weekly').value)||0,
+        monthlyPrice:   parseInt(form.querySelector('#fa-monthly').value)||0,
+        maxWeeks:       Math.max(1, parseInt(form.querySelector('#fa-maxweeks').value)||12),
+      };
+      try {
+        await setDoc(doc(db,'pochub_config','system'), { featuredAds: data }, { merge: true });
+        showToast('Reklam ayarları kaydedildi.');
+        admFeaturedAds(m);
+      } catch(e) {
+        showToast('Hata: '+e.message,'err');
+        btn.disabled = false; btn.textContent = '💾 Kaydet';
+      }
+    });
+
+  } catch(e) {
+    m.innerHTML = '<div class="alert alert-err">Yükleme hatası: '+e.message+'</div>';
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
