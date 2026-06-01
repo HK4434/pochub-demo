@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.58 | pochub.co -->
+<!-- PoCHub v5.59 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.58';
+const VERSION = 'v5.59';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.59': ['KATALOG Faz A3 (veri modeli): SEKTOR artik URUN duzeyinde. Onceden sector yalnizca vendor profilindeydi; urunlerde yoktu — bu yuzden A1 sektor faceti bostu. Simdi urun ekleme (openAddProductModal) ve vendor urun duzenleme (openEditProd) formlarina COKLU sektor pill secimi eklendi; products dokumanina sectors[] yazilir. Katalog faceti/filtresi sectors[] dizisini okur (tekil eski sector alanina geri-uyumlu). Ortak yardimcilar sectorPillsHtml/wireSectorPills/readSectorPills. products owner-update sectors yazabildigi icin RULES degismedi. NOT: eski urunler bos gelir — vendor Urunlerim>Duzenle ile sektor atayinca facete dusserler. A2 (deployment/lisans/dogrulanmis/origin facet) + A3b (admin taksonomi editoru) sirada.'],
   'v5.58': ['KATALOG Faz A1: sektor faceted filtre. Urunun mevcut sector alani artik katalogda CANLI — sayacli, cok-secimli pill satiri (Saglik/Finans/Sanayi...). Aktif filtre CHIP\'leri (arama/kategori/sektor/TR; tek tek veya tumunu temizle). Facet sayaclari diger filtrelere gore guncellenir. Filtreler URL query-param\'a yazilir (paylasilabilir/derin-link, hash router\'a dokunmadan replaceState ile). Eski hasFilter bug fix (category->cat) + bos-sonuc sifirlama sektoru de temizler. UI — rules degismedi. A2 (deployment/lisans/dogrulanmis/origin facet) + A3 (coklu-sektor + admin taksonomi) sirada.'],
   'v5.57': ['ADMIN Kullanici Detayi tamamlandi (oneri 2-6): vendor panelinde RISK rozetleri (askida/acik borc/60g+ hareketsiz/urun yok/dusuk kabul), SON aktivite (PoC+teklif+urun guncel zamani), 6 AYLIK gelir trendi (mini bar grafik), ve acik borc varsa modaldan "Borclari Sifirla" hizli aksiyonu (poc_charges paid + vendor_billing reset). Musteri panelinde PoC durum dagilimi + son talep. Salt-okunur/admin aksiyonu — rules degismedi.'],
   'v5.56': ['ADMIN Kullanici Detayi zenginlestirildi. Vendor icin async "💰 Kazancimiz (PoCHub geliri)" paneli: Yasam Boyu (LTV) = abonelik (subscription_history paid) + override PoC + one cikan reklam (poc_charges paid) + acik bakiye/suspend (vendor_billing). "📊 Aktivite": urun (aktif/toplam), aldigi PoC, teklif kabul orani, aktif one cikan yerlesim, paket adi. Musteri icin PoC/Demo talep sayisi. "📄 Tam Profil" butonu (kategoriler/markalar/bolgeler/vergi/web/referanslar) ve "🔍 Tum Alanlar" ile user dokumaninin ham alanlari toggle. Salt-okunur admin gorunumu — rules degismedi.'],
@@ -6846,6 +6847,27 @@ var SECTORS = [
 var SECTOR_LABEL = {}; SECTORS.forEach(function(s){ SECTOR_LABEL[s[0]] = s[1]; });
 var CAT_SECTORS = []; // seçili sektörler (çoklu)
 
+// v5.59 (Faz A3): ürün formu — çoklu sektör pill yardımcıları
+function sectorPillsHtml(selected){
+  selected = selected || [];
+  return SECTORS.map(function(s){
+    var on = selected.indexOf(s[0])>=0;
+    return '<button type="button" class="pr-sec-pill'+(on?' on':'')+'" data-sec="'+s[0]+'" style="font-size:12px;font-weight:600;padding:5px 11px;border-radius:16px;cursor:pointer;border:1px solid '+(on?'#2563eb':'var(--border)')+';background:'+(on?'#2563eb':'transparent')+';color:'+(on?'#fff':'var(--text-secondary)')+'">'+s[1]+'</button>';
+  }).join('');
+}
+function wireSectorPills(root){
+  if(!root) return;
+  root.querySelectorAll('.pr-sec-pill').forEach(function(b){
+    b.addEventListener('click', function(){
+      var on=b.classList.toggle('on');
+      b.style.background=on?'#2563eb':'transparent';
+      b.style.color=on?'#fff':'var(--text-secondary)';
+      b.style.borderColor=on?'#2563eb':'var(--border)';
+    });
+  });
+}
+function readSectorPills(root){ return root ? [].slice.call(root.querySelectorAll('.pr-sec-pill.on')).map(function(b){return b.dataset.sec;}) : []; }
+
 function syncCatalogURL(){
   try {
     var params = new URLSearchParams();
@@ -6880,7 +6902,7 @@ function clearCatFilter(kind, val){
 function updateCatalogFacetsAndChips(base){
   var fc = el('cat-facets'), ch = el('cat-chips');
   if (fc) {
-    var counts = {}; base.forEach(function(p){ var s=p.sector||'other'; counts[s]=(counts[s]||0)+1; });
+    var counts = {}; base.forEach(function(p){ var arr=(p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:['other']); arr.forEach(function(s){ counts[s]=(counts[s]||0)+1; }); });
     var pills = SECTORS.filter(function(s){ return counts[s[0]] || CAT_SECTORS.indexOf(s[0])>=0; }).map(function(s){
       var sel = CAT_SECTORS.indexOf(s[0])>=0;
       return '<button class="cat-sec-pill" data-sec="'+s[0]+'" style="font-size:12px;font-weight:600;padding:5px 11px;border-radius:18px;cursor:pointer;border:1px solid '+(sel?'#2563eb':'var(--border)')+';background:'+(sel?'#2563eb':'transparent')+';color:'+(sel?'#fff':'var(--text-secondary)')+'">'+s[1]+' <span style="opacity:.7">'+(counts[s[0]]||0)+'</span></button>';
@@ -6970,7 +6992,7 @@ async function loadCatalog() {
     if (cat) prods = prods.filter(p => p.category===cat);
     // v5.58: sektör facet — base (sektör öncesi) sayaçlar için, sonra sektör filtresi (çoklu/OR)
     var base = prods.slice();
-    if (CAT_SECTORS.length) prods = prods.filter(p => p.sector && CAT_SECTORS.indexOf(p.sector) >= 0);
+    if (CAT_SECTORS.length) prods = prods.filter(function(p){ var arr=(p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]); return arr.some(function(s){ return CAT_SECTORS.indexOf(s)>=0; }); });
     updateCatalogFacetsAndChips(base);
     syncCatalogURL();
     var sortBy = el('cat-sort')?.value || 'rating';
@@ -13114,7 +13136,7 @@ async function loadVendTab() {
       m.querySelectorAll('.pr-eb').forEach(function(b){
         b.addEventListener('click', function(){
           var p = products.find(function(x){ return x.id===b.dataset.id; });
-          if (p) openEditProd(p.id, p.name||'', p.category||'', p.country||'', p.description||'', '', null);
+          if (p) openEditProd(p.id, p.name||'', p.category||'', p.country||'', p.description||'', '', null, p.sectors||[]);
         });
       });
 
@@ -14468,7 +14490,7 @@ async function loadVendTab() {
   }
 }
 
-function openEditProd(prodId, name, category, country, description, supportModel, catFieldsData) {
+function openEditProd(prodId, name, category, country, description, supportModel, catFieldsData, sectorsData) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.id = 'prod-edit-modal';
@@ -14521,6 +14543,8 @@ function openEditProd(prodId, name, category, country, description, supportModel
     '<input type="hidden" id="edit-country-val" value="'+(country||'TR')+'">' +
     '<label class="lbl fs12">Açıklama</label>' +
     '<textarea class="inp" id="edit-desc" rows="4" style="resize:vertical;margin-bottom:12px;font-size:13px">'+(description||'')+'</textarea>' +
+    '<label class="lbl t-w8">Sektörler <span style="font-weight:400;color:var(--text-muted);font-size:11px">(çoklu, opsiyonel)</span></label>' +
+    '<div id="edit-sectors" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'+sectorPillsHtml(sectorsData||[])+'</div>' +
     '<label class="lbl t-w8">Destek Modeli</label>' +
     '<select class="inp" id="edit-support" style="font-size:13px">' +
     '<option value="inhouse"'+(supportModel==='inhouse'?' selected':'')+'>Kendi Bünyesi</option>' +
@@ -14549,6 +14573,7 @@ function openEditProd(prodId, name, category, country, description, supportModel
 
   buildCountryInput('edit-country-cont','edit-country-inp','edit-country-val', country||'TR');
   fillCatSelect(modal.querySelector('#edit-cat'), category);
+  wireSectorPills(modal);
 
   // Kategori yüklendikten sonra mevcut alanları göster
   setTimeout(function() {
@@ -14569,6 +14594,7 @@ function openEditProd(prodId, name, category, country, description, supportModel
         category:     newCat,
         country:      modal.querySelector('#edit-country-val')?.value || country || 'TR',
         description:  modal.querySelector('#edit-desc').value.trim(),
+        sectors:      readSectorPills(modal),
         supportModel: modal.querySelector('#edit-support').value,
         catFields:    newCatData,
       });
@@ -22742,6 +22768,9 @@ async function openAddProductModal(prefillCat) {
     '<label class="lbl t-w8">Kısa Açıklama</label>' +
     '<textarea class="inp" id="pr-desc" rows="4" placeholder="Genel ürün açıklaması..." style="resize:vertical;margin-bottom:14px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155"></textarea>' +
 
+    '<label class="lbl t-w8">Sektörler <span style="font-weight:400;color:#94a3b8;font-size:11px">(ürünün hizmet verdiği sektörler — çoklu, opsiyonel)</span></label>' +
+    '<div id="pr-sectors" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">'+sectorPillsHtml([])+'</div>' +
+
     '<label class="lbl t-w8">Destek Modeli</label>' +
     '<select class="inp" id="pr-support" style="font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155">' +
     '<option value="inhouse">Kendi Bünyesi</option>' +
@@ -22818,6 +22847,7 @@ async function openAddProductModal(prefillCat) {
   });
 
   buildCountryInput('pr-country-cont','pr-country-inp','pr-country-val','TR');
+  wireSectorPills(modal);
 
   // ── Menşei değişim handler ────────────────────────────────────────
   // ── Doğrudan satış değişimi ───────────────────────────────────────
@@ -22997,6 +23027,7 @@ async function openAddProductModal(prefillCat) {
         vendorEmail:   CUR_USER.email,
         name, category: cat,
         origin,
+        sectors:       readSectorPills(modal),
         directSale:    isDirectSale,
         country:       modal.querySelector('#pr-country-val')?.value||'TR',
         description:   modal.querySelector('#pr-desc').value.trim(),
