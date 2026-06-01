@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.51 | pochub.co -->
+<!-- PoCHub v5.52 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.51';
+const VERSION = 'v5.52';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.52': ['REKLAM Faz 1b: uretici Featured Boost satin alma akisi. Urunlerim\'de aktif urune "Reklam" butonu (📢) → modal: plan (haftalik/aylik) + sure secimi, canli fiyat/bitis onizlemesi, mevcut featured durumu. Onayda: featured_purchases ledger kaydi (amount/plan/periods/startAt/endAt/status/source) + (autoActivate ise) urun.featured=true & featuredUntil=bitis + admin_inbox bildirimi. autoActivate kapaliysa status=pending_approval (admin onayi 1c). Tutar cari hesaba islenecek borc olarak featured_purchases kaydidir. RULES: featured_purchases eklendi (vendor create/read-own, admin all) → Console re-deploy gerekir. products update kurali sahibe featured yazdirdigi icin ek degisiklik yok.'],
   'v5.51': ['REKLAM/ONE CIKAN Faz 1a: monetizasyon altyapisi. Yeni admin sekmesi "Reklam / One Cikan" — fiyatlandirma & slot ayarlari (program aktif, slot sayisi, haftalik/aylik fiyat, azami sure, Sponsorlu etiketi, otomatik/onayli aktivasyon) + canli durum kartlari. Config pochub_config/system.featuredAds (public-read). Ana sayfa carousel artik: master-switch ile gizlenebilir, slot sayisiyla SINIRLI (kitlik), ve gercek one-cikanlar "Sponsorlu" etiketli (fallback dolgu urunler reklam degil, etiketlenmez). Faz 1b-1d (satin alma, ledger+arama+arsiv, metrikler) sirada. UI/config — rules degismedi.'],
   'v5.50': ['ACIL ONAY (OVERRIDE) bolumu gelistirildi: (1) Isim tutarliligi — admin tarafinda "Override Talepleri" → "Acil Onay Talepleri" (vendor tarafindaki "Acil Onay Talep Et" ile esit). (2) ARAMA: ekrana vendor/PoC/sebep/musteri araması eklendi (DOM-filtre, re-render yok, odak korunur). (3) ARSIV: her talepte Arsivle/Arsivden Cikar + yeni Arsiv sekmesi; arsivlenenler diger sekmelerden gizli; sekme sayaclari arsivsiz. (4) DASHBOARD: bekleyen Acil Onay sayisi hizli-eylem butonu + highlight kart (bekleyen adet + onayli override borc toplami), tikla→sekme. UI/mantik — rules degismedi.'],
   'v5.49': ['ADMIN: Override faturalandirmasi artik PAKET BAZINDA da ayarlanabilir. Paket duzenleme modaline "Override Fiyat Zammi (%)" alani eklendi; bos birakilirsa Sistem Ayarlari\'ndaki global zam kullanilir (paket-oncelikli fallback). override tutari = paketin Asan PoC Fiyati x (1 + zam%). Boylece her tier kendi override fiyatlandirmasina sahip olabilir (or. Enterprise dusuk/sifir, Free caydirici yuksek). Yeni paket sablonuna overrideMultiplier:null eklendi. UI/mantik — rules degismedi.'],
@@ -12964,6 +12965,7 @@ async function loadVendTab() {
           if (lcState === 'active') {
             td.innerHTML =
               '<button class="btn-g btn-sm pr-dist-btn" data-id="' + p.id + '" data-name="' + (p.name||'').replace(/"/g,'') + '" data-origin="' + (p.origin||'domestic') + '" style="font-size:11px;margin-right:4px">🔗 Dağıtım</button>'
+              + '<button class="pr-feature lc-btn" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" title="Öne Çıkar (Reklam)" style="font-size:11px;margin-right:4px;color:#d97706;border-color:rgba(217,119,6,.4)">📢</button>'
               + '<button class="pr-eb lc-btn lc-btn-edit" data-id="'+p.id+'" title="Düzenle">✎</button>'
               + '<button class="pr-arch lc-btn lc-btn-arch" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" title="Arşive al">📦</button>'
               + '<button class="pr-trash lc-btn lc-btn-tr" data-id="'+p.id+'" data-name="'+(p.name||'').replace(/"/g,"&quot;")+'" title="Çöpe at">🗑</button>';
@@ -12988,6 +12990,12 @@ async function loadVendTab() {
       m.querySelector('#v-add-prod2')?.addEventListener('click', function(){ openAddProductModal(); });
       m.querySelectorAll('.pr-dist-btn').forEach(function(b){
         b.addEventListener('click', function(){ openProductDistModal(b.dataset.id, b.dataset.name, b.dataset.origin); });
+      });
+      m.querySelectorAll('.pr-feature').forEach(function(b){
+        b.addEventListener('click', function(){
+          var p = products.find(function(x){ return x.id===b.dataset.id; });
+          openFeaturedBoostModal(b.dataset.id, b.dataset.name, p);
+        });
       });
       m.querySelectorAll('.pr-eb').forEach(function(b){
         b.addEventListener('click', function(){
@@ -30118,6 +30126,108 @@ async function openVendorApprovalDetail(uid) {
     modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
     modal.querySelector('#vad-close').addEventListener('click', function(){ modal.remove(); });
   } catch(e) { showToast('Hata: '+e.message,'err'); }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.52 (Faz 1b): ÜRETİCİ — FEATURED BOOST SATIN ALMA MODALI
+// ════════════════════════════════════════════════════════════════════
+async function openFeaturedBoostModal(pid, pname, product) {
+  if (!CUR_USER || CUR_PROFILE?.role !== 'vendor') { showToast('Bu işlem üretici hesabıyla yapılır.','err'); return; }
+  var cfg = {};
+  try { var cs = await getDoc(doc(db,'pochub_config','system')); cfg = (cs.exists() && cs.data().featuredAds) || {}; } catch(e){}
+  if (cfg.enabled === false) { showToast('Öne Çıkan / Reklam programı şu an kapalı.','err'); return; }
+  var weeklyPrice  = cfg.weeklyPrice  || 2500;
+  var monthlyPrice = cfg.monthlyPrice || 8000;
+  var maxWeeks     = cfg.maxWeeks     || 12;
+  var autoActivate = cfg.autoActivate !== false;
+
+  var curUntil = null;
+  if (product && product.featured && product.featuredUntil) {
+    var u0 = product.featuredUntil.toDate ? product.featuredUntil.toDate() : new Date(product.featuredUntil);
+    if (u0 >= new Date()) curUntil = u0;
+  }
+
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML =
+    '<div style="background:var(--bg-surface);border-radius:14px;max-width:460px;width:100%;padding:22px;position:relative">'
+    + '<button id="fb-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+    + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">📢 Öne Çıkar (Reklam)</div>'
+    + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:6px">'+(pname||'Ürün')+' — ana sayfa carousel\'inde "Sponsorlu" olarak gösterilir.</div>'
+    + (curUntil ? '<div style="background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.25);color:#15803d;border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:12px">✓ Şu an '+curUntil.toLocaleDateString('tr-TR')+' tarihine kadar öne çıkıyor. Yeni alım süreyi uzatır.</div>' : '')
+    + '<div class="g2">'
+    +   '<div><label class="lbl-mini">Plan</label><select class="inp" id="fb-plan"><option value="weekly">Haftalık (₺'+weeklyPrice.toLocaleString('tr-TR')+'/hafta)</option><option value="monthly">Aylık (₺'+monthlyPrice.toLocaleString('tr-TR')+'/ay)</option></select></div>'
+    +   '<div><label class="lbl-mini">Süre</label><input class="inp" type="number" id="fb-dur" min="1" value="1"></div>'
+    + '</div>'
+    + '<div id="fb-summary" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0;font-size:13px"></div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">'+(autoActivate?'Tutar cari hesabına işlenir ve ürün hemen yayına alınır.':'Talebin admin onayına gönderilir; onaylanınca yayına alınır.')+'</div>'
+    + '<div style="display:flex;gap:8px"><button class="btn-p flx1" id="fb-buy">'+(autoActivate?'✓ Satın Al & Yayınla':'Talep Gönder')+'</button><button class="btn-g" id="fb-cancel">Vazgeç</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  var planSel = modal.querySelector('#fb-plan');
+  var durInp  = modal.querySelector('#fb-dur');
+  var summary = modal.querySelector('#fb-summary');
+
+  function calc() {
+    var plan = planSel.value;
+    var dur = Math.max(1, parseInt(durInp.value)||1);
+    var maxDur = plan==='weekly' ? maxWeeks : Math.max(1, Math.ceil(maxWeeks/4));
+    if (dur > maxDur) { dur = maxDur; durInp.value = maxDur; }
+    var unit = plan==='weekly' ? weeklyPrice : monthlyPrice;
+    var amount = unit * dur;
+    var days = plan==='weekly' ? dur*7 : dur*30;
+    var base = Math.max(Date.now(), curUntil ? curUntil.getTime() : 0);
+    var endAt = new Date(base + days*86400000);
+    summary.innerHTML = '<div class="flx-bw-c"><span>'+dur+' '+(plan==='weekly'?'hafta':'ay')+' × ₺'+unit.toLocaleString('tr-TR')+'</span><strong>₺'+amount.toLocaleString('tr-TR')+'</strong></div>'
+      + '<div class="flx-bw-c" style="margin-top:6px;font-size:11.5px;color:var(--text-muted)"><span>Bitiş tarihi</span><span>'+endAt.toLocaleDateString('tr-TR')+'</span></div>';
+    return { plan:plan, dur:dur, amount:amount, days:days, endAt:endAt };
+  }
+  calc();
+  planSel.addEventListener('change', calc);
+  durInp.addEventListener('input', calc);
+
+  modal.querySelector('#fb-close').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#fb-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#fb-buy').addEventListener('click', async function(){
+    var btn = this; btn.disabled = true; btn.textContent = '⏳ İşleniyor...';
+    var c = calc();
+    try {
+      var status = autoActivate ? 'active' : 'pending_approval';
+      await addDoc(collection(db,'featured_purchases'), {
+        vendorId: CUR_USER.uid,
+        vendorName: CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email,
+        productId: pid,
+        productName: pname || '',
+        plan: c.plan,
+        periods: c.dur,
+        durationDays: c.days,
+        amount: c.amount,
+        startAt: serverTimestamp(),
+        endAt: Timestamp.fromDate(c.endAt),
+        status: status,
+        source: 'paid',
+        archived: false,
+        createdAt: serverTimestamp(),
+      });
+      if (autoActivate) {
+        await updateDoc(doc(db,'products', pid), { featured: true, featuredUntil: Timestamp.fromDate(c.endAt) });
+      }
+      await notifyAdmins({
+        type: 'featured_purchase',
+        title: '📢 Yeni Öne Çıkan Satın Alma',
+        message: (CUR_PROFILE?.company || CUR_USER.email) + ' "' + (pname||'ürün') + '" için ' + c.dur + ' ' + (c.plan==='weekly'?'haftalık':'aylık') + ' (₺' + c.amount.toLocaleString('tr-TR') + ') ' + (autoActivate?'satın aldı (yayında).':'talep etti (onay bekliyor).'),
+        productId: pid,
+        productName: pname || '',
+      });
+      showToast(autoActivate ? '✓ Ürünün öne çıkarıldı. Tutar cari hesabına işlendi.' : 'Talebin alındı, admin onayı bekliyor.');
+      modal.remove();
+      if (CUR_VEND_TAB === 'products') loadVendTab();
+    } catch(e) {
+      showToast('Hata: '+e.message,'err');
+      btn.disabled = false; btn.textContent = autoActivate ? '✓ Satın Al & Yayınla' : 'Talep Gönder';
+    }
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════
