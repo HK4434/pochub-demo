@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.54 | pochub.co -->
+<!-- PoCHub v5.55 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.54';
+const VERSION = 'v5.55';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.55': ['REKLAM duzeltme: (1) Urunlerim listesinde one cikan urune "📢 One Cikan" rozeti (featured & suresi gecmemis; tarih ipucu). (2) Featured satin alma artik CARI HESABA islenir: autoActivate alimda + admin onayinda poc_charges (source:featured, status:pending_invoice, aciklama) + updateVendorBilling olusur; boylece vendor Cari Hesap sayfasinda, admin vendor-abonelik tablosu unpaidBalance kolonunda ve odeme-onay akisinda gorunur. KRITIK: featured borcu deltaCount=0 ile islenir — PoC-suspend sayacina (3+) GIRMEZ, yanlis askiyi onler. Cari Hesap sayfasi featured-uyumlu: pocId yoksa aciklama+"📢 One cikan reklam" etiketi, PoC sayaci ile toplam borc ayrildi. Admin iptal (fl-cancel) odenmemis featured borcunu iptal eder + bakiyeyi duser. Odeme onayinda sayac geri alimi featured haric. UI/mantik — rules degismedi.'],
   'v5.54': ['REKLAM Faz 1d (son): analitik & ROI. Carousel\'de gercek reklamlara tiklamada featured_events (tip click, oturum-tekilli) yazilir. Featured\'dan acilan PoC\'ye source:featured + featuredProductId atifi (poc_requests). Admin ledger\'da her kayitta urun-bazli metrik (Tik + Featured PoC). Yeni uretici sekmesi "Reklamlarim": ozet (aktif yerlesim, toplam harcama, toplam tik, featured PoC) + yerlesim kartlari + metrikler (ROI gorunumu). NOT: tik metrigi client-tarafi ve YAKLASIK (bot/adblock/cihaz farki); PoC-source sayisi guvenilir gercek donusum. RULES: featured_events eklendi (anon create, read admin+vendor-own) → Console re-deploy gerekir. poc_requests create kuralinda alan whitelist olmadigi icin ek degisiklik yok. Faz 1 (1a-1d) tamamlandi.'],
   'v5.53': ['REKLAM Faz 1c: admin "Reklam / One Cikan" bolumu detaylandi. Iki alt-sekme: Islemler (ledger) + Ayarlar (1a config). Islemler: ozet kartlari (aktif yerlesim, bu ay/toplam gelir, onay bekleyen) + En Cok Harcayanlar (top 5) + filtre sekmeleri (Aktif/Suresi Dolmus/Onay Bekleyen/Iptal/Tumu/Arsiv, sayacli) + ARAMA (uretici/urun, DOM-filtre) + kayit basina aksiyonlar: pending icin Onayla&Yayinla / Reddet, aktif icin Iptal Et / Arsivle, digerleri Arsivle/Arsivden Cikar. Onayla urunu featured yapar + vendora bildirim; iptal urunu featuredan kaldirir. Dashboard: Reklam highlight karti (aktif yerlesim + bu ay gelir) tikla->bolum + pending varsa hizli-eylem butonu. UI/mantik — rules degismedi.'],
   'v5.52': ['REKLAM Faz 1b: uretici Featured Boost satin alma akisi. Urunlerim\'de aktif urune "Reklam" butonu (📢) → modal: plan (haftalik/aylik) + sure secimi, canli fiyat/bitis onizlemesi, mevcut featured durumu. Onayda: featured_purchases ledger kaydi (amount/plan/periods/startAt/endAt/status/source) + (autoActivate ise) urun.featured=true & featuredUntil=bitis + admin_inbox bildirimi. autoActivate kapaliysa status=pending_approval (admin onayi 1c). Tutar cari hesaba islenecek borc olarak featured_purchases kaydidir. RULES: featured_purchases eklendi (vendor create/read-own, admin all) → Console re-deploy gerekir. products update kurali sahibe featured yazdirdigi icin ek degisiklik yok.'],
@@ -12933,6 +12934,15 @@ async function loadVendTab() {
             }
           }
 
+          // v5.55: Öne Çıkan (aktif reklam) rozeti
+          var featBadge = '';
+          if (p.featured) {
+            var _fU = p.featuredUntil?.toDate ? p.featuredUntil.toDate() : (p.featuredUntil ? new Date(p.featuredUntil) : null);
+            if (!_fU || _fU >= new Date()) {
+              featBadge = ' <span style="font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:7px;background:rgba(124,58,237,.15);color:#7c3aed" title="Ana sayfada öne çıkıyor'+(_fU?' — '+_fU.toLocaleDateString('tr-TR')+' tarihine kadar':'')+'">📢 Öne Çıkan</span>';
+            }
+          }
+
           // Son aktivite metni (ürün adı altında küçük)
           var lastActHtml = '';
           if (p._lastActivity && p._lastActivity.ts > 0) {
@@ -12968,7 +12978,7 @@ async function loadVendTab() {
 
           // Cells
           tr.innerHTML =
-            '<td class="fw6">' + (p.name||'—') + perfBadge + lastActHtml + '</td>' +
+            '<td class="fw6">' + (p.name||'—') + perfBadge + featBadge + lastActHtml + '</td>' +
             '<td class="fs12">' + (p.category||'—') + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:1px">'+(p.country||'TR') + (p.origin==='domestic'?' 🇹🇷':' 🌍')+'</div></td>' +
             '<td style="font-size:12px;text-align:center">' + pocCell + '</td>' +
             '<td style="font-size:12px;text-align:center">' + offCell + '</td>' +
@@ -19185,7 +19195,8 @@ async function vendBilling(m) {
     var threshold = cfg.suspend?.unpaidPocThreshold || 3;
 
     var totalDebt = charges.reduce(function(s,c){ return s + (c.amount || 0); }, 0);
-    var unpaidCount = charges.length;
+    var pocCharges = charges.filter(function(c){ return c.source !== 'featured'; });
+    var unpaidCount = pocCharges.length; // PoC/override borç sayısı (suspend eşiği bununla)
 
     m.innerHTML = '';
 
@@ -19194,10 +19205,10 @@ async function vendBilling(m) {
     hdr.style.cssText = 'margin-bottom:14px';
     hdr.innerHTML =
       '<h2 class="fs18-fw7">💳 Cari Hesap</h2>'
-      + '<div class="txt-muted-12-mt3">Ödenmemiş override PoC borçları</div>';
+      + '<div class="txt-muted-12-mt3">Ödenmemiş borçlar — override PoC + öne çıkan reklam</div>';
     m.appendChild(hdr);
 
-    if (unpaidCount === 0) {
+    if (charges.length === 0) {
       var ok = document.createElement('div');
       ok.style.cssText = 'background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.25);border-radius:12px;padding:24px;text-align:center';
       ok.innerHTML =
@@ -19216,9 +19227,9 @@ async function vendBilling(m) {
     summary.innerHTML =
       '<div class="flx-bw-s-mb10">'
       +   '<div>'
-      +     '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+(billing.isSuspended?'⛔ Hesap Askıda':isCritical?'⚠️ Suspend Eşiği':'Borçlu PoC')+'</div>'
-      +     '<div style="font-size:24px;font-weight:800;color:'+color+'">'+unpaidCount+' / '+threshold+' PoC</div>'
-      +     '<div class="txt-muted-12-mt3">'+(billing.isSuspended?'Tüm borçları öde, hesabın anında aktif olur.':isCritical?'Bu eşik aşıldı! Ödeme yapılana kadar yeni PoC kabul edemezsin.':(threshold-unpaidCount)+' borç daha eklenince hesabın askıya alınacak.')+'</div>'
+      +     '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+(billing.isSuspended?'⛔ Hesap Askıda':isCritical?'⚠️ Suspend Eşiği':(unpaidCount>0?'Borçlu PoC':'Açık Bakiye'))+'</div>'
+      +     (unpaidCount>0 ? '<div style="font-size:24px;font-weight:800;color:'+color+'">'+unpaidCount+' / '+threshold+' PoC</div>' : '<div style="font-size:18px;font-weight:800;color:'+color+'">📢 Reklam Borcu</div>')
+      +     '<div class="txt-muted-12-mt3">'+(billing.isSuspended?'Tüm borçları öde, hesabın anında aktif olur.':isCritical?'Bu eşik aşıldı! Ödeme yapılana kadar yeni PoC kabul edemezsin.':(unpaidCount>0?((threshold-unpaidCount)+' borç daha eklenince hesabın askıya alınacak.'):'Öne çıkan reklam borcun bulunuyor.'))+'</div>'
       +   '</div>'
       +   '<div class="t-rgt">'
       +     '<div style="font-size:24px;font-weight:800;color:'+color+'">₺'+totalDebt.toLocaleString('tr-TR')+'</div>'
@@ -19231,32 +19242,36 @@ async function vendBilling(m) {
     // Borçlu PoC listesi
     var listHdr = document.createElement('div');
     listHdr.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:8px';
-    listHdr.textContent = 'Borçlu PoC\'ler ('+unpaidCount+')';
+    listHdr.textContent = 'Borçlu Kalemler ('+charges.length+')';
     m.appendChild(listHdr);
 
     var list = document.createElement('div');
     list.style.cssText = 'display:flex;flex-direction:column;gap:8px';
 
     for (const ch of charges) {
-      // PoC bilgisini çek
-      var pocSnap = null;
-      try { pocSnap = await getDoc(doc(db,'poc_requests',ch.pocId)); } catch(e) {}
-      var poc = pocSnap?.exists() ? pocSnap.data() : null;
+      var isFeat = ch.source === 'featured';
+      var poc = null;
+      if (!isFeat && ch.pocId) { try { var pocSnap = await getDoc(doc(db,'poc_requests',ch.pocId)); poc = pocSnap?.exists() ? pocSnap.data() : null; } catch(e) {} }
 
       var dt = ch.createdAt?.toDate ? ch.createdAt.toDate().toLocaleDateString('tr-TR') : '—';
+      var ttl = isFeat ? (ch.description || 'Öne Çıkan Reklam') : (poc?.productName||poc?.title||'PoC');
+      var sub = isFeat ? dt : ((poc?.customerName||poc?.customerCompany||'—')+' · '+dt);
+      var srcLabel = isFeat
+        ? '<div style="font-size:11px;color:#7c3aed;margin-top:3px">📢 Öne çıkan ürün reklamı</div>'
+        : '<div style="font-size:11px;color:#d97706;margin-top:3px">⚡ Admin override ile kabul edildi</div>';
 
       var card = document.createElement('div');
       card.style.cssText = 'background:var(--bg-surface);border:1px solid rgba(220,38,38,.2);border-radius:8px;padding:14px';
       card.innerHTML =
         '<div class="flx-bw-s-mb10">'
         +   '<div>'
-        +     '<div class="fs13-fw7">'+(poc?.productName||poc?.title||'PoC')+'</div>'
-        +     '<div class="txt-muted-12-mt2">'+(poc?.customerName||poc?.customerCompany||'—')+' · '+dt+'</div>'
-        +     '<div style="font-size:11px;color:#d97706;margin-top:3px">⚡ Admin override ile kabul edildi</div>'
+        +     '<div class="fs13-fw7">'+ttl+'</div>'
+        +     '<div class="txt-muted-12-mt2">'+sub+'</div>'
+        +     srcLabel
         +   '</div>'
         +   '<div class="t-rgt">'
         +     '<div style="font-size:16px;font-weight:800;color:#dc2626">₺'+(ch.amount||0).toLocaleString('tr-TR')+'</div>'
-        +     '<button class="bill-pay-one btn-warn btn-sm" data-id="'+ch.id+'" data-amount="'+ch.amount+'" data-poc="'+ch.pocId+'" style="margin-top:6px">💰 Öde</button>'
+        +     '<button class="bill-pay-one btn-warn btn-sm" data-id="'+ch.id+'" data-amount="'+ch.amount+'" data-poc="'+(ch.pocId||'')+'" style="margin-top:6px">💰 Öde</button>'
         +   '</div>'
         + '</div>';
       list.appendChild(card);
@@ -28894,8 +28909,9 @@ async function admPayments(m) {
                   paymentApprovedBy: CUR_PROFILE?.displayName || CUR_USER.email,
                 });
               }
-              // vendor_billing güncelle (tümünü kapat)
-              await updateVendorBilling(vendorId, -vTotal, -vCharges.length);
+              // vendor_billing güncelle (tümünü kapat) — featured borçları PoC sayacına girmediği için sayımdan düşülmez
+              var vPocCount = vCharges.filter(function(c){ return c.source !== 'featured'; }).length;
+              await updateVendorBilling(vendorId, -vTotal, -vPocCount);
               // Vendor bildirimi
               await addDoc(collection(db,'notifications'), {
                 userId: vendorId,
@@ -30230,7 +30246,7 @@ async function openFeaturedBoostModal(pid, pname, product) {
     var c = calc();
     try {
       var status = autoActivate ? 'active' : 'pending_approval';
-      await addDoc(collection(db,'featured_purchases'), {
+      var purchaseRef = await addDoc(collection(db,'featured_purchases'), {
         vendorId: CUR_USER.uid,
         vendorName: CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email,
         productId: pid,
@@ -30248,6 +30264,18 @@ async function openFeaturedBoostModal(pid, pname, product) {
       });
       if (autoActivate) {
         await updateDoc(doc(db,'products', pid), { featured: true, featuredUntil: Timestamp.fromDate(c.endAt) });
+        // v5.55: Cari hesaba borç işle — poc_charges + vendor_billing.
+        //   deltaCount=0: featured borcu PoC-suspend sayacına GİRMEZ (yanlış askıyı önler).
+        try {
+          var chRef = await addDoc(collection(db,'poc_charges'), {
+            vendorId: CUR_USER.uid, customerId: null, pocId: null,
+            amount: c.amount, source: 'featured', status: 'pending_invoice',
+            description: (pname||'Ürün') + ' — Öne Çıkan ' + c.dur + (c.plan==='weekly'?' hafta':' ay'),
+            featuredPurchaseId: purchaseRef.id, createdAt: serverTimestamp(),
+          });
+          await updateDoc(doc(db,'featured_purchases', purchaseRef.id), { chargeId: chRef.id });
+          await updateVendorBilling(CUR_USER.uid, c.amount, 0);
+        } catch(ce) { console.warn('featured charge:', ce.message); }
       }
       await notifyAdmins({
         type: 'featured_purchase',
@@ -30492,6 +30520,14 @@ async function renderFeaturedLedger(m) {
         try {
           await updateDoc(doc(db,'featured_purchases',o.id), { status:'active' });
           if (o.productId) await updateDoc(doc(db,'products',o.productId), { featured:true, featuredUntil:o.endAt||null });
+          // v5.55: cari hesaba borç (bir kez)
+          if (!o.chargeId) {
+            try {
+              var chR = await addDoc(collection(db,'poc_charges'), { vendorId:o.vendorId, customerId:null, pocId:null, amount:o.amount||0, source:'featured', status:'pending_invoice', description:(o.productName||'Ürün')+' — Öne Çıkan '+(o.periods||1)+(o.plan==='weekly'?' hafta':' ay'), featuredPurchaseId:o.id, createdAt:serverTimestamp() });
+              await updateDoc(doc(db,'featured_purchases',o.id), { chargeId: chR.id });
+              await updateVendorBilling(o.vendorId, o.amount||0, 0);
+            } catch(ce){ console.warn('featured charge:', ce.message); }
+          }
           if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_approved', title:'📢 Reklam Onaylandı', message:'"'+(o.productName||'ürün')+'" öne çıkan yayını onaylandı.', read:false, createdAt:serverTimestamp() }); }catch(_e){} }
           showToast('Onaylandı & yayınlandı.'); refresh();
         } catch(e){ showToast('Hata: '+e.message,'err'); }
@@ -30511,6 +30547,14 @@ async function renderFeaturedLedger(m) {
         try {
           await updateDoc(doc(db,'featured_purchases',o.id), { status:'cancelled' });
           if (o.productId) { try{ await updateDoc(doc(db,'products',o.productId), { featured:false, featuredUntil:null }); }catch(_e){} }
+          // v5.55: ödenmemiş borcu iptal et + bakiyeyi düş
+          if (o.chargeId) { try {
+            var ccs = await getDoc(doc(db,'poc_charges',o.chargeId));
+            if (ccs.exists() && ccs.data().status==='pending_invoice') {
+              await updateDoc(doc(db,'poc_charges',o.chargeId), { status:'cancelled' });
+              await updateVendorBilling(o.vendorId, -(o.amount||0), 0);
+            }
+          } catch(_e){} }
           if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_cancelled', title:'📢 Reklam İptal Edildi', message:'"'+(o.productName||'ürün')+'" öne çıkan yayını iptal edildi.', read:false, createdAt:serverTimestamp() }); }catch(_e){} }
           showToast('İptal edildi.'); refresh();
         } catch(e){ showToast('Hata: '+e.message,'err'); }
