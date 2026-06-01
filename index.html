@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.56 | pochub.co -->
+<!-- PoCHub v5.57 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.56';
+const VERSION = 'v5.57';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.57': ['ADMIN Kullanici Detayi tamamlandi (oneri 2-6): vendor panelinde RISK rozetleri (askida/acik borc/60g+ hareketsiz/urun yok/dusuk kabul), SON aktivite (PoC+teklif+urun guncel zamani), 6 AYLIK gelir trendi (mini bar grafik), ve acik borc varsa modaldan "Borclari Sifirla" hizli aksiyonu (poc_charges paid + vendor_billing reset). Musteri panelinde PoC durum dagilimi + son talep. Salt-okunur/admin aksiyonu — rules degismedi.'],
   'v5.56': ['ADMIN Kullanici Detayi zenginlestirildi. Vendor icin async "💰 Kazancimiz (PoCHub geliri)" paneli: Yasam Boyu (LTV) = abonelik (subscription_history paid) + override PoC + one cikan reklam (poc_charges paid) + acik bakiye/suspend (vendor_billing). "📊 Aktivite": urun (aktif/toplam), aldigi PoC, teklif kabul orani, aktif one cikan yerlesim, paket adi. Musteri icin PoC/Demo talep sayisi. "📄 Tam Profil" butonu (kategoriler/markalar/bolgeler/vergi/web/referanslar) ve "🔍 Tum Alanlar" ile user dokumaninin ham alanlari toggle. Salt-okunur admin gorunumu — rules degismedi.'],
   'v5.55': ['REKLAM duzeltme: (1) Urunlerim listesinde one cikan urune "📢 One Cikan" rozeti (featured & suresi gecmemis; tarih ipucu). (2) Featured satin alma artik CARI HESABA islenir: autoActivate alimda + admin onayinda poc_charges (source:featured, status:pending_invoice, aciklama) + updateVendorBilling olusur; boylece vendor Cari Hesap sayfasinda, admin vendor-abonelik tablosu unpaidBalance kolonunda ve odeme-onay akisinda gorunur. KRITIK: featured borcu deltaCount=0 ile islenir — PoC-suspend sayacina (3+) GIRMEZ, yanlis askiyi onler. Cari Hesap sayfasi featured-uyumlu: pocId yoksa aciklama+"📢 One cikan reklam" etiketi, PoC sayaci ile toplam borc ayrildi. Admin iptal (fl-cancel) odenmemis featured borcunu iptal eder + bakiyeyi duser. Odeme onayinda sayac geri alimi featured haric. UI/mantik — rules degismedi.'],
   'v5.54': ['REKLAM Faz 1d (son): analitik & ROI. Carousel\'de gercek reklamlara tiklamada featured_events (tip click, oturum-tekilli) yazilir. Featured\'dan acilan PoC\'ye source:featured + featuredProductId atifi (poc_requests). Admin ledger\'da her kayitta urun-bazli metrik (Tik + Featured PoC). Yeni uretici sekmesi "Reklamlarim": ozet (aktif yerlesim, toplam harcama, toplam tik, featured PoC) + yerlesim kartlari + metrikler (ROI gorunumu). NOT: tik metrigi client-tarafi ve YAKLASIK (bot/adblock/cihaz farki); PoC-source sayisi guvenilir gercek donusum. RULES: featured_events eklendi (anon create, read admin+vendor-own) → Console re-deploy gerekir. poc_requests create kuralinda alan whitelist olmadigi icin ek degisiklik yok. Faz 1 (1a-1d) tamamlandi.'],
@@ -28075,6 +28076,30 @@ async function loadUserDetailExtras(u, host) {
       var latestSub = subs.slice().sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);})[0];
       var pkgName = latestSub?.packageName || u.packageName || u.packageTier || u.tier || '—';
 
+      // v5.57: son aktivite
+      var pocDocs = R[4].docs.map(function(d){return d.data();});
+      var actTs = [];
+      pocDocs.forEach(function(r){ var t=r.createdAt?.seconds||0; if(t)actTs.push(t); });
+      offers.forEach(function(o){ var t=o.createdAt?.seconds||0; if(t)actTs.push(t); });
+      prods.forEach(function(p){ var t=(p.updatedAt?.seconds||p.createdAt?.seconds||0); if(t)actTs.push(t); });
+      var lastTs = actTs.length? Math.max.apply(null,actTs):0;
+      var lastActStr='—', daysSince=null;
+      if (lastTs){ daysSince=Math.floor((Date.now()-lastTs*1000)/86400000); lastActStr = daysSince===0?'bugün':daysSince+' gün önce'; }
+      // v5.57: risk rozetleri
+      var risks=[];
+      if (suspended) risks.push(['⛔ Askıda','#dc2626']);
+      if (openBal>0 && !suspended) risks.push(['⚠️ Açık borç','#d97706']);
+      if (daysSince!==null && daysSince>60) risks.push(['💤 '+daysSince+'g hareketsiz','#64748b']);
+      if (prods.length===0) risks.push(['📦 Ürün yok','#64748b']);
+      if (offTotal>=5 && accRate<25) risks.push(['📉 Düşük kabul %'+accRate,'#dc2626']);
+      // v5.57: 6 aylık gelir trendi
+      var months=[]; var d0=new Date(); for(var i=5;i>=0;i--){ var dd=new Date(d0.getFullYear(),d0.getMonth()-i,1); months.push({y:dd.getFullYear(),m:dd.getMonth(),label:('0'+(dd.getMonth()+1)).slice(-2),val:0}); }
+      function addToMonth(ts,amt){ if(!ts)return; var dt=new Date(ts*1000); for(var j=0;j<months.length;j++){ if(months[j].y===dt.getFullYear()&&months[j].m===dt.getMonth()){ months[j].val+=amt; break; } } }
+      paidCh.forEach(function(c){ addToMonth(c.createdAt?.seconds||c.paidAt?.seconds, c.amount||0); });
+      subs.filter(function(h){return h.status==='paid';}).forEach(function(h){ addToMonth(h.createdAt?.seconds, h.amount||0); });
+      var maxM=Math.max.apply(null,months.map(function(x){return x.val;}).concat([1]));
+      var trendBars = months.map(function(x){ var h=Math.round((x.val/maxM)*36)+2; return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:100%;background:'+(x.val>0?'#16a34a':'rgba(15,23,42,.10)')+';height:'+h+'px;border-radius:3px" title="₺'+x.val.toLocaleString('tr-TR')+'"></div><div style="font-size:9px;color:var(--text-muted)">'+x.label+'</div></div>'; }).join('');
+
       host.innerHTML =
         '<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">'
         + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">💰 Kazancımız (PoCHub geliri)</div>'
@@ -28092,19 +28117,47 @@ async function loadUserDetailExtras(u, host) {
         +   card('Teklif (kabul)', offAcc+'/'+offTotal+' · %'+accRate,'#d97706')
         + '</div>'
         + (activeFeat?'<div style="font-size:11px;color:#7c3aed;margin-top:8px">📢 '+activeFeat+' aktif öne çıkan yerleşim</div>':'')
+        + (risks.length?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+risks.map(function(r){return '<span style="font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:10px;background:'+r[1]+'18;color:'+r[1]+'">'+r[0]+'</span>';}).join('')+'</div>':'')
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:10px">⏱ Son aktivite: <b style="color:var(--text)">'+lastActStr+'</b></div>'
+        + '<div style="font-size:12px;font-weight:700;margin:12px 0 6px">📈 Son 6 Ay Gelir</div>'
+        + '<div style="display:flex;align-items:flex-end;gap:5px;height:48px">'+trendBars+'</div>'
+        + (openBal>0?'<button id="ux-cleardebt" class="btn-g" style="width:100%;margin-top:12px;color:#dc2626;border-color:rgba(220,38,38,.3)">💳 Borçları Sıfırla (₺'+openBal.toLocaleString('tr-TR')+')</button>':'')
         + '</div>';
+
+      var cd = host.querySelector('#ux-cleardebt');
+      if (cd) cd.onclick = async function(){
+        if (!confirm('Bu vendor\'ın TÜM açık borçları (₺'+openBal.toLocaleString('tr-TR')+') kapatılacak (paid) ve hesap askıdaysa açılacak. Emin misin?')) return;
+        cd.disabled=true; cd.textContent='⏳ İşleniyor...';
+        try {
+          var chSnap = await getDocs(query(collection(db,'poc_charges'), where('vendorId','==',u.id), where('status','in',['pending_invoice','invoiced'])));
+          for (const ch of chSnap.docs) { await updateDoc(ch.ref, { status:'paid', paidAt:serverTimestamp(), adminCleared: CUR_PROFILE?.displayName||CUR_USER.email }); }
+          await setDoc(doc(db,'vendor_billing',u.id), { vendorId:u.id, unpaidBalance:0, unpaidPocCount:0, isSuspended:false, updatedAt:serverTimestamp() }, { merge:true });
+          showToast('Borçlar sıfırlandı.');
+          loadUserDetailExtras(u, host);
+        } catch(e){ showToast('Hata: '+e.message,'err'); cd.disabled=false; cd.textContent='💳 Borçları Sıfırla'; }
+      };
     } else if (u.role === 'customer') {
       var C = await Promise.all([
         getDocs(query(collection(db,'poc_requests'), where('customerId','==',u.id))).catch(function(){return {docs:[]};}),
         getDocs(query(collection(db,'demo_requests'), where('customerId','==',u.id))).catch(function(){return {docs:[]};}),
       ]);
+      var pocDocsC = C[0].docs.map(function(d){return d.data();});
+      var byStatus = {};
+      pocDocsC.forEach(function(r){ var s=r.status||'?'; byStatus[s]=(byStatus[s]||0)+1; });
+      var statusLabelsC={pending:'Bekleyen',active:'Aktif',accepted:'Kabul',completed:'Tamamlanan',cancelled:'İptal',rejected:'Red'};
+      var statusLine = Object.keys(byStatus).map(function(k){ return (statusLabelsC[k]||k)+': '+byStatus[k]; }).join(' · ');
+      var lastTsC = Math.max.apply(null, pocDocsC.map(function(r){return r.createdAt?.seconds||0;}).concat([0]));
+      var lastC = lastTsC? (Math.floor((Date.now()-lastTsC*1000)/86400000)+' gün önce'):'—';
       host.innerHTML =
         '<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">'
         + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">📊 Aktivite</div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-        +   card('PoC Talebi', String(C[0].docs.length),'#7c3aed')
+        +   card('PoC Talebi', String(pocDocsC.length),'#7c3aed')
         +   card('Demo Talebi', String(C[1].docs.length),'#2563eb')
-        + '</div></div>';
+        + '</div>'
+        + (statusLine?'<div style="font-size:11px;color:var(--text-muted);margin-top:8px">PoC durumları: '+statusLine+'</div>':'')
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">⏱ Son talep: <b style="color:var(--text)">'+lastC+'</b></div>'
+        + '</div>';
     } else {
       host.innerHTML = '';
     }
