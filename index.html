@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.68 | pochub.co -->
+<!-- PoCHub v5.69 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.68';
+const VERSION = 'v5.69';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.69': ['KARSILASTIRMA Gartner seviyesine cikarildi (adim 1): openCompareModal yeniden yazildi — tam-genislik (96vw), YAPISKAN kolon basliklari + yapiskan ilk sutun (oznitelik adi), oznitelikler GRUPLU (Genel + kategoriye ozel teknik gruplar f.group ile), SADECE FARKLARI GOSTER anahtari (ayni degerli satirlari gizler), Puan satirinda EN IYI urun yesil vurgulu, kolon basliginda urun puani + PoC butonu + Urun sayfasi linki (productUrl). PAYLASILABILIR baglanti: Baglantiyi kopyala → ?compare=id1,id2#catalog; katalog acilisinda bu parametre varsa karsilastirma otomatik acilir (deep-link). UI — rules degismedi.'],
   'v5.68': ['FILTRE & TAKSONOMI YONETIM MERKEZI (adim 3): admin artik Katalog ve Etkinlikler facet gruplarinin GORUNURLUGUNU + SIRASINI yonetebiliyor. Sistem Ayarlari > "🎛 Filtre Yonetimi" + openFilterManagerModal (her grup icin ↑/↓ sira + Gorunur anahtari; Varsayilan). pochub_config/system.filters = {catalog:[{key,on}], events:[{key,on}]}. ensureTaxonomy ayni dokumandan filtre yerlesimini de yukler (applyFilterLayout). Katalog sidebar orderFacetList(CAT_FACETS,...) ile siralanir/gizlenir; sektor kapaliysa kesif seridi de gizlenir; gizli grup filtreleri temizlenir. Etkinlik sidebar ayni mantik (kategori kapaliysa rail gizli). Liste icerikleri (sektor/dagitim/lisans) Taksonomi bolumunden yonetilir. config write admin/read public — RULES degismedi.'],
   'v5.67': ['KRITIK DUZELTME — urun duzenleme veri kaybi: Urunlerim>Duzenle cagrisinda catFieldsData=null ve supportModel=\'\' geciliyordu; form bos aciliyor, kaydedilince catFields BOS uzerine yaziliyordu. Cagri artik p.catFields/p.supportModel/p.productUrl geciyor — mevcut teknik alanlar dolu gelir. (Not: daha once bos kaydedilmis urunlerde alanlarin bir kez yeniden girilmesi gerekir.) URUN DETAYI: catFields artik alan GRUPLARINA gore (Performans/VPN/Donanim...) ve sema sirasinda, kaydedilen TUM ozellikleri gosterir; sema disi eski alanlar Diger altinda. URUN URL: add+edit formuna Ureticinin Urun Sayfasi (URL) alani; urun detayinda guvenli (http/https) link butonu. products owner-update zaten serbest oldugundan RULES degismedi.'],
   'v5.66': ['KATALOG dinamik filtre DUZELTME: dinamik kategori-facetleri ve kategori-bilincli karsilastirma artik formla AYNI cozucu olan getCatFields() kullaniyor (dogrudan CATEGORY_FIELDS[ad] yerine — Turkce normalize + Diger fallback). Boylece adi tam eslesmeyen kategoriler (orn. Guvenlik→Guvenlik) ve tum 35 kategori dogru cozulur; formda hangi alanlar girildiyse facet de onlari kullanir. Sidebar seffafligi: tek kategori seciliyken teknik alanlar urunlerde bos ise sessiz kalmak yerine bilgi notu; hicbiri secili degilse ipucu. Not: dinamik facet sadece type=select alanlar icin ve en az bir urunde o alan dolu ise gorunur. UI — rules degismedi.'],
@@ -7215,6 +7216,8 @@ async function renderCatalog() {
 
   el('cat-search').addEventListener('input', function(){ loadCatalog(); });
 
+  try { var _cmp = new URLSearchParams(location.search).get('compare'); window._pendingCompare = _cmp ? _cmp.split(',').filter(Boolean) : null; } catch(e){ window._pendingCompare = null; }
+
   getCategories().then(function(cats){
     setCategoryFacetOptions(cats);
     readCatalogURL();
@@ -7239,6 +7242,11 @@ async function loadCatalog() {
     if (search) prods = prods.filter(p => p.name?.toLowerCase().includes(search)||p.vendorName?.toLowerCase().includes(search)||p.category?.toLowerCase().includes(search));
     var allBase = prods.slice();
     allBase.forEach(function(p){ CAT_PROD_MAP[p.id]=p; }); // karşılaştırma çözümü için
+    if (window._pendingCompare && window._pendingCompare.length>=2) {
+      var _pc = window._pendingCompare.filter(function(id){ return CAT_PROD_MAP[id]; });
+      window._pendingCompare = null;
+      if (_pc.length>=2) { _pc.forEach(function(id){ CAT_COMPARE.add(id); }); setTimeout(function(){ openCompareModal(_pc); }, 60); }
+    }
     try { await preloadVendorBadges([...new Set(allBase.map(function(p){return p.vendorId;}).filter(Boolean))]); } catch(e){}
     updateCatalogFacetsAndChips(allBase);
     syncCatalogURL();
@@ -7390,47 +7398,100 @@ function openCompareModal(ids){
   function depL(p){ var d=normalizeDeployment(p); return (CAT_FACET_LABEL.deployment&&CAT_FACET_LABEL.deployment[d])||'—'; }
   function licL(p){ var l=normalizeLicense(p); return (CAT_FACET_LABEL.license&&CAT_FACET_LABEL.license[l])||'—'; }
   function secL(p){ var s=(p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]); return s.length?s.map(function(x){return SECTOR_LABEL[x]||x;}).join(', '):'—'; }
-  var rows = [
+  function verified(p){ return (window._vendorBadgeCache&&window._vendorBadgeCache[p.vendorId]&&window._vendorBadgeCache[p.vendorId].vendorStatus==='admin_verified')?'✓ Evet':'—'; }
+  var groups = [{ title:'Genel', rows:[
     ['Kategori', function(p){return p.category||'—';}],
     ['Sektörler', secL],
     ['Dağıtım', depL],
     ['Lisans', licL],
     ['Köken', function(p){return p.origin==='domestic'?'🇹🇷 Yerli':p.origin==='foreign'?'🌍 Yabancı':'—';}],
-    ['Doğrulanmış', function(p){return (window._vendorBadgeCache&&window._vendorBadgeCache[p.vendorId]&&window._vendorBadgeCache[p.vendorId].vendorStatus==='admin_verified')?'✓ Evet':'—';}],
-    ['Puan', function(p){return p.avgRating?('⭐ '+p.avgRating.toFixed(1)+' ('+(p.ratingCount||0)+')'):'—';}],
+    ['Doğrulanmış', verified],
+    ['Puan', function(p){return p.avgRating?('⭐ '+p.avgRating.toFixed(1)+' ('+(p.ratingCount||0)+')'):'—';}, {best:'rating'}],
     ['Destek', function(p){return p.supportModel||(p.catFields&&p.catFields.support_model)||'—';}],
-    ['Açıklama', function(p){return p.description?(p.description.length>160?p.description.slice(0,160)+'…':p.description):'—';}],
-  ];
-  // Kategori-bilinçli: karşılaştırılan ürünler aynı kategorideyse o kategorinin alanlarını satır olarak ekle
+    ['Açıklama', function(p){return p.description?(p.description.length>140?p.description.slice(0,140)+'…':p.description):'—';}],
+  ]}];
   (function(){
-    var catsSet = {}; prods.forEach(function(p){ if(p.category) catsSet[p.category]=1; });
-    var catKeys = Object.keys(catsSet);
-    if (catKeys.length!==1) return;
+    var catsSet={}; prods.forEach(function(p){ if(p.category) catsSet[p.category]=1; });
+    var catKeys=Object.keys(catsSet); if(catKeys.length!==1) return;
     var defs = (typeof getCatFields==='function') ? getCatFields(catKeys[0]) : ((typeof CATEGORY_FIELDS!=='undefined') && CATEGORY_FIELDS[catKeys[0]]);
-    if (!defs || !defs.length) return;
+    if(!defs||!defs.length) return;
+    var byG={}, order=[];
     defs.forEach(function(fd){
-      // en az bir üründe değeri olan alanları göster
-      var any = prods.some(function(p){ return p.catFields && p.catFields[fd.id]!==undefined && p.catFields[fd.id]!==''; });
-      if (!any) return;
-      rows.push([fd.label, (function(fid){ return function(p){ var v=p.catFields && p.catFields[fid]; return (v!==undefined&&v!=='')?v:'—'; }; })(fd.id)]);
+      var any=prods.some(function(p){ return p.catFields && p.catFields[fd.id]!==undefined && p.catFields[fd.id]!==''; });
+      if(!any) return;
+      var g=fd.group||'Teknik'; if(!byG[g]){byG[g]=[];order.push(g);}
+      byG[g].push([fd.label, (function(fid){ return function(p){ var v=p.catFields&&p.catFields[fid]; return (v!==undefined&&v!=='')?v:'—'; }; })(fd.id)]);
     });
+    order.forEach(function(g){ groups.push({title:g, rows:byG[g]}); });
   })();
+
+  var diffOnly=false, ncols=prods.length;
+  function ratingBestIdx(){ var max=-1,idx=-1; prods.forEach(function(p,i){ var r=p.avgRating||0; if(r>max){max=r;idx=i;} }); return max>0?idx:-1; }
+  function buildHead(){
+    return '<th style="text-align:left;padding:10px;font-size:11px;color:var(--text-muted);width:140px;position:sticky;left:0;background:var(--bg-surface);z-index:2"></th>'
+      + prods.map(function(p){
+        var purl=(p.productUrl||'').trim();
+        var link = /^https?:\/\//i.test(purl) ? '<a href="'+purl.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener noreferrer" style="display:block;margin-top:4px;font-size:10.5px;color:#2563eb;text-decoration:none">🔗 Ürün sayfası</a>' : '';
+        return '<th style="padding:10px;text-align:left;vertical-align:top;border-left:1px solid var(--border);min-width:160px">'
+          + '<div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px">'+(p.name||'')+'</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);font-weight:500">'+(p.vendorName||'')+'</div>'
+          + (p.avgRating?'<div style="font-size:11px;color:#f59e0b;font-weight:700;margin-top:2px">⭐ '+p.avgRating.toFixed(1)+'</div>':'')
+          + '<button class="cmp-poc" data-id="'+p.id+'" style="margin-top:6px;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">PoC →</button>'
+          + link
+          + '</th>';
+      }).join('');
+  }
+  function buildBody(){
+    var html='';
+    groups.forEach(function(grp){
+      var visRows = grp.rows.filter(function(r){
+        if(!diffOnly) return true;
+        var vals=prods.map(r[1]); return !vals.every(function(v){return v===vals[0];});
+      });
+      if(!visRows.length) return;
+      html += '<tr><td colspan="'+(ncols+1)+'" style="padding:12px 10px 5px;font-size:10.5px;font-weight:800;letter-spacing:.4px;color:#2563eb;text-transform:uppercase;position:sticky;left:0;background:var(--bg-surface)">'+grp.title+'</td></tr>';
+      visRows.forEach(function(r){
+        var vals=prods.map(r[1]);
+        var same=vals.every(function(v){return v===vals[0];});
+        var bestIdx=(r[2]&&r[2].best==='rating')?ratingBestIdx():-1;
+        html += '<tr><td style="padding:9px 10px;font-size:11.5px;font-weight:700;color:var(--text-secondary);position:sticky;left:0;background:var(--bg-surface);border-top:1px solid var(--border)">'+r[0]+'</td>'
+          + vals.map(function(v,i){
+              var hl=(i===bestIdx)?';background:rgba(16,163,74,.10);color:#16a34a;font-weight:700':'';
+              return '<td style="padding:9px 10px;font-size:12px;color:var(--text);border-left:1px solid var(--border);border-top:1px solid var(--border);vertical-align:top'+hl+'">'+v+'</td>';
+            }).join('')
+          + '</tr>';
+      });
+    });
+    return html;
+  }
   var modal=document.createElement('div'); modal.className='modal-overlay';
-  var head = '<th style="text-align:left;padding:10px;font-size:11px;color:var(--text-muted);width:118px"></th>'+prods.map(function(p){ return '<th style="padding:10px;text-align:left;vertical-align:top;border-left:1px solid var(--border)"><div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px">'+(p.name||'')+'</div><div style="font-size:11px;color:var(--text-muted);font-weight:500">'+(p.vendorName||'')+'</div><button class="cmp-poc" data-id="'+p.id+'" style="margin-top:6px;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">PoC →</button></th>'; }).join('');
-  var body = rows.map(function(r,i){ return '<tr style="background:'+(i%2?'transparent':'var(--bg-elevated)')+'"><td style="padding:9px 10px;font-size:11.5px;font-weight:700;color:var(--text-secondary)">'+r[0]+'</td>'+prods.map(function(p){ return '<td style="padding:9px 10px;font-size:12px;color:var(--text);border-left:1px solid var(--border);vertical-align:top">'+r[1](p)+'</td>'; }).join('')+'</tr>'; }).join('');
-  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:920px;width:100%;max-height:88vh;overflow:auto;padding:20px;position:relative">'
-    + '<button id="cmp-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
-    + '<div style="font-size:17px;font-weight:800;margin-bottom:14px">⚖ Ürün Karşılaştırma <span style="font-size:12px;font-weight:500;color:var(--text-muted)">('+prods.length+' ürün)</span></div>'
-    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:480px"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:1080px;width:96vw;max-height:90vh;display:flex;flex-direction:column;padding:0;position:relative">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap">'
+    +   '<div style="font-size:17px;font-weight:800">⚖ Ürün Karşılaştırma <span style="font-size:12px;font-weight:500;color:var(--text-muted)">('+prods.length+' ürün)</span></div>'
+    +   '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+    +     '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer"><input type="checkbox" id="cmp-diff"> Sadece farkları göster</label>'
+    +     '<button id="cmp-copy" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--text-secondary)">🔗 Bağlantıyı kopyala</button>'
+    +     '<button id="cmp-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="overflow:auto;flex:1"><table style="width:100%;border-collapse:collapse;min-width:'+(160+ncols*160)+'px"><thead><tr id="cmp-head" style="position:sticky;top:0;background:var(--bg-surface);z-index:3"></tr></thead><tbody id="cmp-body"></tbody></table></div>'
     + '</div>';
   document.body.appendChild(modal);
-  modal.querySelector('#cmp-close').addEventListener('click', function(){ modal.remove(); });
-  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  modal.querySelector('#cmp-head').innerHTML = buildHead();
   modal.querySelectorAll('.cmp-poc').forEach(function(b){ b.addEventListener('click', function(){
     if (!CUR_USER) { openAuthModal('customer',''); return; }
     if (CUR_PROFILE?.role === 'vendor') { showToast('PoC talebi müşteri hesabıyla oluşturulur.','err'); return; }
     modal.remove(); openMultiVendorPocModal(b.dataset.id);
   }); });
+  function refresh(){ modal.querySelector('#cmp-body').innerHTML = buildBody(); }
+  refresh();
+  modal.querySelector('#cmp-diff').addEventListener('change', function(){ diffOnly=this.checked; refresh(); });
+  modal.querySelector('#cmp-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  modal.querySelector('#cmp-copy').addEventListener('click', function(){
+    var url = location.origin + location.pathname + '?compare=' + prods.map(function(p){return p.id;}).join(',') + '#catalog';
+    try { navigator.clipboard.writeText(url); showToast('Karşılaştırma bağlantısı kopyalandı.'); } catch(e){ showToast(url); }
+  });
 }
 
 /* ═══════════════════════════════════════════
