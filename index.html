@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.64 | pochub.co -->
+<!-- PoCHub v5.65 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.64';
+const VERSION = 'v5.65';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.65': ['ETKINLIKLER kesif tasarimi (Katalog 2.0 dili uyarlandi, karsilastirma YOK): sol kalici facet sidebar + KATEGORIYE GORE kesif seridi + sonuc basligi (etkinlik sayaci + siralama: Tarihe Yakin/Uzak, Yeni, Doluluk + GRID/LISTE gorunum) + aktif filtre chipleri + akilli bos-sonuc. Donem cubugu (Yaklasan/Bu Ay/...) zamansal eksen olarak korundu. Etkinlige ozel paralel facet motoru (EV_FILTERS/evFacets/evFacetFiltered — katalog motoruna dokunulmadi): Kategori (getCategories), Format (Online/Fiziksel/Hibrit), Dil (POC_LANGUAGES), Ucret (Ucretsiz/Ucretli); ici-OR/gruplar-AND, capraz sayim. Eski inline secimler (ev-cat/format/lang/free) kaldirildi. Kart tiklamasi → etkinlik detay; Kayit butonu korundu. UI — rules degismedi.'],
   'v5.64': ['KATALOG dinamik (baglama-duyarli) filtre: kullanici TEK kategori sectiginde, o kategorinin CATEGORY_FIELDS icindeki select-tipi alanlari sol sidebarda standart facetlerin altinda DINAMIK facet gruplari olarak acilir (rebuildDynamicFacets + allFacets; key cf:<fieldId>). Ornek: Firewall secince SSL Inceleme/ZTNA/Form Faktoru/HA Modu/Lisans Modeli; Yedekleme secince kendi alanlari. Canli capraz sayim, chip, URL deep-link (cf:* parametreleri), Temizle hepsini kapsar. Kategori degisince dinamik secimler sifirlanir; ipucu metni (tek kategori sec → ozel filtreler). KARSILASTIRMA da kategori-bilincli: ayni kategorideki urunlerde o kategorinin alanlari otomatik satir olur. UI — rules degismedi.'],
   'v5.63': ['KATALOG 2.0 (Faz B+C+Lisans) — kataloğu çok yönlü keşif ortamına dönüştüren büyük yeniden kurgu. YENI DUZEN: sol kalıcı facet kenar çubuğu (sticky) + üstte SEKTOR KESIF SERIDI (Faz B: sektör kutucukları + çözüm sayıları, tıkla-filtrele) + sonuç başlığı (canlı çözüm sayacı + sıralama + GRID/LISTE gorunum gecisi). FACET GRUPLARI 7ye cikti: Kategori (cok-secim, getCategories\'ten), Sektor, Dagitim, LISANS (yeni — normalizeLicense + TAXONOMY_DEFAULTS.licenses match anahtarlari), Koken, Dogrulama, Puan (4+/3+). Ici-OR/gruplar-AND, capraz sayaclar, chip + URL deep-link (q/sort/view + tum gruplar). KARSILASTIRMA (Faz C): kart/satir secimi (CAT_COMPARE, filtreler arasi kalici) + sticky aksiyon bari (N secili → Karsilastir[≥2] + PoC Baslat) → openCompareModal yan-yana tablo (Kategori/Sektorler/Dagitim/Lisans/Koken/Dogrulanmis/Puan/Destek/Aciklama, kolon basligi PoC butonu). LISTE gorunumu + grid. AKILLI BOS-SONUC: filtre gevsetme/sifirlama. Admin Taksonomi Editorune LISANS bolumu eklendi (sektor+dagitim+lisans). config read public — RULES degismedi.'],
   'v5.62': ['KATALOG Faz A3b (taksonomi admin-yonetilir): sektor ve dagitim listeleri artik HARDCODE degil — pochub_config/system.taxonomy\'den okunur, kod yalniz varsayilan/seed (TAXONOMY_DEFAULTS). applyTaxonomy yerinde mutasyonla SECTORS/TAX_DEPLOYMENTS/CAT_FACETS gunceller; ensureTaxonomy bir kez yukler (boot fire-and-forget + renderCatalog/openAddProductModal/admSettings await). normalizeDeployment artik config match anahtarlarini kullanir. Sistem Ayarlari > "🏷 Taksonomi" bolumu + Taksonomi Editoru modali (sektor/dagitim ekle-duzenle-sil, dagitim match kelimeleri, Varsayilana Don). Kayit setDoc merge taxonomy. config write admin / read public oldugundan RULES degismedi. Faz A tamam.'],
@@ -6570,66 +6571,151 @@ async function loadFeaturedProducts() {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ETKİNLİK KEŞİF — Katalog 2.0 dili (etkinliğe özel, karşılaştırma yok)
+// ════════════════════════════════════════════════════════════════════
+var EV_FILTERS = { category:[], format:[], language:[], fee:[] };
+var EV_SORT = 'date_asc';
+var EV_VIEW = 'list';
+var EV_CAT_OPTS = [];
+function setEvCategoryOptions(cats){ EV_CAT_OPTS.length=0; (cats||[]).forEach(function(c){ var n=(c&&c.name)||c; if(n) EV_CAT_OPTS.push([n,n]); }); }
+function evFacets(){ return [
+  { key:'category', label:'Kategori', options:EV_CAT_OPTS, get:function(e){ return e.category?[e.category]:[]; } },
+  { key:'format', label:'Format', options:[['online','💻 Online'],['onsite','🏢 Fiziksel'],['hybrid','🔀 Hibrit']], get:function(e){ return [e.format||'online']; } },
+  { key:'language', label:'Dil', options:(typeof POC_LANGUAGES!=='undefined'?POC_LANGUAGES:[]).map(function(l){ return [l.code, l.flag+' '+l.name]; }), get:function(e){ return e.language?[e.language]:[]; } },
+  { key:'fee', label:'Ücret', options:[['free','🎁 Ücretsiz'],['paid','💳 Ücretli']], get:function(e){ return [(e.fee>0?'paid':'free')]; } },
+]; }
+function anyEvFacet(){ return evFacets().some(function(f){ return (EV_FILTERS[f.key]||[]).length; }); }
+function evFacetFiltered(list, exceptKey){ return list.filter(function(e){ return evFacets().every(function(f){ if(f.key===exceptKey) return true; var sel=EV_FILTERS[f.key]||[]; if(!sel.length) return true; return f.get(e).some(function(v){ return sel.indexOf(v)>=0; }); }); }); }
+function toggleEvFacet(k,v){ var a=EV_FILTERS[k]; if(!a) return; var i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); loadEventsList(); }
+function clearEvFilter(kind,val){ if(kind==='search'){ var s=el('ev-search'); if(s)s.value=''; } else if(kind==='all'){ var s2=el('ev-search'); if(s2)s2.value=''; Object.keys(EV_FILTERS).forEach(function(k){ EV_FILTERS[k]=[]; }); } else if(EV_FILTERS[kind]){ var i=EV_FILTERS[kind].indexOf(val); if(i>=0) EV_FILTERS[kind].splice(i,1); } loadEventsList(); }
+function evFacetLabel(key,v){ var f=evFacets().filter(function(x){return x.key===key;})[0]; if(!f) return v; var o=f.options.filter(function(x){return x[0]===v;})[0]; return o?o[1]:v; }
+function updateEventFacets(base){
+  var rail=el('ev-rail'), sb=el('ev-sidebar'), ch=el('ev-chips');
+  if (rail) {
+    var catF = evFacets()[0];
+    var fb = evFacetFiltered(base,'category');
+    var cnt={}; fb.forEach(function(e){ catF.get(e).forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
+    var tiles = catF.options.filter(function(o){ return cnt[o[0]]; }).sort(function(a,b){return (cnt[b[0]]||0)-(cnt[a[0]]||0);}).map(function(o){
+      var on = EV_FILTERS.category.indexOf(o[0])>=0;
+      return '<button class="ev-rail-tile" data-cat="'+String(o[0]).replace(/"/g,'&quot;')+'" style="flex-shrink:0;display:flex;flex-direction:column;gap:2px;min-width:104px;padding:10px 12px;border-radius:12px;cursor:pointer;border:1.5px solid '+(on?'#2563eb':'var(--border)')+';background:'+(on?'rgba(37,99,235,.08)':'var(--bg-surface)')+';text-align:left"><span style="font-size:13px;font-weight:700;color:var(--text)">'+o[1]+'</span><span style="font-size:11px;color:var(--text-muted)">'+(cnt[o[0]]||0)+' etkinlik</span></button>';
+    }).join('');
+    rail.innerHTML = tiles ? '<div style="font-size:12.5px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">🧭 Kategoriye göre keşfet</div><div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">'+tiles+'</div>' : '';
+    rail.querySelectorAll('.ev-rail-tile').forEach(function(b){ b.addEventListener('click', function(){ toggleEvFacet('category', b.dataset.cat); }); });
+  }
+  if (sb) {
+    var groups = evFacets().map(function(f){
+      var fbg = evFacetFiltered(base, f.key);
+      var cnt={}; fbg.forEach(function(e){ f.get(e).forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
+      var sel = EV_FILTERS[f.key]||[];
+      var opts = f.options.filter(function(o){ return cnt[o[0]] || sel.indexOf(o[0])>=0; });
+      if (!opts.length) return '';
+      var rows = opts.map(function(o){
+        var on = sel.indexOf(o[0])>=0;
+        return '<button class="ev-facet-pill" data-fk="'+f.key+'" data-fv="'+String(o[0]).replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;text-align:left;font-size:12px;font-weight:'+(on?'700':'500')+';padding:5px 9px;border-radius:8px;cursor:pointer;border:1px solid '+(on?'#2563eb':'transparent')+';background:'+(on?'rgba(37,99,235,.08)':'transparent')+';color:'+(on?'#2563eb':'var(--text-secondary)')+'"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(on?'✓ ':'')+o[1]+'</span><span style="font-size:11px;color:var(--text-muted);flex-shrink:0">'+(cnt[o[0]]||0)+'</span></button>';
+      }).join('');
+      return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">'+f.label+'</div><div style="display:flex;flex-direction:column;gap:2px">'+rows+'</div></div>';
+    }).filter(Boolean).join('');
+    var anyF = anyEvFacet() || (el('ev-search')?.value||'');
+    sb.innerHTML = '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:14px;position:sticky;top:14px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:13px;font-weight:800">Filtreler</span>'+(anyF?'<button class="ev-clear-all" style="font-size:11px;font-weight:600;color:#dc2626;background:none;border:none;cursor:pointer">Temizle</button>':'')+'</div>'
+      + (groups || '<span class="t-muted" style="font-size:12px">Filtre için veri yok</span>')
+      + '</div>';
+    sb.querySelectorAll('.ev-facet-pill').forEach(function(b){ b.addEventListener('click', function(){ toggleEvFacet(b.dataset.fk, b.dataset.fv); }); });
+    var ca=sb.querySelector('.ev-clear-all'); if(ca) ca.addEventListener('click', function(){ clearEvFilter('all'); });
+  }
+  if (ch) {
+    var chips=[];
+    var q=el('ev-search')?.value||''; if(q) chips.push(['search','','🔍 "'+q+'"']);
+    evFacets().forEach(function(f){ (EV_FILTERS[f.key]||[]).forEach(function(v){ chips.push([f.key,v,evFacetLabel(f.key,v)]); }); });
+    if(!chips.length){ ch.innerHTML=''; return; }
+    ch.innerHTML='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+      + chips.map(function(c){ return '<span class="ev-chip" data-kind="'+c[0]+'" data-val="'+String(c[1]).replace(/"/g,'&quot;')+'" style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 6px 3px 10px;border-radius:14px;background:rgba(37,99,235,.10);color:#2563eb;cursor:pointer">'+c[2]+' <span style="font-size:14px;line-height:1">×</span></span>'; }).join('')
+      + '<button class="ev-clear-all" style="font-size:11.5px;font-weight:600;color:var(--text-muted);background:none;border:none;cursor:pointer;text-decoration:underline">Tümünü temizle</button>'
+      + '</div>';
+    ch.querySelectorAll('.ev-chip').forEach(function(b){ b.addEventListener('click', function(){ clearEvFilter(b.dataset.kind,b.dataset.val); }); });
+    var ca2=ch.querySelector('.ev-clear-all'); if(ca2) ca2.addEventListener('click', function(){ clearEvFilter('all'); });
+  }
+}
+function evCardList(e){
+  var date = e.eventDate?.toDate ? e.eventDate.toDate().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '—';
+  var spots = (e.capacity||0) - (e.registeredCount||0);
+  var feeBg = e.fee>0?'rgba(37,99,235,.12)':'rgba(22,163,74,.12)'; var feeCol=e.fee>0?'#2563eb':'#16a34a'; var feeLabel=e.fee>0?('₺'+e.fee):'Ücretsiz';
+  return '<div class="card ev-card" data-id="'+e.id+'" style="margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;cursor:pointer">'
+    + '<div><div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'
+    + '<span class="bdg" style="background:var(--bg-elevated);color:#475569;font-weight:600">'+(e.category||'—')+'</span>'
+    + '<span class="bdg" style="background:rgba(37,99,235,.12);color:#2563eb;font-weight:600">'+evFacetLabel('format',e.format||'online')+'</span>'
+    + '<span class="bdg" style="background:'+feeBg+';color:'+feeCol+';font-weight:600">'+feeLabel+'</span>'
+    + (e.language?'<span class="bdg" style="background:rgba(168,85,247,.12);color:#a855f7;font-weight:600">'+langLabel(e.language)+'</span>':'')
+    + '</div>'
+    + '<div style="font-size:15px;font-weight:700;margin-bottom:5px;color:#0f172a">'+escHtml(cleanTitle(e.title))+'</div>'
+    + '<div style="font-size:12.5px;color:#475569;margin-bottom:5px">'+(e.vendorName||'—')+' · '+(e.productName||'—')+'</div>'
+    + '<div style="font-size:12px;color:#64748b">📅 '+date+(e.location?' · 📍 '+e.location:'')+'</div>'
+    + (e.description?'<p style="font-size:12.5px;color:#64748b;margin-top:8px;line-height:1.6">'+e.description+'</p>':'')
+    + '</div>'
+    + '<div style="text-align:right;flex-shrink:0">'
+    + '<div style="font-size:12px;color:'+(spots<=0?'#dc2626':spots<=5?'#d97706':'#16a34a')+';margin-bottom:8px;font-weight:700">'+(spots<=0?'Dolu':spots+' yer kaldı')+'</div>'
+    + '<div style="background:var(--bg-elevated);border-radius:5px;height:4px;width:100px;margin-left:auto;margin-bottom:10px"><div style="background:#2563eb;height:100%;width:'+Math.min(100,((e.registeredCount||0)/(e.capacity||1))*100)+'%;border-radius:5px"></div></div>'
+    + '<button class="btn-p btn-sm ev-reg-btn" data-id="'+e.id+'" data-title="'+escHtml(e.title||'')+'" data-vendor-email="'+(e.vendorEmail||'')+'" data-vendor-name="'+escHtml(e.vendorName||'')+'">'+(CUR_USER?'Kayıt Ol':'Giriş Yap & Kayıt Ol')+'</button>'
+    + '</div></div>';
+}
+function evCardGrid(e){
+  var date = e.eventDate?.toDate ? e.eventDate.toDate().toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'}) : '—';
+  var spots = (e.capacity||0) - (e.registeredCount||0);
+  var feeBg = e.fee>0?'rgba(37,99,235,.12)':'rgba(22,163,74,.12)'; var feeCol=e.fee>0?'#2563eb':'#16a34a'; var feeLabel=e.fee>0?('₺'+e.fee):'Ücretsiz';
+  return '<div class="card ev-card" data-id="'+e.id+'" style="display:flex;flex-direction:column;cursor:pointer">'
+    + '<div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">'
+    + '<span class="bdg" style="background:var(--bg-elevated);color:#475569;font-weight:600">'+(e.category||'—')+'</span>'
+    + '<span class="bdg" style="background:'+feeBg+';color:'+feeCol+';font-weight:600">'+feeLabel+'</span>'
+    + '</div>'
+    + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;flex:1">'+escHtml(cleanTitle(e.title))+'</div>'
+    + '<div style="font-size:11.5px;color:#64748b;margin-bottom:6px">📅 '+date+' · '+evFacetLabel('format',e.format||'online')+(e.language?' · '+langLabel(e.language):'')+'</div>'
+    + '<div style="font-size:11.5px;color:'+(spots<=0?'#dc2626':spots<=5?'#d97706':'#16a34a')+';font-weight:700;margin-bottom:8px">'+(spots<=0?'Dolu':spots+' yer kaldı')+'</div>'
+    + '<button class="btn-p btn-sm ev-reg-btn" data-id="'+e.id+'" data-title="'+escHtml(e.title||'')+'" data-vendor-email="'+(e.vendorEmail||'')+'" data-vendor-name="'+escHtml(e.vendorName||'')+'">'+(CUR_USER?'Kayıt Ol':'Kayıt')+'</button>'
+    + '</div>';
+}
+
 async function renderEvents() {
   const wrap = el('scr-events');
   wrap.innerHTML = `<div class="wrap">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <h2 style="font-size:20px;font-weight:700">Public PoC Etkinlikleri</h2>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+      <div>
+        <h2 style="font-size:21px;font-weight:800">Public PoC Etkinlikleri</h2>
+        <div style="font-size:12.5px;color:var(--text-secondary);margin-top:2px">Kategori · format · dil · ücret — keşfet, filtrele, kayıt ol</div>
+      </div>
       ${CUR_PROFILE?.role==='vendor' ? '<button class="btn-p btn-sm" id="new-event-btn">+ Etkinlik Oluştur</button>' : ''}
     </div>
-    <div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap" id="ev-period-bar">
+    <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap" id="ev-period-bar">
       <button class="${CUR_EV_PERIOD==='upcoming'?'btn-p':'btn-g'} btn-sm ev-period-btn fs12" data-period="upcoming">📅 Yaklaşan</button>
       <button class="${CUR_EV_PERIOD==='this_month'?'btn-p':'btn-g'} btn-sm ev-period-btn fs12" data-period="this_month">Bu Ay Geçenler</button>
       <button class="${CUR_EV_PERIOD==='last_month'?'btn-p':'btn-g'} btn-sm ev-period-btn fs12" data-period="last_month">Geçen Ay</button>
       <button class="${CUR_EV_PERIOD==='this_year'?'btn-p':'btn-g'} btn-sm ev-period-btn fs12" data-period="this_year">Bu Yıl Geçenler</button>
       <button class="${CUR_EV_PERIOD==='all'?'btn-p':'btn-g'} btn-sm ev-period-btn fs12" data-period="all">Tümü</button>
     </div>
-    <div style="display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap">
-      <input class="inp" id="ev-search" placeholder="Etkinlik veya ürün ara..." style="flex:1;min-width:180px">
-      <select class="inp" id="ev-cat" style="width:auto">
-        <option value="">Tüm Kategoriler</option>
-      </select>
-      <select class="inp" id="ev-format" style="width:auto">
-        <option value="">Tüm Formatlar</option>
-        <option value="online">Online</option><option value="onsite">Fiziksel</option><option value="hybrid">Hibrit</option>
-      </select>
-      <select class="inp" id="ev-lang-filter" style="width:auto">
-        <option value="">Tüm Diller</option>
-      </select>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary);cursor:pointer">
-        <input type="checkbox" id="ev-free"> Ücretsiz
-      </label>
+    <div id="ev-rail" style="margin-bottom:14px"></div>
+    <div style="margin-bottom:14px"><input class="inp" id="ev-search" placeholder="🔍 Etkinlik, ürün veya üretici ara..." style="width:100%"></div>
+    <div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
+      <aside id="ev-sidebar" style="width:240px;flex-shrink:0;min-width:200px"></aside>
+      <div style="flex:1;min-width:300px">
+        <div id="ev-chips" style="margin-bottom:10px"></div>
+        <div id="ev-results-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap"></div>
+        <div id="events-list"><div class="loading"><div class="spinner"></div>Etkinlikler yükleniyor...</div></div>
+      </div>
     </div>
-    <div id="events-list"><div class="loading"><div class="spinner"></div>Etkinlikler yükleniyor...</div></div>
   </div>`;
 
-  if (CUR_PROFILE?.role==='vendor') {
-    el('new-event-btn')?.addEventListener('click', () => openNewEventModal());
-  }
-  ['ev-search','ev-cat','ev-format','ev-lang-filter','ev-free'].forEach(id => {
-    el(id)?.addEventListener('change', loadEventsList);
-    el(id)?.addEventListener('input', loadEventsList);
-  });
-  getCategories().then(function(cats){
-    var sel=el('ev-cat');
-    if(sel) sel.innerHTML='<option value="">Tüm Kategoriler</option>'+cats.map(function(cat){return '<option value="'+cat.name+'">'+cat.name+'</option>';}).join('');
-    var sel2=el('ev-lang-filter');
-    if(sel2) sel2.innerHTML='<option value="">Tüm Diller</option>'+POC_LANGUAGES.map(function(l){return '<option value="'+l.code+'">'+l.flag+' '+l.name+'</option>';}).join('');
-  });
-  // Dönem filtresi butonları — scr-events üzerinden event delegation
+  if (CUR_PROFILE?.role==='vendor') el('new-event-btn')?.addEventListener('click', () => openNewEventModal());
+  el('ev-search')?.addEventListener('input', loadEventsList);
+  getCategories().then(function(cats){ setEvCategoryOptions(cats); loadEventsList(); }).catch(function(){ loadEventsList(); });
   el('scr-events')?.addEventListener('click', function(e) {
     var pb = e.target.closest('.ev-period-btn');
     if (pb) {
       CUR_EV_PERIOD = pb.dataset.period;
-      el('scr-events').querySelectorAll('.ev-period-btn').forEach(function(x){
-        x.className = 'btn-g btn-sm ev-period-btn';
-      });
-      pb.className = 'btn-p btn-sm ev-period-btn';
+      el('scr-events').querySelectorAll('.ev-period-btn').forEach(function(x){ x.className = 'btn-g btn-sm ev-period-btn fs12'; });
+      pb.className = 'btn-p btn-sm ev-period-btn fs12';
       loadEventsList();
     }
   });
-
-  loadEventsList();
 }
 
 /* ── ETKİNLİK DETAY MODAL ── */
@@ -6704,88 +6790,67 @@ async function loadEventsList() {
   if (!listEl) return;
   listEl.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
   try {
-    let q = query(collection(db,'public_events'), where('status','==','published'));
-    const snap = await getDocs(q);
-    let allDocs = snap.docs.map(d => ({...d.data(), id:d.id}))
-      .filter(e => getLifecycleState(e) === 'active');
-    // Dönem filtresi
+    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published')));
+    let allDocs = snap.docs.map(d => ({...d.data(), id:d.id})).filter(e => getLifecycleState(e) === 'active');
     var evPeriod = CUR_EV_PERIOD || 'upcoming';
-    var now2 = new Date();
-    var thisMonthStart = new Date(now2.getFullYear(), now2.getMonth(), 1);
-    var lastMonthStart = new Date(now2.getFullYear(), now2.getMonth()-1, 1);
-    var lastMonthEnd   = new Date(now2.getFullYear(), now2.getMonth(), 1);
-    var thisYearStart  = new Date(now2.getFullYear(), 0, 1);
-    var docs = allDocs.filter(function(e) {
-      var ed = e.eventDate?.toDate ? e.eventDate.toDate() : null;
-      if (!ed) return true;
-      if (evPeriod === 'upcoming')    return ed >= now2;
-      if (evPeriod === 'this_month')  return ed >= thisMonthStart && ed < now2;
-      if (evPeriod === 'last_month')  return ed >= lastMonthStart && ed < lastMonthEnd;
-      if (evPeriod === 'this_year')   return ed >= thisYearStart && ed < now2;
-      return true; // 'all'
+    var now2=new Date(),
+        tMS=new Date(now2.getFullYear(),now2.getMonth(),1),
+        lMS=new Date(now2.getFullYear(),now2.getMonth()-1,1),
+        lME=new Date(now2.getFullYear(),now2.getMonth(),1),
+        tYS=new Date(now2.getFullYear(),0,1);
+    var periodDocs = allDocs.filter(function(e){
+      var ed=e.eventDate?.toDate?e.eventDate.toDate():null; if(!ed) return true;
+      if(evPeriod==='upcoming')   return ed>=now2;
+      if(evPeriod==='this_month') return ed>=tMS&&ed<now2;
+      if(evPeriod==='last_month') return ed>=lMS&&ed<lME;
+      if(evPeriod==='this_year')  return ed>=tYS&&ed<now2;
+      return true;
     });
-    // Sırala
-    docs.sort((a,b) => (a.eventDate?.seconds||0) - (b.eventDate?.seconds||0));
+    var search = el('ev-search')?.value?.toLowerCase()||'';
+    if (search) periodDocs = periodDocs.filter(e => (e.title||'').toLowerCase().includes(search) || (e.productName||'').toLowerCase().includes(search) || (e.vendorName||'').toLowerCase().includes(search));
 
-    // Filtrele
-    const search = el('ev-search')?.value?.toLowerCase()||'';
-    const cat = el('ev-cat')?.value||'';
-    const format = el('ev-format')?.value||'';
-    const free = el('ev-free')?.checked||false;
-    if (search) docs = docs.filter(e => e.title?.toLowerCase().includes(search) || e.productName?.toLowerCase().includes(search));
-    if (cat) docs = docs.filter(e => (e.category||'') === cat || (e.category||'').includes(cat));
-    if (format) docs = docs.filter(e => e.format===format);
-    const langF = el('ev-lang-filter')?.value||'';
-    if (langF) docs = docs.filter(e => e.language===langF);
-    if (free) docs = docs.filter(e => !e.fee || e.fee===0);
+    var base = periodDocs.slice();
+    updateEventFacets(base);
+    var docs = evFacetFiltered(base, null);
+    docs.sort(function(a,b){
+      if (EV_SORT==='date_asc')  return (a.eventDate?.seconds||0)-(b.eventDate?.seconds||0);
+      if (EV_SORT==='date_desc') return (b.eventDate?.seconds||0)-(a.eventDate?.seconds||0);
+      if (EV_SORT==='newest')    return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);
+      if (EV_SORT==='fill')      return ((b.registeredCount||0)/(b.capacity||1))-((a.registeredCount||0)/(a.capacity||1));
+      return 0;
+    });
 
-    if (!docs.length) {
-      listEl.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>Kriterlere uygun etkinlik bulunamadı.</div>';
+    var hdr=el('ev-results-hdr');
+    if (hdr){
+      hdr.innerHTML='<div style="font-size:13px;color:var(--text-secondary)"><b style="color:var(--text);font-size:16px">'+docs.length+'</b> etkinlik</div>'
+        +'<div style="display:flex;align-items:center;gap:8px"><select class="inp" id="ev-sort-sel" style="width:auto;font-size:12.5px;padding:5px 8px">'
+        + ['date_asc:Tarihe Yakın','date_desc:Tarihe Uzak','newest:Yeni Eklenen','fill:Doluluk'].map(function(o){var kv=o.split(':');return '<option value="'+kv[0]+'"'+(EV_SORT===kv[0]?' selected':'')+'>'+kv[1]+'</option>';}).join('')
+        +'</select>'
+        +'<div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden"><button id="ev-view-list" title="Liste" style="padding:6px 10px;cursor:pointer;border:none;font-size:14px;background:'+(EV_VIEW==='list'?'#2563eb':'transparent')+';color:'+(EV_VIEW==='list'?'#fff':'var(--text-secondary)')+'">☰</button><button id="ev-view-grid" title="Izgara" style="padding:6px 10px;cursor:pointer;border:none;font-size:14px;background:'+(EV_VIEW==='grid'?'#2563eb':'transparent')+';color:'+(EV_VIEW==='grid'?'#fff':'var(--text-secondary)')+'">▦</button></div></div>';
+      hdr.querySelector('#ev-sort-sel').addEventListener('change',function(){EV_SORT=this.value; loadEventsList();});
+      hdr.querySelector('#ev-view-list').addEventListener('click',function(){if(EV_VIEW!=='list'){EV_VIEW='list';loadEventsList();}});
+      hdr.querySelector('#ev-view-grid').addEventListener('click',function(){if(EV_VIEW!=='grid'){EV_VIEW='grid';loadEventsList();}});
+    }
+
+    if (!docs.length){
+      var hasF = !!(search || anyEvFacet());
+      listEl.innerHTML='<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:36px 20px;text-align:center"><div style="font-size:36px;margin-bottom:10px">📅</div><div style="font-size:15.5px;font-weight:700;margin-bottom:4px">'+(hasF?'Kriterlere uygun etkinlik yok':'Bu dönemde etkinlik yok')+'</div><div style="font-size:12.5px;color:var(--text-muted);margin-bottom:16px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.5">'+(hasF?'Filtreleri gevşet ya da üstten farklı bir dönem seç.':'Başka bir dönem seç veya yaklaşan etkinliklere göz at.')+'</div>'+(hasF?'<button class="btn-p btn-sm" id="ev-relax">Filtreleri Sıfırla</button>':'')+'</div>';
+      var rb=listEl.querySelector('#ev-relax'); if(rb) rb.addEventListener('click',function(){var s=el('ev-search'); if(s)s.value=''; Object.keys(EV_FILTERS).forEach(function(k){EV_FILTERS[k]=[];}); loadEventsList();});
       return;
     }
 
-    var periodTitles = {
-      upcoming: '📅 Yaklaşan Etkinlikler',
-      this_month: '📅 Bu Ay Gerçekleşen Etkinlikler',
-      last_month: '📅 Geçen Ay Gerçekleşen Etkinlikler',
-      this_year: '📅 Bu Yıl Gerçekleşen Etkinlikler',
-      all: '📅 Tüm Etkinlikler'
-    };
-    listEl.innerHTML = '<div style="font-size:13px;color:#334155;font-weight:600;margin-bottom:12px;padding:10px 14px;background:#f8fafc;border:1px solid rgba(15,23,42,.08);border-radius:8px">' +
-      (periodTitles[evPeriod]||'Etkinlikler') + ' — <span style="color:#2563eb;font-weight:700">' + docs.length + '</span> sonuç' +
-      '</div>' +
-      docs.map(e => {
-      const date = e.eventDate?.toDate ? e.eventDate.toDate().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '—';
-      const spots = e.capacity - (e.registeredCount||0);
-      const feeBg = e.fee>0?'rgba(37,99,235,.12)':'rgba(22,163,74,.12)';
-      const feeCol = e.fee>0?'#2563eb':'#16a34a';
-      const feeLabel = e.fee>0?('₺'+e.fee):'Ücretsiz';
-      return `<div class="card" style="margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
-        <div>
-          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
-            <span class="bdg" style="background:var(--bg-elevated);color:#475569;font-weight:600">${e.category||'—'}</span>
-            <span class="bdg" style="background:rgba(37,99,235,.12);color:#2563eb;font-weight:600">${e.format||'Online'}</span>
-            <span class="bdg" style="background:${feeBg};color:${feeCol};font-weight:600">${feeLabel}</span>
-          </div>
-          <div style="font-size:15px;font-weight:700;margin-bottom:5px;color:#0f172a">${e.language ? '<span class="bdg" style="background:rgba(168,85,247,.12);color:#a855f7;margin-right:4px;font-weight:600">'+langLabel(e.language)+'</span>' : ''}${escHtml(cleanTitle(e.title))}</div>
-          <div style="font-size:12.5px;color:#475569;margin-bottom:5px">${e.vendorName||'—'} · ${e.productName||'—'}</div>
-          <div style="font-size:12px;color:#64748b">📅 ${date}${e.location?' · 📍 '+e.location:''}</div>
-          ${e.description ? '<p style="font-size:12.5px;color:#64748b;margin-top:8px;line-height:1.6">' + e.description + '</p>' : ''}
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:12px;color:${spots<=0?'#dc2626':spots<=5?'#d97706':'#16a34a'};margin-bottom:8px;font-weight:700">${spots<=0?'Dolu':spots+' yer kaldı'}</div>
-          <div style="background:var(--bg-elevated);border-radius:5px;height:4px;width:100px;margin-left:auto;margin-bottom:10px">
-            <div style="background:#2563eb;height:100%;width:${Math.min(100,((e.registeredCount||0)/e.capacity)*100)}%;border-radius:5px"></div>
-          </div>
-          <button class="btn-p btn-sm ev-reg-btn" data-id="${e.id}" data-title="${e.title}" data-vendor-email="${e.vendorEmail||''}" data-vendor-name="${e.vendorName||''}">${CUR_USER?'Kayıt Ol':'Giriş Yap & Kayıt Ol'}</button>
-        </div>
-      </div>`;
-    }).join('');
+    listEl.innerHTML = EV_VIEW==='grid'
+      ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">'+docs.map(evCardGrid).join('')+'</div>'
+      : docs.map(evCardList).join('');
 
-    listEl.querySelectorAll('.ev-reg-btn').forEach(b => b.addEventListener('click', () => {
+    listEl.querySelectorAll('.ev-reg-btn').forEach(b => b.addEventListener('click', function(ev){
+      ev.stopPropagation();
       if (!CUR_USER) { openAuthModal('customer',''); return; }
       registerForEvent(b.dataset.id, b, b.dataset.vendorEmail, b.dataset.vendorName, b.dataset.title);
     }));
+    listEl.querySelectorAll('.ev-card').forEach(function(card){
+      card.addEventListener('click', function(e){ if(e.target.closest('.ev-reg-btn')) return; openEventDetail(card.dataset.id); });
+    });
   } catch(e) {
     listEl.innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
   }
