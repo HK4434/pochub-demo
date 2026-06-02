@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.70 | pochub.co -->
+<!-- PoCHub v5.71 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.70';
+const VERSION = 'v5.71';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.71': ['KADEME 2 — PoC sonrasi COK-KRITERLI degerlendirme (Gartner akran-puani karsiligi): openPocEvalModal yeniden yazildi. Tek yildiz yerine REVIEW_CRITERIA (Kurulum & Entegrasyon, Destek & Hizmet, Urun Yetenekleri, Fiyat/Deger) her biri 5 yildiz + Tavsiye eder misiniz? (Evet/Hayir). Genel puan = kriter ortalamasi. poc_requests.completed dokumanlarina rating(genel)+criteriaRatings+recommend yazilir; urun agregasyonu avgRating/ratingCount + criteriaAvg{} + recommendPct hesaplar. Urun detayinda DEGERLENDIRME (AKRAN PUANI) blogu: kriter barlari + Genel puan + %tavsiye. Karsilastirmada Degerlendirme (Akran Puani) grubu: kriter ortalamasi satirlari + Tavsiye % (satir-bazli en-iyi vurgusu best:self). KURALLAR DEGISTI: products musteri rating update artik criteriaAvg+recommendPct kapsar; poc_requests musteri alanlarina rating/criteriaRatings/recommend/evalNote/completedBy eklendi (mevcut puanlama bosluğu da kapandi). Kurallar Console + repo mirror guncellendi.'],
   'v5.70': ['FILTRE YONETIMI esnek (ekle/cikar/duzenle): Filtre Yonetimi modali yeniden yazildi. DUZENLE: her facet grubunun etiketi inline input ile degistirilebilir (override config.filters[].label). CIKAR: gorunurluk anahtari (gizle) + ozel facetlerde 🗑 tam silme. EKLE: admin yeni OZEL facet ekleyebilir — aday alan secer (katalog: Satis Tipi/Destek Modeli/Ulke + tum kategorilerin select tipi catFields alanlari; etkinlik: Konum), secenekler VERIDEN otomatik turetilir (computeCustomOptions). Ozel facetler katalog/etkinlik motoruna tam entegre (allFacets/evAllFacets, facetFiltered, sayim, chip, URL deep-link, sira/gorunurluk). config: filters.{catalog,events,catalogCustom,eventsCustom}. config write admin/read public — RULES degismedi.'],
   'v5.69': ['KARSILASTIRMA Gartner seviyesine cikarildi (adim 1): openCompareModal yeniden yazildi — tam-genislik (96vw), YAPISKAN kolon basliklari + yapiskan ilk sutun (oznitelik adi), oznitelikler GRUPLU (Genel + kategoriye ozel teknik gruplar f.group ile), SADECE FARKLARI GOSTER anahtari (ayni degerli satirlari gizler), Puan satirinda EN IYI urun yesil vurgulu, kolon basliginda urun puani + PoC butonu + Urun sayfasi linki (productUrl). PAYLASILABILIR baglanti: Baglantiyi kopyala → ?compare=id1,id2#catalog; katalog acilisinda bu parametre varsa karsilastirma otomatik acilir (deep-link). UI — rules degismedi.'],
   'v5.68': ['FILTRE & TAKSONOMI YONETIM MERKEZI (adim 3): admin artik Katalog ve Etkinlikler facet gruplarinin GORUNURLUGUNU + SIRASINI yonetebiliyor. Sistem Ayarlari > "🎛 Filtre Yonetimi" + openFilterManagerModal (her grup icin ↑/↓ sira + Gorunur anahtari; Varsayilan). pochub_config/system.filters = {catalog:[{key,on}], events:[{key,on}]}. ensureTaxonomy ayni dokumandan filtre yerlesimini de yukler (applyFilterLayout). Katalog sidebar orderFacetList(CAT_FACETS,...) ile siralanir/gizlenir; sektor kapaliysa kesif seridi de gizlenir; gizli grup filtreleri temizlenir. Etkinlik sidebar ayni mantik (kategori kapaliysa rail gizli). Liste icerikleri (sektor/dagitim/lisans) Taksonomi bolumunden yonetilir. config write admin/read public — RULES degismedi.'],
@@ -5384,6 +5385,22 @@ async function openProductDetailModal(productId) {
     var urlHtml = /^https?:\/\//i.test(_purl)
       ? '<a href="'+_purl.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#2563eb;text-decoration:none;margin-bottom:16px;padding:9px 13px;border:1px solid rgba(37,99,235,.3);border-radius:9px;background:rgba(37,99,235,.05)">🔗 Üreticinin ürün sayfasını aç →</a>'
       : '';
+    // Akran puanı (çok-kriterli) özeti
+    var reviewHtml = '';
+    if (p.ratingCount && ((p.criteriaAvg && Object.keys(p.criteriaAvg).length) || p.recommendPct!=null)) {
+      var bars = REVIEW_CRITERIA.map(function(c){
+        var v = p.criteriaAvg && p.criteriaAvg[c.id];
+        if (!v) return '';
+        return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px"><span style="font-size:12px;color:#94a3b8;width:170px;flex-shrink:0">'+c.label+'</span>'
+          + '<div style="flex:1;height:6px;background:rgba(255,255,255,.10);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+(v/5*100)+'%;background:#f59e0b"></div></div>'
+          + '<span style="font-size:12px;font-weight:700;color:#f59e0b;width:28px;text-align:right">'+v.toFixed(1)+'</span></div>';
+      }).join('');
+      reviewHtml = '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.6px">DEĞERLENDİRME (AKRAN PUANI)</div>'
+        + (p.recommendPct!=null?'<div style="font-size:12px;font-weight:700;color:#16a34a">👍 %'+p.recommendPct+' tavsiye ediyor</div>':'')+'</div>'
+        + '<div style="font-size:13px;margin-bottom:12px;color:#c8cfdb">Genel: <span style="color:#f59e0b;font-weight:700">⭐ '+(p.avgRating||0).toFixed(1)+'</span> <span style="color:#94a3b8">('+(p.ratingCount||0)+' PoC değerlendirmesi)</span></div>'
+        + bars + '</div>';
+    }
 
     var canPoc = CUR_USER && CUR_PROFILE?.role !== 'vendor';
     var pocBtnHtml = CUR_USER
@@ -5423,6 +5440,9 @@ async function openProductDetailModal(productId) {
       // Üreticinin ürün sayfası linki
       urlHtml +
 
+      // Akran puanı özeti
+      reviewHtml +
+
       // Teknik özellikler
       catFieldsHtml +
       '</div>' +
@@ -5460,6 +5480,12 @@ async function openProductDetailModal(productId) {
 /* ══════════════════════════════════════════════════════
    POC DEGERLENDIRME MODAL — Musteri (v4.4)
 ══════════════════════════════════════════════════════ */
+var REVIEW_CRITERIA = [
+  {id:'install', label:'Kurulum & Entegrasyon'},
+  {id:'support', label:'Destek & Hizmet'},
+  {id:'capabilities', label:'Ürün Yetenekleri'},
+  {id:'value', label:'Fiyat / Değer'}
+];
 function openPocEvalModal(poc) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
@@ -5472,13 +5498,23 @@ function openPocEvalModal(poc) {
     '</div>' +
     '<button id="eval-close" class="btn-x">x</button>' +
     '</div>' +
-    '<label class="lbl">Teknik Degerlendirme Puani <span class="t-red">*</span></label>' +
-    '<div id="star-rating" style="display:flex;gap:8px;margin-bottom:16px">' +
-    [1,2,3,4,5].map(function(i){
-      return '<button class="star-btn" data-val="'+i+'" style="font-size:28px;background:none;border:none;cursor:pointer;padding:4px;transition:transform .15s;color:#64748b">&#9734;</button>';
+    '<label class="lbl">Kriter Bazlı Değerlendirme <span class="t-red">*</span></label>' +
+    '<div style="margin-bottom:14px">' +
+    REVIEW_CRITERIA.map(function(c){
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px">' +
+        '<span style="font-size:12.5px;color:var(--text-secondary)">'+c.label+'</span>' +
+        '<div class="crit-row" data-crit="'+c.id+'" style="display:flex;gap:3px">' +
+        [1,2,3,4,5].map(function(i){ return '<button class="crit-star" data-crit="'+c.id+'" data-val="'+i+'" style="font-size:21px;background:none;border:none;cursor:pointer;padding:1px;color:#64748b">&#9734;</button>'; }).join('') +
+        '</div><input type="hidden" class="crit-val" id="crit-'+c.id+'" value="0"></div>';
     }).join('') +
     '</div>' +
     '<input type="hidden" id="eval-rating" value="0">' +
+    '<label class="lbl">Bu ürünü tavsiye eder misiniz?</label>' +
+    '<div style="display:flex;gap:8px;margin-bottom:16px">' +
+    '<button class="rec-btn btn-g btn-sm flx1" data-val="yes">👍 Evet</button>' +
+    '<button class="rec-btn btn-g btn-sm flx1" data-val="no">👎 Hayır</button>' +
+    '</div>' +
+    '<input type="hidden" id="eval-recommend" value="">' +
     '<label class="lbl">Satin Alma Karari <span class="t-red">*</span></label>' +
     '<div style="display:flex;gap:8px;margin-bottom:16px">' +
     '<button class="decision-btn btn-g btn-sm flx1" data-val="purchased">Satin Alindi</button>' +
@@ -5496,33 +5532,20 @@ function openPocEvalModal(poc) {
   modal.querySelector('#eval-close').addEventListener('click', function(){ modal.remove(); });
   modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
 
-  var ratingVal = 0;
-  modal.querySelectorAll('.star-btn').forEach(function(btn) {
+  modal.querySelectorAll('.crit-star').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      ratingVal = parseInt(btn.dataset.val);
-      modal.querySelector('#eval-rating').value = ratingVal;
-      modal.querySelectorAll('.star-btn').forEach(function(b) {
-        var v = parseInt(b.dataset.val);
-        b.innerHTML = v <= ratingVal ? '&#11088;' : '&#9734;';
-        b.style.color = v <= ratingVal ? '#f59e0b' : '#64748b';
-        b.style.transform = v === ratingVal ? 'scale(1.2)' : 'scale(1)';
-      });
-    });
-    btn.addEventListener('mouseenter', function() {
-      var hv = parseInt(btn.dataset.val);
-      modal.querySelectorAll('.star-btn').forEach(function(b) {
-        b.innerHTML = parseInt(b.dataset.val) <= hv ? '&#11088;' : '&#9734;';
-      });
-    });
-    btn.addEventListener('mouseleave', function() {
-      modal.querySelectorAll('.star-btn').forEach(function(b) {
-        var v2 = parseInt(b.dataset.val);
-        b.innerHTML = v2 <= ratingVal ? '&#11088;' : '&#9734;';
-        b.style.color = v2 <= ratingVal ? '#f59e0b' : '#64748b';
-      });
+      var crit=btn.dataset.crit, val=parseInt(btn.dataset.val);
+      modal.querySelector('#crit-'+crit).value = val;
+      modal.querySelectorAll('.crit-star[data-crit="'+crit+'"]').forEach(function(b){ var v=parseInt(b.dataset.val); b.innerHTML = v<=val?'&#11088;':'&#9734;'; b.style.color = v<=val?'#f59e0b':'#64748b'; });
     });
   });
-
+  modal.querySelectorAll('.rec-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      modal.querySelector('#eval-recommend').value = btn.dataset.val;
+      modal.querySelectorAll('.rec-btn').forEach(function(b){ b.className='rec-btn btn-g btn-sm flx1'; });
+      btn.className = 'rec-btn btn-p btn-sm flx1';
+    });
+  });
   modal.querySelectorAll('.decision-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       modal.querySelector('#eval-decision').value = btn.dataset.val;
@@ -5532,17 +5555,21 @@ function openPocEvalModal(poc) {
   });
 
   modal.querySelector('#eval-submit').addEventListener('click', async function() {
-    var rating = parseInt(modal.querySelector('#eval-rating').value);
+    var errDiv = modal.querySelector('#eval-err');
+    var crits={}, sum=0, missing=false;
+    REVIEW_CRITERIA.forEach(function(c){ var v=parseInt(modal.querySelector('#crit-'+c.id).value)||0; if(!v) missing=true; crits[c.id]=v; sum+=v; });
+    if (missing) { errDiv.textContent = 'Lütfen tüm kriterleri puanlayın.'; return; }
+    var overall = Math.round((sum/REVIEW_CRITERIA.length)*10)/10;
     var decision = modal.querySelector('#eval-decision').value;
     var note = modal.querySelector('#eval-note').value.trim();
-    var errDiv = modal.querySelector('#eval-err');
-    if (!rating) { errDiv.textContent = 'Lutfen bir puan verin.'; return; }
+    var recVal = modal.querySelector('#eval-recommend').value;
+    var recommend = recVal==='yes' ? true : (recVal==='no' ? false : null);
     if (!decision) { errDiv.textContent = 'Satin alma kararini belirtin.'; return; }
     var btn = modal.querySelector('#eval-submit');
     btn.disabled = true; btn.textContent = 'Kaydediliyor...';
     try {
       await updateDoc(doc(db,'poc_requests',poc.id), {
-        status: 'completed', rating: rating,
+        status: 'completed', rating: overall, criteriaRatings: crits, recommend: recommend,
         purchaseDecision: decision, evalNote: note,
         completedAt: serverTimestamp(), completedBy: CUR_USER.uid,
       });
@@ -5552,13 +5579,16 @@ function openPocEvalModal(poc) {
           where('productId','==',poc.productId),
           where('status','==','completed')
         ));
-        var ratings2 = prodSnap2.docs.map(function(d){ return d.data().rating; }).filter(Boolean);
-        if (ratings2.length) {
-          var avg2 = ratings2.reduce(function(a,b){ return a+b; },0) / ratings2.length;
-          await updateDoc(doc(db,'products',poc.productId), {
-            avgRating: Math.round(avg2*10)/10, ratingCount: ratings2.length
-          });
-        }
+        var ds = prodSnap2.docs.map(function(d){ return d.data(); });
+        var ratings2 = ds.map(function(d){ return d.rating; }).filter(Boolean);
+        var upd = {};
+        if (ratings2.length) { upd.avgRating = Math.round((ratings2.reduce(function(a,b){ return a+b; },0)/ratings2.length)*10)/10; upd.ratingCount = ratings2.length; }
+        var cavg = {};
+        REVIEW_CRITERIA.forEach(function(c){ var vs=ds.map(function(d){ return d.criteriaRatings && d.criteriaRatings[c.id]; }).filter(Boolean); if(vs.length) cavg[c.id]=Math.round((vs.reduce(function(a,b){ return a+b; },0)/vs.length)*10)/10; });
+        if (Object.keys(cavg).length) upd.criteriaAvg = cavg;
+        var recs = ds.map(function(d){ return d.recommend; }).filter(function(v){ return v===true||v===false; });
+        if (recs.length) upd.recommendPct = Math.round(recs.filter(Boolean).length/recs.length*100);
+        if (Object.keys(upd).length) await updateDoc(doc(db,'products',poc.productId), upd);
       }
       modal.remove();
       showToast('Degerlendirmeniz kaydedildi!');
@@ -7462,6 +7492,12 @@ function openCompareModal(ids){
     ['Açıklama', function(p){return p.description?(p.description.length>140?p.description.slice(0,140)+'…':p.description):'—';}],
   ]}];
   (function(){
+    var revRows=[];
+    REVIEW_CRITERIA.forEach(function(c){ if(prods.some(function(p){return p.criteriaAvg&&p.criteriaAvg[c.id];})) revRows.push([c.label,(function(cid){return function(p){ var v=p.criteriaAvg&&p.criteriaAvg[cid]; return v?('⭐ '+v.toFixed(1)):'—'; };})(c.id),{best:'self'}]); });
+    if (prods.some(function(p){return p.recommendPct!=null;})) revRows.push(['Tavsiye %', function(p){ return p.recommendPct!=null?('%'+p.recommendPct):'—'; }, {best:'self'}]);
+    if (revRows.length) groups.push({title:'Değerlendirme (Akran Puanı)', rows:revRows});
+  })();
+  (function(){
     var catsSet={}; prods.forEach(function(p){ if(p.category) catsSet[p.category]=1; });
     var catKeys=Object.keys(catsSet); if(catKeys.length!==1) return;
     var defs = (typeof getCatFields==='function') ? getCatFields(catKeys[0]) : ((typeof CATEGORY_FIELDS!=='undefined') && CATEGORY_FIELDS[catKeys[0]]);
@@ -7504,7 +7540,13 @@ function openCompareModal(ids){
       visRows.forEach(function(r){
         var vals=prods.map(r[1]);
         var same=vals.every(function(v){return v===vals[0];});
-        var bestIdx=(r[2]&&r[2].best==='rating')?ratingBestIdx():-1;
+        var bestIdx=-1;
+        if (r[2] && r[2].best==='rating') bestIdx=ratingBestIdx();
+        else if (r[2] && r[2].best==='self') {
+          var nums=vals.map(function(v){ var m=String(v).match(/[\d]+(?:\.[\d]+)?/); return m?parseFloat(m[0]):null; });
+          var mx=-Infinity, mi=-1; nums.forEach(function(nv,i){ if(nv!=null && nv>mx){mx=nv;mi=i;} });
+          bestIdx=(mi>=0 && nums.filter(function(x){return x!=null;}).length>=2)?mi:-1;
+        }
         html += '<tr><td style="padding:9px 10px;font-size:11.5px;font-weight:700;color:var(--text-secondary);position:sticky;left:0;background:var(--bg-surface);border-top:1px solid var(--border)">'+r[0]+'</td>'
           + vals.map(function(v,i){
               var hl=(i===bestIdx)?';background:rgba(16,163,74,.10);color:#16a34a;font-weight:700':'';
