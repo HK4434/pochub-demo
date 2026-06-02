@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.63 | pochub.co -->
+<!-- PoCHub v5.64 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.63';
+const VERSION = 'v5.64';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.64': ['KATALOG dinamik (baglama-duyarli) filtre: kullanici TEK kategori sectiginde, o kategorinin CATEGORY_FIELDS icindeki select-tipi alanlari sol sidebarda standart facetlerin altinda DINAMIK facet gruplari olarak acilir (rebuildDynamicFacets + allFacets; key cf:<fieldId>). Ornek: Firewall secince SSL Inceleme/ZTNA/Form Faktoru/HA Modu/Lisans Modeli; Yedekleme secince kendi alanlari. Canli capraz sayim, chip, URL deep-link (cf:* parametreleri), Temizle hepsini kapsar. Kategori degisince dinamik secimler sifirlanir; ipucu metni (tek kategori sec → ozel filtreler). KARSILASTIRMA da kategori-bilincli: ayni kategorideki urunlerde o kategorinin alanlari otomatik satir olur. UI — rules degismedi.'],
   'v5.63': ['KATALOG 2.0 (Faz B+C+Lisans) — kataloğu çok yönlü keşif ortamına dönüştüren büyük yeniden kurgu. YENI DUZEN: sol kalıcı facet kenar çubuğu (sticky) + üstte SEKTOR KESIF SERIDI (Faz B: sektör kutucukları + çözüm sayıları, tıkla-filtrele) + sonuç başlığı (canlı çözüm sayacı + sıralama + GRID/LISTE gorunum gecisi). FACET GRUPLARI 7ye cikti: Kategori (cok-secim, getCategories\'ten), Sektor, Dagitim, LISANS (yeni — normalizeLicense + TAXONOMY_DEFAULTS.licenses match anahtarlari), Koken, Dogrulama, Puan (4+/3+). Ici-OR/gruplar-AND, capraz sayaclar, chip + URL deep-link (q/sort/view + tum gruplar). KARSILASTIRMA (Faz C): kart/satir secimi (CAT_COMPARE, filtreler arasi kalici) + sticky aksiyon bari (N secili → Karsilastir[≥2] + PoC Baslat) → openCompareModal yan-yana tablo (Kategori/Sektorler/Dagitim/Lisans/Koken/Dogrulanmis/Puan/Destek/Aciklama, kolon basligi PoC butonu). LISTE gorunumu + grid. AKILLI BOS-SONUC: filtre gevsetme/sifirlama. Admin Taksonomi Editorune LISANS bolumu eklendi (sektor+dagitim+lisans). config read public — RULES degismedi.'],
   'v5.62': ['KATALOG Faz A3b (taksonomi admin-yonetilir): sektor ve dagitim listeleri artik HARDCODE degil — pochub_config/system.taxonomy\'den okunur, kod yalniz varsayilan/seed (TAXONOMY_DEFAULTS). applyTaxonomy yerinde mutasyonla SECTORS/TAX_DEPLOYMENTS/CAT_FACETS gunceller; ensureTaxonomy bir kez yukler (boot fire-and-forget + renderCatalog/openAddProductModal/admSettings await). normalizeDeployment artik config match anahtarlarini kullanir. Sistem Ayarlari > "🏷 Taksonomi" bolumu + Taksonomi Editoru modali (sektor/dagitim ekle-duzenle-sil, dagitim match kelimeleri, Varsayilana Don). Kayit setDoc merge taxonomy. config write admin / read public oldugundan RULES degismedi. Faz A tamam.'],
   'v5.61': ['KATALOG kart zenginlestirme (gorsel profesyonellik): katalog urun kartina aciklamanin altinda etiket satiri — SEKTOR chipleri (ilk 3 + sayac), DAGITIM rozeti (Cloud/On-Prem/Hybrid/Yonetilen, normalizeDeployment), KOKEN (Yerli/Yabanci). Mevcut verified/tier rozeti ve puan zaten vardi. Duz listeden cozum-keyfi kartina dogru gorsel sicrama. UI — rules degismedi.'],
@@ -6876,6 +6877,7 @@ var CAT_VIEW = 'grid';        // grid | list
 var CAT_COMPARE = new Set();  // karşılaştırma/PoC için seçili ürün id'leri
 var CAT_SORT = 'rating';      // sıralama
 var CAT_PROD_MAP = {};        // id → ürün (seçim filtre dışı kalsa da çözülsün)
+var CAT_DYNAMIC = [];         // tek kategori seçilince açılan kategori-özel (select) facet grupları
 
 // deployment normalizasyonu — config'deki match anahtarlarıyla tek kovaya indir
 function normalizeDeployment(p){
@@ -6950,12 +6952,28 @@ function wireSectorPills(root){
 }
 function readSectorPills(root){ return root ? [].slice.call(root.querySelectorAll('.pr-sec-pill.on')).map(function(b){return b.dataset.sec;}) : []; }
 
-function anyCatFacet(){ return CAT_FACETS.some(function(f){ return CAT_FILTERS[f.key].length; }); }
+// Dinamik kategori-facet'leri: tek kategori seçiliyse o kategorinin select alanlarını facet yap
+function rebuildDynamicFacets(){
+  CAT_DYNAMIC = [];
+  var sel = CAT_FILTERS.category || [];
+  if (sel.length !== 1) return;
+  var defs = (typeof CATEGORY_FIELDS!=='undefined') && CATEGORY_FIELDS[sel[0]];
+  if (!defs || !defs.length) return;
+  defs.forEach(function(fd){
+    if (fd.type!=='select' || !fd.opts || !fd.opts.length) return;
+    var key = 'cf:'+fd.id;
+    if (!(key in CAT_FILTERS)) CAT_FILTERS[key] = [];
+    CAT_DYNAMIC.push({ key:key, label:fd.label, dynamic:true, group:fd.group||'', options: fd.opts.map(function(o){ return [o,o]; }), get:(function(fid){ return function(p){ var v=p.catFields && p.catFields[fid]; return (v!==undefined&&v!=='')?[v]:[]; }; })(fd.id) });
+  });
+}
+function allFacets(){ return CAT_DYNAMIC.length ? CAT_FACETS.concat(CAT_DYNAMIC) : CAT_FACETS; }
+function anyCatFacet(){ return allFacets().some(function(f){ return (CAT_FILTERS[f.key]||[]).length; }); }
 function syncCatalogURL(){
   try {
     var params = new URLSearchParams();
     var q = el('cat-search')?.value||''; if(q) params.set('q', q);
     CAT_FACETS.forEach(function(f){ if(CAT_FILTERS[f.key].length) params.set(f.key, CAT_FILTERS[f.key].join(',')); });
+    CAT_DYNAMIC.forEach(function(f){ if((CAT_FILTERS[f.key]||[]).length) params.set(f.key, CAT_FILTERS[f.key].join(',')); });
     if (CAT_SORT && CAT_SORT!=='rating') params.set('sort', CAT_SORT);
     if (CAT_VIEW==='list') params.set('view','list');
     var newUrl = window.location.pathname + (params.toString()?'?'+params.toString():'') + '#catalog';
@@ -6967,28 +6985,31 @@ function readCatalogURL(){
     var params = new URLSearchParams(window.location.search);
     var q=params.get('q'); if(q && el('cat-search')) el('cat-search').value=q;
     CAT_FACETS.forEach(function(f){ var v=params.get(f.key); CAT_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
+    rebuildDynamicFacets();
+    CAT_DYNAMIC.forEach(function(f){ var v=params.get(f.key); CAT_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
     CAT_SORT = params.get('sort') || 'rating';
     CAT_VIEW = params.get('view')==='list' ? 'list' : 'grid';
   } catch(e){ CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key]=[]; }); }
 }
-function toggleCatFacet(key, v){ var a=CAT_FILTERS[key]; if(!a) return; var i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); loadCatalog(); }
+function toggleCatFacet(key, v){ var a=CAT_FILTERS[key]; if(!a) return; var i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); if(key==='category'){ Object.keys(CAT_FILTERS).forEach(function(k){ if(k.indexOf('cf:')===0) CAT_FILTERS[k]=[]; }); } loadCatalog(); }
 function clearCatFilter(kind, val){
   if(kind==='search'){ var s=el('cat-search'); if(s)s.value=''; }
-  else if(kind==='all'){ var s2=el('cat-search'); if(s2)s2.value=''; CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key]=[]; }); }
-  else if(CAT_FILTERS[kind]){ var i=CAT_FILTERS[kind].indexOf(val); if(i>=0) CAT_FILTERS[kind].splice(i,1); }
+  else if(kind==='all'){ var s2=el('cat-search'); if(s2)s2.value=''; Object.keys(CAT_FILTERS).forEach(function(k){ CAT_FILTERS[k]=[]; }); }
+  else if(CAT_FILTERS[kind]){ var i=CAT_FILTERS[kind].indexOf(val); if(i>=0) CAT_FILTERS[kind].splice(i,1); if(kind==='category'){ Object.keys(CAT_FILTERS).forEach(function(k){ if(k.indexOf('cf:')===0) CAT_FILTERS[k]=[]; }); } }
   loadCatalog();
 }
 // Bir grup HARİÇ diğer grupları uygula (proper faceting: her grubun sayacı diğer filtrelere göre)
 function facetFiltered(list, exceptKey){
   return list.filter(function(p){
-    return CAT_FACETS.every(function(f){
+    return allFacets().every(function(f){
       if(f.key===exceptKey) return true;
-      var sel=CAT_FILTERS[f.key]; if(!sel.length) return true;
+      var sel=CAT_FILTERS[f.key]||[]; if(!sel.length) return true;
       return f.get(p).some(function(v){ return sel.indexOf(v)>=0; });
     });
   });
 }
 function updateCatalogFacetsAndChips(allBase){
+  rebuildDynamicFacets();
   var sb = el('cat-sidebar'), rail = el('cat-rail'), ch = el('cat-chips');
   // Sektör keşif şeridi (Faz B) — prominent giriş
   if (rail) {
@@ -7002,36 +7023,45 @@ function updateCatalogFacetsAndChips(allBase){
     rail.innerHTML = tiles ? '<div style="font-size:12.5px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">🧭 Sektöre göre keşfet</div><div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">'+tiles+'</div>' : '';
     rail.querySelectorAll('.cat-rail-tile').forEach(function(b){ b.addEventListener('click', function(){ toggleCatFacet('sector', b.dataset.sec); }); });
   }
-  // Sol sidebar — tüm facet grupları (dikey)
+  // Tek facet grubu HTML (standart + dinamik ortak)
+  function makeGroup(f){
+    var fbg = facetFiltered(allBase, f.key);
+    var cnt = {}; fbg.forEach(function(p){ f.get(p).forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
+    var sel = CAT_FILTERS[f.key]||[];
+    var opts = f.options.filter(function(o){ return cnt[o[0]] || sel.indexOf(o[0])>=0; });
+    if (!opts.length) return '';
+    var rows = opts.map(function(o){
+      var on = sel.indexOf(o[0])>=0;
+      return '<button class="cat-facet-pill" data-fk="'+f.key+'" data-fv="'+String(o[0]).replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;text-align:left;font-size:12px;font-weight:'+(on?'700':'500')+';padding:5px 9px;border-radius:8px;cursor:pointer;border:1px solid '+(on?'#2563eb':'transparent')+';background:'+(on?'rgba(37,99,235,.08)':'transparent')+';color:'+(on?'#2563eb':'var(--text-secondary)')+'"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(on?'✓ ':'')+o[1]+'</span><span style="font-size:11px;color:var(--text-muted);flex-shrink:0">'+(cnt[o[0]]||0)+'</span></button>';
+    }).join('');
+    return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">'+f.label+'</div><div style="display:flex;flex-direction:column;gap:2px">'+rows+'</div></div>';
+  }
+  // Sol sidebar — standart gruplar + (varsa) dinamik kategori-özel gruplar
   if (sb) {
-    var groupsHtml = CAT_FACETS.map(function(f){
-      var fb = facetFiltered(allBase, f.key);
-      var counts = {}; fb.forEach(function(p){ f.get(p).forEach(function(v){ counts[v]=(counts[v]||0)+1; }); });
-      var sel = CAT_FILTERS[f.key];
-      var opts = f.options.filter(function(o){ return counts[o[0]] || sel.indexOf(o[0])>=0; });
-      if (!opts.length) return '';
-      var rows = opts.map(function(o){
-        var on = sel.indexOf(o[0])>=0;
-        return '<button class="cat-facet-pill" data-fk="'+f.key+'" data-fv="'+o[0]+'" style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;text-align:left;font-size:12px;font-weight:'+(on?'700':'500')+';padding:5px 9px;border-radius:8px;cursor:pointer;border:1px solid '+(on?'#2563eb':'transparent')+';background:'+(on?'rgba(37,99,235,.08)':'transparent')+';color:'+(on?'#2563eb':'var(--text-secondary)')+'"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(on?'✓ ':'')+o[1]+'</span><span style="font-size:11px;color:var(--text-muted);flex-shrink:0">'+(counts[o[0]]||0)+'</span></button>';
-      }).join('');
-      return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">'+f.label+'</div><div style="display:flex;flex-direction:column;gap:2px">'+rows+'</div></div>';
-    }).filter(Boolean).join('');
+    var stdHtml = CAT_FACETS.map(makeGroup).filter(Boolean).join('');
+    var dynHtml = '';
+    if (CAT_DYNAMIC.length) {
+      var inner = CAT_DYNAMIC.map(makeGroup).filter(Boolean).join('');
+      if (inner) dynHtml = '<div style="margin:4px 0 12px;padding-top:12px;border-top:1px dashed var(--border)"><div style="font-size:11.5px;font-weight:800;color:#2563eb;margin-bottom:10px">🔧 '+(CAT_FILTERS.category[0]||'')+' özellikleri</div>'+inner+'</div>';
+    }
     var anyF = anyCatFacet() || (el('cat-search')?.value||'');
     sb.innerHTML = '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:14px;position:sticky;top:14px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:13px;font-weight:800">Filtreler</span>'+(anyF?'<button class="cat-clear-all" style="font-size:11px;font-weight:600;color:#dc2626;background:none;border:none;cursor:pointer">Temizle</button>':'')+'</div>'
-      + (groupsHtml || '<span class="t-muted" style="font-size:12px">Filtre için veri yok</span>')
+      + (stdHtml || '<span class="t-muted" style="font-size:12px">Filtre için veri yok</span>')
+      + dynHtml
+      + (CAT_FILTERS.category.length===1 && !CAT_DYNAMIC.length ? '' : (CAT_FILTERS.category.length!==1 ? '<div style="font-size:10.5px;color:var(--text-muted);border-top:1px dashed var(--border);padding-top:10px;margin-top:2px">💡 Tek kategori seç → o kategoriye özel filtreler (lisans, performans, form faktörü…) açılır.</div>' : ''))
       + '</div>';
     sb.querySelectorAll('.cat-facet-pill').forEach(function(b){ b.addEventListener('click', function(){ toggleCatFacet(b.dataset.fk, b.dataset.fv); }); });
     var ca0 = sb.querySelector('.cat-clear-all'); if (ca0) ca0.addEventListener('click', function(){ clearCatFilter('all'); });
   }
-  // Aktif filtre chip'leri (sonuç üstü)
+  // Aktif filtre chip'leri (sonuç üstü) — standart + dinamik
   if (ch) {
     var chips = [];
     var q = el('cat-search')?.value||''; if(q) chips.push(['search','','🔍 "'+q+'"']);
-    CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key].forEach(function(v){ chips.push([f.key, v, (CAT_FACET_LABEL[f.key][v]||v)]); }); });
+    allFacets().forEach(function(f){ (CAT_FILTERS[f.key]||[]).forEach(function(v){ var lbl=(CAT_FACET_LABEL[f.key]&&CAT_FACET_LABEL[f.key][v])||v; chips.push([f.key, v, lbl]); }); });
     if (!chips.length) { ch.innerHTML=''; return; }
     ch.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-      + chips.map(function(c){ return '<span class="cat-chip" data-kind="'+c[0]+'" data-val="'+c[1]+'" style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 6px 3px 10px;border-radius:14px;background:rgba(37,99,235,.10);color:#2563eb;cursor:pointer">'+c[2]+' <span style="font-size:14px;line-height:1">×</span></span>'; }).join('')
+      + chips.map(function(c){ return '<span class="cat-chip" data-kind="'+c[0]+'" data-val="'+String(c[1]).replace(/"/g,'&quot;')+'" style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 6px 3px 10px;border-radius:14px;background:rgba(37,99,235,.10);color:#2563eb;cursor:pointer">'+c[2]+' <span style="font-size:14px;line-height:1">×</span></span>'; }).join('')
       + '<button class="cat-clear-all" style="font-size:11.5px;font-weight:600;color:var(--text-muted);background:none;border:none;cursor:pointer;text-decoration:underline">Tümünü temizle</button>'
       + '</div>';
     ch.querySelectorAll('.cat-chip').forEach(function(b){ b.addEventListener('click', function(){ clearCatFilter(b.dataset.kind, b.dataset.val); }); });
@@ -7136,7 +7166,7 @@ async function loadCatalog() {
         + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:16px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.5">'+(hasFilter?'Filtreleri gevşetip yeniden dene; çok dar bir kesişim seçmiş olabilirsin. Tek tek filtre kaldırarak daha fazla çözüm görebilirsin.':'Vendor\'lar ürün ekledikçe çözümler burada listelenecek.')+'</div>'
         + (hasFilter?'<button class="btn-p btn-sm" id="cat-relax">Tüm Filtreleri Sıfırla</button> <button class="btn-g btn-sm" id="cat-gohome2">Anasayfa</button>':'<button class="btn-p btn-sm" id="cat-gohome">Anasayfa</button>')
         + '</div>';
-      var rb=gridEl.querySelector('#cat-relax'); if(rb) rb.addEventListener('click', function(){ var s=el('cat-search'); if(s)s.value=''; CAT_FACETS.forEach(function(f){CAT_FILTERS[f.key]=[];}); loadCatalog(); });
+      var rb=gridEl.querySelector('#cat-relax'); if(rb) rb.addEventListener('click', function(){ var s=el('cat-search'); if(s)s.value=''; Object.keys(CAT_FILTERS).forEach(function(k){CAT_FILTERS[k]=[];}); loadCatalog(); });
       var gh=gridEl.querySelector('#cat-gohome'); if(gh) gh.addEventListener('click', function(){ go('home'); });
       var gh2=gridEl.querySelector('#cat-gohome2'); if(gh2) gh2.addEventListener('click', function(){ go('home'); });
       updateCatActionBar();
@@ -7251,6 +7281,20 @@ function openCompareModal(ids){
     ['Destek', function(p){return p.supportModel||(p.catFields&&p.catFields.support_model)||'—';}],
     ['Açıklama', function(p){return p.description?(p.description.length>160?p.description.slice(0,160)+'…':p.description):'—';}],
   ];
+  // Kategori-bilinçli: karşılaştırılan ürünler aynı kategorideyse o kategorinin alanlarını satır olarak ekle
+  (function(){
+    var catsSet = {}; prods.forEach(function(p){ if(p.category) catsSet[p.category]=1; });
+    var catKeys = Object.keys(catsSet);
+    if (catKeys.length!==1) return;
+    var defs = (typeof CATEGORY_FIELDS!=='undefined') && CATEGORY_FIELDS[catKeys[0]];
+    if (!defs || !defs.length) return;
+    defs.forEach(function(fd){
+      // en az bir üründe değeri olan alanları göster
+      var any = prods.some(function(p){ return p.catFields && p.catFields[fd.id]!==undefined && p.catFields[fd.id]!==''; });
+      if (!any) return;
+      rows.push([fd.label, (function(fid){ return function(p){ var v=p.catFields && p.catFields[fid]; return (v!==undefined&&v!=='')?v:'—'; }; })(fd.id)]);
+    });
+  })();
   var modal=document.createElement('div'); modal.className='modal-overlay';
   var head = '<th style="text-align:left;padding:10px;font-size:11px;color:var(--text-muted);width:118px"></th>'+prods.map(function(p){ return '<th style="padding:10px;text-align:left;vertical-align:top;border-left:1px solid var(--border)"><div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px">'+(p.name||'')+'</div><div style="font-size:11px;color:var(--text-muted);font-weight:500">'+(p.vendorName||'')+'</div><button class="cmp-poc" data-id="'+p.id+'" style="margin-top:6px;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">PoC →</button></th>'; }).join('');
   var body = rows.map(function(r,i){ return '<tr style="background:'+(i%2?'transparent':'var(--bg-elevated)')+'"><td style="padding:9px 10px;font-size:11.5px;font-weight:700;color:var(--text-secondary)">'+r[0]+'</td>'+prods.map(function(p){ return '<td style="padding:9px 10px;font-size:12px;color:var(--text);border-left:1px solid var(--border);vertical-align:top">'+r[1](p)+'</td>'; }).join('')+'</tr>'; }).join('');
