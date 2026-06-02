@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.67 | pochub.co -->
+<!-- PoCHub v5.68 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.67';
+const VERSION = 'v5.68';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.68': ['FILTRE & TAKSONOMI YONETIM MERKEZI (adim 3): admin artik Katalog ve Etkinlikler facet gruplarinin GORUNURLUGUNU + SIRASINI yonetebiliyor. Sistem Ayarlari > "🎛 Filtre Yonetimi" + openFilterManagerModal (her grup icin ↑/↓ sira + Gorunur anahtari; Varsayilan). pochub_config/system.filters = {catalog:[{key,on}], events:[{key,on}]}. ensureTaxonomy ayni dokumandan filtre yerlesimini de yukler (applyFilterLayout). Katalog sidebar orderFacetList(CAT_FACETS,...) ile siralanir/gizlenir; sektor kapaliysa kesif seridi de gizlenir; gizli grup filtreleri temizlenir. Etkinlik sidebar ayni mantik (kategori kapaliysa rail gizli). Liste icerikleri (sektor/dagitim/lisans) Taksonomi bolumunden yonetilir. config write admin/read public — RULES degismedi.'],
   'v5.67': ['KRITIK DUZELTME — urun duzenleme veri kaybi: Urunlerim>Duzenle cagrisinda catFieldsData=null ve supportModel=\'\' geciliyordu; form bos aciliyor, kaydedilince catFields BOS uzerine yaziliyordu. Cagri artik p.catFields/p.supportModel/p.productUrl geciyor — mevcut teknik alanlar dolu gelir. (Not: daha once bos kaydedilmis urunlerde alanlarin bir kez yeniden girilmesi gerekir.) URUN DETAYI: catFields artik alan GRUPLARINA gore (Performans/VPN/Donanim...) ve sema sirasinda, kaydedilen TUM ozellikleri gosterir; sema disi eski alanlar Diger altinda. URUN URL: add+edit formuna Ureticinin Urun Sayfasi (URL) alani; urun detayinda guvenli (http/https) link butonu. products owner-update zaten serbest oldugundan RULES degismedi.'],
   'v5.66': ['KATALOG dinamik filtre DUZELTME: dinamik kategori-facetleri ve kategori-bilincli karsilastirma artik formla AYNI cozucu olan getCatFields() kullaniyor (dogrudan CATEGORY_FIELDS[ad] yerine — Turkce normalize + Diger fallback). Boylece adi tam eslesmeyen kategoriler (orn. Guvenlik→Guvenlik) ve tum 35 kategori dogru cozulur; formda hangi alanlar girildiyse facet de onlari kullanir. Sidebar seffafligi: tek kategori seciliyken teknik alanlar urunlerde bos ise sessiz kalmak yerine bilgi notu; hicbiri secili degilse ipucu. Not: dinamik facet sadece type=select alanlar icin ve en az bir urunde o alan dolu ise gorunur. UI — rules degismedi.'],
   'v5.65': ['ETKINLIKLER kesif tasarimi (Katalog 2.0 dili uyarlandi, karsilastirma YOK): sol kalici facet sidebar + KATEGORIYE GORE kesif seridi + sonuc basligi (etkinlik sayaci + siralama: Tarihe Yakin/Uzak, Yeni, Doluluk + GRID/LISTE gorunum) + aktif filtre chipleri + akilli bos-sonuc. Donem cubugu (Yaklasan/Bu Ay/...) zamansal eksen olarak korundu. Etkinlige ozel paralel facet motoru (EV_FILTERS/evFacets/evFacetFiltered — katalog motoruna dokunulmadi): Kategori (getCategories), Format (Online/Fiziksel/Hibrit), Dil (POC_LANGUAGES), Ucret (Ucretsiz/Ucretli); ici-OR/gruplar-AND, capraz sayim. Eski inline secimler (ev-cat/format/lang/free) kaldirildi. Kart tiklamasi → etkinlik detay; Kayit butonu korundu. UI — rules degismedi.'],
@@ -6618,8 +6619,10 @@ function toggleEvFacet(k,v){ var a=EV_FILTERS[k]; if(!a) return; var i=a.indexOf
 function clearEvFilter(kind,val){ if(kind==='search'){ var s=el('ev-search'); if(s)s.value=''; } else if(kind==='all'){ var s2=el('ev-search'); if(s2)s2.value=''; Object.keys(EV_FILTERS).forEach(function(k){ EV_FILTERS[k]=[]; }); } else if(EV_FILTERS[kind]){ var i=EV_FILTERS[kind].indexOf(val); if(i>=0) EV_FILTERS[kind].splice(i,1); } loadEventsList(); }
 function evFacetLabel(key,v){ var f=evFacets().filter(function(x){return x.key===key;})[0]; if(!f) return v; var o=f.options.filter(function(x){return x[0]===v;})[0]; return o?o[1]:v; }
 function updateEventFacets(base){
+  Object.keys(EV_FACET_OFF).forEach(function(k){ if(EV_FILTERS[k] && EV_FILTERS[k].length) EV_FILTERS[k]=[]; });
   var rail=el('ev-rail'), sb=el('ev-sidebar'), ch=el('ev-chips');
-  if (rail) {
+  if (rail && EV_FACET_OFF['category']) rail.innerHTML='';
+  if (rail && !EV_FACET_OFF['category']) {
     var catF = evFacets()[0];
     var fb = evFacetFiltered(base,'category');
     var cnt={}; fb.forEach(function(e){ catF.get(e).forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
@@ -6631,7 +6634,7 @@ function updateEventFacets(base){
     rail.querySelectorAll('.ev-rail-tile').forEach(function(b){ b.addEventListener('click', function(){ toggleEvFacet('category', b.dataset.cat); }); });
   }
   if (sb) {
-    var groups = evFacets().map(function(f){
+    var groups = orderFacetList(evFacets(), EV_FACET_ORDER, EV_FACET_OFF).map(function(f){
       var fbg = evFacetFiltered(base, f.key);
       var cnt={}; fbg.forEach(function(e){ f.get(e).forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
       var sel = EV_FILTERS[f.key]||[];
@@ -6703,6 +6706,7 @@ function evCardGrid(e){
 }
 
 async function renderEvents() {
+  await ensureTaxonomy();
   const wrap = el('scr-events');
   wrap.innerHTML = `<div class="wrap">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
@@ -7019,7 +7023,7 @@ function applyTaxonomy(tax){
 var _taxLoaded = false;
 async function ensureTaxonomy(force){
   if (_taxLoaded && !force) return;
-  try { var cs = await getDoc(doc(db,'pochub_config','system')); var t = cs.exists() && cs.data().taxonomy; if (t) applyTaxonomy(t); } catch(e){}
+  try { var cs = await getDoc(doc(db,'pochub_config','system')); if (cs.exists()) { var d=cs.data(); if (d.taxonomy) applyTaxonomy(d.taxonomy); applyFilterLayout(d.filters); } } catch(e){}
   _taxLoaded = true;
 }
 
@@ -7059,6 +7063,23 @@ function rebuildDynamicFacets(){
   });
 }
 function allFacets(){ return CAT_DYNAMIC.length ? CAT_FACETS.concat(CAT_DYNAMIC) : CAT_FACETS; }
+
+// ── Filtre yerleşimi (admin: görünürlük + sıra) ──
+var CAT_FACET_ORDER = null, CAT_FACET_OFF = {};
+var EV_FACET_ORDER  = null, EV_FACET_OFF  = {};
+function orderFacetList(master, orderArr, offMap){
+  var byKey={}; master.forEach(function(f){ byKey[f.key]=f; });
+  var out=[];
+  (orderArr||[]).forEach(function(k){ if(byKey[k] && out.indexOf(byKey[k])<0) out.push(byKey[k]); });
+  master.forEach(function(f){ if(out.indexOf(f)<0) out.push(f); }); // yeni/eksik gruplar sona
+  return out.filter(function(f){ return !offMap[f.key]; });
+}
+function applyFilterLayout(filters){
+  CAT_FACET_ORDER=null; CAT_FACET_OFF={}; EV_FACET_ORDER=null; EV_FACET_OFF={};
+  if(!filters) return;
+  if(Array.isArray(filters.catalog)){ CAT_FACET_ORDER=filters.catalog.map(function(g){return g.key;}); filters.catalog.forEach(function(g){ if(g && g.on===false) CAT_FACET_OFF[g.key]=true; }); }
+  if(Array.isArray(filters.events)){ EV_FACET_ORDER=filters.events.map(function(g){return g.key;}); filters.events.forEach(function(g){ if(g && g.on===false) EV_FACET_OFF[g.key]=true; }); }
+}
 function anyCatFacet(){ return allFacets().some(function(f){ return (CAT_FILTERS[f.key]||[]).length; }); }
 function syncCatalogURL(){
   try {
@@ -7102,9 +7123,11 @@ function facetFiltered(list, exceptKey){
 }
 function updateCatalogFacetsAndChips(allBase){
   rebuildDynamicFacets();
+  Object.keys(CAT_FACET_OFF).forEach(function(k){ if(CAT_FILTERS[k] && CAT_FILTERS[k].length) CAT_FILTERS[k]=[]; });
   var sb = el('cat-sidebar'), rail = el('cat-rail'), ch = el('cat-chips');
+  if (rail && CAT_FACET_OFF['sector']) rail.innerHTML='';
   // Sektör keşif şeridi (Faz B) — prominent giriş
-  if (rail) {
+  if (rail && !CAT_FACET_OFF['sector']) {
     var secFacet = CAT_FACETS.filter(function(f){return f.key==='sector';})[0];
     var fb = facetFiltered(allBase, 'sector');
     var counts = {}; fb.forEach(function(p){ secFacet.get(p).forEach(function(v){ counts[v]=(counts[v]||0)+1; }); });
@@ -7130,7 +7153,7 @@ function updateCatalogFacetsAndChips(allBase){
   }
   // Sol sidebar — standart gruplar + (varsa) dinamik kategori-özel gruplar
   if (sb) {
-    var stdHtml = CAT_FACETS.map(makeGroup).filter(Boolean).join('');
+    var stdHtml = orderFacetList(CAT_FACETS, CAT_FACET_ORDER, CAT_FACET_OFF).map(makeGroup).filter(Boolean).join('');
     var dynHtml = '';
     if (CAT_FILTERS.category.length===1) {
       var inner = CAT_DYNAMIC.length ? CAT_DYNAMIC.map(makeGroup).filter(Boolean).join('') : '';
@@ -28788,6 +28811,70 @@ function openPackageEditor(pkgId, allPackages) {
 
 // Admin: Sistem Ayarları Sayfası
 // ════════════════════════════════════════════════════════════════════
+// v5.68: Admin — Filtre Yönetimi (katalog & etkinlik facet görünürlük + sıra)
+// ════════════════════════════════════════════════════════════════════
+function openFilterManagerModal(){
+  var catMaster = CAT_FACETS.map(function(f){ return {key:f.key, label:f.label}; });
+  var evMaster  = evFacets().map(function(f){ return {key:f.key, label:f.label}; });
+  function layout(master, orderArr, offMap){
+    var byKey={}; master.forEach(function(m){ byKey[m.key]=m; });
+    var rows=[], seen={};
+    (orderArr||[]).forEach(function(k){ if(byKey[k] && !seen[k]){ seen[k]=1; rows.push({key:k,label:byKey[k].label,on:!offMap[k]}); } });
+    master.forEach(function(m){ if(!seen[m.key]){ seen[m.key]=1; rows.push({key:m.key,label:m.label,on:!offMap[m.key]}); } });
+    return rows;
+  }
+  var catRows = layout(catMaster, CAT_FACET_ORDER, CAT_FACET_OFF);
+  var evRows  = layout(evMaster, EV_FACET_ORDER, EV_FACET_OFF);
+
+  var modal=document.createElement('div'); modal.className='modal-overlay';
+  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:680px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;position:relative">'
+    + '<button id="fil-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+    + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">🎛 Filtre Yönetimi</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sıra için ↑/↓, görünürlük için anahtarı kullan. Kategori filtresi kapalıyken keşif şeridi de gizlenir. (Kategoriye özel dinamik filtreler her zaman açıktır.)</div>'
+    + '<div style="display:flex;gap:18px;flex-wrap:wrap">'
+    + '<div style="flex:1;min-width:240px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📦 Katalog filtreleri</div><div id="fil-cat"></div></div>'
+    + '<div style="flex:1;min-width:240px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📅 Etkinlik filtreleri</div><div id="fil-ev"></div></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:20px"><button class="btn-p" id="fil-save" style="flex:1">💾 Kaydet</button><button class="btn-g" id="fil-reset">↺ Varsayılan</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  function renderList(hostId, rows){
+    var host=modal.querySelector(hostId); host.innerHTML='';
+    rows.forEach(function(r){
+      var row=document.createElement('div'); row.className='fil-row'; row.dataset.key=r.key; row.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)';
+      row.innerHTML = '<div style="display:flex;flex-direction:column;gap:1px"><button class="fil-up" title="Yukarı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▲</button><button class="fil-down" title="Aşağı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▼</button></div>'
+        + '<span style="flex:1;font-size:13px;font-weight:600">'+r.label+'</span>'
+        + '<label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-muted);cursor:pointer"><input type="checkbox" class="fil-on"'+(r.on?' checked':'')+'> Görünür</label>';
+      host.appendChild(row);
+    });
+    host.querySelectorAll('.fil-up').forEach(function(b){ b.addEventListener('click', function(){ var row=b.closest('.fil-row'); var prev=row.previousElementSibling; if(prev) row.parentNode.insertBefore(row, prev); }); });
+    host.querySelectorAll('.fil-down').forEach(function(b){ b.addEventListener('click', function(){ var row=b.closest('.fil-row'); var next=row.nextElementSibling; if(next) row.parentNode.insertBefore(next, row); }); });
+  }
+  renderList('#fil-cat', catRows);
+  renderList('#fil-ev', evRows);
+
+  function collect(hostId){ return [].slice.call(modal.querySelectorAll(hostId+' .fil-row')).map(function(row){ return {key:row.dataset.key, on:row.querySelector('.fil-on').checked}; }); }
+  modal.querySelector('#fil-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  modal.querySelector('#fil-reset').addEventListener('click', function(){
+    renderList('#fil-cat', catMaster.map(function(m){return {key:m.key,label:m.label,on:true};}));
+    renderList('#fil-ev', evMaster.map(function(m){return {key:m.key,label:m.label,on:true};}));
+  });
+  modal.querySelector('#fil-save').addEventListener('click', async function(){
+    var btn=this; btn.disabled=true; btn.textContent='⏳ Kaydediliyor...';
+    var filters = { catalog: collect('#fil-cat'), events: collect('#fil-ev') };
+    try {
+      await setDoc(doc(db,'pochub_config','system'), { filters: filters }, {merge:true});
+      applyFilterLayout(filters); _taxLoaded=true;
+      showToast('Filtre ayarları kaydedildi.');
+      modal.remove();
+      var mm=el('adm-main'); if(mm) admSettings(mm);
+    } catch(e){ showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='💾 Kaydet'; }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
 // v5.62 (Faz A3b): Admin — Taksonomi Editörü (sektör & dağıtım)
 // ════════════════════════════════════════════════════════════════════
 function openTaxonomyEditorModal(){
@@ -29079,6 +29166,16 @@ async function admSettings(m) {
     taxBtn.addEventListener('click', function(){ openTaxonomyEditorModal(); });
     sTax.appendChild(taxBtn);
     m.appendChild(sTax);
+
+    // v5.68: Filtre Yönetimi (katalog & etkinlik facet görünürlük + sıra)
+    var sFil = section('🎛 Filtre Yönetimi (Katalog & Etkinlik)', '#2563eb');
+    var filInfo = document.createElement('div'); filInfo.style.cssText='font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6';
+    filInfo.textContent = 'Katalog ve Etkinlikler sayfalarında hangi filtre gruplarının görüneceğini ve sırasını yönet. (Liste içerikleri — sektör/dağıtım/lisans — Taksonomi bölümünden yönetilir.)';
+    sFil.appendChild(filInfo);
+    var filBtn = document.createElement('button'); filBtn.className='btn-g'; filBtn.textContent='🎛 Filtreleri Düzenle';
+    filBtn.addEventListener('click', function(){ openFilterManagerModal(); });
+    sFil.appendChild(filBtn);
+    m.appendChild(sFil);
 
     // Suspend
     var s4 = section('⚠️ Suspend Kuralları', '#dc2626');
