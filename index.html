@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.65 | pochub.co -->
+<!-- PoCHub v5.66 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.65';
+const VERSION = 'v5.66';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.66': ['KATALOG dinamik filtre DUZELTME: dinamik kategori-facetleri ve kategori-bilincli karsilastirma artik formla AYNI cozucu olan getCatFields() kullaniyor (dogrudan CATEGORY_FIELDS[ad] yerine — Turkce normalize + Diger fallback). Boylece adi tam eslesmeyen kategoriler (orn. Guvenlik→Guvenlik) ve tum 35 kategori dogru cozulur; formda hangi alanlar girildiyse facet de onlari kullanir. Sidebar seffafligi: tek kategori seciliyken teknik alanlar urunlerde bos ise sessiz kalmak yerine bilgi notu; hicbiri secili degilse ipucu. Not: dinamik facet sadece type=select alanlar icin ve en az bir urunde o alan dolu ise gorunur. UI — rules degismedi.'],
   'v5.65': ['ETKINLIKLER kesif tasarimi (Katalog 2.0 dili uyarlandi, karsilastirma YOK): sol kalici facet sidebar + KATEGORIYE GORE kesif seridi + sonuc basligi (etkinlik sayaci + siralama: Tarihe Yakin/Uzak, Yeni, Doluluk + GRID/LISTE gorunum) + aktif filtre chipleri + akilli bos-sonuc. Donem cubugu (Yaklasan/Bu Ay/...) zamansal eksen olarak korundu. Etkinlige ozel paralel facet motoru (EV_FILTERS/evFacets/evFacetFiltered — katalog motoruna dokunulmadi): Kategori (getCategories), Format (Online/Fiziksel/Hibrit), Dil (POC_LANGUAGES), Ucret (Ucretsiz/Ucretli); ici-OR/gruplar-AND, capraz sayim. Eski inline secimler (ev-cat/format/lang/free) kaldirildi. Kart tiklamasi → etkinlik detay; Kayit butonu korundu. UI — rules degismedi.'],
   'v5.64': ['KATALOG dinamik (baglama-duyarli) filtre: kullanici TEK kategori sectiginde, o kategorinin CATEGORY_FIELDS icindeki select-tipi alanlari sol sidebarda standart facetlerin altinda DINAMIK facet gruplari olarak acilir (rebuildDynamicFacets + allFacets; key cf:<fieldId>). Ornek: Firewall secince SSL Inceleme/ZTNA/Form Faktoru/HA Modu/Lisans Modeli; Yedekleme secince kendi alanlari. Canli capraz sayim, chip, URL deep-link (cf:* parametreleri), Temizle hepsini kapsar. Kategori degisince dinamik secimler sifirlanir; ipucu metni (tek kategori sec → ozel filtreler). KARSILASTIRMA da kategori-bilincli: ayni kategorideki urunlerde o kategorinin alanlari otomatik satir olur. UI — rules degismedi.'],
   'v5.63': ['KATALOG 2.0 (Faz B+C+Lisans) — kataloğu çok yönlü keşif ortamına dönüştüren büyük yeniden kurgu. YENI DUZEN: sol kalıcı facet kenar çubuğu (sticky) + üstte SEKTOR KESIF SERIDI (Faz B: sektör kutucukları + çözüm sayıları, tıkla-filtrele) + sonuç başlığı (canlı çözüm sayacı + sıralama + GRID/LISTE gorunum gecisi). FACET GRUPLARI 7ye cikti: Kategori (cok-secim, getCategories\'ten), Sektor, Dagitim, LISANS (yeni — normalizeLicense + TAXONOMY_DEFAULTS.licenses match anahtarlari), Koken, Dogrulama, Puan (4+/3+). Ici-OR/gruplar-AND, capraz sayaclar, chip + URL deep-link (q/sort/view + tum gruplar). KARSILASTIRMA (Faz C): kart/satir secimi (CAT_COMPARE, filtreler arasi kalici) + sticky aksiyon bari (N secili → Karsilastir[≥2] + PoC Baslat) → openCompareModal yan-yana tablo (Kategori/Sektorler/Dagitim/Lisans/Koken/Dogrulanmis/Puan/Destek/Aciklama, kolon basligi PoC butonu). LISTE gorunumu + grid. AKILLI BOS-SONUC: filtre gevsetme/sifirlama. Admin Taksonomi Editorune LISANS bolumu eklendi (sektor+dagitim+lisans). config read public — RULES degismedi.'],
@@ -7022,7 +7023,7 @@ function rebuildDynamicFacets(){
   CAT_DYNAMIC = [];
   var sel = CAT_FILTERS.category || [];
   if (sel.length !== 1) return;
-  var defs = (typeof CATEGORY_FIELDS!=='undefined') && CATEGORY_FIELDS[sel[0]];
+  var defs = (typeof getCatFields==='function') ? getCatFields(sel[0]) : ((typeof CATEGORY_FIELDS!=='undefined') && CATEGORY_FIELDS[sel[0]]);
   if (!defs || !defs.length) return;
   defs.forEach(function(fd){
     if (fd.type!=='select' || !fd.opts || !fd.opts.length) return;
@@ -7105,16 +7106,21 @@ function updateCatalogFacetsAndChips(allBase){
   if (sb) {
     var stdHtml = CAT_FACETS.map(makeGroup).filter(Boolean).join('');
     var dynHtml = '';
-    if (CAT_DYNAMIC.length) {
-      var inner = CAT_DYNAMIC.map(makeGroup).filter(Boolean).join('');
-      if (inner) dynHtml = '<div style="margin:4px 0 12px;padding-top:12px;border-top:1px dashed var(--border)"><div style="font-size:11.5px;font-weight:800;color:#2563eb;margin-bottom:10px">🔧 '+(CAT_FILTERS.category[0]||'')+' özellikleri</div>'+inner+'</div>';
+    if (CAT_FILTERS.category.length===1) {
+      var inner = CAT_DYNAMIC.length ? CAT_DYNAMIC.map(makeGroup).filter(Boolean).join('') : '';
+      if (inner) {
+        dynHtml = '<div style="margin:4px 0 12px;padding-top:12px;border-top:1px dashed var(--border)"><div style="font-size:11.5px;font-weight:800;color:#2563eb;margin-bottom:10px">🔧 '+(CAT_FILTERS.category[0]||'')+' özellikleri</div>'+inner+'</div>';
+      } else {
+        dynHtml = '<div style="font-size:10.5px;color:var(--text-muted);border-top:1px dashed var(--border);padding-top:10px;margin-top:6px;line-height:1.5">🔧 '+(CAT_FILTERS.category[0]||'')+' için teknik filtre, ürünlerde bu alanlar doldurulduğunda otomatik açılır.</div>';
+      }
+    } else {
+      dynHtml = '<div style="font-size:10.5px;color:var(--text-muted);border-top:1px dashed var(--border);padding-top:10px;margin-top:6px;line-height:1.5">💡 Tek kategori seç → o kategoriye özel filtreler (lisans, performans, form faktörü…) açılır.</div>';
     }
     var anyF = anyCatFacet() || (el('cat-search')?.value||'');
     sb.innerHTML = '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:14px;position:sticky;top:14px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:13px;font-weight:800">Filtreler</span>'+(anyF?'<button class="cat-clear-all" style="font-size:11px;font-weight:600;color:#dc2626;background:none;border:none;cursor:pointer">Temizle</button>':'')+'</div>'
       + (stdHtml || '<span class="t-muted" style="font-size:12px">Filtre için veri yok</span>')
       + dynHtml
-      + (CAT_FILTERS.category.length===1 && !CAT_DYNAMIC.length ? '' : (CAT_FILTERS.category.length!==1 ? '<div style="font-size:10.5px;color:var(--text-muted);border-top:1px dashed var(--border);padding-top:10px;margin-top:2px">💡 Tek kategori seç → o kategoriye özel filtreler (lisans, performans, form faktörü…) açılır.</div>' : ''))
       + '</div>';
     sb.querySelectorAll('.cat-facet-pill').forEach(function(b){ b.addEventListener('click', function(){ toggleCatFacet(b.dataset.fk, b.dataset.fv); }); });
     var ca0 = sb.querySelector('.cat-clear-all'); if (ca0) ca0.addEventListener('click', function(){ clearCatFilter('all'); });
@@ -7351,7 +7357,7 @@ function openCompareModal(ids){
     var catsSet = {}; prods.forEach(function(p){ if(p.category) catsSet[p.category]=1; });
     var catKeys = Object.keys(catsSet);
     if (catKeys.length!==1) return;
-    var defs = (typeof CATEGORY_FIELDS!=='undefined') && CATEGORY_FIELDS[catKeys[0]];
+    var defs = (typeof getCatFields==='function') ? getCatFields(catKeys[0]) : ((typeof CATEGORY_FIELDS!=='undefined') && CATEGORY_FIELDS[catKeys[0]]);
     if (!defs || !defs.length) return;
     defs.forEach(function(fd){
       // en az bir üründe değeri olan alanları göster
