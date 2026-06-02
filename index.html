@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.66 | pochub.co -->
+<!-- PoCHub v5.67 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.66';
+const VERSION = 'v5.67';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.67': ['KRITIK DUZELTME — urun duzenleme veri kaybi: Urunlerim>Duzenle cagrisinda catFieldsData=null ve supportModel=\'\' geciliyordu; form bos aciliyor, kaydedilince catFields BOS uzerine yaziliyordu. Cagri artik p.catFields/p.supportModel/p.productUrl geciyor — mevcut teknik alanlar dolu gelir. (Not: daha once bos kaydedilmis urunlerde alanlarin bir kez yeniden girilmesi gerekir.) URUN DETAYI: catFields artik alan GRUPLARINA gore (Performans/VPN/Donanim...) ve sema sirasinda, kaydedilen TUM ozellikleri gosterir; sema disi eski alanlar Diger altinda. URUN URL: add+edit formuna Ureticinin Urun Sayfasi (URL) alani; urun detayinda guvenli (http/https) link butonu. products owner-update zaten serbest oldugundan RULES degismedi.'],
   'v5.66': ['KATALOG dinamik filtre DUZELTME: dinamik kategori-facetleri ve kategori-bilincli karsilastirma artik formla AYNI cozucu olan getCatFields() kullaniyor (dogrudan CATEGORY_FIELDS[ad] yerine — Turkce normalize + Diger fallback). Boylece adi tam eslesmeyen kategoriler (orn. Guvenlik→Guvenlik) ve tum 35 kategori dogru cozulur; formda hangi alanlar girildiyse facet de onlari kullanir. Sidebar seffafligi: tek kategori seciliyken teknik alanlar urunlerde bos ise sessiz kalmak yerine bilgi notu; hicbiri secili degilse ipucu. Not: dinamik facet sadece type=select alanlar icin ve en az bir urunde o alan dolu ise gorunur. UI — rules degismedi.'],
   'v5.65': ['ETKINLIKLER kesif tasarimi (Katalog 2.0 dili uyarlandi, karsilastirma YOK): sol kalici facet sidebar + KATEGORIYE GORE kesif seridi + sonuc basligi (etkinlik sayaci + siralama: Tarihe Yakin/Uzak, Yeni, Doluluk + GRID/LISTE gorunum) + aktif filtre chipleri + akilli bos-sonuc. Donem cubugu (Yaklasan/Bu Ay/...) zamansal eksen olarak korundu. Etkinlige ozel paralel facet motoru (EV_FILTERS/evFacets/evFacetFiltered — katalog motoruna dokunulmadi): Kategori (getCategories), Format (Online/Fiziksel/Hibrit), Dil (POC_LANGUAGES), Ucret (Ucretsiz/Ucretli); ici-OR/gruplar-AND, capraz sayim. Eski inline secimler (ev-cat/format/lang/free) kaldirildi. Kart tiklamasi → etkinlik detay; Kayit butonu korundu. UI — rules degismedi.'],
   'v5.64': ['KATALOG dinamik (baglama-duyarli) filtre: kullanici TEK kategori sectiginde, o kategorinin CATEGORY_FIELDS icindeki select-tipi alanlari sol sidebarda standart facetlerin altinda DINAMIK facet gruplari olarak acilir (rebuildDynamicFacets + allFacets; key cf:<fieldId>). Ornek: Firewall secince SSL Inceleme/ZTNA/Form Faktoru/HA Modu/Lisans Modeli; Yedekleme secince kendi alanlari. Canli capraz sayim, chip, URL deep-link (cf:* parametreleri), Temizle hepsini kapsar. Kategori degisince dinamik secimler sifirlanir; ipucu metni (tek kategori sec → ozel filtreler). KARSILASTIRMA da kategori-bilincli: ayni kategorideki urunlerde o kategorinin alanlari otomatik satir olur. UI — rules degismedi.'],
@@ -5341,23 +5342,45 @@ async function openProductDetailModal(productId) {
     modal.className = 'modal-bg on';
     modal.id = 'prod-detail-modal';
 
-    // catFields alanlarını güzel göster
+    // catFields alanlarını gruplara göre güzel göster
     var catFieldsHtml = '';
     if (p.catFields && Object.keys(p.catFields).length) {
       var fields = getCatFields(p.category||'');
-      var fieldMap = {};
-      fields.forEach(function(f){ fieldMap[f.id] = f.label; });
-      catFieldsHtml = '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(15,23,42,.08)">' +
-        '<div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.6px;margin-bottom:12px">TEKNİK ÖZELLİKLER</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px">';
-      Object.entries(p.catFields).forEach(function(kv) {
-        var label = fieldMap[kv[0]] || kv[0].replace(/_/g,' ');
-        catFieldsHtml += '<div style="display:flex;flex-direction:column;padding:8px 0;border-bottom:1px solid var(--border)">' +
-          '<span style="font-size:10.5px;color:var(--text-muted);margin-bottom:2px">'+label+'</span>' +
-          '<span class="fs13-fw6">'+kv[1]+'</span></div>';
+      var byId = {}; fields.forEach(function(f){ byId[f.id]=f; });
+      var groupsOrder = []; var grouped = {};
+      fields.forEach(function(f){
+        var v = p.catFields[f.id];
+        if (v===undefined || v==='') return;
+        var g = f.group || 'Genel';
+        if(!grouped[g]){ grouped[g]=[]; groupsOrder.push(g); }
+        grouped[g].push([f.label, v]);
       });
-      catFieldsHtml += '</div></div>';
+      Object.keys(p.catFields).forEach(function(k){
+        if (byId[k]) return; var v=p.catFields[k]; if(v===undefined||v==='') return;
+        if(!grouped['Diğer']){ grouped['Diğer']=[]; groupsOrder.push('Diğer'); }
+        grouped['Diğer'].push([k.replace(/_/g,' '), v]);
+      });
+      if (groupsOrder.length) {
+        catFieldsHtml = '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(15,23,42,.08)">' +
+          '<div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.6px;margin-bottom:6px">TEKNİK ÖZELLİKLER</div>';
+        groupsOrder.forEach(function(g){
+          catFieldsHtml += '<div style="font-size:11px;font-weight:800;color:#2563eb;margin:12px 0 6px">'+g+'</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px">';
+          grouped[g].forEach(function(kv){
+            catFieldsHtml += '<div style="display:flex;flex-direction:column;padding:8px 0;border-bottom:1px solid var(--border)">' +
+              '<span style="font-size:10.5px;color:var(--text-muted);margin-bottom:2px">'+kv[0]+'</span>' +
+              '<span class="fs13-fw6">'+kv[1]+'</span></div>';
+          });
+          catFieldsHtml += '</div>';
+        });
+        catFieldsHtml += '</div>';
+      }
     }
+    // Üreticinin ürün sayfası (varsa) — güvenli http(s) linki
+    var _purl = (p.productUrl||'').trim();
+    var urlHtml = /^https?:\/\//i.test(_purl)
+      ? '<a href="'+_purl.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#2563eb;text-decoration:none;margin-bottom:16px;padding:9px 13px;border:1px solid rgba(37,99,235,.3);border-radius:9px;background:rgba(37,99,235,.05)">🔗 Üreticinin ürün sayfasını aç →</a>'
+      : '';
 
     var canPoc = CUR_USER && CUR_PROFILE?.role !== 'vendor';
     var pocBtnHtml = CUR_USER
@@ -5393,6 +5416,9 @@ async function openProductDetailModal(productId) {
 
       // Açıklama
       (p.description ? '<div style="font-size:14px;color:#c8cfdb;line-height:1.7;margin-bottom:16px">'+(p.description)+'</div>' : '') +
+
+      // Üreticinin ürün sayfası linki
+      urlHtml +
 
       // Teknik özellikler
       catFieldsHtml +
@@ -13373,7 +13399,7 @@ async function loadVendTab() {
       m.querySelectorAll('.pr-eb').forEach(function(b){
         b.addEventListener('click', function(){
           var p = products.find(function(x){ return x.id===b.dataset.id; });
-          if (p) openEditProd(p.id, p.name||'', p.category||'', p.country||'', p.description||'', '', null, p.sectors||[]);
+          if (p) openEditProd(p.id, p.name||'', p.category||'', p.country||'', p.description||'', p.supportModel||'', p.catFields||{}, p.sectors||[], p.productUrl||'');
         });
       });
 
@@ -14727,7 +14753,7 @@ async function loadVendTab() {
   }
 }
 
-function openEditProd(prodId, name, category, country, description, supportModel, catFieldsData, sectorsData) {
+function openEditProd(prodId, name, category, country, description, supportModel, catFieldsData, sectorsData, productUrl) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.id = 'prod-edit-modal';
@@ -14780,6 +14806,8 @@ function openEditProd(prodId, name, category, country, description, supportModel
     '<input type="hidden" id="edit-country-val" value="'+(country||'TR')+'">' +
     '<label class="lbl fs12">Açıklama</label>' +
     '<textarea class="inp" id="edit-desc" rows="4" style="resize:vertical;margin-bottom:12px;font-size:13px">'+(description||'')+'</textarea>' +
+    '<label class="lbl t-w8">Üreticinin Ürün Sayfası (URL)</label>' +
+    '<input class="inp" id="edit-url" type="url" placeholder="https://uretici.com/urun" value="'+(productUrl||'').replace(/"/g,'&quot;')+'" style="margin-bottom:12px;font-size:13px">' +
     '<label class="lbl t-w8">Sektörler <span style="font-weight:400;color:var(--text-muted);font-size:11px">(çoklu, opsiyonel)</span></label>' +
     '<div id="edit-sectors" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'+sectorPillsHtml(sectorsData||[])+'</div>' +
     '<label class="lbl t-w8">Destek Modeli</label>' +
@@ -14831,6 +14859,7 @@ function openEditProd(prodId, name, category, country, description, supportModel
         category:     newCat,
         country:      modal.querySelector('#edit-country-val')?.value || country || 'TR',
         description:  modal.querySelector('#edit-desc').value.trim(),
+        productUrl:   (modal.querySelector('#edit-url')?.value||'').trim(),
         sectors:      readSectorPills(modal),
         supportModel: modal.querySelector('#edit-support').value,
         catFields:    newCatData,
@@ -23006,6 +23035,9 @@ async function openAddProductModal(prefillCat) {
     '<label class="lbl t-w8">Kısa Açıklama</label>' +
     '<textarea class="inp" id="pr-desc" rows="4" placeholder="Genel ürün açıklaması..." style="resize:vertical;margin-bottom:14px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155"></textarea>' +
 
+    '<label class="lbl t-w8">Üreticinin Ürün Sayfası (URL) <span style="font-weight:400;color:#94a3b8;font-size:11px">(opsiyonel — müşteri detayda görür)</span></label>' +
+    '<input class="inp" id="pr-url" type="url" placeholder="https://uretici.com/urun" style="margin-bottom:14px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155">' +
+
     '<label class="lbl t-w8">Sektörler <span style="font-weight:400;color:#94a3b8;font-size:11px">(ürünün hizmet verdiği sektörler — çoklu, opsiyonel)</span></label>' +
     '<div id="pr-sectors" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">'+sectorPillsHtml([])+'</div>' +
 
@@ -23269,6 +23301,7 @@ async function openAddProductModal(prefillCat) {
         directSale:    isDirectSale,
         country:       modal.querySelector('#pr-country-val')?.value||'TR',
         description:   modal.querySelector('#pr-desc').value.trim(),
+        productUrl:    (modal.querySelector('#pr-url')?.value||'').trim(),
         supportModel:  modal.querySelector('#pr-support').value,
         catFields:     catData,
         distributors,
