@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.69 | pochub.co -->
+<!-- PoCHub v5.70 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.69';
+const VERSION = 'v5.70';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.70': ['FILTRE YONETIMI esnek (ekle/cikar/duzenle): Filtre Yonetimi modali yeniden yazildi. DUZENLE: her facet grubunun etiketi inline input ile degistirilebilir (override config.filters[].label). CIKAR: gorunurluk anahtari (gizle) + ozel facetlerde 🗑 tam silme. EKLE: admin yeni OZEL facet ekleyebilir — aday alan secer (katalog: Satis Tipi/Destek Modeli/Ulke + tum kategorilerin select tipi catFields alanlari; etkinlik: Konum), secenekler VERIDEN otomatik turetilir (computeCustomOptions). Ozel facetler katalog/etkinlik motoruna tam entegre (allFacets/evAllFacets, facetFiltered, sayim, chip, URL deep-link, sira/gorunurluk). config: filters.{catalog,events,catalogCustom,eventsCustom}. config write admin/read public — RULES degismedi.'],
   'v5.69': ['KARSILASTIRMA Gartner seviyesine cikarildi (adim 1): openCompareModal yeniden yazildi — tam-genislik (96vw), YAPISKAN kolon basliklari + yapiskan ilk sutun (oznitelik adi), oznitelikler GRUPLU (Genel + kategoriye ozel teknik gruplar f.group ile), SADECE FARKLARI GOSTER anahtari (ayni degerli satirlari gizler), Puan satirinda EN IYI urun yesil vurgulu, kolon basliginda urun puani + PoC butonu + Urun sayfasi linki (productUrl). PAYLASILABILIR baglanti: Baglantiyi kopyala → ?compare=id1,id2#catalog; katalog acilisinda bu parametre varsa karsilastirma otomatik acilir (deep-link). UI — rules degismedi.'],
   'v5.68': ['FILTRE & TAKSONOMI YONETIM MERKEZI (adim 3): admin artik Katalog ve Etkinlikler facet gruplarinin GORUNURLUGUNU + SIRASINI yonetebiliyor. Sistem Ayarlari > "🎛 Filtre Yonetimi" + openFilterManagerModal (her grup icin ↑/↓ sira + Gorunur anahtari; Varsayilan). pochub_config/system.filters = {catalog:[{key,on}], events:[{key,on}]}. ensureTaxonomy ayni dokumandan filtre yerlesimini de yukler (applyFilterLayout). Katalog sidebar orderFacetList(CAT_FACETS,...) ile siralanir/gizlenir; sektor kapaliysa kesif seridi de gizlenir; gizli grup filtreleri temizlenir. Etkinlik sidebar ayni mantik (kategori kapaliysa rail gizli). Liste icerikleri (sektor/dagitim/lisans) Taksonomi bolumunden yonetilir. config write admin/read public — RULES degismedi.'],
   'v5.67': ['KRITIK DUZELTME — urun duzenleme veri kaybi: Urunlerim>Duzenle cagrisinda catFieldsData=null ve supportModel=\'\' geciliyordu; form bos aciliyor, kaydedilince catFields BOS uzerine yaziliyordu. Cagri artik p.catFields/p.supportModel/p.productUrl geciyor — mevcut teknik alanlar dolu gelir. (Not: daha once bos kaydedilmis urunlerde alanlarin bir kez yeniden girilmesi gerekir.) URUN DETAYI: catFields artik alan GRUPLARINA gore (Performans/VPN/Donanim...) ve sema sirasinda, kaydedilen TUM ozellikleri gosterir; sema disi eski alanlar Diger altinda. URUN URL: add+edit formuna Ureticinin Urun Sayfasi (URL) alani; urun detayinda guvenli (http/https) link butonu. products owner-update zaten serbest oldugundan RULES degismedi.'],
@@ -6614,13 +6615,15 @@ function evFacets(){ return [
   { key:'language', label:'Dil', options:(typeof POC_LANGUAGES!=='undefined'?POC_LANGUAGES:[]).map(function(l){ return [l.code, l.flag+' '+l.name]; }), get:function(e){ return e.language?[e.language]:[]; } },
   { key:'fee', label:'Ücret', options:[['free','🎁 Ücretsiz'],['paid','💳 Ücretli']], get:function(e){ return [(e.fee>0?'paid':'free')]; } },
 ]; }
-function anyEvFacet(){ return evFacets().some(function(f){ return (EV_FILTERS[f.key]||[]).length; }); }
-function evFacetFiltered(list, exceptKey){ return list.filter(function(e){ return evFacets().every(function(f){ if(f.key===exceptKey) return true; var sel=EV_FILTERS[f.key]||[]; if(!sel.length) return true; return f.get(e).some(function(v){ return sel.indexOf(v)>=0; }); }); }); }
+function evAllFacets(){ return EV_CUSTOM.length ? evFacets().concat(EV_CUSTOM) : evFacets(); }
+function anyEvFacet(){ return evAllFacets().some(function(f){ return (EV_FILTERS[f.key]||[]).length; }); }
+function evFacetFiltered(list, exceptKey){ return list.filter(function(e){ return evAllFacets().every(function(f){ if(f.key===exceptKey) return true; var sel=EV_FILTERS[f.key]||[]; if(!sel.length) return true; return f.get(e).some(function(v){ return sel.indexOf(v)>=0; }); }); }); }
 function toggleEvFacet(k,v){ var a=EV_FILTERS[k]; if(!a) return; var i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); loadEventsList(); }
 function clearEvFilter(kind,val){ if(kind==='search'){ var s=el('ev-search'); if(s)s.value=''; } else if(kind==='all'){ var s2=el('ev-search'); if(s2)s2.value=''; Object.keys(EV_FILTERS).forEach(function(k){ EV_FILTERS[k]=[]; }); } else if(EV_FILTERS[kind]){ var i=EV_FILTERS[kind].indexOf(val); if(i>=0) EV_FILTERS[kind].splice(i,1); } loadEventsList(); }
-function evFacetLabel(key,v){ var f=evFacets().filter(function(x){return x.key===key;})[0]; if(!f) return v; var o=f.options.filter(function(x){return x[0]===v;})[0]; return o?o[1]:v; }
+function evFacetLabel(key,v){ var f=evAllFacets().filter(function(x){return x.key===key;})[0]; if(!f) return v; var o=(f.options||[]).filter(function(x){return x[0]===v;})[0]; return o?o[1]:v; }
 function updateEventFacets(base){
   Object.keys(EV_FACET_OFF).forEach(function(k){ if(EV_FILTERS[k] && EV_FILTERS[k].length) EV_FILTERS[k]=[]; });
+  computeCustomOptions(EV_CUSTOM, base);
   var rail=el('ev-rail'), sb=el('ev-sidebar'), ch=el('ev-chips');
   if (rail && EV_FACET_OFF['category']) rail.innerHTML='';
   if (rail && !EV_FACET_OFF['category']) {
@@ -6635,7 +6638,7 @@ function updateEventFacets(base){
     rail.querySelectorAll('.ev-rail-tile').forEach(function(b){ b.addEventListener('click', function(){ toggleEvFacet('category', b.dataset.cat); }); });
   }
   if (sb) {
-    var groups = orderFacetList(evFacets(), EV_FACET_ORDER, EV_FACET_OFF).map(function(f){
+    var groups = orderFacetList(evFacets().concat(EV_CUSTOM), EV_FACET_ORDER, EV_FACET_OFF).map(function(f){
       var fbg = evFacetFiltered(base, f.key);
       var cnt={}; fbg.forEach(function(e){ f.get(e).forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
       var sel = EV_FILTERS[f.key]||[];
@@ -6645,7 +6648,7 @@ function updateEventFacets(base){
         var on = sel.indexOf(o[0])>=0;
         return '<button class="ev-facet-pill" data-fk="'+f.key+'" data-fv="'+String(o[0]).replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;text-align:left;font-size:12px;font-weight:'+(on?'700':'500')+';padding:5px 9px;border-radius:8px;cursor:pointer;border:1px solid '+(on?'#2563eb':'transparent')+';background:'+(on?'rgba(37,99,235,.08)':'transparent')+';color:'+(on?'#2563eb':'var(--text-secondary)')+'"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(on?'✓ ':'')+o[1]+'</span><span style="font-size:11px;color:var(--text-muted);flex-shrink:0">'+(cnt[o[0]]||0)+'</span></button>';
       }).join('');
-      return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">'+f.label+'</div><div style="display:flex;flex-direction:column;gap:2px">'+rows+'</div></div>';
+      return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">'+facetLabel(f,'events')+'</div><div style="display:flex;flex-direction:column;gap:2px">'+rows+'</div></div>';
     }).filter(Boolean).join('');
     var anyF = anyEvFacet() || (el('ev-search')?.value||'');
     sb.innerHTML = '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:14px;position:sticky;top:14px">'
@@ -6658,7 +6661,7 @@ function updateEventFacets(base){
   if (ch) {
     var chips=[];
     var q=el('ev-search')?.value||''; if(q) chips.push(['search','','🔍 "'+q+'"']);
-    evFacets().forEach(function(f){ (EV_FILTERS[f.key]||[]).forEach(function(v){ chips.push([f.key,v,evFacetLabel(f.key,v)]); }); });
+    evAllFacets().forEach(function(f){ (EV_FILTERS[f.key]||[]).forEach(function(v){ chips.push([f.key,v,evFacetLabel(f.key,v)]); }); });
     if(!chips.length){ ch.innerHTML=''; return; }
     ch.innerHTML='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
       + chips.map(function(c){ return '<span class="ev-chip" data-kind="'+c[0]+'" data-val="'+String(c[1]).replace(/"/g,'&quot;')+'" style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 6px 3px 10px;border-radius:14px;background:rgba(37,99,235,.10);color:#2563eb;cursor:pointer">'+c[2]+' <span style="font-size:14px;line-height:1">×</span></span>'; }).join('')
@@ -7063,11 +7066,13 @@ function rebuildDynamicFacets(){
     CAT_DYNAMIC.push({ key:key, label:fd.label, dynamic:true, group:fd.group||'', options: fd.opts.map(function(o){ return [o,o]; }), get:(function(fid){ return function(p){ var v=p.catFields && p.catFields[fid]; return (v!==undefined&&v!=='')?[v]:[]; }; })(fd.id) });
   });
 }
-function allFacets(){ return CAT_DYNAMIC.length ? CAT_FACETS.concat(CAT_DYNAMIC) : CAT_FACETS; }
+function allFacets(){ var b = CAT_CUSTOM.length ? CAT_FACETS.concat(CAT_CUSTOM) : CAT_FACETS; return CAT_DYNAMIC.length ? b.concat(CAT_DYNAMIC) : b; }
 
 // ── Filtre yerleşimi (admin: görünürlük + sıra) ──
 var CAT_FACET_ORDER = null, CAT_FACET_OFF = {};
 var EV_FACET_ORDER  = null, EV_FACET_OFF  = {};
+var CAT_LABEL_OVR = {}, EV_LABEL_OVR = {};   // admin etiket override
+var CAT_CUSTOM = [], EV_CUSTOM = [];          // admin-tanımlı özel facet'ler
 function orderFacetList(master, orderArr, offMap){
   var byKey={}; master.forEach(function(f){ byKey[f.key]=f; });
   var out=[];
@@ -7075,18 +7080,62 @@ function orderFacetList(master, orderArr, offMap){
   master.forEach(function(f){ if(out.indexOf(f)<0) out.push(f); }); // yeni/eksik gruplar sona
   return out.filter(function(f){ return !offMap[f.key]; });
 }
+function facetLabel(f, scope){ var ovr=(scope==='events'?EV_LABEL_OVR:CAT_LABEL_OVR); return (ovr && ovr[f.key]) || f.label; }
+function buildCustomGet(def){
+  return function(p){
+    var v = def.top ? p[def.field] : (p.catFields && p.catFields[def.field]);
+    if (def.bool){ if(v===undefined||v===null||v==='') return []; return [ v ? (def.tLabel||'Evet') : (def.fLabel||'Hayır') ]; }
+    return (v!==undefined && v!==null && v!=='') ? [String(v)] : [];
+  };
+}
+function buildCustomFacets(defs, filtersObj){
+  return (defs||[]).map(function(d){
+    if(filtersObj && !(d.key in filtersObj)) filtersObj[d.key]=[];
+    return { key:d.key, label:d.label||d.field, custom:true, def:d, options:[], get:buildCustomGet(d) };
+  });
+}
+function computeCustomOptions(customArr, list){
+  customArr.forEach(function(f){
+    var seen={}, opts=[];
+    list.forEach(function(p){ f.get(p).forEach(function(v){ if(!seen[v]){ seen[v]=1; opts.push([v,v]); } }); });
+    opts.sort(function(a,b){ return String(a[1]).localeCompare(String(b[1]),'tr'); });
+    f.options = opts;
+  });
+}
 function applyFilterLayout(filters){
   CAT_FACET_ORDER=null; CAT_FACET_OFF={}; EV_FACET_ORDER=null; EV_FACET_OFF={};
+  CAT_LABEL_OVR={}; EV_LABEL_OVR={}; CAT_CUSTOM=[]; EV_CUSTOM=[];
   if(!filters) return;
-  if(Array.isArray(filters.catalog)){ CAT_FACET_ORDER=filters.catalog.map(function(g){return g.key;}); filters.catalog.forEach(function(g){ if(g && g.on===false) CAT_FACET_OFF[g.key]=true; }); }
-  if(Array.isArray(filters.events)){ EV_FACET_ORDER=filters.events.map(function(g){return g.key;}); filters.events.forEach(function(g){ if(g && g.on===false) EV_FACET_OFF[g.key]=true; }); }
+  if(Array.isArray(filters.catalogCustom)) CAT_CUSTOM = buildCustomFacets(filters.catalogCustom, CAT_FILTERS);
+  if(Array.isArray(filters.eventsCustom))  EV_CUSTOM  = buildCustomFacets(filters.eventsCustom, EV_FILTERS);
+  if(Array.isArray(filters.catalog)){
+    CAT_FACET_ORDER=filters.catalog.map(function(g){return g.key;});
+    filters.catalog.forEach(function(g){ if(!g) return; if(g.on===false) CAT_FACET_OFF[g.key]=true; if(g.label) CAT_LABEL_OVR[g.key]=g.label; });
+  }
+  if(Array.isArray(filters.events)){
+    EV_FACET_ORDER=filters.events.map(function(g){return g.key;});
+    filters.events.forEach(function(g){ if(!g) return; if(g.on===false) EV_FACET_OFF[g.key]=true; if(g.label) EV_LABEL_OVR[g.key]=g.label; });
+  }
 }
+// Özel facet aday alanları (admin "ekle" için)
+function catalogCustomCandidates(){
+  var arr = [
+    {field:'directSale', top:true, bool:true, tLabel:'Direkt Satış', fLabel:'Bayi/Partner', label:'Satış Tipi'},
+    {field:'supportModel', top:true, label:'Destek Modeli'},
+    {field:'country', top:true, label:'Ülke'}
+  ];
+  var seen={};
+  try { Object.keys(CATEGORY_FIELDS||{}).forEach(function(cat){ (CATEGORY_FIELDS[cat]||[]).forEach(function(fd){ if(fd.type==='select' && !seen[fd.id]){ seen[fd.id]=1; arr.push({field:fd.id, cf:true, label:fd.label}); } }); }); } catch(e){}
+  return arr;
+}
+function eventsCustomCandidates(){ return [ {field:'location', top:true, label:'Konum'} ]; }
 function anyCatFacet(){ return allFacets().some(function(f){ return (CAT_FILTERS[f.key]||[]).length; }); }
 function syncCatalogURL(){
   try {
     var params = new URLSearchParams();
     var q = el('cat-search')?.value||''; if(q) params.set('q', q);
     CAT_FACETS.forEach(function(f){ if(CAT_FILTERS[f.key].length) params.set(f.key, CAT_FILTERS[f.key].join(',')); });
+    CAT_CUSTOM.forEach(function(f){ if((CAT_FILTERS[f.key]||[]).length) params.set(f.key, CAT_FILTERS[f.key].join(',')); });
     CAT_DYNAMIC.forEach(function(f){ if((CAT_FILTERS[f.key]||[]).length) params.set(f.key, CAT_FILTERS[f.key].join(',')); });
     if (CAT_SORT && CAT_SORT!=='rating') params.set('sort', CAT_SORT);
     if (CAT_VIEW==='list') params.set('view','list');
@@ -7099,6 +7148,7 @@ function readCatalogURL(){
     var params = new URLSearchParams(window.location.search);
     var q=params.get('q'); if(q && el('cat-search')) el('cat-search').value=q;
     CAT_FACETS.forEach(function(f){ var v=params.get(f.key); CAT_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
+    CAT_CUSTOM.forEach(function(f){ var v=params.get(f.key); CAT_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
     rebuildDynamicFacets();
     CAT_DYNAMIC.forEach(function(f){ var v=params.get(f.key); CAT_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
     CAT_SORT = params.get('sort') || 'rating';
@@ -7124,6 +7174,7 @@ function facetFiltered(list, exceptKey){
 }
 function updateCatalogFacetsAndChips(allBase){
   rebuildDynamicFacets();
+  computeCustomOptions(CAT_CUSTOM, allBase);
   Object.keys(CAT_FACET_OFF).forEach(function(k){ if(CAT_FILTERS[k] && CAT_FILTERS[k].length) CAT_FILTERS[k]=[]; });
   var sb = el('cat-sidebar'), rail = el('cat-rail'), ch = el('cat-chips');
   if (rail && CAT_FACET_OFF['sector']) rail.innerHTML='';
@@ -7150,11 +7201,11 @@ function updateCatalogFacetsAndChips(allBase){
       var on = sel.indexOf(o[0])>=0;
       return '<button class="cat-facet-pill" data-fk="'+f.key+'" data-fv="'+String(o[0]).replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;text-align:left;font-size:12px;font-weight:'+(on?'700':'500')+';padding:5px 9px;border-radius:8px;cursor:pointer;border:1px solid '+(on?'#2563eb':'transparent')+';background:'+(on?'rgba(37,99,235,.08)':'transparent')+';color:'+(on?'#2563eb':'var(--text-secondary)')+'"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(on?'✓ ':'')+o[1]+'</span><span style="font-size:11px;color:var(--text-muted);flex-shrink:0">'+(cnt[o[0]]||0)+'</span></button>';
     }).join('');
-    return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">'+f.label+'</div><div style="display:flex;flex-direction:column;gap:2px">'+rows+'</div></div>';
+    return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">'+facetLabel(f,'catalog')+'</div><div style="display:flex;flex-direction:column;gap:2px">'+rows+'</div></div>';
   }
   // Sol sidebar — standart gruplar + (varsa) dinamik kategori-özel gruplar
   if (sb) {
-    var stdHtml = orderFacetList(CAT_FACETS, CAT_FACET_ORDER, CAT_FACET_OFF).map(makeGroup).filter(Boolean).join('');
+    var stdHtml = orderFacetList(CAT_FACETS.concat(CAT_CUSTOM), CAT_FACET_ORDER, CAT_FACET_OFF).map(makeGroup).filter(Boolean).join('');
     var dynHtml = '';
     if (CAT_FILTERS.category.length===1) {
       var inner = CAT_DYNAMIC.length ? CAT_DYNAMIC.map(makeGroup).filter(Boolean).join('') : '';
@@ -28877,54 +28928,88 @@ function openPackageEditor(pkgId, allPackages) {
 function openFilterManagerModal(){
   var catMaster = CAT_FACETS.map(function(f){ return {key:f.key, label:f.label}; });
   var evMaster  = evFacets().map(function(f){ return {key:f.key, label:f.label}; });
-  function layout(master, orderArr, offMap){
-    var byKey={}; master.forEach(function(m){ byKey[m.key]=m; });
+  var customDefs = {};   // key -> def (özel facet'ler, her iki scope)
+  CAT_CUSTOM.forEach(function(f){ customDefs[f.key]=f.def; });
+  EV_CUSTOM.forEach(function(f){ customDefs[f.key]=f.def; });
+  var catCands = catalogCustomCandidates();
+  var evCands  = eventsCustomCandidates();
+
+  function layout(master, customArr, orderArr, offMap, ovr){
     var rows=[], seen={};
-    (orderArr||[]).forEach(function(k){ if(byKey[k] && !seen[k]){ seen[k]=1; rows.push({key:k,label:byKey[k].label,on:!offMap[k]}); } });
-    master.forEach(function(m){ if(!seen[m.key]){ seen[m.key]=1; rows.push({key:m.key,label:m.label,on:!offMap[m.key]}); } });
+    var all = master.concat(customArr.map(function(f){ return {key:f.key, label:(f.def&&f.def.label)||f.label, custom:true}; }));
+    var byKey={}; all.forEach(function(m){ byKey[m.key]=m; });
+    (orderArr||[]).forEach(function(k){ if(byKey[k] && !seen[k]){ seen[k]=1; var m=byKey[k]; rows.push({key:k,label:(ovr&&ovr[k])||m.label,on:!offMap[k],custom:!!m.custom}); } });
+    all.forEach(function(m){ if(!seen[m.key]){ seen[m.key]=1; rows.push({key:m.key,label:(ovr&&ovr[m.key])||m.label,on:!offMap[m.key],custom:!!m.custom}); } });
     return rows;
   }
-  var catRows = layout(catMaster, CAT_FACET_ORDER, CAT_FACET_OFF);
-  var evRows  = layout(evMaster, EV_FACET_ORDER, EV_FACET_OFF);
+  var catRows = layout(catMaster, CAT_CUSTOM, CAT_FACET_ORDER, CAT_FACET_OFF, CAT_LABEL_OVR);
+  var evRows  = layout(evMaster,  EV_CUSTOM,  EV_FACET_ORDER,  EV_FACET_OFF,  EV_LABEL_OVR);
+
+  function candOptions(cands){ return cands.map(function(c,i){ return '<option value="'+i+'">'+(c.label||c.field)+(c.cf?' (teknik)':'')+'</option>'; }).join(''); }
 
   var modal=document.createElement('div'); modal.className='modal-overlay';
-  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:680px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;position:relative">'
+  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:760px;width:100%;max-height:90vh;overflow-y:auto;padding:22px;position:relative">'
     + '<button id="fil-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
     + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">🎛 Filtre Yönetimi</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sıra için ↑/↓, görünürlük için anahtarı kullan. Kategori filtresi kapalıyken keşif şeridi de gizlenir. (Kategoriye özel dinamik filtreler her zaman açıktır.)</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sıra için ↑/↓ · görünürlük için anahtar · etiketi yazarak değiştir · özel filtre ekle/sil. Seçenekler veriden otomatik gelir. (Liste içerikleri sektör/dağıtım/lisans için Taksonomi bölümünde.)</div>'
     + '<div style="display:flex;gap:18px;flex-wrap:wrap">'
-    + '<div style="flex:1;min-width:240px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📦 Katalog filtreleri</div><div id="fil-cat"></div></div>'
-    + '<div style="flex:1;min-width:240px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📅 Etkinlik filtreleri</div><div id="fil-ev"></div></div>'
+    +   '<div style="flex:1;min-width:300px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📦 Katalog filtreleri</div><div id="fil-cat"></div>'
+    +     '<div style="display:flex;gap:6px;margin-top:8px"><select class="inp" id="fil-cat-cand" style="flex:1;font-size:12px;padding:5px 8px">'+candOptions(catCands)+'</select><button class="btn-g btn-sm" id="fil-cat-add">+ Ekle</button></div></div>'
+    +   '<div style="flex:1;min-width:300px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📅 Etkinlik filtreleri</div><div id="fil-ev"></div>'
+    +     '<div style="display:flex;gap:6px;margin-top:8px"><select class="inp" id="fil-ev-cand" style="flex:1;font-size:12px;padding:5px 8px">'+candOptions(evCands)+'</select><button class="btn-g btn-sm" id="fil-ev-add">+ Ekle</button></div></div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;margin-top:20px"><button class="btn-p" id="fil-save" style="flex:1">💾 Kaydet</button><button class="btn-g" id="fil-reset">↺ Varsayılan</button></div>'
     + '</div>';
   document.body.appendChild(modal);
 
-  function renderList(hostId, rows){
-    var host=modal.querySelector(hostId); host.innerHTML='';
-    rows.forEach(function(r){
-      var row=document.createElement('div'); row.className='fil-row'; row.dataset.key=r.key; row.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)';
-      row.innerHTML = '<div style="display:flex;flex-direction:column;gap:1px"><button class="fil-up" title="Yukarı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▲</button><button class="fil-down" title="Aşağı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▼</button></div>'
-        + '<span style="flex:1;font-size:13px;font-weight:600">'+r.label+'</span>'
-        + '<label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-muted);cursor:pointer"><input type="checkbox" class="fil-on"'+(r.on?' checked':'')+'> Görünür</label>';
-      host.appendChild(row);
-    });
-    host.querySelectorAll('.fil-up').forEach(function(b){ b.addEventListener('click', function(){ var row=b.closest('.fil-row'); var prev=row.previousElementSibling; if(prev) row.parentNode.insertBefore(row, prev); }); });
-    host.querySelectorAll('.fil-down').forEach(function(b){ b.addEventListener('click', function(){ var row=b.closest('.fil-row'); var next=row.nextElementSibling; if(next) row.parentNode.insertBefore(next, row); }); });
+  function rowHtml(r){
+    return '<div class="fil-row" data-key="'+r.key+'" data-custom="'+(r.custom?'1':'0')+'" style="display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)">'
+      + '<div style="display:flex;flex-direction:column;gap:1px"><button class="fil-up" title="Yukarı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▲</button><button class="fil-down" title="Aşağı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▼</button></div>'
+      + '<input class="inp fil-label" value="'+(r.label||'').replace(/"/g,'&quot;')+'" style="flex:1;font-size:12.5px;padding:4px 8px">'
+      + (r.custom?'<span title="Özel filtre" style="font-size:10px;color:#2563eb;font-weight:700">★</span>':'')
+      + '<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);cursor:pointer"><input type="checkbox" class="fil-on"'+(r.on?' checked':'')+'>Görünür</label>'
+      + (r.custom?'<button class="fil-del" title="Sil" style="background:none;border:none;cursor:pointer;font-size:13px">🗑</button>':'')
+      + '</div>';
   }
+  function wireRow(row){
+    row.querySelector('.fil-up').addEventListener('click', function(){ var p=row.previousElementSibling; if(p) row.parentNode.insertBefore(row,p); });
+    row.querySelector('.fil-down').addEventListener('click', function(){ var n=row.nextElementSibling; if(n) row.parentNode.insertBefore(n,row); });
+    var del=row.querySelector('.fil-del'); if(del) del.addEventListener('click', function(){ row.remove(); });
+  }
+  function renderList(hostId, rows){ var host=modal.querySelector(hostId); host.innerHTML=''; rows.forEach(function(r){ host.insertAdjacentHTML('beforeend', rowHtml(r)); }); [].slice.call(host.children).forEach(wireRow); }
   renderList('#fil-cat', catRows);
   renderList('#fil-ev', evRows);
 
-  function collect(hostId){ return [].slice.call(modal.querySelectorAll(hostId+' .fil-row')).map(function(row){ return {key:row.dataset.key, on:row.querySelector('.fil-on').checked}; }); }
+  function addCustom(hostId, cands, candSelId){
+    var idx=parseInt(modal.querySelector(candSelId).value,10); var c=cands[idx]; if(!c) return;
+    var base='cust:'+(c.cf?'cf_':'')+c.field; var key=base, n=2;
+    while(customDefs[key] || modal.querySelector('.fil-row[data-key="'+key+'"]')){ key=base+'_'+n; n++; }
+    var def={key:key, label:c.label||c.field, field:c.field}; if(c.top)def.top=true; if(c.cf)def.cf=true; if(c.bool){def.bool=true; def.tLabel=c.tLabel; def.fLabel=c.fLabel;}
+    customDefs[key]=def;
+    var host=modal.querySelector(hostId); host.insertAdjacentHTML('beforeend', rowHtml({key:key,label:def.label,on:true,custom:true})); wireRow(host.lastElementChild);
+  }
+  modal.querySelector('#fil-cat-add').addEventListener('click', function(){ addCustom('#fil-cat', catCands, '#fil-cat-cand'); });
+  modal.querySelector('#fil-ev-add').addEventListener('click', function(){ addCustom('#fil-ev', evCands, '#fil-ev-cand'); });
+
+  function collect(hostId){
+    return [].slice.call(modal.querySelectorAll(hostId+' .fil-row')).map(function(row){
+      return { key:row.dataset.key, on:row.querySelector('.fil-on').checked, label:(row.querySelector('.fil-label').value||'').trim(), custom:row.dataset.custom==='1' };
+    });
+  }
   modal.querySelector('#fil-close').addEventListener('click', function(){ modal.remove(); });
   modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
   modal.querySelector('#fil-reset').addEventListener('click', function(){
+    customDefs={};
     renderList('#fil-cat', catMaster.map(function(m){return {key:m.key,label:m.label,on:true};}));
     renderList('#fil-ev', evMaster.map(function(m){return {key:m.key,label:m.label,on:true};}));
   });
   modal.querySelector('#fil-save').addEventListener('click', async function(){
     var btn=this; btn.disabled=true; btn.textContent='⏳ Kaydediliyor...';
-    var filters = { catalog: collect('#fil-cat'), events: collect('#fil-ev') };
+    var catC=collect('#fil-cat'), evC=collect('#fil-ev');
+    function defaultLabel(key, scope){ var m=(scope==='ev'?evMaster:catMaster).filter(function(x){return x.key===key;})[0]; return m?m.label:''; }
+    function layoutOut(rows, scope){ return rows.map(function(r){ var o={key:r.key, on:r.on}; if(r.label && r.label!==defaultLabel(r.key,scope)) o.label=r.label; return o; }); }
+    function customOut(rows){ return rows.filter(function(r){return r.custom && customDefs[r.key];}).map(function(r){ var d=Object.assign({}, customDefs[r.key]); d.label=r.label||d.label; return d; }); }
+    var filters = { catalog: layoutOut(catC,'cat'), events: layoutOut(evC,'ev'), catalogCustom: customOut(catC), eventsCustom: customOut(evC) };
     try {
       await setDoc(doc(db,'pochub_config','system'), { filters: filters }, {merge:true});
       applyFilterLayout(filters); _taxLoaded=true;
