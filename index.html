@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.72 | pochub.co -->
+<!-- PoCHub v5.73 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.72';
+const VERSION = 'v5.73';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.73': ['IZIN HATASI DUZELTILDI + akran-puani mimarisi: Onceki agregasyon poc_requests uzerinde o urunun TUM tamamlanmis PoClarini okuyordu; gizlilik kurali musterinin baska musterilerin PoClarini okumasina izin vermedigi icin sorgu komple reddediliyordu (Missing or insufficient permissions). Cozum: giris-yapmis-herkese-okunur REVIEWS koleksiyonu agregasyon kaynagi yapildi. Submit artik reviews/{pocId} dokumanini yazar (productId,vendorId,customerId,pocId,rating,criteriaRatings,recommend,createdAt — serbest NOT burada DEGIL, gizli), urun avgRating/ratingCount/criteriaAvg/recommendPct bu koleksiyondan hesaplanir. poc_requests sahibin kendi gosterimi/on-doldurma icin guncellenmeye devam eder (kendi PoCu). RULES DEGISTI: yeni reviews kurali (read isSignedIn / write customerId==uid / delete admin). Console + repo mirror guncellendi.'],
   'v5.72': ['DEGERLENDIRME GIRIS NOKTALARI (UX fix): Musteri talep kartlarinda detay/degerlendirme girisi yoktu — eklendi. Her kartta "📋 Detay" (openPocTimeline), TAMAMLANAN kartlarda dogrudan "⭐ Degerlendir" / "Degerlendirmeyi Guncelle" (openPocEvalModal). openPocTimeline: degerlendirme butonu artik tamamlanmis PoClarda da gorunur (yoksa Degerlendir, varsa Guncelle). Eval modali mevcut puanlarla on-doldurulur (kriter yildizlari, tavsiye, karar, not). Tamamlanan kutusu kriter kirilimi + tavsiye gosterir; genel puan ondalikli olabildigi icin yildiz tekrari yuvarlanir. RULES degismedi (v5.71 kurallari gecerli).'],
   'v5.71': ['KADEME 2 — PoC sonrasi COK-KRITERLI degerlendirme (Gartner akran-puani karsiligi): openPocEvalModal yeniden yazildi. Tek yildiz yerine REVIEW_CRITERIA (Kurulum & Entegrasyon, Destek & Hizmet, Urun Yetenekleri, Fiyat/Deger) her biri 5 yildiz + Tavsiye eder misiniz? (Evet/Hayir). Genel puan = kriter ortalamasi. poc_requests.completed dokumanlarina rating(genel)+criteriaRatings+recommend yazilir; urun agregasyonu avgRating/ratingCount + criteriaAvg{} + recommendPct hesaplar. Urun detayinda DEGERLENDIRME (AKRAN PUANI) blogu: kriter barlari + Genel puan + %tavsiye. Karsilastirmada Degerlendirme (Akran Puani) grubu: kriter ortalamasi satirlari + Tavsiye % (satir-bazli en-iyi vurgusu best:self). KURALLAR DEGISTI: products musteri rating update artik criteriaAvg+recommendPct kapsar; poc_requests musteri alanlarina rating/criteriaRatings/recommend/evalNote/completedBy eklendi (mevcut puanlama bosluğu da kapandi). Kurallar Console + repo mirror guncellendi.'],
   'v5.70': ['FILTRE YONETIMI esnek (ekle/cikar/duzenle): Filtre Yonetimi modali yeniden yazildi. DUZENLE: her facet grubunun etiketi inline input ile degistirilebilir (override config.filters[].label). CIKAR: gorunurluk anahtari (gizle) + ozel facetlerde 🗑 tam silme. EKLE: admin yeni OZEL facet ekleyebilir — aday alan secer (katalog: Satis Tipi/Destek Modeli/Ulke + tum kategorilerin select tipi catFields alanlari; etkinlik: Konum), secenekler VERIDEN otomatik turetilir (computeCustomOptions). Ozel facetler katalog/etkinlik motoruna tam entegre (allFacets/evAllFacets, facetFiltered, sayim, chip, URL deep-link, sira/gorunurluk). config: filters.{catalog,events,catalogCustom,eventsCustom}. config write admin/read public — RULES degismedi.'],
@@ -5594,11 +5595,12 @@ function openPocEvalModal(poc) {
         completedAt: serverTimestamp(), completedBy: CUR_USER.uid,
       });
       if (poc.productId) {
-        var prodSnap2 = await getDocs(query(
-          collection(db,'poc_requests'),
-          where('productId','==',poc.productId),
-          where('status','==','completed')
-        ));
+        // Akran puanı: herkese-okunur reviews koleksiyonu (agregasyon kaynağı)
+        await setDoc(doc(db,'reviews',poc.id), {
+          productId: poc.productId, vendorId: poc.vendorId||'', customerId: CUR_USER.uid, pocId: poc.id,
+          rating: overall, criteriaRatings: crits, recommend: recommend, createdAt: serverTimestamp()
+        }, { merge:true });
+        var prodSnap2 = await getDocs(query(collection(db,'reviews'), where('productId','==',poc.productId)));
         var ds = prodSnap2.docs.map(function(d){ return d.data(); });
         var ratings2 = ds.map(function(d){ return d.rating; }).filter(Boolean);
         var upd = {};
