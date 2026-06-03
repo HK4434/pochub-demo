@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.79 | pochub.co -->
+<!-- PoCHub v5.80 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -684,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.79';
+const VERSION = 'v5.80';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.80': ['WIN/LOSS KARAR NEDENLERI (Gartnerda olmayan veri) + Quadrant gorunurlugu. (1) Quadrant promosu: katalog grid/list gorunumunde dikkat ceken gradient afis (🧭 Haritayi Ac) — yalnizca degerlendirilmis urun varsa, kapatilabilir. (2) Win/Loss: PoC degerlendirmesinde Satin Alindi/Alinmadi secilince KARAR NEDENI sorulur (admin-yonetilebilir win/loss listeleri, pochub_config.decisionReasons). Neden review dokumanina yazilir (decisionReason — serbest alan, kural degismez). Urun detayinda (giris yapmis) KARAR ANALIZI paneli: karar veren kurumlarin %kaci satin aldi + Kazandiran/Kaybettiren nedenler bar dagilimi; her yorumda neden etiketi. Admin > Sistem Ayarlari > Karar Nedenleri editoru (iki liste ekle/cikar/duzenle/sirala). UI — RULES degismedi.'],
   'v5.79': ['POCHUB QUADRANT — gercek PoC verisinden canli, seffaf konumlandirma haritasi (bizim Magic Quadrant). Katalogda 3. gorunum modu (🧭, grid/list yaninda). SVG balon grafik: eksenler SECILEBILIR (Kanit Skoru / Genel Memnuniyet / Tavsiye % / PoC→Satin Alma + tum degerlendirme kriterleri), balon boyutu = degerlendirme sayisi, renk = Kanit Skoru. 4 ceyrek: Liderler / Vizyonerler / Uzmanlar / Nis. Balona tiklayinca urun detayi. Yalnizca degerlendirilmis urunler haritalanir; tek kategori secince kategori-ici karsilastirma en anlamli. Eksen state CAT_QX/CAT_QY, gorunum URLe yazilir (view=quadrant). Seffaflik notu: ucretli yerlesim yok, analist gorusu degil kanit. UI — RULES degismedi.'],
   'v5.78': ['KANIT SKORU (Evidence Score) — manifestonun "kanitlanmis performans" vaadinin somut hali. computeEvidenceScore: urunun GERCEK PoC verisinden seffaf skor (0-100) = agirlikli ortalama [Genel Memnuniyet=avgRating, Tavsiye Orani=recommendPct, PoC→Satin Alma=purchaseRate]. Agregasyona purchaseRate eklendi (reviews: satin alindi / (alindi+alinmadi)). Gosterim: katalog kart rozeti (🛡 skor), urun detayinda SEFFAF panel (kirilim barlari + agirlik %), karsilastirmada Kanit Skoru satiri, katalogda "Kanit Skoru" siralamasi. Guven: ratingCount < minReviews ise dusuk-guven isareti. Admin > Sistem Ayarlari > "🛡 Kanit Skoru Agirliklari" (3 agirlik + min, otomatik normalize) — pochub_config/system.evidence. RULES DEGISTI: products musteri rating update purchaseRate kapsar. Console + repo guncellendi.'],
   'v5.77': ['BIZ KIMIZ / MISYON-VIZYON manifesto sayfasi (config-driven, admin-editable): yeni #about ekrani + navda "Biz Kimiz" linki. renderAbout — iddialibir hero (Kanita dayanir), istatistik seridi, Biz Kimiz, Misyon/Vizyon kartlari, Ilkeler grid, Neden Farkliyiz (Kanit>Gorus / Islemsel>Danismanlik / Yerelden Global), CTA. Tum icerik pochub_config/about dokumaninda; ABOUT_DEFAULT seed + applyAbout + ensureAbout. Ana sayfa hero artik ayni config-ten (badge/baslik/altbaslik/aciklama editlenebilir) + hero CTAya Biz Kimiz. Admin > Sistem Ayarlari > "📖 Biz Kimiz" + openAboutEditorModal: hero alanlari, Misyon/Vizyon, Ilkeler/Farklilastiricilar/Istatistikler ekle-cikar-duzenle-sirala. updatePageSEO about title/desc. pochub_config read public/write admin — RULES degismedi.'],
@@ -5719,15 +5720,48 @@ function evidenceBadgeHtml(p, compact){
   return '<span title="Kanıt Skoru — gerçek PoC verisinden hesaplanır" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;color:'+c+';background:'+c+'1a;border:1px solid '+c+'44;padding:2px 8px;border-radius:6px'+(e.low?';opacity:.65':'')+'">🛡 '+e.score+(compact?'':' Kanıt')+(e.low?' •':'')+'</span>';
 }
 
+// ── Win/Loss — Karar Nedenleri (admin-yönetilebilir) ──
+var DECISION_REASONS_DEFAULT = {
+  win: ['Fiyat / Değer','Ürün Yetenekleri','Kolay Entegrasyon','Destek Kalitesi','Yerli / Uyum','Güçlü Referanslar'],
+  loss: ['Fiyat Yüksek','Entegrasyon Zorluğu','Eksik Özellik','Destek Yetersiz','Performans Sorunu','Zamanlama / Bütçe','Başka Ürün Seçildi']
+};
+var DECISION_REASONS = JSON.parse(JSON.stringify(DECISION_REASONS_DEFAULT));
+function applyDecisionReasons(d){
+  DECISION_REASONS = JSON.parse(JSON.stringify(DECISION_REASONS_DEFAULT));
+  if(!d) return;
+  if(Array.isArray(d.win) && d.win.length) DECISION_REASONS.win = d.win.map(String).filter(Boolean);
+  if(Array.isArray(d.loss) && d.loss.length) DECISION_REASONS.loss = d.loss.map(String).filter(Boolean);
+}
+
 async function renderProductReviews(productId, host){
   if(!host) return;
   if(!CUR_USER){ host.innerHTML=''; return; }
   try {
     var snap = await getDocs(query(collection(db,'reviews'), where('productId','==',productId)));
-    var ds = snap.docs.map(function(d){ return d.data(); });
-    if(!ds.length){ host.innerHTML=''; return; }
-    ds.sort(function(a,b){ return (b.createdAt&&b.createdAt.seconds||0)-(a.createdAt&&a.createdAt.seconds||0); });
-    ds = ds.slice(0,12);
+    var all = snap.docs.map(function(d){ return d.data(); });
+    if(!all.length){ host.innerHTML=''; return; }
+    // Win/Loss karar analizi (tüm değerlendirmeler üzerinden)
+    var decided = all.filter(function(d){ return d.purchaseDecision==='purchased' || d.purchaseDecision==='not_purchased'; });
+    var conv = decided.length ? Math.round(decided.filter(function(d){return d.purchaseDecision==='purchased';}).length/decided.length*100) : null;
+    var winC={}, lossC={};
+    all.forEach(function(d){ if(!d.decisionReason) return; if(d.purchaseDecision==='purchased') winC[d.decisionReason]=(winC[d.decisionReason]||0)+1; else if(d.purchaseDecision==='not_purchased') lossC[d.decisionReason]=(lossC[d.decisionReason]||0)+1; });
+    function reasonList(counts, color){
+      var arr = Object.keys(counts).map(function(k){return {k:k,n:counts[k]};}).sort(function(a,b){return b.n-a.n;}).slice(0,5);
+      if(!arr.length) return '<div style="font-size:11.5px;color:#64748b">Henüz veri yok</div>';
+      var mx = arr[0].n||1;
+      return arr.map(function(x){ return '<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:#94a3b8;margin-bottom:2px"><span>'+escHtml(x.k)+'</span><span style="color:#c8cfdb;font-weight:600">'+x.n+'</span></div><div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+Math.round(x.n/mx*100)+'%;background:'+color+'"></div></div></div>'; }).join('');
+    }
+    var winLossHtml = '';
+    if (decided.length) {
+      winLossHtml = '<div style="margin-top:18px;padding:16px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.02)">'
+        + '<div style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.6px;margin-bottom:10px">KARAR ANALİZİ · WIN / LOSS</div>'
+        + '<div style="font-size:13px;color:#c8cfdb;margin-bottom:14px">PoC sonrası karar veren <b>'+decided.length+'</b> kurumdan <b style="color:#16a34a">%'+conv+'</b>’i satın aldı.</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">'
+        +   '<div><div style="font-size:11.5px;font-weight:700;color:#16a34a;margin-bottom:8px">✅ Kazandıran nedenler</div>'+reasonList(winC,'#16a34a')+'</div>'
+        +   '<div><div style="font-size:11.5px;font-weight:700;color:#dc2626;margin-bottom:8px">⊘ Kaybettiren nedenler</div>'+reasonList(lossC,'#dc2626')+'</div>'
+        + '</div></div>';
+    }
+    var ds = all.slice().sort(function(a,b){ return (b.createdAt&&b.createdAt.seconds||0)-(a.createdAt&&a.createdAt.seconds||0); }).slice(0,12);
     var rows = ds.map(function(r){
       var rr = Math.round(r.rating||0);
       var stars = '⭐'.repeat(rr) + '☆'.repeat(Math.max(0,5-rr));
@@ -5736,6 +5770,7 @@ async function renderProductReviews(productId, host){
       if(r.customerCompanySize) tags.push('👥 '+(COMPANY_SIZE_LABEL[r.customerCompanySize] || r.customerCompanySize));
       var tagHtml = tags.map(function(t){ return '<span style="font-size:10.5px;padding:2px 8px;border-radius:5px;background:rgba(255,255,255,.06);color:#94a3b8">'+t+'</span>'; }).join('');
       var dec = (r.purchaseDecision && REVIEW_DECISION_LABEL[r.purchaseDecision]) ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:5px;background:rgba(37,99,235,.12);color:#60a5fa">'+REVIEW_DECISION_LABEL[r.purchaseDecision]+'</span>' : '';
+      var rsn = r.decisionReason ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:5px;background:rgba(255,255,255,.06);color:#94a3b8">💬 '+escHtml(r.decisionReason)+'</span>' : '';
       var rec = r.recommend===true?'<span style="font-size:11px;font-weight:700;color:#16a34a">👍 Tavsiye ediyor</span>':(r.recommend===false?'<span style="font-size:11px;font-weight:700;color:#dc2626">👎 Tavsiye etmiyor</span>':'');
       var crit = REVIEW_CRITERIA.map(function(c){ var v=r.criteriaRatings&&r.criteriaRatings[c.id]; return v?('<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#94a3b8;margin-bottom:2px"><span>'+c.label+'</span><span style="color:#f59e0b;letter-spacing:1px">'+'★'.repeat(v)+'</span></div>'):''; }).join('');
       var when = (r.createdAt&&r.createdAt.seconds) ? new Date(r.createdAt.seconds*1000).toLocaleDateString('tr-TR',{year:'numeric',month:'short'}) : '';
@@ -5744,13 +5779,14 @@ async function renderProductReviews(productId, host){
         +   '<div style="font-size:13px;color:#f59e0b;font-weight:700">'+stars+' <span style="color:#94a3b8;font-weight:500;font-size:11px">'+(r.rating||0)+'/5</span></div>'
         +   '<div style="font-size:10.5px;color:#64748b">🔒 Doğrulanmış PoC'+(when?' · '+when:'')+'</div>'
         + '</div>'
-        + ((tagHtml||dec) ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+tagHtml+dec+'</div>' : '')
+        + ((tagHtml||dec||rsn) ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+tagHtml+dec+rsn+'</div>' : '')
         + crit
         + (rec ? '<div style="margin-top:6px">'+rec+'</div>' : '')
         + '</div>';
     }).join('');
-    host.innerHTML = '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)">'
-      + '<div style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.6px;margin-bottom:12px">BİREYSEL DEĞERLENDİRMELER ('+ds.length+')</div>'
+    host.innerHTML = winLossHtml
+      + '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)">'
+      + '<div style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.6px;margin-bottom:12px">BİREYSEL DEĞERLENDİRMELER ('+all.length+')</div>'
       + rows + '</div>';
   } catch(e){ host.innerHTML=''; }
 }
@@ -5791,6 +5827,10 @@ async function openPocEvalModal(poc) {
     '<button class="decision-btn btn-g btn-sm flx1" data-val="not_purchased">Alinmadi</button>' +
     '</div>' +
     '<input type="hidden" id="eval-decision" value="">' +
+    '<div id="eval-reason-wrap" style="display:none;margin-bottom:16px">' +
+    '<label class="lbl" id="eval-reason-lbl">Karar nedeni</label>' +
+    '<select class="inp" id="eval-reason" style="width:100%;font-size:13px"></select>' +
+    '</div>' +
     '<label class="lbl">Teknik Notlar</label>' +
     '<textarea class="inp" id="eval-note" rows="4" placeholder="Teknik bulgular, guclu ve zayif yonler..." style="resize:vertical;margin-bottom:16px"></textarea>' +
     '<div id="eval-err" style="font-size:12px;color:#dc2626;margin-bottom:10px"></div>' +
@@ -5820,6 +5860,15 @@ async function openPocEvalModal(poc) {
       modal.querySelector('#eval-decision').value = btn.dataset.val;
       modal.querySelectorAll('.decision-btn').forEach(function(b){ b.className = 'decision-btn btn-g btn-sm'; });
       btn.className = 'decision-btn btn-p btn-sm';
+      var wrap=modal.querySelector('#eval-reason-wrap'), sel=modal.querySelector('#eval-reason'), lb=modal.querySelector('#eval-reason-lbl');
+      var list = btn.dataset.val==='purchased' ? DECISION_REASONS.win : (btn.dataset.val==='not_purchased' ? DECISION_REASONS.loss : null);
+      if (list) {
+        lb.textContent = btn.dataset.val==='purchased' ? 'Neden bu ürünü seçtiniz?' : 'Neden tercih etmediniz?';
+        var prev = sel.value;
+        sel.innerHTML = '<option value="">Seçiniz (opsiyonel)</option>' + list.map(function(r){ return '<option value="'+escHtml(r)+'">'+escHtml(r)+'</option>'; }).join('');
+        if (prev && list.indexOf(prev)>=0) sel.value = prev;
+        wrap.style.display = 'block';
+      } else { wrap.style.display='none'; sel.value=''; }
     });
   });
 
@@ -5839,6 +5888,14 @@ async function openPocEvalModal(poc) {
   if (poc.purchaseDecision) {
     modal.querySelector('#eval-decision').value = poc.purchaseDecision;
     var db2 = modal.querySelector('.decision-btn[data-val="'+poc.purchaseDecision+'"]'); if(db2) db2.className='decision-btn btn-p btn-sm flx1';
+    var _rl = poc.purchaseDecision==='purchased' ? DECISION_REASONS.win : (poc.purchaseDecision==='not_purchased' ? DECISION_REASONS.loss : null);
+    if (_rl) {
+      var _w=modal.querySelector('#eval-reason-wrap'), _s=modal.querySelector('#eval-reason'), _l=modal.querySelector('#eval-reason-lbl');
+      _l.textContent = poc.purchaseDecision==='purchased' ? 'Neden bu ürünü seçtiniz?' : 'Neden tercih etmediniz?';
+      _s.innerHTML = '<option value="">Seçiniz (opsiyonel)</option>' + _rl.map(function(r){ return '<option value="'+escHtml(r)+'">'+escHtml(r)+'</option>'; }).join('');
+      if (poc.decisionReason && _rl.indexOf(poc.decisionReason)>=0) _s.value = poc.decisionReason;
+      _w.style.display='block';
+    }
   }
   if (poc.evalNote) modal.querySelector('#eval-note').value = poc.evalNote;
 
@@ -5852,6 +5909,7 @@ async function openPocEvalModal(poc) {
     var note = modal.querySelector('#eval-note').value.trim();
     var recVal = modal.querySelector('#eval-recommend').value;
     var recommend = recVal==='yes' ? true : (recVal==='no' ? false : null);
+    var reason = (modal.querySelector('#eval-reason') && modal.querySelector('#eval-reason-wrap').style.display!=='none') ? modal.querySelector('#eval-reason').value : '';
     if (!decision) { errDiv.textContent = 'Satin alma kararini belirtin.'; return; }
     var btn = modal.querySelector('#eval-submit');
     btn.disabled = true; btn.textContent = 'Kaydediliyor...';
@@ -5865,7 +5923,7 @@ async function openPocEvalModal(poc) {
         // Akran puanı: herkese-okunur reviews koleksiyonu (agregasyon kaynağı)
         await setDoc(doc(db,'reviews',poc.id), {
           productId: poc.productId, vendorId: poc.vendorId||'', customerId: CUR_USER.uid, pocId: poc.id,
-          rating: overall, criteriaRatings: crits, recommend: recommend, purchaseDecision: decision,
+          rating: overall, criteriaRatings: crits, recommend: recommend, purchaseDecision: decision, decisionReason: reason,
           customerSector: (CUR_PROFILE && CUR_PROFILE.sector) || '', customerCompanySize: (CUR_PROFILE && CUR_PROFILE.companySize) || '',
           createdAt: serverTimestamp()
         }, { merge:true });
@@ -7354,7 +7412,7 @@ function applyTaxonomy(tax){
 var _taxLoaded = false;
 async function ensureTaxonomy(force){
   if (_taxLoaded && !force) return;
-  try { var cs = await getDoc(doc(db,'pochub_config','system')); if (cs.exists()) { var d=cs.data(); if (d.taxonomy) applyTaxonomy(d.taxonomy); applyFilterLayout(d.filters); applyReviewCriteria(d.reviewCriteria); applyEvidence(d.evidence); } } catch(e){}
+  try { var cs = await getDoc(doc(db,'pochub_config','system')); if (cs.exists()) { var d=cs.data(); if (d.taxonomy) applyTaxonomy(d.taxonomy); applyFilterLayout(d.filters); applyReviewCriteria(d.reviewCriteria); applyEvidence(d.evidence); applyDecisionReasons(d.decisionReasons); } } catch(e){}
   _taxLoaded = true;
 }
 
@@ -7485,6 +7543,14 @@ function readEventURL(){
 // ════════════════════════════════════════════════════════════════════
 // v5.79: PoCHub Quadrant — gerçek PoC verisinden canlı konumlandırma
 // ════════════════════════════════════════════════════════════════════
+function quadPromoHtml(){
+  return '<div id="cat-quad-promo" style="position:relative;margin-bottom:14px;padding:16px 18px;border-radius:12px;background:linear-gradient(120deg,#2563eb,#1e40af);color:#fff;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 6px 20px rgba(37,99,235,.25)">'
+    + '<div style="font-size:30px;line-height:1">🧭</div>'
+    + '<div style="flex:1;min-width:200px"><div style="font-size:15px;font-weight:800;margin-bottom:2px">PoCHub Quadrant — pazarı tek bakışta gör</div><div style="font-size:12.5px;color:rgba(255,255,255,.88);line-height:1.5">Liderleri, Vizyonerleri ve Niş oyuncuları <b>gerçek PoC kanıtıyla</b> haritada keşfet. Analist görüşü değil; ölçülmüş sonuç.</div></div>'
+    + '<button id="cat-quad-open" style="padding:10px 18px;font-size:13px;font-weight:800;background:#fff;color:#1e40af;border:none;border-radius:8px;cursor:pointer;white-space:nowrap">🧭 Haritayı Aç →</button>'
+    + '<button id="cat-quad-dismiss" title="Gizle" style="position:absolute;top:8px;right:10px;background:none;border:none;color:rgba(255,255,255,.7);font-size:16px;cursor:pointer">×</button>'
+    + '</div>';
+}
 function quadrantMetrics(){
   var m = [
     {key:'evidence',   label:'Kanıt Skoru',      get:function(p){ var e=computeEvidenceScore(p); return e?e.score:null; }},
@@ -7786,9 +7852,14 @@ async function loadCatalog() {
     }
       // (seçim CAT_COMPARE ile yönetilir — karşılaştırma + PoC için)
     if (CAT_VIEW==='quadrant') { renderQuadrant(prods, gridEl); }
-    else gridEl.innerHTML = CAT_VIEW==='list'
-      ? '<div style="display:flex;flex-direction:column;gap:10px">'+prods.map(catListRow).join('')+'</div>'
-      : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">'+prods.map(catGridCard).join('')+'</div>';
+    else {
+      var _promo = (!window._quadPromoDismissed && prods.some(function(p){return computeEvidenceScore(p);})) ? quadPromoHtml() : '';
+      gridEl.innerHTML = _promo + (CAT_VIEW==='list'
+        ? '<div style="display:flex;flex-direction:column;gap:10px">'+prods.map(catListRow).join('')+'</div>'
+        : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">'+prods.map(catGridCard).join('')+'</div>');
+      var _qpo=gridEl.querySelector('#cat-quad-open'); if(_qpo) _qpo.addEventListener('click', function(){ CAT_VIEW='quadrant'; loadCatalog(); });
+      var _qpd=gridEl.querySelector('#cat-quad-dismiss'); if(_qpd) _qpd.addEventListener('click', function(){ window._quadPromoDismissed=true; var b=gridEl.querySelector('#cat-quad-promo'); if(b) b.remove(); });
+    }
 
     gridEl.querySelectorAll('.prod-select-cb').forEach(function(cb){
       cb.checked = CAT_COMPARE.has(cb.dataset.id);
@@ -29383,6 +29454,54 @@ function openPackageEditor(pkgId, allPackages) {
 
 // Admin: Sistem Ayarları Sayfası
 // ════════════════════════════════════════════════════════════════════
+// v5.80: Admin — Karar Nedenleri (Win/Loss) yönetimi
+// ════════════════════════════════════════════════════════════════════
+function openDecisionReasonsModal(){
+  ensureTaxonomy().then(function(){
+    var win = DECISION_REASONS.win.slice(), loss = DECISION_REASONS.loss.slice();
+    var modal=document.createElement('div'); modal.className='modal-overlay';
+    modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:620px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;position:relative">'
+      + '<button id="drm-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+      + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">🧩 Karar Nedenleri</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sıra için ↑/↓ · yazarak düzenle · ekle/sil. Boş satırlar kaydedilmez.</div>'
+      + '<div style="display:flex;gap:18px;flex-wrap:wrap">'
+      +   '<div style="flex:1;min-width:240px"><div style="font-size:12.5px;font-weight:700;color:#16a34a;margin-bottom:8px">✅ Kazandıran (Satın Alındı)</div><div id="drm-win"></div><button class="btn-g btn-sm" id="drm-add-win">+ Ekle</button></div>'
+      +   '<div style="flex:1;min-width:240px"><div style="font-size:12.5px;font-weight:700;color:#dc2626;margin-bottom:8px">⊘ Kaybettiren (Alınmadı)</div><div id="drm-loss"></div><button class="btn-g btn-sm" id="drm-add-loss">+ Ekle</button></div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;margin-top:20px"><button class="btn-p" id="drm-save" style="flex:1">💾 Kaydet</button><button class="btn-g" id="drm-reset">↺ Varsayılan</button></div>'
+      + '</div>';
+    document.body.appendChild(modal);
+    function rowHtml(v){ return '<div class="drm-row" style="display:flex;gap:7px;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)"><div style="display:flex;flex-direction:column;gap:1px"><button class="drm-up" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▲</button><button class="drm-down" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▼</button></div><input class="inp drm-val" value="'+escHtml(v||'')+'" placeholder="Neden" style="flex:1;font-size:12.5px"><button class="drm-del" style="background:none;border:none;cursor:pointer;font-size:13px">🗑</button></div>'; }
+    function wire(row){
+      row.querySelector('.drm-up').addEventListener('click', function(){ var p=row.previousElementSibling; if(p) row.parentNode.insertBefore(row,p); });
+      row.querySelector('.drm-down').addEventListener('click', function(){ var n=row.nextElementSibling; if(n) row.parentNode.insertBefore(n,row); });
+      row.querySelector('.drm-del').addEventListener('click', function(){ row.remove(); });
+    }
+    function fill(hostId, arr){ var h=modal.querySelector(hostId); h.innerHTML=''; arr.forEach(function(v){ h.insertAdjacentHTML('beforeend', rowHtml(v)); }); [].slice.call(h.children).forEach(wire); }
+    fill('#drm-win', win); fill('#drm-loss', loss);
+    function add(hostId){ var h=modal.querySelector(hostId); h.insertAdjacentHTML('beforeend', rowHtml('')); wire(h.lastElementChild); h.lastElementChild.querySelector('.drm-val').focus(); }
+    modal.querySelector('#drm-add-win').addEventListener('click', function(){ add('#drm-win'); });
+    modal.querySelector('#drm-add-loss').addEventListener('click', function(){ add('#drm-loss'); });
+    function collect(hostId){ return [].slice.call(modal.querySelectorAll(hostId+' .drm-row')).map(function(r){ return r.querySelector('.drm-val').value.trim(); }).filter(Boolean); }
+    modal.querySelector('#drm-close').addEventListener('click', function(){ modal.remove(); });
+    modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+    modal.querySelector('#drm-reset').addEventListener('click', function(){ fill('#drm-win', DECISION_REASONS_DEFAULT.win); fill('#drm-loss', DECISION_REASONS_DEFAULT.loss); });
+    modal.querySelector('#drm-save').addEventListener('click', async function(){
+      var btn=this; var obj={ win:collect('#drm-win'), loss:collect('#drm-loss') };
+      if(!obj.win.length && !obj.loss.length){ showToast('En az bir neden girin.','err'); return; }
+      btn.disabled=true; btn.textContent='⏳ Kaydediliyor...';
+      try {
+        await setDoc(doc(db,'pochub_config','system'), { decisionReasons: obj }, {merge:true});
+        applyDecisionReasons(obj); _taxLoaded=true;
+        showToast('Karar nedenleri kaydedildi.');
+        modal.remove();
+        var mm=el('adm-main'); if(mm) admSettings(mm);
+      } catch(e){ showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='💾 Kaydet'; }
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
 // v5.78: Admin — Kanıt Skoru ağırlık yönetimi
 // ════════════════════════════════════════════════════════════════════
 function openEvidenceConfigModal(){
@@ -29902,6 +30021,16 @@ async function admSettings(m) {
     evBtn.addEventListener('click', function(){ openEvidenceConfigModal(); });
     sEv.appendChild(evBtn);
     m.appendChild(sEv);
+
+    // v5.80: Karar Nedenleri (Win/Loss)
+    var sDr = section('🧩 Karar Nedenleri (Win/Loss)', '#7c3aed');
+    var drInfo = document.createElement('div'); drInfo.style.cssText='font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6';
+    drInfo.textContent = 'PoC değerlendirmesinde "Satın Alındı / Alınmadı" seçilince sorulan neden listeleri. Kazandıran ve kaybettiren nedenler ayrı yönetilir; ürün detayında Win/Loss analizine dönüşür.';
+    sDr.appendChild(drInfo);
+    var drBtn = document.createElement('button'); drBtn.className='btn-g'; drBtn.textContent='🧩 Nedenleri Düzenle';
+    drBtn.addEventListener('click', function(){ openDecisionReasonsModal(); });
+    sDr.appendChild(drBtn);
+    m.appendChild(sDr);
 
     // v5.77: Biz Kimiz / Misyon-Vizyon yönetimi
     var sAbout = section('📖 Biz Kimiz / Misyon-Vizyon', '#1e40af');
