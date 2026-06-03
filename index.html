@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.80 | pochub.co -->
+<!-- PoCHub v5.81 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -684,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.80';
+const VERSION = 'v5.81';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.81': ['ANA SAYFA KANIT VITRINI — differensiyatorler artik her ziyaretciye gorunur (anonim dahil; products public-read). renderHomeda featured carouselin altina "🛡 Kanitlanmis Liderler" seridi: aktif urunler arasinda Kanit Skoru hesaplanir, en yuksek 6 urun yatay kart seridinde (kategori + 🛡 rozet + skor bari, tikla > urun detayi). Seridin sonunda gradient "🧭 PoCHub Quadrant" CTA karti. "Tumu →" katalogu Kanit Skoruna gore siralar; Quadrant CTA dogrudan katalog quadrant gorunumune dusurur (window._pendingCatView/_pendingCatSort tek-seferlik intent; readCatalogURL bunlari URL uzerine yazip uygular). Degerlendirilmis urun yoksa serit gizlenir. UI/turetilmis veri — RULES degismedi.'],
   'v5.80': ['WIN/LOSS KARAR NEDENLERI (Gartnerda olmayan veri) + Quadrant gorunurlugu. (1) Quadrant promosu: katalog grid/list gorunumunde dikkat ceken gradient afis (🧭 Haritayi Ac) — yalnizca degerlendirilmis urun varsa, kapatilabilir. (2) Win/Loss: PoC degerlendirmesinde Satin Alindi/Alinmadi secilince KARAR NEDENI sorulur (admin-yonetilebilir win/loss listeleri, pochub_config.decisionReasons). Neden review dokumanina yazilir (decisionReason — serbest alan, kural degismez). Urun detayinda (giris yapmis) KARAR ANALIZI paneli: karar veren kurumlarin %kaci satin aldi + Kazandiran/Kaybettiren nedenler bar dagilimi; her yorumda neden etiketi. Admin > Sistem Ayarlari > Karar Nedenleri editoru (iki liste ekle/cikar/duzenle/sirala). UI — RULES degismedi.'],
   'v5.79': ['POCHUB QUADRANT — gercek PoC verisinden canli, seffaf konumlandirma haritasi (bizim Magic Quadrant). Katalogda 3. gorunum modu (🧭, grid/list yaninda). SVG balon grafik: eksenler SECILEBILIR (Kanit Skoru / Genel Memnuniyet / Tavsiye % / PoC→Satin Alma + tum degerlendirme kriterleri), balon boyutu = degerlendirme sayisi, renk = Kanit Skoru. 4 ceyrek: Liderler / Vizyonerler / Uzmanlar / Nis. Balona tiklayinca urun detayi. Yalnizca degerlendirilmis urunler haritalanir; tek kategori secince kategori-ici karsilastirma en anlamli. Eksen state CAT_QX/CAT_QY, gorunum URLe yazilir (view=quadrant). Seffaflik notu: ucretli yerlesim yok, analist gorusu degil kanit. UI — RULES degismedi.'],
   'v5.78': ['KANIT SKORU (Evidence Score) — manifestonun "kanitlanmis performans" vaadinin somut hali. computeEvidenceScore: urunun GERCEK PoC verisinden seffaf skor (0-100) = agirlikli ortalama [Genel Memnuniyet=avgRating, Tavsiye Orani=recommendPct, PoC→Satin Alma=purchaseRate]. Agregasyona purchaseRate eklendi (reviews: satin alindi / (alindi+alinmadi)). Gosterim: katalog kart rozeti (🛡 skor), urun detayinda SEFFAF panel (kirilim barlari + agirlik %), karsilastirmada Kanit Skoru satiri, katalogda "Kanit Skoru" siralamasi. Guven: ratingCount < minReviews ise dusuk-guven isareti. Admin > Sistem Ayarlari > "🛡 Kanit Skoru Agirliklari" (3 agirlik + min, otomatik normalize) — pochub_config/system.evidence. RULES DEGISTI: products musteri rating update purchaseRate kapsar. Console + repo guncellendi.'],
@@ -5148,6 +5149,37 @@ function _openAboutEditor(){
   });
 }
 
+async function loadEvidenceLeaders(){
+  var host = el('home-evidence-leaders'); if(!host) return;
+  try {
+    await ensureTaxonomy();
+    var snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
+    var prods = snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; });
+    var scored = prods.map(function(p){ var e=computeEvidenceScore(p); return e?{p:p,e:e}:null; }).filter(Boolean);
+    if(!scored.length){ host.innerHTML=''; return; }
+    scored.sort(function(a,b){ return b.e.score-a.e.score; });
+    var top = scored.slice(0,6);
+    var cards = top.map(function(x){
+      var p=x.p, e=x.e, c=evidenceColor(e.score);
+      return '<div class="ev-leader-card" data-id="'+p.id+'" style="min-width:212px;flex:0 0 212px;border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--bg-surface);cursor:pointer;scroll-snap-align:start">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px"><span style="font-size:11px;color:var(--text-muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.category||'')+'</span>'+evidenceBadgeHtml(p,true)+'</div>'
+        + '<div style="font-size:15px;font-weight:800;margin-bottom:2px;color:var(--text)">'+escHtml(p.name||'')+'</div>'
+        + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">'+escHtml(p.vendorName||'')+'</div>'
+        + '<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:var(--bg-elevated);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+e.score+'%;background:'+c+'"></div></div><span style="font-size:14px;font-weight:900;color:'+c+'">'+e.score+'</span></div>'
+        + '</div>';
+    }).join('');
+    var quadCta = '<div id="home-quad-cta" style="min-width:212px;flex:0 0 212px;border-radius:12px;padding:16px;cursor:pointer;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;display:flex;flex-direction:column;justify-content:center;scroll-snap-align:start">'
+      + '<div style="font-size:28px;margin-bottom:6px">🧭</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">PoCHub Quadrant</div><div style="font-size:11.5px;color:rgba(255,255,255,.85);line-height:1.45;margin-bottom:12px">Pazarı haritada keşfet — Liderler, Vizyonerler, Niş.</div><div style="font-size:12px;font-weight:800">Haritayı Aç →</div></div>';
+    host.innerHTML = '<div class="card" style="padding:20px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px"><div style="font-size:15px;font-weight:800">🛡 Kanıtlanmış Liderler</div><button class="btn-g btn-sm" id="ev-leaders-all">Tümü →</button></div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Gerçek PoC değerlendirmelerinden hesaplanan Kanıt Skoru’na göre. Analist görüşü değil; ölçülmüş sonuç.</div>'
+      + '<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory">'+cards+quadCta+'</div>'
+      + '</div>';
+    host.querySelectorAll('.ev-leader-card').forEach(function(c){ c.addEventListener('click', function(){ openProductDetailModal(c.dataset.id); }); });
+    var qc=host.querySelector('#home-quad-cta'); if(qc) qc.addEventListener('click', function(){ window._pendingCatView='quadrant'; go('catalog'); });
+    var la=host.querySelector('#ev-leaders-all'); if(la) la.addEventListener('click', function(){ window._pendingCatSort='evidence'; go('catalog'); });
+  } catch(e){ host.innerHTML=''; }
+}
 async function renderHome() {
   const wrap = el('scr-home');
   await ensureAbout();
@@ -5178,6 +5210,9 @@ async function renderHome() {
 
     <!-- Featured Products Carousel -->
     <div id="featured-carousel-section" style="margin-bottom:24px"></div>
+
+    <!-- v5.81: Kanıtlanmış Liderler + Quadrant vitrin -->
+    <div id="home-evidence-leaders" style="margin-bottom:24px"></div>
 
     <div class="g4" style="margin-bottom:20px" id="home-stats">
       ${['Aktif Etkinlik','Toplam Kullanıcı','PoC Talebi','Aktif Ürün'].map((lbl,i)=>'<div class="stat-card" data-i="'+i+'"><div class="stat-num skel skel-line w50" style="height:28px"></div><div class="stat-lbl" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:6px">'+lbl+'</div></div>').join('')}
@@ -5252,6 +5287,7 @@ async function renderHome() {
   el('cta-catalog').addEventListener('click', () => go('catalog'));
   el('cal-prev').addEventListener('click', () => { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(calYear,calMonth); });
   el('cal-next').addEventListener('click', () => { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(calYear,calMonth); });
+  loadEvidenceLeaders();
 
   // Stats yükle
   try {
@@ -7644,6 +7680,8 @@ function readCatalogURL(){
     CAT_DYNAMIC.forEach(function(f){ var v=params.get(f.key); CAT_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
     CAT_SORT = params.get('sort') || 'rating';
     CAT_VIEW = params.get('view')==='list' ? 'list' : (params.get('view')==='quadrant' ? 'quadrant' : 'grid');
+    if (window._pendingCatView){ CAT_VIEW = window._pendingCatView; window._pendingCatView=null; }
+    if (window._pendingCatSort){ CAT_SORT = window._pendingCatSort; window._pendingCatSort=null; }
   } catch(e){ CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key]=[]; }); }
 }
 function toggleCatFacet(key, v){ var a=CAT_FILTERS[key]; if(!a) return; var i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); if(key==='category'){ Object.keys(CAT_FILTERS).forEach(function(k){ if(k.indexOf('cf:')===0) CAT_FILTERS[k]=[]; }); } loadCatalog(); }
