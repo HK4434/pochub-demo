@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.76 | pochub.co -->
+<!-- PoCHub v5.77 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -587,6 +587,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 
 <!-- SCREENS -->
 <div class="scr on" id="scr-home"></div>
+<div class="scr" id="scr-about"></div>
 <div class="scr" id="scr-catalog"></div>
 <div class="scr" id="scr-events"></div>
 <div class="scr" id="scr-customer"></div>
@@ -683,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.76';
+const VERSION = 'v5.77';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.77': ['BIZ KIMIZ / MISYON-VIZYON manifesto sayfasi (config-driven, admin-editable): yeni #about ekrani + navda "Biz Kimiz" linki. renderAbout — iddialibir hero (Kanita dayanir), istatistik seridi, Biz Kimiz, Misyon/Vizyon kartlari, Ilkeler grid, Neden Farkliyiz (Kanit>Gorus / Islemsel>Danismanlik / Yerelden Global), CTA. Tum icerik pochub_config/about dokumaninda; ABOUT_DEFAULT seed + applyAbout + ensureAbout. Ana sayfa hero artik ayni config-ten (badge/baslik/altbaslik/aciklama editlenebilir) + hero CTAya Biz Kimiz. Admin > Sistem Ayarlari > "📖 Biz Kimiz" + openAboutEditorModal: hero alanlari, Misyon/Vizyon, Ilkeler/Farklilastiricilar/Istatistikler ekle-cikar-duzenle-sirala. updatePageSEO about title/desc. pochub_config read public/write admin — RULES degismedi.'],
   'v5.76': ['AKRAN-PUANI ZENGINLESTIRME — urun detayinda BIREYSEL dogrulanmis-PoC degerlendirmeleri + degerlendiren demografisi. renderProductReviews: reviews koleksiyonundan (giris yapmis kullanici) o urunun degerlendirmeleri cekilir (createdAt desc, ilk 12), her biri: genel yildiz + kriter bazli mini yildizlar + Tavsiye rozeti + Satin alma karari + SEKTOR ve SIRKET BUYUKLUGU etiketi (anonim; isim/sirket adi YOK) + tarih, kilitli Dogrulanmis PoC isareti. Detay modaline #pd-reviews-list eklendi, appendChild sonrasi asenkron doldurulur (giris yoksa gizli). Submit: review dokumanina purchaseDecision + customerSector + customerCompanySize (CUR_PROFILE snapshot) eklendi — serbest NOT hala yok (gizli). Etiket haritalari PROFILE_SECTOR_LABEL/COMPANY_SIZE_LABEL/REVIEW_DECISION_LABEL. reviews kuralinda alan beyaz-listesi olmadigi icin RULES degismedi.'],
   'v5.75': ['ETKINLIK FILTRELERINE URL DEEP-LINK (katalog paritesi): syncEventURL/readEventURL eklendi — etkinlik arama, facetler (category/format/language/fee + ozel), sort, view (grid), donem (period) artik URLe yazilir; paylasilabilir/yer-imlenebilir, yeniden yuklemede/deep-linkte geri yuklenir. loadEventsList her yuklemede syncEventURL cagirir; renderEvents ensureTaxonomy sonrasi readEventURL ile durumu geri yukler (arama kutusu HTML kurulunca doldurulur). KRITIK: etkinlik parametreleri ev_ ON EKIYLE ad-uzaylandi — katalogla paylasilen anahtar adlari (category/q/sort/view) CAKISMASIN; iki ekran filtreleri birbirini bozmaz. syncCatalogURL ev_ parametrelerini korur (katalog ziyareti etkinlik filtresini silmez). UI — RULES degismedi.'],
   'v5.74': ['DEGERLENDIRME KRITERLERI admin-yonetilebilir (config-driven): REVIEW_CRITERIA artik kodda sabit degil — pochub_config/system.reviewCriteria. REVIEW_CRITERIA_DEFAULT (4 kriter) + applyReviewCriteria; ensureTaxonomy ayni dokumandan yukler. Sistem Ayarlari > "⭐ Degerlendirme Kriterleri" + openReviewCriteriaModal: ekle/cikar/duzenle(etiket)/sirala(↑/↓), en az 1 kriter, Varsayilan. openPocEvalModal async oldu (modal acilmadan ensureTaxonomy ile kriterler yuklenir). Tum kullanim noktalari (eval modal, agregasyon, urun detayi akran-puani, karsilastirma Degerlendirme grubu) REVIEW_CRITERIA uzerinden calistigi icin otomatik uyumlu. Kaldirilan kriter eski degerlendirmeleri bozmaz, yeni degerlendirmelerde gorunmez. config write admin/read public — RULES degismedi.'],
@@ -3799,6 +3801,7 @@ function buildNav() {
     ['home',    t('nav.home', 'Ana Sayfa')],
     ['events',  t('nav.events', 'Etkinlikler')],
     ['catalog', t('nav.catalog', 'Katalog')],
+    ['about',   t('nav.about', 'Biz Kimiz')],
   ];
   if (CUR_PROFILE?.role === 'customer') tabItems.push(['customer', t('nav.customer_panel', 'Panelim')]);
   if (CUR_PROFILE?.role === 'vendor') tabItems.push(['vendor', t('nav.vendor_panel', 'Vendor Paneli')]);
@@ -4388,6 +4391,7 @@ function renderScreen(s) {
     try { updatePageSEO(s); } catch(e){}
   }
   if (s==='home') renderHome();
+  else if (s==='about') renderAbout();
   else if (s==='events') renderEvents();
   else if (s==='catalog') renderCatalog();
   else if (s==='customer') renderCustomer();
@@ -4987,22 +4991,178 @@ window.closeMultiPocAndOpenCustom = closeMultiPocAndOpenCustom;
 /* ══════════════════════════════════════
    ANA SAYFA
 ══════════════════════════════════════ */
+// ════════════════════════════════════════════════════════════════════
+// v5.77: BİZ KİMİZ / MİSYON / VİZYON (config-driven, admin-editable)
+// ════════════════════════════════════════════════════════════════════
+var ABOUT_DEFAULT = {
+  hero: {
+    badge: '✦ GÜVEN, KANITA DAYANIR',
+    title: 'Doğru IT Kararı,\nKanıtlanmış Teknolojiyle Başlar',
+    subtitle: 'Satın alma kararı vermeden önce teknolojiyi gerçek ortamda test edin.',
+    description: 'Bağımsız PoC süreçleri, uzman Vendor değerlendirmeleri ve şeffaf teknik karşılaştırmalarla kurumunuz için en doğru teknolojiyi seçin.'
+  },
+  whoWeAre: 'PoCHub, kurumların IT satın alma kararını sezgiden kanıta taşıyan bağımsız teknoloji değerlendirme platformudur.\nBir ürünün gerçekten işe yarayıp yaramadığı, ancak kendi ortamınızda test edildiğinde belli olur. Biz bu testi — Proof of Concept (PoC) sürecini — standartlaştırdık, ölçülebilir kıldık ve şeffaflaştırdık.\nTürkiye’den doğduk; küresel standardı belirlemek için yola çıktık. Burada bir ürünün değeri pazarlama vaadiyle değil, gerçek PoC’lardan damıtılan kanıtla konuşur.',
+  mission: 'Her kurumun doğru teknolojiyi pazarlama vaadiyle değil, gerçek ortamda kanıtlanmış performansla seçmesini sağlamak. PoC sürecini herkes için hızlı, adil, ölçülebilir ve şeffaf kılmak.',
+  vision: 'Teknoloji seçiminde dünyanın referans noktası olmak. Bir ürünün değeri analist görüşüyle değil, binlerce gerçek PoC’tan damıtılan kanıtla konuşulduğunda — o standardı koyan PoCHub olacak. Global, bizim ürettiğimiz kanıta bakarak değerlendirme yapacak.',
+  values: [
+    { icon:'🔬', title:'Kanıt, görüşün yerini alır', text:'Her değerlendirme gerçek bir PoC’a bağlıdır. Beyan değil, davranış; izlenim değil, sonuç.' },
+    { icon:'🪟', title:'Radikal şeffaflık', text:'Skorların formülü açıktır. Gizli sıralama yok, parayla yükselen konum yok.' },
+    { icon:'⚖️', title:'Bağımsızlık', text:'Hiçbir vendor ödeme ile üst sıraya çıkamaz. Sıralamayı yalnızca gerçek sonuçlar belirler.' },
+    { icon:'⚡', title:'Hız ve ölçülebilirlik', text:'PoC süreçleri ölçülür: yanıt süresi, kurulum, dönüşüm — hepsi kanıta dönüşür.' },
+    { icon:'🇹🇷', title:'Yerelden globale', text:'KVKK, yerli üretim, yerel referans: yerel gücümüz, küresel iddiamızın temelidir.' },
+    { icon:'🤝', title:'İki tarafın da kazandığı pazar', text:'Alıcı doğru kararı verir; vendor gerçek geri bildirimle ürününü geliştirir.' }
+  ],
+  differentiators: [
+    { title:'Kanıt > Görüş', text:'Analist firmaları görüş ve brifing sunar; biz gerçek PoC’lardan kanıt üretiriz — hiçbir araştırma kuruluşunun erişemediği bir veri katmanı.' },
+    { title:'İşlemsel > Danışmanlık', text:'Yalnızca rapor sunmayız; PoC sürecinin kendisine sahibiz. Talep, değerlendirme, karşılaştırma ve karar tek akışta birleşir.' },
+    { title:'Yerelden Global Standarda', text:'Türkiye pazarının derinliğinden doğan kanıt, küresel referans standardına dönüşür. Standardı takip etmiyoruz; koyuyoruz.' }
+  ],
+  stats: [
+    { value:'%100', label:'Doğrulanmış PoC Değerlendirmesi' },
+    { value:'0', label:'Ücretli Sıralama' },
+    { value:'7/24', label:'Canlı Kanıt Akışı' },
+    { value:'∞', label:'Şeffaflık' }
+  ]
+};
+var ABOUT = JSON.parse(JSON.stringify(ABOUT_DEFAULT));
+var _aboutLoaded = false;
+function applyAbout(d){
+  ABOUT = JSON.parse(JSON.stringify(ABOUT_DEFAULT));
+  if (!d || typeof d!=='object') return;
+  if (d.hero && typeof d.hero==='object') { ['badge','title','subtitle','description'].forEach(function(k){ if(typeof d.hero[k]==='string') ABOUT.hero[k]=d.hero[k]; }); }
+  ['whoWeAre','mission','vision'].forEach(function(k){ if(typeof d[k]==='string') ABOUT[k]=d[k]; });
+  if (Array.isArray(d.values)) ABOUT.values = d.values.filter(function(v){return v&&(v.title||v.text);}).map(function(v){ return {icon:String(v.icon||'✦'), title:String(v.title||''), text:String(v.text||'')}; });
+  if (Array.isArray(d.differentiators)) ABOUT.differentiators = d.differentiators.filter(function(v){return v&&(v.title||v.text);}).map(function(v){ return {title:String(v.title||''), text:String(v.text||'')}; });
+  if (Array.isArray(d.stats)) ABOUT.stats = d.stats.filter(function(v){return v&&(v.value||v.label);}).map(function(v){ return {value:String(v.value||''), label:String(v.label||'')}; });
+}
+async function ensureAbout(force){
+  if (_aboutLoaded && !force) return;
+  try { var cs = await getDoc(doc(db,'pochub_config','about')); applyAbout(cs.exists()?cs.data():null); } catch(e){ applyAbout(null); }
+  _aboutLoaded = true;
+}
+async function renderAbout(){
+  await ensureAbout();
+  var a = ABOUT, wrap = el('scr-about'); if(!wrap) return;
+  var heroTitle = escHtml(a.hero.title||'').replace(/\n/g,'<br>');
+  var values = (a.values||[]).map(function(v){ return '<div class="card" style="padding:22px;border-color:rgba(37,99,235,.12)"><div style="font-size:26px;margin-bottom:10px">'+(v.icon||'✦')+'</div><div style="font-size:15px;font-weight:800;margin-bottom:6px">'+escHtml(v.title||'')+'</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+escHtml(v.text||'')+'</div></div>'; }).join('');
+  var diffs = (a.differentiators||[]).map(function(d,i){ return '<div style="display:flex;gap:16px;align-items:flex-start;padding:18px 0;border-top:1px solid var(--border)"><div style="font-size:14px;font-weight:900;color:#2563eb;min-width:34px">0'+(i+1)+'</div><div><div style="font-size:16px;font-weight:800;margin-bottom:4px">'+escHtml(d.title||'')+'</div><div style="font-size:13.5px;color:var(--text-secondary);line-height:1.65">'+escHtml(d.text||'')+'</div></div></div>'; }).join('');
+  var stats = (a.stats||[]).map(function(s){ return '<div style="text-align:center;flex:1;min-width:120px"><div style="font-size:30px;font-weight:900;background:linear-gradient(135deg,#2563eb,#16a34a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">'+escHtml(s.value||'')+'</div><div style="font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:4px">'+escHtml(s.label||'')+'</div></div>'; }).join('');
+  wrap.innerHTML = '<div class="wrap">'
+    + '<div class="card" style="padding:54px 40px;margin-bottom:22px;text-align:center;background:linear-gradient(160deg,rgba(37,99,235,.07),rgba(22,163,74,.04));border-color:rgba(37,99,235,.18)">'
+    +   '<div style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;background:rgba(37,99,235,.10);padding:6px 14px;border-radius:20px;margin-bottom:18px">'+escHtml(a.hero.badge||'')+'</div>'
+    +   '<h1 style="font-size:38px;line-height:1.15;font-weight:900;margin:0 0 16px;letter-spacing:-.5px">'+heroTitle+'</h1>'
+    +   '<p style="font-size:16px;color:var(--text-secondary);max-width:680px;margin:0 auto 8px;line-height:1.6">'+escHtml(a.hero.subtitle||'')+'</p>'
+    +   '<p style="font-size:14px;color:var(--text-muted);max-width:640px;margin:0 auto;line-height:1.6">'+escHtml(a.hero.description||'')+'</p>'
+    + '</div>'
+    + (stats ? '<div class="card" style="padding:26px;margin-bottom:22px;display:flex;gap:18px;flex-wrap:wrap;justify-content:space-around">'+stats+'</div>' : '')
+    + (a.whoWeAre ? '<div class="card" style="padding:32px;margin-bottom:22px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:12px">BİZ KİMİZ</div><div style="font-size:15.5px;color:var(--text-secondary);line-height:1.8">'+escHtml(a.whoWeAre).replace(/\n/g,'<br><br>')+'</div></div>' : '')
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-bottom:22px">'
+    +   '<div class="card" style="padding:28px;border-top:3px solid #2563eb"><div style="font-size:22px;margin-bottom:10px">🎯</div><div style="font-size:17px;font-weight:800;margin-bottom:8px">Misyonumuz</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7">'+escHtml(a.mission||'')+'</div></div>'
+    +   '<div class="card" style="padding:28px;border-top:3px solid #16a34a"><div style="font-size:22px;margin-bottom:10px">🚀</div><div style="font-size:17px;font-weight:800;margin-bottom:8px">Vizyonumuz</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7">'+escHtml(a.vision||'')+'</div></div>'
+    + '</div>'
+    + (values ? '<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:14px;text-align:center">İLKELERİMİZ</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:22px">'+values+'</div></div>' : '')
+    + (diffs ? '<div class="card" style="padding:32px;margin-bottom:22px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:6px">NEDEN FARKLIYIZ</div>'+diffs+'</div>' : '')
+    + '<div class="card" style="padding:36px;text-align:center;background:linear-gradient(135deg,#2563eb,#1e40af);border:none">'
+    +   '<div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:8px">Kararını kanıtla ver.</div>'
+    +   '<div style="font-size:14px;color:rgba(255,255,255,.85);margin-bottom:18px">Gerçek ortamda test et, şeffaf karşılaştır, doğru teknolojiyi seç.</div>'
+    +   '<button id="about-cta-catalog" style="padding:12px 28px;font-size:14px;font-weight:700;background:#fff;color:#2563eb;border:none;border-radius:8px;cursor:pointer">Kataloğu Keşfet →</button>'
+    + '</div>'
+    + '</div>';
+  el('about-cta-catalog')?.addEventListener('click', function(){ go('catalog'); });
+}
+
+// ── Admin: Biz Kimiz editörü ──
+function openAboutEditorModal(){ ensureAbout().then(_openAboutEditor); }
+function _openAboutEditor(){
+  var a = JSON.parse(JSON.stringify(ABOUT));
+  var modal=document.createElement('div'); modal.className='modal-overlay';
+  function inp(id,val,ph){ return '<input class="inp" id="'+id+'" value="'+escHtml(val||'')+'" placeholder="'+(ph||'')+'" style="width:100%;font-size:13px;margin-bottom:10px">'; }
+  function ta(id,val,ph,rows){ return '<textarea class="inp" id="'+id+'" rows="'+(rows||3)+'" placeholder="'+(ph||'')+'" style="width:100%;font-size:13px;margin-bottom:10px;resize:vertical">'+escHtml(val||'')+'</textarea>'; }
+  function lbl(t){ return '<label class="lbl">'+t+'</label>'; }
+  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;padding:22px;position:relative">'
+    + '<button id="abe-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+    + '<div style="font-size:17px;font-weight:800;margin-bottom:16px">📖 Biz Kimiz / Misyon-Vizyon</div>'
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#2563eb;margin:6px 0 10px">HERO (ANA MESAJ — ana sayfa + Biz Kimiz)</div>'
+    + lbl('Rozet') + inp('abe-badge', a.hero.badge)
+    + lbl('Başlık (satır için Enter / \\n)') + ta('abe-title', a.hero.title, '', 2)
+    + lbl('Alt başlık') + ta('abe-subtitle', a.hero.subtitle, '', 2)
+    + lbl('Açıklama') + ta('abe-desc', a.hero.description, '', 2)
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#2563eb;margin:14px 0 10px">İÇERİK</div>'
+    + lbl('Biz Kimiz (paragraf arası için boş satır)') + ta('abe-who', a.whoWeAre, '', 5)
+    + lbl('Misyon') + ta('abe-mission', a.mission, '', 3)
+    + lbl('Vizyon') + ta('abe-vision', a.vision, '', 3)
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#2563eb;margin:14px 0 8px">İLKELER</div><div id="abe-values"></div><button class="btn-g btn-sm" id="abe-add-value">+ İlke Ekle</button>'
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#2563eb;margin:14px 0 8px">FARKLILAŞTIRICILAR</div><div id="abe-diffs"></div><button class="btn-g btn-sm" id="abe-add-diff">+ Madde Ekle</button>'
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#2563eb;margin:14px 0 8px">İSTATİSTİKLER</div><div id="abe-stats"></div><button class="btn-g btn-sm" id="abe-add-stat">+ İstatistik Ekle</button>'
+    + '<div style="display:flex;gap:8px;margin-top:20px"><button class="btn-p" id="abe-save" style="flex:1">💾 Kaydet</button><button class="btn-g" id="abe-reset">↺ Varsayılan</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  function wireRow(row){
+    row.querySelector('.abe-up')?.addEventListener('click', function(){ var p=row.previousElementSibling; if(p) row.parentNode.insertBefore(row,p); });
+    row.querySelector('.abe-down')?.addEventListener('click', function(){ var n=row.nextElementSibling; if(n) row.parentNode.insertBefore(n,row); });
+    row.querySelector('.abe-del')?.addEventListener('click', function(){ row.remove(); });
+  }
+  function ctrls(){ return '<div style="display:flex;flex-direction:column;gap:1px"><button class="abe-up" title="Yukarı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▲</button><button class="abe-down" title="Aşağı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▼</button></div>'; }
+  function del(){ return '<button class="abe-del" title="Sil" style="background:none;border:none;cursor:pointer;font-size:13px">🗑</button>'; }
+  function valueRow(v){ var r=document.createElement('div'); r.className='abe-vrow'; r.style.cssText='display:flex;gap:7px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<input class="inp abe-v-icon" value="'+escHtml(v.icon||'')+'" placeholder="✦" style="width:42px;font-size:14px;text-align:center"><div style="flex:1"><input class="inp abe-v-title" value="'+escHtml(v.title||'')+'" placeholder="Başlık" style="width:100%;font-size:12.5px;margin-bottom:5px"><textarea class="inp abe-v-text" rows="2" placeholder="Açıklama" style="width:100%;font-size:12px;resize:vertical">'+escHtml(v.text||'')+'</textarea></div>'+del(); return r; }
+  function diffRow(d){ var r=document.createElement('div'); r.className='abe-drow'; r.style.cssText='display:flex;gap:7px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<div style="flex:1"><input class="inp abe-d-title" value="'+escHtml(d.title||'')+'" placeholder="Başlık" style="width:100%;font-size:12.5px;margin-bottom:5px"><textarea class="inp abe-d-text" rows="2" placeholder="Açıklama" style="width:100%;font-size:12px;resize:vertical">'+escHtml(d.text||'')+'</textarea></div>'+del(); return r; }
+  function statRow(s){ var r=document.createElement('div'); r.className='abe-srow'; r.style.cssText='display:flex;gap:7px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<input class="inp abe-s-value" value="'+escHtml(s.value||'')+'" placeholder="Değer" style="width:90px;font-size:12.5px;font-weight:700"><input class="inp abe-s-label" value="'+escHtml(s.label||'')+'" placeholder="Etiket" style="flex:1;font-size:12.5px">'+del(); return r; }
+  function fill(hostId, arr, mk){ var h=modal.querySelector(hostId); h.innerHTML=''; (arr||[]).forEach(function(x){ var r=mk(x); h.appendChild(r); wireRow(r); }); }
+  fill('#abe-values', a.values, valueRow);
+  fill('#abe-diffs', a.differentiators, diffRow);
+  fill('#abe-stats', a.stats, statRow);
+  function addTo(hostId, mk, obj){ var h=modal.querySelector(hostId); var r=mk(obj); h.appendChild(r); wireRow(r); }
+  modal.querySelector('#abe-add-value').addEventListener('click', function(){ addTo('#abe-values', valueRow, {icon:'✦',title:'',text:''}); });
+  modal.querySelector('#abe-add-diff').addEventListener('click', function(){ addTo('#abe-diffs', diffRow, {title:'',text:''}); });
+  modal.querySelector('#abe-add-stat').addEventListener('click', function(){ addTo('#abe-stats', statRow, {value:'',label:''}); });
+
+  modal.querySelector('#abe-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  modal.querySelector('#abe-reset').addEventListener('click', function(){
+    var d=ABOUT_DEFAULT;
+    modal.querySelector('#abe-badge').value=d.hero.badge; modal.querySelector('#abe-title').value=d.hero.title; modal.querySelector('#abe-subtitle').value=d.hero.subtitle; modal.querySelector('#abe-desc').value=d.hero.description;
+    modal.querySelector('#abe-who').value=d.whoWeAre; modal.querySelector('#abe-mission').value=d.mission; modal.querySelector('#abe-vision').value=d.vision;
+    fill('#abe-values', d.values, valueRow); fill('#abe-diffs', d.differentiators, diffRow); fill('#abe-stats', d.stats, statRow);
+  });
+  modal.querySelector('#abe-save').addEventListener('click', async function(){
+    var btn=this; btn.disabled=true; btn.textContent='⏳ Kaydediliyor...';
+    var obj = {
+      hero: { badge:modal.querySelector('#abe-badge').value.trim(), title:modal.querySelector('#abe-title').value, subtitle:modal.querySelector('#abe-subtitle').value.trim(), description:modal.querySelector('#abe-desc').value.trim() },
+      whoWeAre: modal.querySelector('#abe-who').value, mission: modal.querySelector('#abe-mission').value.trim(), vision: modal.querySelector('#abe-vision').value.trim(),
+      values: [].slice.call(modal.querySelectorAll('#abe-values .abe-vrow')).map(function(r){ return {icon:r.querySelector('.abe-v-icon').value.trim()||'✦', title:r.querySelector('.abe-v-title').value.trim(), text:r.querySelector('.abe-v-text').value.trim()}; }).filter(function(v){return v.title||v.text;}),
+      differentiators: [].slice.call(modal.querySelectorAll('#abe-diffs .abe-drow')).map(function(r){ return {title:r.querySelector('.abe-d-title').value.trim(), text:r.querySelector('.abe-d-text').value.trim()}; }).filter(function(v){return v.title||v.text;}),
+      stats: [].slice.call(modal.querySelectorAll('#abe-stats .abe-srow')).map(function(r){ return {value:r.querySelector('.abe-s-value').value.trim(), label:r.querySelector('.abe-s-label').value.trim()}; }).filter(function(v){return v.value||v.label;})
+    };
+    try {
+      await setDoc(doc(db,'pochub_config','about'), obj, {merge:true});
+      applyAbout(obj); _aboutLoaded=true;
+      showToast('Biz Kimiz içeriği kaydedildi.');
+      modal.remove();
+      if (CUR_SCREEN==='about') renderAbout();
+      var mm=el('adm-main'); if(mm) admSettings(mm);
+    } catch(e){ showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='💾 Kaydet'; }
+  });
+}
+
 async function renderHome() {
   const wrap = el('scr-home');
+  await ensureAbout();
   const today = new Date();
   let calYear = today.getFullYear();
   let calMonth = today.getMonth();
 
   wrap.innerHTML = `<div class="wrap">
     <div class="hero-section card" style="padding:40px 40px 36px;margin-bottom:20px;border-color:rgba(37,99,235,.15)">
-      <div class="hero-eyebrow">✦ GÜVEN, KANITA DAYANIR</div>
-      <h1 class="hero-title">Doğru IT Kararı,<br>Kanıtlanmış Teknolojiyle Başlar</h1>
-      <p class="hero-sub">Satın alma kararı vermeden önce teknolojiyi gerçek ortamda test edin.</p>
-      <p class="hero-sub2">Bağımsız PoC süreçleri, uzman Vendor değerlendirmeleri ve şeffaf teknik karşılaştırmalarla kurumunuz için en doğru teknolojiyi seçin.</p>
+      <div class="hero-eyebrow">${escHtml(ABOUT.hero.badge||'')}</div>
+      <h1 class="hero-title">${escHtml(ABOUT.hero.title||'').replace(/\n/g,'<br>')}</h1>
+      <p class="hero-sub">${escHtml(ABOUT.hero.subtitle||'')}</p>
+      <p class="hero-sub2">${escHtml(ABOUT.hero.description||'')}</p>
       <div class="hero-cta-row" style="display:flex;gap:10px;flex-wrap:wrap">
         ${!CUR_USER ? '<button id="home-demo-btn" style="padding:12px 26px;font-size:14px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.25),0 1px 3px rgba(37,99,235,.15);transition:all .2s">' + t('hero.cta.demo', '📅 Ücretsiz 15dk Demo İste') + '</button>' : ''}
         <button id="home-events-btn" style="padding:12px 24px;font-size:13.5px;font-weight:600;background:#fff;color:#2563eb;border:1.5px solid #2563eb;border-radius:8px;cursor:pointer;transition:all .2s">${t('hero.cta.events', 'PoC Etkinliklerini İncele →')}</button>
         <button id="home-catalog-btn" style="padding:12px 24px;font-size:13.5px;font-weight:600;background:transparent;color:#475569;border:1.5px solid #cbd5e1;border-radius:8px;cursor:pointer;transition:all .2s">${t('hero.cta.catalog', 'Ürün Kataloğu')}</button>
+        <button id="home-about-btn" style="padding:12px 24px;font-size:13.5px;font-weight:600;background:transparent;color:#475569;border:1.5px solid #cbd5e1;border-radius:8px;cursor:pointer;transition:all .2s">${t('hero.cta.about', 'Biz Kimiz →')}</button>
         ${!CUR_USER ? '<button id="home-vendor-signup-btn" style="padding:12px 22px;font-size:13.5px;font-weight:700;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 12px rgba(22,163,74,.22);transition:all .2s">' + t('hero.cta.vendor_signup', '🎁 Vendor Olarak Ücretsiz Katıl') + '</button>' : ''}
       </div>
       <div class="trust-bar">
@@ -5074,6 +5234,7 @@ async function renderHome() {
 
   el('home-events-btn').addEventListener('click', () => go('events'));
   el('home-catalog-btn').addEventListener('click', () => go('catalog'));
+  el('home-about-btn')?.addEventListener('click', () => go('about'));
   // v4.81: Vendor ücretsiz katıl CTA
   el('home-vendor-signup-btn')?.addEventListener('click', () => {
     // Vendor tipi seçim modal'ı açabiliriz, ama şimdilik üretici default
@@ -29550,6 +29711,16 @@ async function admSettings(m) {
     sRev.appendChild(revBtn);
     m.appendChild(sRev);
 
+    // v5.77: Biz Kimiz / Misyon-Vizyon yönetimi
+    var sAbout = section('📖 Biz Kimiz / Misyon-Vizyon', '#1e40af');
+    var abInfo = document.createElement('div'); abInfo.style.cssText='font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6';
+    abInfo.textContent = 'Ana sayfa hero mesajı ve "Biz Kimiz" sayfası içeriği: rozet, başlık, misyon, vizyon, ilkeler, farklılaştırıcılar ve istatistikler. Tümü buradan eklenir/düzenlenir/sıralanır.';
+    sAbout.appendChild(abInfo);
+    var abBtn = document.createElement('button'); abBtn.className='btn-g'; abBtn.textContent='📖 İçeriği Düzenle';
+    abBtn.addEventListener('click', function(){ openAboutEditorModal(); });
+    sAbout.appendChild(abBtn);
+    m.appendChild(sAbout);
+
     // Suspend
     var s4 = section('⚠️ Suspend Kuralları', '#dc2626');
     s4.appendChild(field('Suspend Eşiği (kaç ödenmemiş PoC)', 'cfg-sus-threshold', 'number', cfg.suspend?.unpaidPocThreshold ?? 3));
@@ -33059,6 +33230,7 @@ function updatePageSEO(screen) {
     vendor:  'Vendor Paneli | PoCHub',
     customer:'Müşteri Paneli | PoCHub',
     admin:   'Admin Paneli | PoCHub',
+    about:   'Biz Kimiz | PoCHub — Misyon, Vizyon ve Manifesto',
   };
   var descs = {
     home:    'Türkiye\'nin IT PoC pazaryeri. Müşteriler PoC açar, vendor\'lar teklif gönderir. Süreç hızlanır, zaman ve maliyet tasarrufu.',
@@ -33066,6 +33238,7 @@ function updatePageSEO(screen) {
     events:  'PoC etkinlikleri, vendor demoları ve buluşmalar. Kurumsal IT için canlı etkinlik takvimi.',
     demo:    'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı öğrenin.',
     help:    'PoCHub kullanım rehberi. Vendor ve müşteri için sık sorulan sorular, paketler, ödeme, davet sistemi.',
+    about:   'PoCHub kimdir? Misyonumuz, vizyonumuz ve ilkelerimiz. IT satın alma kararını sezgiden kanıta taşıyan bağımsız PoC platformu.',
   };
 
   if (titles[screen]) document.title = titles[screen];
