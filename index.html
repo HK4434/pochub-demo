@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.74 | pochub.co -->
+<!-- PoCHub v5.75 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.74';
+const VERSION = 'v5.75';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.75': ['ETKINLIK FILTRELERINE URL DEEP-LINK (katalog paritesi): syncEventURL/readEventURL eklendi — etkinlik arama, facetler (category/format/language/fee + ozel), sort, view (grid), donem (period) artik URLe yazilir; paylasilabilir/yer-imlenebilir, yeniden yuklemede/deep-linkte geri yuklenir. loadEventsList her yuklemede syncEventURL cagirir; renderEvents ensureTaxonomy sonrasi readEventURL ile durumu geri yukler (arama kutusu HTML kurulunca doldurulur). KRITIK: etkinlik parametreleri ev_ ON EKIYLE ad-uzaylandi — katalogla paylasilen anahtar adlari (category/q/sort/view) CAKISMASIN; iki ekran filtreleri birbirini bozmaz. syncCatalogURL ev_ parametrelerini korur (katalog ziyareti etkinlik filtresini silmez). UI — RULES degismedi.'],
   'v5.74': ['DEGERLENDIRME KRITERLERI admin-yonetilebilir (config-driven): REVIEW_CRITERIA artik kodda sabit degil — pochub_config/system.reviewCriteria. REVIEW_CRITERIA_DEFAULT (4 kriter) + applyReviewCriteria; ensureTaxonomy ayni dokumandan yukler. Sistem Ayarlari > "⭐ Degerlendirme Kriterleri" + openReviewCriteriaModal: ekle/cikar/duzenle(etiket)/sirala(↑/↓), en az 1 kriter, Varsayilan. openPocEvalModal async oldu (modal acilmadan ensureTaxonomy ile kriterler yuklenir). Tum kullanim noktalari (eval modal, agregasyon, urun detayi akran-puani, karsilastirma Degerlendirme grubu) REVIEW_CRITERIA uzerinden calistigi icin otomatik uyumlu. Kaldirilan kriter eski degerlendirmeleri bozmaz, yeni degerlendirmelerde gorunmez. config write admin/read public — RULES degismedi.'],
   'v5.73': ['IZIN HATASI DUZELTILDI + akran-puani mimarisi: Onceki agregasyon poc_requests uzerinde o urunun TUM tamamlanmis PoClarini okuyordu; gizlilik kurali musterinin baska musterilerin PoClarini okumasina izin vermedigi icin sorgu komple reddediliyordu (Missing or insufficient permissions). Cozum: giris-yapmis-herkese-okunur REVIEWS koleksiyonu agregasyon kaynagi yapildi. Submit artik reviews/{pocId} dokumanini yazar (productId,vendorId,customerId,pocId,rating,criteriaRatings,recommend,createdAt — serbest NOT burada DEGIL, gizli), urun avgRating/ratingCount/criteriaAvg/recommendPct bu koleksiyondan hesaplanir. poc_requests sahibin kendi gosterimi/on-doldurma icin guncellenmeye devam eder (kendi PoCu). RULES DEGISTI: yeni reviews kurali (read isSignedIn / write customerId==uid / delete admin). Console + repo mirror guncellendi.'],
   'v5.72': ['DEGERLENDIRME GIRIS NOKTALARI (UX fix): Musteri talep kartlarinda detay/degerlendirme girisi yoktu — eklendi. Her kartta "📋 Detay" (openPocTimeline), TAMAMLANAN kartlarda dogrudan "⭐ Degerlendir" / "Degerlendirmeyi Guncelle" (openPocEvalModal). openPocTimeline: degerlendirme butonu artik tamamlanmis PoClarda da gorunur (yoksa Degerlendir, varsa Guncelle). Eval modali mevcut puanlarla on-doldurulur (kriter yildizlari, tavsiye, karar, not). Tamamlanan kutusu kriter kirilimi + tavsiye gosterir; genel puan ondalikli olabildigi icin yildiz tekrari yuvarlanir. RULES degismedi (v5.71 kurallari gecerli).'],
@@ -6774,6 +6775,7 @@ function evCardGrid(e){
 
 async function renderEvents() {
   await ensureTaxonomy();
+  readEventURL();
   const wrap = el('scr-events');
   wrap.innerHTML = `<div class="wrap">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
@@ -6803,6 +6805,7 @@ async function renderEvents() {
   </div>`;
 
   if (CUR_PROFILE?.role==='vendor') el('new-event-btn')?.addEventListener('click', () => openNewEventModal());
+  if (el('ev-search')) el('ev-search').value = window._evSearchFromUrl || '';
   el('ev-search')?.addEventListener('input', loadEventsList);
   getCategories().then(function(cats){ setEvCategoryOptions(cats); loadEventsList(); }).catch(function(){ loadEventsList(); });
   el('scr-events')?.addEventListener('click', function(e) {
@@ -6886,6 +6889,7 @@ async function openEventDetail(eventId) {
 async function loadEventsList() {
   const listEl = el('events-list');
   if (!listEl) return;
+  syncEventURL();
   listEl.innerHTML = '<div class="loading"><div class="spinner"></div>Yükleniyor...</div>';
   try {
     const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published')));
@@ -7193,9 +7197,36 @@ function catalogCustomCandidates(){
 }
 function eventsCustomCandidates(){ return [ {field:'location', top:true, label:'Konum'} ]; }
 function anyCatFacet(){ return allFacets().some(function(f){ return (CAT_FILTERS[f.key]||[]).length; }); }
+function syncEventURL(){
+  try {
+    var params = new URLSearchParams(window.location.search);
+    Array.prototype.slice.call(params.keys()).forEach(function(k){ if(k.indexOf('ev_')===0) params.delete(k); });
+    var q = el('ev-search')?.value||''; if(q) params.set('ev_q', q);
+    evFacets().forEach(function(f){ if((EV_FILTERS[f.key]||[]).length) params.set('ev_'+f.key, EV_FILTERS[f.key].join(',')); });
+    EV_CUSTOM.forEach(function(f){ if((EV_FILTERS[f.key]||[]).length) params.set('ev_'+f.key, EV_FILTERS[f.key].join(',')); });
+    if (EV_SORT && EV_SORT!=='date_asc') params.set('ev_sort', EV_SORT);
+    if (EV_VIEW==='grid') params.set('ev_view','grid');
+    if (CUR_EV_PERIOD && CUR_EV_PERIOD!=='upcoming') params.set('ev_period', CUR_EV_PERIOD);
+    var newUrl = window.location.pathname + (params.toString()?'?'+params.toString():'') + '#events';
+    history.replaceState(null, '', newUrl);
+  } catch(e){}
+}
+function readEventURL(){
+  try {
+    var params = new URLSearchParams(window.location.search);
+    window._evSearchFromUrl = params.get('ev_q') || '';
+    evFacets().forEach(function(f){ var v=params.get('ev_'+f.key); EV_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
+    EV_CUSTOM.forEach(function(f){ var v=params.get('ev_'+f.key); EV_FILTERS[f.key] = v ? v.split(',').filter(Boolean) : []; });
+    var sort=params.get('ev_sort'); EV_SORT = ['date_asc','date_desc','newest','fill'].indexOf(sort)>=0 ? sort : 'date_asc';
+    EV_VIEW = params.get('ev_view')==='grid' ? 'grid' : 'list';
+    var per=params.get('ev_period'); CUR_EV_PERIOD = ['upcoming','this_month','last_month','this_year','all'].indexOf(per)>=0 ? per : 'upcoming';
+  } catch(e){ window._evSearchFromUrl=''; }
+}
 function syncCatalogURL(){
   try {
     var params = new URLSearchParams();
+    var _cur = new URLSearchParams(window.location.search);
+    Array.prototype.slice.call(_cur.keys()).forEach(function(k){ if(k.indexOf('ev_')===0) params.set(k, _cur.get(k)); });
     var q = el('cat-search')?.value||''; if(q) params.set('q', q);
     CAT_FACETS.forEach(function(f){ if(CAT_FILTERS[f.key].length) params.set(f.key, CAT_FILTERS[f.key].join(',')); });
     CAT_CUSTOM.forEach(function(f){ if((CAT_FILTERS[f.key]||[]).length) params.set(f.key, CAT_FILTERS[f.key].join(',')); });
