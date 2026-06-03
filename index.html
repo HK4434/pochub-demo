@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.73 | pochub.co -->
+<!-- PoCHub v5.74 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.73';
+const VERSION = 'v5.74';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.74': ['DEGERLENDIRME KRITERLERI admin-yonetilebilir (config-driven): REVIEW_CRITERIA artik kodda sabit degil — pochub_config/system.reviewCriteria. REVIEW_CRITERIA_DEFAULT (4 kriter) + applyReviewCriteria; ensureTaxonomy ayni dokumandan yukler. Sistem Ayarlari > "⭐ Degerlendirme Kriterleri" + openReviewCriteriaModal: ekle/cikar/duzenle(etiket)/sirala(↑/↓), en az 1 kriter, Varsayilan. openPocEvalModal async oldu (modal acilmadan ensureTaxonomy ile kriterler yuklenir). Tum kullanim noktalari (eval modal, agregasyon, urun detayi akran-puani, karsilastirma Degerlendirme grubu) REVIEW_CRITERIA uzerinden calistigi icin otomatik uyumlu. Kaldirilan kriter eski degerlendirmeleri bozmaz, yeni degerlendirmelerde gorunmez. config write admin/read public — RULES degismedi.'],
   'v5.73': ['IZIN HATASI DUZELTILDI + akran-puani mimarisi: Onceki agregasyon poc_requests uzerinde o urunun TUM tamamlanmis PoClarini okuyordu; gizlilik kurali musterinin baska musterilerin PoClarini okumasina izin vermedigi icin sorgu komple reddediliyordu (Missing or insufficient permissions). Cozum: giris-yapmis-herkese-okunur REVIEWS koleksiyonu agregasyon kaynagi yapildi. Submit artik reviews/{pocId} dokumanini yazar (productId,vendorId,customerId,pocId,rating,criteriaRatings,recommend,createdAt — serbest NOT burada DEGIL, gizli), urun avgRating/ratingCount/criteriaAvg/recommendPct bu koleksiyondan hesaplanir. poc_requests sahibin kendi gosterimi/on-doldurma icin guncellenmeye devam eder (kendi PoCu). RULES DEGISTI: yeni reviews kurali (read isSignedIn / write customerId==uid / delete admin). Console + repo mirror guncellendi.'],
   'v5.72': ['DEGERLENDIRME GIRIS NOKTALARI (UX fix): Musteri talep kartlarinda detay/degerlendirme girisi yoktu — eklendi. Her kartta "📋 Detay" (openPocTimeline), TAMAMLANAN kartlarda dogrudan "⭐ Degerlendir" / "Degerlendirmeyi Guncelle" (openPocEvalModal). openPocTimeline: degerlendirme butonu artik tamamlanmis PoClarda da gorunur (yoksa Degerlendir, varsa Guncelle). Eval modali mevcut puanlarla on-doldurulur (kriter yildizlari, tavsiye, karar, not). Tamamlanan kutusu kriter kirilimi + tavsiye gosterir; genel puan ondalikli olabildigi icin yildiz tekrari yuvarlanir. RULES degismedi (v5.71 kurallari gecerli).'],
   'v5.71': ['KADEME 2 — PoC sonrasi COK-KRITERLI degerlendirme (Gartner akran-puani karsiligi): openPocEvalModal yeniden yazildi. Tek yildiz yerine REVIEW_CRITERIA (Kurulum & Entegrasyon, Destek & Hizmet, Urun Yetenekleri, Fiyat/Deger) her biri 5 yildiz + Tavsiye eder misiniz? (Evet/Hayir). Genel puan = kriter ortalamasi. poc_requests.completed dokumanlarina rating(genel)+criteriaRatings+recommend yazilir; urun agregasyonu avgRating/ratingCount + criteriaAvg{} + recommendPct hesaplar. Urun detayinda DEGERLENDIRME (AKRAN PUANI) blogu: kriter barlari + Genel puan + %tavsiye. Karsilastirmada Degerlendirme (Akran Puani) grubu: kriter ortalamasi satirlari + Tavsiye % (satir-bazli en-iyi vurgusu best:self). KURALLAR DEGISTI: products musteri rating update artik criteriaAvg+recommendPct kapsar; poc_requests musteri alanlarina rating/criteriaRatings/recommend/evalNote/completedBy eklendi (mevcut puanlama bosluğu da kapandi). Kurallar Console + repo mirror guncellendi.'],
@@ -5482,13 +5483,23 @@ async function openProductDetailModal(productId) {
 /* ══════════════════════════════════════════════════════
    POC DEGERLENDIRME MODAL — Musteri (v4.4)
 ══════════════════════════════════════════════════════ */
-var REVIEW_CRITERIA = [
+var REVIEW_CRITERIA_DEFAULT = [
   {id:'install', label:'Kurulum & Entegrasyon'},
   {id:'support', label:'Destek & Hizmet'},
   {id:'capabilities', label:'Ürün Yetenekleri'},
   {id:'value', label:'Fiyat / Değer'}
 ];
-function openPocEvalModal(poc) {
+var REVIEW_CRITERIA = REVIEW_CRITERIA_DEFAULT.slice();
+function applyReviewCriteria(arr){
+  if (Array.isArray(arr) && arr.length) {
+    REVIEW_CRITERIA = arr.filter(function(c){ return c && c.id && c.label; }).map(function(c){ return {id:String(c.id), label:String(c.label)}; });
+    if (!REVIEW_CRITERIA.length) REVIEW_CRITERIA = REVIEW_CRITERIA_DEFAULT.slice();
+  } else {
+    REVIEW_CRITERIA = REVIEW_CRITERIA_DEFAULT.slice();
+  }
+}
+async function openPocEvalModal(poc) {
+  await ensureTaxonomy();
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.innerHTML =
@@ -7079,7 +7090,7 @@ function applyTaxonomy(tax){
 var _taxLoaded = false;
 async function ensureTaxonomy(force){
   if (_taxLoaded && !force) return;
-  try { var cs = await getDoc(doc(db,'pochub_config','system')); if (cs.exists()) { var d=cs.data(); if (d.taxonomy) applyTaxonomy(d.taxonomy); applyFilterLayout(d.filters); } } catch(e){}
+  try { var cs = await getDoc(doc(db,'pochub_config','system')); if (cs.exists()) { var d=cs.data(); if (d.taxonomy) applyTaxonomy(d.taxonomy); applyFilterLayout(d.filters); applyReviewCriteria(d.reviewCriteria); } } catch(e){}
   _taxLoaded = true;
 }
 
@@ -28999,6 +29010,60 @@ function openPackageEditor(pkgId, allPackages) {
 
 // Admin: Sistem Ayarları Sayfası
 // ════════════════════════════════════════════════════════════════════
+// v5.74: Admin — Değerlendirme Kriterleri yönetimi (config-driven)
+// ════════════════════════════════════════════════════════════════════
+function openReviewCriteriaModal(){
+  var rows = REVIEW_CRITERIA.map(function(c){ return {id:c.id, label:c.label}; });
+  var modal=document.createElement('div'); modal.className='modal-overlay';
+  modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:520px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;position:relative">'
+    + '<button id="rcm-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+    + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">⭐ Değerlendirme Kriterleri</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sıra için ↑/↓ · etiketi yazarak değiştir · ekle/sil. En az 1 kriter gerekir. Genel puan = kriterlerin ortalaması.</div>'
+    + '<div id="rcm-list"></div>'
+    + '<button class="btn-g btn-sm" id="rcm-add" style="margin-top:8px">+ Kriter Ekle</button>'
+    + '<div style="display:flex;gap:8px;margin-top:20px"><button class="btn-p" id="rcm-save" style="flex:1">💾 Kaydet</button><button class="btn-g" id="rcm-reset">↺ Varsayılan</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+
+  function rowHtml(r){
+    return '<div class="rcm-row" data-id="'+r.id+'" style="display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)">'
+      + '<div style="display:flex;flex-direction:column;gap:1px"><button class="rcm-up" title="Yukarı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▲</button><button class="rcm-down" title="Aşağı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▼</button></div>'
+      + '<input class="inp rcm-label" value="'+(r.label||'').replace(/"/g,'&quot;')+'" placeholder="Kriter adı" style="flex:1;font-size:12.5px;padding:5px 9px">'
+      + '<button class="rcm-del" title="Sil" style="background:none;border:none;cursor:pointer;font-size:13px">🗑</button>'
+      + '</div>';
+  }
+  function wireRow(row){
+    row.querySelector('.rcm-up').addEventListener('click', function(){ var p=row.previousElementSibling; if(p) row.parentNode.insertBefore(row,p); });
+    row.querySelector('.rcm-down').addEventListener('click', function(){ var n=row.nextElementSibling; if(n) row.parentNode.insertBefore(n,row); });
+    row.querySelector('.rcm-del').addEventListener('click', function(){ row.remove(); });
+  }
+  function renderList(list){ var host=modal.querySelector('#rcm-list'); host.innerHTML=''; list.forEach(function(r){ host.insertAdjacentHTML('beforeend', rowHtml(r)); }); [].slice.call(host.children).forEach(wireRow); }
+  renderList(rows);
+
+  modal.querySelector('#rcm-add').addEventListener('click', function(){
+    var host=modal.querySelector('#rcm-list'); var id='c'+Date.now().toString(36);
+    host.insertAdjacentHTML('beforeend', rowHtml({id:id, label:''})); wireRow(host.lastElementChild);
+    host.lastElementChild.querySelector('.rcm-label').focus();
+  });
+  modal.querySelector('#rcm-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  modal.querySelector('#rcm-reset').addEventListener('click', function(){ renderList(REVIEW_CRITERIA_DEFAULT.map(function(c){ return {id:c.id, label:c.label}; })); });
+  modal.querySelector('#rcm-save').addEventListener('click', async function(){
+    var btn=this;
+    var list=[].slice.call(modal.querySelectorAll('#rcm-list .rcm-row')).map(function(row){ return {id:row.dataset.id, label:(row.querySelector('.rcm-label').value||'').trim()}; }).filter(function(c){ return c.label; });
+    if(!list.length){ showToast('En az bir kriter gerekli.','err'); return; }
+    btn.disabled=true; btn.textContent='⏳ Kaydediliyor...';
+    try {
+      await setDoc(doc(db,'pochub_config','system'), { reviewCriteria: list }, {merge:true});
+      applyReviewCriteria(list); _taxLoaded=true;
+      showToast('Değerlendirme kriterleri kaydedildi.');
+      modal.remove();
+      var mm=el('adm-main'); if(mm) admSettings(mm);
+    } catch(e){ showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='💾 Kaydet'; }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
 // v5.68: Admin — Filtre Yönetimi (katalog & etkinlik facet görünürlük + sıra)
 // ════════════════════════════════════════════════════════════════════
 function openFilterManagerModal(){
@@ -29398,6 +29463,16 @@ async function admSettings(m) {
     filBtn.addEventListener('click', function(){ openFilterManagerModal(); });
     sFil.appendChild(filBtn);
     m.appendChild(sFil);
+
+    // v5.74: Değerlendirme Kriterleri (PoC sonrası akran-puanı kriterleri)
+    var sRev = section('⭐ Değerlendirme Kriterleri', '#f59e0b');
+    var revInfo = document.createElement('div'); revInfo.style.cssText='font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6';
+    revInfo.textContent = 'PoC sonrası müşteri değerlendirmesinde kullanılan kriterler (her biri 5 yıldız). Ekle/çıkar/düzenle/sırala. Genel puan bu kriterlerin ortalamasıdır. Mevcut değerlendirmeler etkilenmez; kaldırılan kriter yeni değerlendirmelerde görünmez.';
+    sRev.appendChild(revInfo);
+    var revBtn = document.createElement('button'); revBtn.className='btn-g'; revBtn.textContent='⭐ Kriterleri Düzenle';
+    revBtn.addEventListener('click', function(){ openReviewCriteriaModal(); });
+    sRev.appendChild(revBtn);
+    m.appendChild(sRev);
 
     // Suspend
     var s4 = section('⚠️ Suspend Kuralları', '#dc2626');
