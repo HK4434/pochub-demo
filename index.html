@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.77 | pochub.co -->
+<!-- PoCHub v5.78 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -684,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.77';
+const VERSION = 'v5.78';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.78': ['KANIT SKORU (Evidence Score) — manifestonun "kanitlanmis performans" vaadinin somut hali. computeEvidenceScore: urunun GERCEK PoC verisinden seffaf skor (0-100) = agirlikli ortalama [Genel Memnuniyet=avgRating, Tavsiye Orani=recommendPct, PoC→Satin Alma=purchaseRate]. Agregasyona purchaseRate eklendi (reviews: satin alindi / (alindi+alinmadi)). Gosterim: katalog kart rozeti (🛡 skor), urun detayinda SEFFAF panel (kirilim barlari + agirlik %), karsilastirmada Kanit Skoru satiri, katalogda "Kanit Skoru" siralamasi. Guven: ratingCount < minReviews ise dusuk-guven isareti. Admin > Sistem Ayarlari > "🛡 Kanit Skoru Agirliklari" (3 agirlik + min, otomatik normalize) — pochub_config/system.evidence. RULES DEGISTI: products musteri rating update purchaseRate kapsar. Console + repo guncellendi.'],
   'v5.77': ['BIZ KIMIZ / MISYON-VIZYON manifesto sayfasi (config-driven, admin-editable): yeni #about ekrani + navda "Biz Kimiz" linki. renderAbout — iddialibir hero (Kanita dayanir), istatistik seridi, Biz Kimiz, Misyon/Vizyon kartlari, Ilkeler grid, Neden Farkliyiz (Kanit>Gorus / Islemsel>Danismanlik / Yerelden Global), CTA. Tum icerik pochub_config/about dokumaninda; ABOUT_DEFAULT seed + applyAbout + ensureAbout. Ana sayfa hero artik ayni config-ten (badge/baslik/altbaslik/aciklama editlenebilir) + hero CTAya Biz Kimiz. Admin > Sistem Ayarlari > "📖 Biz Kimiz" + openAboutEditorModal: hero alanlari, Misyon/Vizyon, Ilkeler/Farklilastiricilar/Istatistikler ekle-cikar-duzenle-sirala. updatePageSEO about title/desc. pochub_config read public/write admin — RULES degismedi.'],
   'v5.76': ['AKRAN-PUANI ZENGINLESTIRME — urun detayinda BIREYSEL dogrulanmis-PoC degerlendirmeleri + degerlendiren demografisi. renderProductReviews: reviews koleksiyonundan (giris yapmis kullanici) o urunun degerlendirmeleri cekilir (createdAt desc, ilk 12), her biri: genel yildiz + kriter bazli mini yildizlar + Tavsiye rozeti + Satin alma karari + SEKTOR ve SIRKET BUYUKLUGU etiketi (anonim; isim/sirket adi YOK) + tarih, kilitli Dogrulanmis PoC isareti. Detay modaline #pd-reviews-list eklendi, appendChild sonrasi asenkron doldurulur (giris yoksa gizli). Submit: review dokumanina purchaseDecision + customerSector + customerCompanySize (CUR_PROFILE snapshot) eklendi — serbest NOT hala yok (gizli). Etiket haritalari PROFILE_SECTOR_LABEL/COMPANY_SIZE_LABEL/REVIEW_DECISION_LABEL. reviews kuralinda alan beyaz-listesi olmadigi icin RULES degismedi.'],
   'v5.75': ['ETKINLIK FILTRELERINE URL DEEP-LINK (katalog paritesi): syncEventURL/readEventURL eklendi — etkinlik arama, facetler (category/format/language/fee + ozel), sort, view (grid), donem (period) artik URLe yazilir; paylasilabilir/yer-imlenebilir, yeniden yuklemede/deep-linkte geri yuklenir. loadEventsList her yuklemede syncEventURL cagirir; renderEvents ensureTaxonomy sonrasi readEventURL ile durumu geri yukler (arama kutusu HTML kurulunca doldurulur). KRITIK: etkinlik parametreleri ev_ ON EKIYLE ad-uzaylandi — katalogla paylasilen anahtar adlari (category/q/sort/view) CAKISMASIN; iki ekran filtreleri birbirini bozmaz. syncCatalogURL ev_ parametrelerini korur (katalog ziyareti etkinlik filtresini silmez). UI — RULES degismedi.'],
@@ -5553,6 +5554,21 @@ async function openProductDetailModal(productId) {
       : '';
     // Akran puanı (çok-kriterli) özeti
     var reviewHtml = '';
+    var _ev = computeEvidenceScore(p);
+    var evidenceHtml = '';
+    if (_ev) {
+      var _ec = evidenceColor(_ev.score);
+      var _bars = _ev.parts.map(function(pt){
+        return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#94a3b8;margin-bottom:3px"><span>'+pt.label+' <span style="color:#64748b">· ağırlık %'+Math.round(pt.weight*100)+'</span></span><span style="color:#c8cfdb;font-weight:700">'+pt.value+'</span></div>'
+          + '<div style="height:6px;background:rgba(255,255,255,.10);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+Math.max(0,Math.min(100,pt.value))+'%;background:'+_ec+'"></div></div></div>';
+      }).join('');
+      evidenceHtml = '<div style="margin-bottom:18px;padding:18px;border:1px solid '+_ec+'40;border-radius:12px;background:'+_ec+'0d">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px"><div style="font-size:12px;font-weight:800;letter-spacing:.5px;color:'+_ec+'">🛡 KANIT SKORU</div><div style="font-size:30px;font-weight:900;color:'+_ec+'">'+_ev.score+'<span style="font-size:13px;color:#64748b;font-weight:600">/100</span></div></div>'
+        + '<div style="font-size:11.5px;color:#64748b;margin-bottom:12px">Gerçek PoC verisinden hesaplanır — '+_ev.n+' değerlendirme'+(_ev.low?' · ⚠ düşük güven (az veri)':'')+'</div>'
+        + _bars
+        + '<div style="font-size:10.5px;color:#64748b;margin-top:8px">Şeffaf formül: kriterlerin ağırlıklı ortalaması. Ücretli sıralama yoktur.</div>'
+        + '</div>';
+    }
     if (p.ratingCount && ((p.criteriaAvg && Object.keys(p.criteriaAvg).length) || p.recommendPct!=null)) {
       var bars = REVIEW_CRITERIA.map(function(c){
         var v = p.criteriaAvg && p.criteriaAvg[c.id];
@@ -5605,6 +5621,9 @@ async function openProductDetailModal(productId) {
 
       // Üreticinin ürün sayfası linki
       urlHtml +
+
+      // Kanıt Skoru paneli
+      evidenceHtml +
 
       // Akran puanı özeti
       reviewHtml +
@@ -5668,6 +5687,37 @@ function applyReviewCriteria(arr){
 var PROFILE_SECTOR_LABEL = {finance:'🏦 Finans/Bankacılık', healthcare:'🏥 Sağlık', education:'🎓 Eğitim', manufacturing:'🏭 Üretim/Sanayi', retail:'🛒 Perakende', telecom:'📡 Telekom', government:'🏛 Kamu', energy:'⚡ Enerji', logistics:'🚚 Lojistik', media:'📺 Medya', tech:'💻 Teknoloji', other:'🌐 Diğer'};
 var COMPANY_SIZE_LABEL = {'1-10':'Mikro (1-10)','11-50':'Küçük (11-50)','51-250':'Orta (51-250)','251-1000':'Büyük (251-1000)','1000+':'Kurumsal (1000+)'};
 var REVIEW_DECISION_LABEL = {purchased:'✅ Satın Alındı', evaluating:'🔍 Değerlendiriliyor', not_purchased:'⊘ Alınmadı'};
+
+// ── Kanıt Skoru (Evidence Score) — gerçek PoC verisinden, şeffaf formül ──
+var EVIDENCE_DEFAULT = { weights:{rating:0.40, recommend:0.35, conversion:0.25}, minReviews:3 };
+var EVIDENCE_WEIGHTS = {rating:0.40, recommend:0.35, conversion:0.25};
+var EVIDENCE_MIN = 3;
+function applyEvidence(d){
+  var w = (d && d.weights) ? d.weights : EVIDENCE_DEFAULT.weights;
+  var r=Number(w.rating)||0, rc=Number(w.recommend)||0, cv=Number(w.conversion)||0, sum=r+rc+cv;
+  if(sum<=0){ r=EVIDENCE_DEFAULT.weights.rating; rc=EVIDENCE_DEFAULT.weights.recommend; cv=EVIDENCE_DEFAULT.weights.conversion; sum=r+rc+cv; }
+  EVIDENCE_WEIGHTS = { rating:r/sum, recommend:rc/sum, conversion:cv/sum };
+  EVIDENCE_MIN = (d && d.minReviews!=null) ? (Number(d.minReviews)||0) : EVIDENCE_DEFAULT.minReviews;
+}
+function computeEvidenceScore(p){
+  if(!p) return null;
+  var n = p.ratingCount||0; if(!n) return null;
+  var w = EVIDENCE_WEIGHTS;
+  var parts = [
+    {key:'rating', label:'Genel Memnuniyet', value:Math.round(((p.avgRating||0)/5)*100), weight:w.rating},
+    {key:'recommend', label:'Tavsiye Oranı', value:Math.round(p.recommendPct||0), weight:w.recommend},
+    {key:'conversion', label:'PoC → Satın Alma', value:Math.round(p.purchaseRate||0), weight:w.conversion}
+  ];
+  var raw = parts.reduce(function(a,x){ return a + x.value*x.weight; }, 0);
+  return { score:Math.round(raw), parts:parts, n:n, low:(n < EVIDENCE_MIN) };
+}
+function evidenceColor(s){ return s>=80?'#16a34a':(s>=60?'#2563eb':(s>=40?'#d97706':'#dc2626')); }
+function evidenceBadgeHtml(p, compact){
+  var e = computeEvidenceScore(p); if(!e) return '';
+  var c = evidenceColor(e.score);
+  return '<span title="Kanıt Skoru — gerçek PoC verisinden hesaplanır" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;color:'+c+';background:'+c+'1a;border:1px solid '+c+'44;padding:2px 8px;border-radius:6px'+(e.low?';opacity:.65':'')+'">🛡 '+e.score+(compact?'':' Kanıt')+(e.low?' •':'')+'</span>';
+}
+
 async function renderProductReviews(productId, host){
   if(!host) return;
   if(!CUR_USER){ host.innerHTML=''; return; }
@@ -5828,6 +5878,8 @@ async function openPocEvalModal(poc) {
         if (Object.keys(cavg).length) upd.criteriaAvg = cavg;
         var recs = ds.map(function(d){ return d.recommend; }).filter(function(v){ return v===true||v===false; });
         if (recs.length) upd.recommendPct = Math.round(recs.filter(Boolean).length/recs.length*100);
+        var decided = ds.filter(function(d){ return d.purchaseDecision==='purchased' || d.purchaseDecision==='not_purchased'; });
+        if (decided.length) upd.purchaseRate = Math.round(decided.filter(function(d){ return d.purchaseDecision==='purchased'; }).length/decided.length*100);
         if (Object.keys(upd).length) await updateDoc(doc(db,'products',poc.productId), upd);
       }
       modal.remove();
@@ -7300,7 +7352,7 @@ function applyTaxonomy(tax){
 var _taxLoaded = false;
 async function ensureTaxonomy(force){
   if (_taxLoaded && !force) return;
-  try { var cs = await getDoc(doc(db,'pochub_config','system')); if (cs.exists()) { var d=cs.data(); if (d.taxonomy) applyTaxonomy(d.taxonomy); applyFilterLayout(d.filters); applyReviewCriteria(d.reviewCriteria); } } catch(e){}
+  try { var cs = await getDoc(doc(db,'pochub_config','system')); if (cs.exists()) { var d=cs.data(); if (d.taxonomy) applyTaxonomy(d.taxonomy); applyFilterLayout(d.filters); applyReviewCriteria(d.reviewCriteria); applyEvidence(d.evidence); } } catch(e){}
   _taxLoaded = true;
 }
 
@@ -7604,6 +7656,12 @@ async function loadCatalog() {
     prods = facetFiltered(allBase, null);
     var sortBy = CAT_SORT;
     prods.sort(function(a, b) {
+      if (sortBy === 'evidence') {
+        var ea=computeEvidenceScore(a), eb=computeEvidenceScore(b);
+        var sa=ea?ea.score:-1, sb=eb?eb.score:-1;
+        if (sa !== sb) return sb - sa;
+        return (b.avgRating||0) - (a.avgRating||0);
+      }
       if (sortBy === 'rating') {
         var fa = a.featured?1:0, fb = b.featured?1:0;
         if (fa !== fb) return fb - fa;
@@ -7626,7 +7684,7 @@ async function loadCatalog() {
       hdr.innerHTML = '<div style="font-size:13px;color:var(--text-secondary)"><b style="color:var(--text);font-size:16px">'+prods.length+'</b> çözüm</div>'
         + '<div style="display:flex;align-items:center;gap:8px">'
         + '<select class="inp" id="cat-sort-sel" style="width:auto;font-size:12.5px;padding:5px 8px">'
-        +   ['rating:En Yüksek Puan','rating_count:En Çok Değerlendirilen','newest:En Yeni','name:A-Z','tr:🇹🇷 Yerli Önce'].map(function(o){ var kv=o.split(':'); return '<option value="'+kv[0]+'"'+(CAT_SORT===kv[0]?' selected':'')+'>'+kv[1]+'</option>'; }).join('')
+        +   ['evidence:🛡 Kanıt Skoru','rating:En Yüksek Puan','rating_count:En Çok Değerlendirilen','newest:En Yeni','name:A-Z','tr:🇹🇷 Yerli Önce'].map(function(o){ var kv=o.split(':'); return '<option value="'+kv[0]+'"'+(CAT_SORT===kv[0]?' selected':'')+'>'+kv[1]+'</option>'; }).join('')
         + '</select>'
         + '<div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden">'
         +   '<button id="cat-view-grid" title="Izgara" style="padding:6px 10px;cursor:pointer;border:none;font-size:14px;background:'+(CAT_VIEW==='grid'?'#2563eb':'transparent')+';color:'+(CAT_VIEW==='grid'?'#fff':'var(--text-secondary)')+'">▦</button>'
@@ -7702,6 +7760,7 @@ function catGridCard(p){
     +   '<div style="font-size:12px;color:#64748b;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;flex:1">'+(p.vendorId?getVendorAvatarFromCache(p.vendorId,24,{square:true}):'')+'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.vendorName||'—')+'</span>'+getVendorBadgeRow(p.vendorId)+'</div>'
     +   (p.avgRating?'<div style="font-size:11.5px;color:#f59e0b;font-weight:700;flex-shrink:0">&#11088; '+p.avgRating.toFixed(1)+' <span style="color:#94a3b8;font-weight:500">('+(p.ratingCount||0)+')</span></div>':'')
     + '</div>'
+    + (computeEvidenceScore(p) ? '<div style="margin-bottom:8px">'+evidenceBadgeHtml(p)+'</div>' : '')
     + '<p style="font-size:12px;color:#64748b;line-height:1.5;flex:1;margin-bottom:10px">'+(p.description||'')+'</p>'
     + (function(){ var t=catProdTags(p); return t?'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">'+t+'</div>':''; })()
     + '<button class="btn-p btn-sm poc-req-btn" data-id="'+p.id+'">PoC Talebi Oluştur →</button>'
@@ -7711,7 +7770,7 @@ function catListRow(p){
   return '<div class="prod-card" data-id="'+p.id+'" style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer">'
     + '<input type="checkbox" class="prod-select-cb" data-id="'+p.id+'" style="width:16px;height:16px;cursor:pointer;flex-shrink:0">'
     + '<div style="flex:1;min-width:0">'
-    +   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:14px;font-weight:700;color:#0f172a">'+(p.name||'')+'</span><span class="bdg" style="background:var(--bg-elevated);color:#475569;font-weight:600">'+(p.category||'—')+'</span>'+(p.avgRating?'<span style="font-size:11.5px;color:#f59e0b;font-weight:700">&#11088; '+p.avgRating.toFixed(1)+'</span>':'')+'</div>'
+    +   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:14px;font-weight:700;color:#0f172a">'+(p.name||'')+'</span><span class="bdg" style="background:var(--bg-elevated);color:#475569;font-weight:600">'+(p.category||'—')+'</span>'+(p.avgRating?'<span style="font-size:11.5px;color:#f59e0b;font-weight:700">&#11088; '+p.avgRating.toFixed(1)+'</span>':'')+evidenceBadgeHtml(p,true)+'</div>'
     +   '<div style="font-size:12px;color:#64748b;margin:3px 0;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">'+(p.vendorName||'—')+'</span>'+getVendorBadgeRow(p.vendorId)+'</div>'
     +   '<div style="display:flex;gap:5px;flex-wrap:wrap">'+catProdTags(p)+'</div>'
     + '</div>'
@@ -7757,6 +7816,7 @@ function openCompareModal(ids){
     ['Lisans', licL],
     ['Köken', function(p){return p.origin==='domestic'?'🇹🇷 Yerli':p.origin==='foreign'?'🌍 Yabancı':'—';}],
     ['Doğrulanmış', verified],
+    ['Kanıt Skoru', function(p){ var e=computeEvidenceScore(p); return e?('🛡 '+e.score):'—'; }, {best:'self'}],
     ['Puan', function(p){return p.avgRating?('⭐ '+p.avgRating.toFixed(1)+' ('+(p.ratingCount||0)+')'):'—';}, {best:'rating'}],
     ['Destek', function(p){return p.supportModel||(p.catFields&&p.catFields.support_model)||'—';}],
     ['Açıklama', function(p){return p.description?(p.description.length>140?p.description.slice(0,140)+'…':p.description):'—';}],
@@ -29247,6 +29307,52 @@ function openPackageEditor(pkgId, allPackages) {
 
 // Admin: Sistem Ayarları Sayfası
 // ════════════════════════════════════════════════════════════════════
+// v5.78: Admin — Kanıt Skoru ağırlık yönetimi
+// ════════════════════════════════════════════════════════════════════
+function openEvidenceConfigModal(){
+  ensureTaxonomy().then(function(){
+    var w = EVIDENCE_WEIGHTS;
+    // normalize edilmiş ağırlıkları yüzdeye çevirip göster (düzenlenebilir ham değer)
+    var modal=document.createElement('div'); modal.className='modal-overlay';
+    function row(id,label,val){ return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px"><label class="lbl" style="margin:0">'+label+'</label><input type="number" min="0" step="1" class="inp" id="'+id+'" value="'+Math.round(val*100)+'" style="width:90px;font-size:13px;text-align:right"></div>'; }
+    modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:460px;width:100%;padding:22px;position:relative">'
+      + '<button id="ev-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+      + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">🛡 Kanıt Skoru Ağırlıkları</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Göreli ağırlık girin (otomatik normalize edilir). Toplamın 100 olması gerekmez.</div>'
+      + row('ev-w-rating','Genel Memnuniyet', w.rating)
+      + row('ev-w-recommend','Tavsiye Oranı', w.recommend)
+      + row('ev-w-conversion','PoC → Satın Alma', w.conversion)
+      + '<div style="height:1px;background:var(--border);margin:14px 0"></div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px"><label class="lbl" style="margin:0">Min. değerlendirme (güven eşiği)</label><input type="number" min="0" step="1" class="inp" id="ev-min" value="'+EVIDENCE_MIN+'" style="width:90px;font-size:13px;text-align:right"></div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:16px">Bu sayının altında değerlendirmesi olan ürünler "düşük güven" işaretlenir.</div>'
+      + '<div style="display:flex;gap:8px"><button class="btn-p" id="ev-save" style="flex:1">💾 Kaydet</button><button class="btn-g" id="ev-reset">↺ Varsayılan</button></div>'
+      + '</div>';
+    document.body.appendChild(modal);
+    modal.querySelector('#ev-close').addEventListener('click', function(){ modal.remove(); });
+    modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+    modal.querySelector('#ev-reset').addEventListener('click', function(){
+      modal.querySelector('#ev-w-rating').value=Math.round(EVIDENCE_DEFAULT.weights.rating*100);
+      modal.querySelector('#ev-w-recommend').value=Math.round(EVIDENCE_DEFAULT.weights.recommend*100);
+      modal.querySelector('#ev-w-conversion').value=Math.round(EVIDENCE_DEFAULT.weights.conversion*100);
+      modal.querySelector('#ev-min').value=EVIDENCE_DEFAULT.minReviews;
+    });
+    modal.querySelector('#ev-save').addEventListener('click', async function(){
+      var btn=this;
+      var ev = { weights:{ rating:Number(modal.querySelector('#ev-w-rating').value)||0, recommend:Number(modal.querySelector('#ev-w-recommend').value)||0, conversion:Number(modal.querySelector('#ev-w-conversion').value)||0 }, minReviews:Number(modal.querySelector('#ev-min').value)||0 };
+      if ((ev.weights.rating+ev.weights.recommend+ev.weights.conversion)<=0){ showToast('En az bir ağırlık 0’dan büyük olmalı.','err'); return; }
+      btn.disabled=true; btn.textContent='⏳ Kaydediliyor...';
+      try {
+        await setDoc(doc(db,'pochub_config','system'), { evidence: ev }, {merge:true});
+        applyEvidence(ev); _taxLoaded=true;
+        showToast('Kanıt Skoru ağırlıkları kaydedildi.');
+        modal.remove();
+        var mm=el('adm-main'); if(mm) admSettings(mm);
+      } catch(e){ showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='💾 Kaydet'; }
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
 // v5.74: Admin — Değerlendirme Kriterleri yönetimi (config-driven)
 // ════════════════════════════════════════════════════════════════════
 function openReviewCriteriaModal(){
@@ -29710,6 +29816,16 @@ async function admSettings(m) {
     revBtn.addEventListener('click', function(){ openReviewCriteriaModal(); });
     sRev.appendChild(revBtn);
     m.appendChild(sRev);
+
+    // v5.78: Kanıt Skoru ağırlıkları
+    var sEv = section('🛡 Kanıt Skoru Ağırlıkları', '#16a34a');
+    var evInfo = document.createElement('div'); evInfo.style.cssText='font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6';
+    evInfo.textContent = 'Kanıt Skoru’nu oluşturan sinyallerin ağırlıkları (Genel Memnuniyet, Tavsiye Oranı, PoC→Satın Alma) ve minimum güven için gereken değerlendirme sayısı. Ağırlıklar otomatik normalize edilir.';
+    sEv.appendChild(evInfo);
+    var evBtn = document.createElement('button'); evBtn.className='btn-g'; evBtn.textContent='🛡 Ağırlıkları Düzenle';
+    evBtn.addEventListener('click', function(){ openEvidenceConfigModal(); });
+    sEv.appendChild(evBtn);
+    m.appendChild(sEv);
 
     // v5.77: Biz Kimiz / Misyon-Vizyon yönetimi
     var sAbout = section('📖 Biz Kimiz / Misyon-Vizyon', '#1e40af');
