@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.75 | pochub.co -->
+<!-- PoCHub v5.76 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.75';
+const VERSION = 'v5.76';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.76': ['AKRAN-PUANI ZENGINLESTIRME — urun detayinda BIREYSEL dogrulanmis-PoC degerlendirmeleri + degerlendiren demografisi. renderProductReviews: reviews koleksiyonundan (giris yapmis kullanici) o urunun degerlendirmeleri cekilir (createdAt desc, ilk 12), her biri: genel yildiz + kriter bazli mini yildizlar + Tavsiye rozeti + Satin alma karari + SEKTOR ve SIRKET BUYUKLUGU etiketi (anonim; isim/sirket adi YOK) + tarih, kilitli Dogrulanmis PoC isareti. Detay modaline #pd-reviews-list eklendi, appendChild sonrasi asenkron doldurulur (giris yoksa gizli). Submit: review dokumanina purchaseDecision + customerSector + customerCompanySize (CUR_PROFILE snapshot) eklendi — serbest NOT hala yok (gizli). Etiket haritalari PROFILE_SECTOR_LABEL/COMPANY_SIZE_LABEL/REVIEW_DECISION_LABEL. reviews kuralinda alan beyaz-listesi olmadigi icin RULES degismedi.'],
   'v5.75': ['ETKINLIK FILTRELERINE URL DEEP-LINK (katalog paritesi): syncEventURL/readEventURL eklendi — etkinlik arama, facetler (category/format/language/fee + ozel), sort, view (grid), donem (period) artik URLe yazilir; paylasilabilir/yer-imlenebilir, yeniden yuklemede/deep-linkte geri yuklenir. loadEventsList her yuklemede syncEventURL cagirir; renderEvents ensureTaxonomy sonrasi readEventURL ile durumu geri yukler (arama kutusu HTML kurulunca doldurulur). KRITIK: etkinlik parametreleri ev_ ON EKIYLE ad-uzaylandi — katalogla paylasilen anahtar adlari (category/q/sort/view) CAKISMASIN; iki ekran filtreleri birbirini bozmaz. syncCatalogURL ev_ parametrelerini korur (katalog ziyareti etkinlik filtresini silmez). UI — RULES degismedi.'],
   'v5.74': ['DEGERLENDIRME KRITERLERI admin-yonetilebilir (config-driven): REVIEW_CRITERIA artik kodda sabit degil — pochub_config/system.reviewCriteria. REVIEW_CRITERIA_DEFAULT (4 kriter) + applyReviewCriteria; ensureTaxonomy ayni dokumandan yukler. Sistem Ayarlari > "⭐ Degerlendirme Kriterleri" + openReviewCriteriaModal: ekle/cikar/duzenle(etiket)/sirala(↑/↓), en az 1 kriter, Varsayilan. openPocEvalModal async oldu (modal acilmadan ensureTaxonomy ile kriterler yuklenir). Tum kullanim noktalari (eval modal, agregasyon, urun detayi akran-puani, karsilastirma Degerlendirme grubu) REVIEW_CRITERIA uzerinden calistigi icin otomatik uyumlu. Kaldirilan kriter eski degerlendirmeleri bozmaz, yeni degerlendirmelerde gorunmez. config write admin/read public — RULES degismedi.'],
   'v5.73': ['IZIN HATASI DUZELTILDI + akran-puani mimarisi: Onceki agregasyon poc_requests uzerinde o urunun TUM tamamlanmis PoClarini okuyordu; gizlilik kurali musterinin baska musterilerin PoClarini okumasina izin vermedigi icin sorgu komple reddediliyordu (Missing or insufficient permissions). Cozum: giris-yapmis-herkese-okunur REVIEWS koleksiyonu agregasyon kaynagi yapildi. Submit artik reviews/{pocId} dokumanini yazar (productId,vendorId,customerId,pocId,rating,criteriaRatings,recommend,createdAt — serbest NOT burada DEGIL, gizli), urun avgRating/ratingCount/criteriaAvg/recommendPct bu koleksiyondan hesaplanir. poc_requests sahibin kendi gosterimi/on-doldurma icin guncellenmeye devam eder (kendi PoCu). RULES DEGISTI: yeni reviews kurali (read isSignedIn / write customerId==uid / delete admin). Console + repo mirror guncellendi.'],
@@ -5447,6 +5448,9 @@ async function openProductDetailModal(productId) {
       // Akran puanı özeti
       reviewHtml +
 
+      // Bireysel değerlendirmeler (giriş yapmış kullanıcı)
+      '<div id="pd-reviews-list"></div>' +
+
       // Teknik özellikler
       catFieldsHtml +
       '</div>' +
@@ -5458,6 +5462,7 @@ async function openProductDetailModal(productId) {
       '</div>';
 
     document.body.appendChild(modal);
+    if (CUR_USER) renderProductReviews(productId, modal.querySelector('#pd-reviews-list'));
 
     modal.querySelector('#close-prod-detail').addEventListener('click', function(){ modal.remove(); });
     modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
@@ -5498,6 +5503,44 @@ function applyReviewCriteria(arr){
   } else {
     REVIEW_CRITERIA = REVIEW_CRITERIA_DEFAULT.slice();
   }
+}
+var PROFILE_SECTOR_LABEL = {finance:'🏦 Finans/Bankacılık', healthcare:'🏥 Sağlık', education:'🎓 Eğitim', manufacturing:'🏭 Üretim/Sanayi', retail:'🛒 Perakende', telecom:'📡 Telekom', government:'🏛 Kamu', energy:'⚡ Enerji', logistics:'🚚 Lojistik', media:'📺 Medya', tech:'💻 Teknoloji', other:'🌐 Diğer'};
+var COMPANY_SIZE_LABEL = {'1-10':'Mikro (1-10)','11-50':'Küçük (11-50)','51-250':'Orta (51-250)','251-1000':'Büyük (251-1000)','1000+':'Kurumsal (1000+)'};
+var REVIEW_DECISION_LABEL = {purchased:'✅ Satın Alındı', evaluating:'🔍 Değerlendiriliyor', not_purchased:'⊘ Alınmadı'};
+async function renderProductReviews(productId, host){
+  if(!host) return;
+  if(!CUR_USER){ host.innerHTML=''; return; }
+  try {
+    var snap = await getDocs(query(collection(db,'reviews'), where('productId','==',productId)));
+    var ds = snap.docs.map(function(d){ return d.data(); });
+    if(!ds.length){ host.innerHTML=''; return; }
+    ds.sort(function(a,b){ return (b.createdAt&&b.createdAt.seconds||0)-(a.createdAt&&a.createdAt.seconds||0); });
+    ds = ds.slice(0,12);
+    var rows = ds.map(function(r){
+      var rr = Math.round(r.rating||0);
+      var stars = '⭐'.repeat(rr) + '☆'.repeat(Math.max(0,5-rr));
+      var tags = [];
+      if(r.customerSector) tags.push(PROFILE_SECTOR_LABEL[r.customerSector] || r.customerSector);
+      if(r.customerCompanySize) tags.push('👥 '+(COMPANY_SIZE_LABEL[r.customerCompanySize] || r.customerCompanySize));
+      var tagHtml = tags.map(function(t){ return '<span style="font-size:10.5px;padding:2px 8px;border-radius:5px;background:rgba(255,255,255,.06);color:#94a3b8">'+t+'</span>'; }).join('');
+      var dec = (r.purchaseDecision && REVIEW_DECISION_LABEL[r.purchaseDecision]) ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:5px;background:rgba(37,99,235,.12);color:#60a5fa">'+REVIEW_DECISION_LABEL[r.purchaseDecision]+'</span>' : '';
+      var rec = r.recommend===true?'<span style="font-size:11px;font-weight:700;color:#16a34a">👍 Tavsiye ediyor</span>':(r.recommend===false?'<span style="font-size:11px;font-weight:700;color:#dc2626">👎 Tavsiye etmiyor</span>':'');
+      var crit = REVIEW_CRITERIA.map(function(c){ var v=r.criteriaRatings&&r.criteriaRatings[c.id]; return v?('<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#94a3b8;margin-bottom:2px"><span>'+c.label+'</span><span style="color:#f59e0b;letter-spacing:1px">'+'★'.repeat(v)+'</span></div>'):''; }).join('');
+      var when = (r.createdAt&&r.createdAt.seconds) ? new Date(r.createdAt.seconds*1000).toLocaleDateString('tr-TR',{year:'numeric',month:'short'}) : '';
+      return '<div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;margin-bottom:8px;background:rgba(255,255,255,.02)">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
+        +   '<div style="font-size:13px;color:#f59e0b;font-weight:700">'+stars+' <span style="color:#94a3b8;font-weight:500;font-size:11px">'+(r.rating||0)+'/5</span></div>'
+        +   '<div style="font-size:10.5px;color:#64748b">🔒 Doğrulanmış PoC'+(when?' · '+when:'')+'</div>'
+        + '</div>'
+        + ((tagHtml||dec) ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+tagHtml+dec+'</div>' : '')
+        + crit
+        + (rec ? '<div style="margin-top:6px">'+rec+'</div>' : '')
+        + '</div>';
+    }).join('');
+    host.innerHTML = '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)">'
+      + '<div style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.6px;margin-bottom:12px">BİREYSEL DEĞERLENDİRMELER ('+ds.length+')</div>'
+      + rows + '</div>';
+  } catch(e){ host.innerHTML=''; }
 }
 async function openPocEvalModal(poc) {
   await ensureTaxonomy();
@@ -5610,7 +5653,9 @@ async function openPocEvalModal(poc) {
         // Akran puanı: herkese-okunur reviews koleksiyonu (agregasyon kaynağı)
         await setDoc(doc(db,'reviews',poc.id), {
           productId: poc.productId, vendorId: poc.vendorId||'', customerId: CUR_USER.uid, pocId: poc.id,
-          rating: overall, criteriaRatings: crits, recommend: recommend, createdAt: serverTimestamp()
+          rating: overall, criteriaRatings: crits, recommend: recommend, purchaseDecision: decision,
+          customerSector: (CUR_PROFILE && CUR_PROFILE.sector) || '', customerCompanySize: (CUR_PROFILE && CUR_PROFILE.companySize) || '',
+          createdAt: serverTimestamp()
         }, { merge:true });
         var prodSnap2 = await getDocs(query(collection(db,'reviews'), where('productId','==',poc.productId)));
         var ds = prodSnap2.docs.map(function(d){ return d.data(); });
