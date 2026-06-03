@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.71 | pochub.co -->
+<!-- PoCHub v5.72 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -683,7 +683,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.71';
+const VERSION = 'v5.72';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -918,6 +918,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.72': ['DEGERLENDIRME GIRIS NOKTALARI (UX fix): Musteri talep kartlarinda detay/degerlendirme girisi yoktu — eklendi. Her kartta "📋 Detay" (openPocTimeline), TAMAMLANAN kartlarda dogrudan "⭐ Degerlendir" / "Degerlendirmeyi Guncelle" (openPocEvalModal). openPocTimeline: degerlendirme butonu artik tamamlanmis PoClarda da gorunur (yoksa Degerlendir, varsa Guncelle). Eval modali mevcut puanlarla on-doldurulur (kriter yildizlari, tavsiye, karar, not). Tamamlanan kutusu kriter kirilimi + tavsiye gosterir; genel puan ondalikli olabildigi icin yildiz tekrari yuvarlanir. RULES degismedi (v5.71 kurallari gecerli).'],
   'v5.71': ['KADEME 2 — PoC sonrasi COK-KRITERLI degerlendirme (Gartner akran-puani karsiligi): openPocEvalModal yeniden yazildi. Tek yildiz yerine REVIEW_CRITERIA (Kurulum & Entegrasyon, Destek & Hizmet, Urun Yetenekleri, Fiyat/Deger) her biri 5 yildiz + Tavsiye eder misiniz? (Evet/Hayir). Genel puan = kriter ortalamasi. poc_requests.completed dokumanlarina rating(genel)+criteriaRatings+recommend yazilir; urun agregasyonu avgRating/ratingCount + criteriaAvg{} + recommendPct hesaplar. Urun detayinda DEGERLENDIRME (AKRAN PUANI) blogu: kriter barlari + Genel puan + %tavsiye. Karsilastirmada Degerlendirme (Akran Puani) grubu: kriter ortalamasi satirlari + Tavsiye % (satir-bazli en-iyi vurgusu best:self). KURALLAR DEGISTI: products musteri rating update artik criteriaAvg+recommendPct kapsar; poc_requests musteri alanlarina rating/criteriaRatings/recommend/evalNote/completedBy eklendi (mevcut puanlama bosluğu da kapandi). Kurallar Console + repo mirror guncellendi.'],
   'v5.70': ['FILTRE YONETIMI esnek (ekle/cikar/duzenle): Filtre Yonetimi modali yeniden yazildi. DUZENLE: her facet grubunun etiketi inline input ile degistirilebilir (override config.filters[].label). CIKAR: gorunurluk anahtari (gizle) + ozel facetlerde 🗑 tam silme. EKLE: admin yeni OZEL facet ekleyebilir — aday alan secer (katalog: Satis Tipi/Destek Modeli/Ulke + tum kategorilerin select tipi catFields alanlari; etkinlik: Konum), secenekler VERIDEN otomatik turetilir (computeCustomOptions). Ozel facetler katalog/etkinlik motoruna tam entegre (allFacets/evAllFacets, facetFiltered, sayim, chip, URL deep-link, sira/gorunurluk). config: filters.{catalog,events,catalogCustom,eventsCustom}. config write admin/read public — RULES degismedi.'],
   'v5.69': ['KARSILASTIRMA Gartner seviyesine cikarildi (adim 1): openCompareModal yeniden yazildi — tam-genislik (96vw), YAPISKAN kolon basliklari + yapiskan ilk sutun (oznitelik adi), oznitelikler GRUPLU (Genel + kategoriye ozel teknik gruplar f.group ile), SADECE FARKLARI GOSTER anahtari (ayni degerli satirlari gizler), Puan satirinda EN IYI urun yesil vurgulu, kolon basliginda urun puani + PoC butonu + Urun sayfasi linki (productUrl). PAYLASILABILIR baglanti: Baglantiyi kopyala → ?compare=id1,id2#catalog; katalog acilisinda bu parametre varsa karsilastirma otomatik acilir (deep-link). UI — rules degismedi.'],
@@ -5554,6 +5555,25 @@ function openPocEvalModal(poc) {
     });
   });
 
+  // Mevcut değerlendirmeyi ön-doldur (güncelleme)
+  if (poc.criteriaRatings) {
+    REVIEW_CRITERIA.forEach(function(c){
+      var v = poc.criteriaRatings[c.id]; if(!v) return;
+      modal.querySelector('#crit-'+c.id).value = v;
+      modal.querySelectorAll('.crit-star[data-crit="'+c.id+'"]').forEach(function(b){ var bv=parseInt(b.dataset.val); b.innerHTML = bv<=v?'&#11088;':'&#9734;'; b.style.color = bv<=v?'#f59e0b':'#64748b'; });
+    });
+  }
+  if (poc.recommend===true||poc.recommend===false) {
+    var rv = poc.recommend?'yes':'no';
+    modal.querySelector('#eval-recommend').value = rv;
+    var rb = modal.querySelector('.rec-btn[data-val="'+rv+'"]'); if(rb) rb.className='rec-btn btn-p btn-sm flx1';
+  }
+  if (poc.purchaseDecision) {
+    modal.querySelector('#eval-decision').value = poc.purchaseDecision;
+    var db2 = modal.querySelector('.decision-btn[data-val="'+poc.purchaseDecision+'"]'); if(db2) db2.className='decision-btn btn-p btn-sm flx1';
+  }
+  if (poc.evalNote) modal.querySelector('#eval-note').value = poc.evalNote;
+
   modal.querySelector('#eval-submit').addEventListener('click', async function() {
     var errDiv = modal.querySelector('#eval-err');
     var crits={}, sum=0, missing=false;
@@ -9119,7 +9139,9 @@ async function openPocTimeline(poc) {
 
     '<div style="margin-top:18px;display:flex;gap:8px;flex-direction:column">' +
     (CUR_PROFILE?.role==='customer' && ['active','offer_sent'].includes(poc.status) ?
-      '<button class="btn-p" id="ptl-complete" style="padding:10px;font-size:13.5px">✅ PoC Tamamlandı — Değerlendirme Yap</button>' : '') +
+      '<button class="btn-p" id="ptl-complete" style="padding:10px;font-size:13.5px">✅ PoC Tamamlandı — Değerlendirme Yap</button>' :
+     CUR_PROFILE?.role==='customer' && poc.status==='completed' ?
+      '<button class="btn-p" id="ptl-complete" style="padding:10px;font-size:13.5px">⭐ '+(poc.criteriaRatings ? 'Değerlendirmeyi Güncelle' : 'Değerlendirme Yap')+'</button>' : '') +
     (CUR_PROFILE?.role==='vendor' && ['active','offer_sent'].includes(poc.status) ?
       '<button class="btn-g" id="ptl-vendor-note" style="padding:10px;font-size:13px">📋 PoC Sonuç Notu Ekle</button>' : '') +
     (poc.id && poc.vendorId ? '<button class="btn-g" id="ptl-chat" style="padding:10px;font-size:13px">💬 Vendor ile Mesajlaş</button>' : '') +
@@ -9127,7 +9149,9 @@ async function openPocTimeline(poc) {
     (poc.status==='completed' && poc.rating ?
       '<div style="margin-top:16px;padding:14px;background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);border-radius:10px">' +
       '<div style="font-size:11px;color:#16a34a;font-weight:700;letter-spacing:.5px;margin-bottom:8px">MÜŞTERİ DEĞERLENDİRMESİ</div>' +
-      '<div style="font-size:18px;margin-bottom:4px">' + '⭐'.repeat(poc.rating) + '☆'.repeat(5-poc.rating) + ' <span style="font-size:13px;color:#64748b">('+poc.rating+'/5)</span></div>' +
+      '<div style="font-size:18px;margin-bottom:8px">' + '⭐'.repeat(Math.round(poc.rating)) + '☆'.repeat(Math.max(0,5-Math.round(poc.rating))) + ' <span style="font-size:13px;color:#64748b">('+poc.rating+'/5)</span></div>' +
+      (poc.criteriaRatings ? REVIEW_CRITERIA.map(function(c){ var v=poc.criteriaRatings[c.id]; return v?('<div style="font-size:12px;color:#475569;margin-bottom:3px;display:flex;justify-content:space-between;gap:10px"><span>'+c.label+'</span><span style="color:#f59e0b;font-weight:600;letter-spacing:1px">'+'⭐'.repeat(v)+'</span></div>'):''; }).join('') : '') +
+      (poc.recommend===true?'<div style="font-size:12px;font-weight:700;color:#16a34a;margin:8px 0 4px">👍 Tavsiye ediyor</div>':poc.recommend===false?'<div style="font-size:12px;font-weight:700;color:#dc2626;margin:8px 0 4px">👎 Tavsiye etmiyor</div>':'') +
       (poc.purchaseDecision ? '<div style="font-size:12px;margin-bottom:6px">Satın Alma: <span style="font-weight:700;color:'+(poc.purchaseDecision==='purchased'?'#16a34a':poc.purchaseDecision==='evaluating'?'#d97706':'#dc2626')+'">'+({'purchased':'✅ Satın Alındı','evaluating':'🔄 Değerlendiriliyor','not_purchased':'❌ Alınmadı'}[poc.purchaseDecision]||poc.purchaseDecision)+'</span></div>' : '') +
       (poc.evalNote ? '<div style="font-size:13px;color:#64748b;line-height:1.6">'+poc.evalNote+'</div>' : '') +
       '</div>' : '') +
@@ -9979,14 +10003,22 @@ async function loadCustTab() {
           +   (r.location?'<span>'+(locL[r.location]||r.location)+'</span>':'')
           +   (r.duration?'<span>'+r.duration+'</span>':'')
           + '</div>'
-          + (r.status==='active'?'<div style="margin-top:10px;display:flex;gap:8px">'
-            + '<button class="rq-msg btn-g btn-sm" data-id="'+r.id+'" data-title="'+(r.productName||r.title||'').replace(/"/g,"'")+'">💬 Mesaj</button>'
-            + '<button class="rq-off btn-g btn-sm" data-id="'+r.id+'">💰 Teklif Durumu</button>'
-            + '</div>':'')
-          + (r.status==='pending'?'<div style="margin-top:10px;display:flex;gap:8px">'
-            + '<button class="rq-msg btn-g btn-sm" data-id="'+r.id+'" data-title="'+(r.productName||r.title||'').replace(/"/g,"'")+'">💬 Vendor\'a Mesaj</button>'
-            + '</div>':'')
+          + '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+          +   '<button class="rq-detail btn-g btn-sm" data-id="'+r.id+'">📋 Detay</button>'
+          +   ((r.status==='active'||r.status==='offer_sent')
+              ? '<button class="rq-msg btn-g btn-sm" data-id="'+r.id+'" data-title="'+(r.productName||r.title||'').replace(/"/g,"'")+'">💬 Mesaj</button>'
+                + '<button class="rq-off btn-g btn-sm" data-id="'+r.id+'">💰 Teklif Durumu</button>'
+              : '')
+          +   (r.status==='pending'
+              ? '<button class="rq-msg btn-g btn-sm" data-id="'+r.id+'" data-title="'+(r.productName||r.title||'').replace(/"/g,"'")+'">💬 Vendor\'a Mesaj</button>'
+              : '')
+          +   (r.status==='completed'
+              ? '<button class="rq-eval btn-p btn-sm" data-id="'+r.id+'">⭐ '+(r.criteriaRatings?'Değerlendirmeyi Güncelle':'Değerlendir')+'</button>'
+              : '')
+          + '</div>'
         ;
+        card.querySelector('.rq-detail')?.addEventListener('click', function(){ openPocTimeline(r); });
+        card.querySelector('.rq-eval')?.addEventListener('click', function(){ openPocEvalModal(r); });
         lst.appendChild(card);
       });
       m.appendChild(lst);
