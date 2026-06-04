@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.89 | pochub.co -->
+<!-- PoCHub v5.90 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.89';
+const VERSION = 'v5.90';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.90': ['KARAR RAPORU PDF ZENGINLESTIRME — yonetime sunulan PoC Karar Raporu artik sadece skor degil GEREKCE de icerir. generateDecisionPdf basinda karsilastirilan urunlerin reviewlari tek sorguda cekilir (where productId in, <=10), urun basina en cok kazandiran/kaybettiren neden hesaplanir. PDFe "Karar Gerekcesi" bolumu: her urun icin Tavsiye % + PoC->Satin Alma % (public agregalardan) + Kazandiran/Kaybettiren neden (reviewlardan). Sayfa tasmasi icin _ensure ile otomatik addPage. Boylece belge alici organizasyonunda "neden bu urun" sorusunu da yanitlar, markamizi tasir. RULES degismedi (reviews signed-in; rapor giris yapmis alici tarafindan uretilir).'],
   'v5.89': ['KATEGORI LIDERLERI — kamuya acik, Kanit Skoru siralamasi (Gartner MQin seffaf, ucretsiz, herkese acik cevabi). Yeni #leaderboard ekrani + navda "🏆 Liderler" (public). renderLeaderboard: aktif urunler (public) kategoriye gore gruplanir, yalniz degerlendirilmis olanlar Kanit Skoruna gore siralanir; kategori basina ilk 10, madalyali (🥇🥈🥉), skor bari + yerli rozeti + degerlendirme sayisi, satira tikla>urun detayi. Ust kisimda kategori cipleri (tikla>scroll). Quadrant CTA. Hero: "Kanitla belirlenen liderler — analist gorusu degil, olculmus sonuc; ucretli siralama yok". parseAndNavigate whitelistine leaderboard+about eklendi; updatePageSEO title/desc (SEO landing). Bos: kanitlanmis lider yoksa nazik durum. UI/public — RULES degismedi.'],
   'v5.88': ['QUADRANT KOHORT LENSI — harita artik "senin akran segmentin" gozuyle yeniden cizilebilir (Gartnerda imkansiz). Giris yapmis musteriye Quadrant ustunde lens segmenti: Genel / 👥 Sektorum / 👥 Buyuklugum (profilde olana gore). Kohort secilince ensureQuadCohort yalniz HARITADAKI urunlerin reviewlarini ceker (where productId in, 10luk chunk), izleyicinin sektor/buyukluk kohortuna gore filtreler, urun basina kohort agregasi hesaplar (avg/recommend/conversion/kriter). quadCohortMetric bu agregadan eksen degerlerini ve kohort Kanit Skorunu uretir; balon boyutu=kohort n, renk=kohort evidence. Onbellek imzasi (lens+attr+urun-id-seti) ile gereksiz fetch yok; eksen degisiminde refetch yok. Kohortta veri yoksa nazik bos-durum. Okuma maliyeti haritadaki urunlerle sinirli. RULES degismedi (reviews signed-in).'],
   'v5.87': ['SATICI KANIT PANELI — vendor Urunlerim listesinde her aktif urunde "📊" butonu > openVendorEvidenceModal: urunun gercek PoC degerlendirmelerinden (reviews, signed-in okunur) arz-tarafi icgoru. (1) Ozet: Kanit Skoru + Tavsiye + PoC->Satin Alma + n; her biri AKRAN (ayni kategori, public agregalar) ortalamasina gore Δ. (2) Kriter Performansi: kriter bazli ortalama bar + akran farki, EN ZAYIF kriter kirmizi isaretli. (3) Kazanma/Kaybetme Nedenleri: win/loss reason bar dagilimi (deal kaybettiren nedenler). (4) Sektor Performansi: sektor bazli n/tavsiye/satin alma. Akran kiyasi peers=query(products category==) status active, self haric. Yalniz saticiya gorunur; saticiyi urunu iyilestirmeye ve platforma icerik uretmeye tesvik eden arz-tarafi cark. RULES degismedi.'],
@@ -27738,6 +27739,16 @@ async function generateDecisionPdf(prods, factors, weights, scores){
     await loadJsPDF();
     if(!window.jspdf || !window.jspdf.jsPDF){ showToast('PDF kütüphanesi yüklenemedi.','err'); return; }
     var S=_sanitizeForPdf, T=function(s,n){ s=String(s||''); return s.length>n?s.slice(0,n-1)+'.':s; };
+    // v5.90: Karar gerekçesi — reviewlardan kazandıran/kaybettiren neden
+    var reasonMap={};
+    try {
+      var rids=prods.map(function(p){return p.id;}).filter(Boolean).slice(0,10);
+      if(rids.length){
+        var rrs=await getDocs(query(collection(db,'reviews'), where('productId','in',rids)));
+        var byp={}; rrs.docs.forEach(function(d){ var r=d.data(); (byp[r.productId]=byp[r.productId]||[]).push(r); });
+        Object.keys(byp).forEach(function(pid){ var L=byp[pid], w={}, l={}; L.forEach(function(r){ if(!r.decisionReason)return; if(r.purchaseDecision==='purchased')w[r.decisionReason]=(w[r.decisionReason]||0)+1; else if(r.purchaseDecision==='not_purchased')l[r.decisionReason]=(l[r.decisionReason]||0)+1; }); function top(o){var k=Object.keys(o); if(!k.length)return''; k.sort(function(a,b){return o[b]-o[a];}); return k[0];} reasonMap[pid]={win:top(w), loss:top(l)}; });
+      }
+    } catch(e){}
     var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
     var W=210, M=14, x0=M, y=20;
     pdf.setFont('helvetica','bold'); pdf.setFontSize(18); pdf.setTextColor(20,20,20);
@@ -27764,6 +27775,21 @@ async function generateDecisionPdf(prods, factors, weights, scores){
     var winner=scores.slice().sort(function(a,b){return b.score-a.score;})[0];
     if(winner && maxScore>0){ pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(22,163,74);
       pdf.text(S('Onerilen: '+T(winner.p.name,40)+'   ('+winner.score+'/100)'), x0, y); y+=9; }
+    pdf.setTextColor(110,110,110); pdf.setFont('helvetica','normal'); pdf.setFontSize(8);
+    function _ensure(need){ if(y+need>282){ pdf.addPage(); y=20; } }
+    _ensure(12);
+    pdf.setTextColor(20,20,20); pdf.setFont('helvetica','bold'); pdf.setFontSize(11);
+    pdf.text(S('Karar Gerekcesi'), x0, y); y+=6;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5);
+    prods.forEach(function(p){
+      _ensure(15);
+      pdf.setFont('helvetica','bold'); pdf.setTextColor(20,20,20); pdf.text(S(T(p.name,46)), x0, y); y+=4.6;
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(70,70,70);
+      var rm=reasonMap[p.id]||{};
+      pdf.text(S('Tavsiye: '+(p.recommendPct!=null?'%'+p.recommendPct:'-')+'    PoC->Satin Alma: '+(p.purchaseRate!=null?'%'+p.purchaseRate:'-')), x0+2, y); y+=4.4;
+      pdf.text(S('Kazandiran: '+(rm.win?T(rm.win,30):'-')+'    Kaybettiren: '+(rm.loss?T(rm.loss,30):'-')), x0+2, y); y+=6.2;
+    });
+    y+=2; _ensure(20);
     pdf.setTextColor(110,110,110); pdf.setFont('helvetica','normal'); pdf.setFontSize(8);
     var note='Skorlar gercek PoC degerlendirmelerinden turetilmistir: kriter puanlari, Kanit Skoru, tavsiye ve PoC->satin alma orani. (a:) bu rapor icin secilen oncelik agirligidir; * en yuksek skoru gosterir; eksik veri 0 sayilir. Bu rapor PoCHub uzerinde olusturulmustur - pochub.co';
     pdf.text(pdf.splitTextToSize(S(note), W-2*M), x0, y);
