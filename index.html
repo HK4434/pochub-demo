@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.96 | pochub.co -->
+<!-- PoCHub v5.97 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.96';
+const VERSION = 'v5.97';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.97': ['URUN KANIT KARTI (PNG) — satici/alicinin paylasacagi markali kanit gorseli. Urun detayi Kanit panelinde "📷 Kanit Karti (PNG)" butonu: generateEvidenceCard canvasta (600x340 @2x) beyaz kart cizer — ust aksan cubugu evidenceColor, urun adi (_fitText ile kisaltma), satici·kategori, buyuk Kanit Skoru +/100 + skor bari, 3 istatistik (Genel Memnuniyet/Tavsiye/PoC->Satin Alma), alt bilgi "Analist gorusu degil; olculmus sonuc · pochub.co". PNG iner + destekleyen cihazda navigator.share. Skor yoksa uyari. Canvasta ASCII metin (emoji render sorunlarindan kacinmak icin). Off-site marka/geri-baglanti. UI — RULES degismedi.'],
   'v5.96': ['URUN DERIN BAGLANTI + PAYLAS — urun detayi artik paylasilabilir. Detay basligina 🔗 buton: location.origin+pathname+?p=<id> baglantisini navigator.share ile paylasir veya panoya kopyalar. Sayfa yuklenince ?p parametresi okunur ve ilgili urun detayi otomatik acilir (auth otursun diye 1.2sn gecikme; urun public-read oldugu icin anonim de acar). Modal kapaninca ?p replaceState ile URLden temizlenir (geri tusu/router bozulmaz). Boylece urunler paylasilabilir/linklenebilir (Liderler/Quadrant/sosyal), ileride Dogrulanmis rozet icin URL hedefi hazir, SEO icin urun bazli giris. UI/public — RULES degismedi.'],
   'v5.95': ['QUADRANT GORSEL INDIR / PAYLAS — haritayi markali PNG olarak disa aktar (viral/off-site). Quadrant kontrollerine "📷 Gorsel" butonu: exportQuadrantPng SVGyi klonlar, CSS degiskenlerini (var(--...)) getComputedStyle ile cozer, 2x canvasa cizer, alt bilgi seridi ekler (PoCHub Quadrant · pochub.co), PNG olarak indirir; destekleyen cihazda navigator.share ile paylasim. Harici kaynak yok > canvas taintlenmez. Tamamen client-side. RULES degismedi.'],
   'v5.94': ['ADMIN ARAC: Urun Kanit Agregalari — Yeniden Hesapla (Veri Sagligi). Tum urunlerin avgRating/ratingCount/criteriaAvg/recommendPct/purchaseRate/lastEvaluatedAt alanlarini reviews verisinden yeniden hesaplar (_peAgg). Eski degerlendirilmis urunlerde lastEvaluatedAt-i doldurur (Son Hareketler aninda canlanir) + drift duzeltir. Tek getDocs(reviews) > productId grupla > urun basina updateDoc (sirali, ilerleme). Idempotent; review-i olmayana dokunmaz. Admin update izni rules-ta var — RULES degismedi.'],
@@ -5723,6 +5724,7 @@ async function openProductDetailModal(productId) {
         + '<div style="font-size:11.5px;color:#64748b;margin-bottom:12px">Gerçek PoC verisinden hesaplanır — '+_ev.n+' değerlendirme'+(_ev.low?' · ⚠ düşük güven (az veri)':'')+'</div>'
         + _bars
         + '<div style="font-size:10.5px;color:#64748b;margin-top:8px">Şeffaf formül: kriterlerin ağırlıklı ortalaması. Ücretli sıralama yoktur.</div>'
+        + '<div style="margin-top:12px"><button id="ev-card-btn" style="font-size:12px;font-weight:700;padding:7px 13px;border:1px solid '+_ec+'55;background:'+_ec+'14;color:'+_ec+';border-radius:8px;cursor:pointer">📷 Kanıt Kartı (PNG)</button></div>'
         + '</div>';
     }
     if (p.ratingCount && ((p.criteriaAvg && Object.keys(p.criteriaAvg).length) || p.recommendPct!=null)) {
@@ -5816,6 +5818,8 @@ async function openProductDetailModal(productId) {
       catch(e){ window.prompt('Bağlantıyı kopyala:', shareUrl); }
     });
 
+    var evCardBtn = modal.querySelector('#ev-card-btn');
+    if (evCardBtn) evCardBtn.addEventListener('click', function(){ generateEvidenceCard(p); });
     var pocBtn = modal.querySelector('#prod-detail-poc-btn');
     if (pocBtn) {
       pocBtn.addEventListener('click', function() {
@@ -7910,6 +7914,56 @@ function exportQuadrantPng(svgEl){
     img.onerror = function(){ URL.revokeObjectURL(url); showToast('Görsel oluşturulamadı.','err'); };
     img.src = url;
   } catch(e){ showToast('Görsel hatası: '+((e&&e.message)||''),'err'); }
+}
+// v5.97: Ürün Kanıt Kartı — paylaşılabilir markalı PNG (canvas)
+function _fitText(ctx, text, maxW){
+  text = String(text||'');
+  if (ctx.measureText(text).width <= maxW) return text;
+  while (text.length > 1 && ctx.measureText(text+'..').width > maxW) text = text.slice(0, -1);
+  return text + '..';
+}
+function generateEvidenceCard(p){
+  try {
+    var e = computeEvidenceScore(p);
+    if(!e){ showToast('Bu ürün için henüz Kanıt Skoru yok.','err'); return; }
+    var col = evidenceColor(e.score);
+    var W=600, H=340, scale=2, pad=28;
+    var cv=document.createElement('canvas'); cv.width=W*scale; cv.height=H*scale;
+    var x=cv.getContext('2d'); x.scale(scale,scale); x.textBaseline='alphabetic';
+    x.fillStyle='#ffffff'; x.fillRect(0,0,W,H);
+    x.strokeStyle='#e2e8f0'; x.lineWidth=1; x.strokeRect(0.5,0.5,W-1,H-1);
+    x.fillStyle=col; x.fillRect(0,0,W,6);
+    var y=48;
+    x.fillStyle='#64748b'; x.font='700 11px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+    x.fillText('POCHUB  ·  KANITA DAYALI DEGERLENDIRME', pad, y);
+    y+=36; x.fillStyle='#0f172a'; x.font='800 26px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+    x.fillText(_fitText(x, p.name||'Urun', W-2*pad), pad, y);
+    y+=24; x.fillStyle='#64748b'; x.font='400 14px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+    x.fillText(_fitText(x, (p.vendorName||'')+(p.category?('  ·  '+p.category):''), W-2*pad), pad, y);
+    y+=72; x.fillStyle=col; x.font='900 66px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+    x.fillText(String(e.score), pad, y);
+    var sw=x.measureText(String(e.score)).width;
+    x.fillStyle='#0f172a'; x.font='700 14px system-ui,Segoe UI,Roboto,Arial,sans-serif'; x.fillText('Kanit Skoru', pad+sw+10, y-26);
+    x.fillStyle='#94a3b8'; x.font='700 16px system-ui,Segoe UI,Roboto,Arial,sans-serif'; x.fillText('/100', pad+sw+10, y-4);
+    var by=y+16, bw=W-2*pad;
+    x.fillStyle='#eef2f7'; x.fillRect(pad,by,bw,8);
+    x.fillStyle=col; x.fillRect(pad,by,bw*Math.max(0,Math.min(100,e.score))/100,8);
+    var sy=by+46, c3=bw/3;
+    var stats=[['Genel Memnuniyet', p.avgRating?(Math.round(p.avgRating*10)/10)+'/5':'-'], ['Tavsiye', p.recommendPct!=null?('%'+p.recommendPct):'-'], ['PoC -> Satin Alma', p.purchaseRate!=null?('%'+p.purchaseRate):'-']];
+    stats.forEach(function(s,i){
+      var sx=pad+i*c3;
+      x.fillStyle='#0f172a'; x.font='800 20px system-ui,Segoe UI,Roboto,Arial,sans-serif'; x.fillText(s[1], sx, sy);
+      x.fillStyle='#64748b'; x.font='400 11px system-ui,Segoe UI,Roboto,Arial,sans-serif'; x.fillText(s[0], sx, sy+18);
+    });
+    x.fillStyle='#94a3b8'; x.font='400 11px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+    x.fillText('Analist gorusu degil; olculmus sonuc.   ·   pochub.co', pad, H-18);
+    cv.toBlob(function(blob){
+      if(!blob){ showToast('Kart oluşturulamadı.','err'); return; }
+      try { var f=new File([blob],'pochub-kanit-karti.png',{type:'image/png'}); if(navigator.canShare && navigator.canShare({files:[f]})){ navigator.share({files:[f], title:'PoCHub Kanıt Kartı', text:(p.name||'')+' — pochub.co'}).catch(function(){}); } } catch(e2){}
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='pochub-kanit-karti.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1500);
+      showToast('Kanıt kartı indirildi.');
+    }, 'image/png');
+  } catch(e){ showToast('Kart hatası: '+((e&&e.message)||''),'err'); }
 }
 function renderQuadrant(prods, host){
   var mx = quadMetric(CAT_QX), my = quadMetric(CAT_QY);
