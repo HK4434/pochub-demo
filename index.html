@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.88 | pochub.co -->
+<!-- PoCHub v5.89 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -589,6 +589,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <div class="scr on" id="scr-home"></div>
 <div class="scr" id="scr-about"></div>
 <div class="scr" id="scr-catalog"></div>
+<div class="scr" id="scr-leaderboard"></div>
 <div class="scr" id="scr-events"></div>
 <div class="scr" id="scr-customer"></div>
 <div class="scr" id="scr-vendor"></div>
@@ -684,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.88';
+const VERSION = 'v5.89';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.89': ['KATEGORI LIDERLERI — kamuya acik, Kanit Skoru siralamasi (Gartner MQin seffaf, ucretsiz, herkese acik cevabi). Yeni #leaderboard ekrani + navda "🏆 Liderler" (public). renderLeaderboard: aktif urunler (public) kategoriye gore gruplanir, yalniz degerlendirilmis olanlar Kanit Skoruna gore siralanir; kategori basina ilk 10, madalyali (🥇🥈🥉), skor bari + yerli rozeti + degerlendirme sayisi, satira tikla>urun detayi. Ust kisimda kategori cipleri (tikla>scroll). Quadrant CTA. Hero: "Kanitla belirlenen liderler — analist gorusu degil, olculmus sonuc; ucretli siralama yok". parseAndNavigate whitelistine leaderboard+about eklendi; updatePageSEO title/desc (SEO landing). Bos: kanitlanmis lider yoksa nazik durum. UI/public — RULES degismedi.'],
   'v5.88': ['QUADRANT KOHORT LENSI — harita artik "senin akran segmentin" gozuyle yeniden cizilebilir (Gartnerda imkansiz). Giris yapmis musteriye Quadrant ustunde lens segmenti: Genel / 👥 Sektorum / 👥 Buyuklugum (profilde olana gore). Kohort secilince ensureQuadCohort yalniz HARITADAKI urunlerin reviewlarini ceker (where productId in, 10luk chunk), izleyicinin sektor/buyukluk kohortuna gore filtreler, urun basina kohort agregasi hesaplar (avg/recommend/conversion/kriter). quadCohortMetric bu agregadan eksen degerlerini ve kohort Kanit Skorunu uretir; balon boyutu=kohort n, renk=kohort evidence. Onbellek imzasi (lens+attr+urun-id-seti) ile gereksiz fetch yok; eksen degisiminde refetch yok. Kohortta veri yoksa nazik bos-durum. Okuma maliyeti haritadaki urunlerle sinirli. RULES degismedi (reviews signed-in).'],
   'v5.87': ['SATICI KANIT PANELI — vendor Urunlerim listesinde her aktif urunde "📊" butonu > openVendorEvidenceModal: urunun gercek PoC degerlendirmelerinden (reviews, signed-in okunur) arz-tarafi icgoru. (1) Ozet: Kanit Skoru + Tavsiye + PoC->Satin Alma + n; her biri AKRAN (ayni kategori, public agregalar) ortalamasina gore Δ. (2) Kriter Performansi: kriter bazli ortalama bar + akran farki, EN ZAYIF kriter kirmizi isaretli. (3) Kazanma/Kaybetme Nedenleri: win/loss reason bar dagilimi (deal kaybettiren nedenler). (4) Sektor Performansi: sektor bazli n/tavsiye/satin alma. Akran kiyasi peers=query(products category==) status active, self haric. Yalniz saticiya gorunur; saticiyi urunu iyilestirmeye ve platforma icerik uretmeye tesvik eden arz-tarafi cark. RULES degismedi.'],
   'v5.86': ['ZIYARET ANALITIGI (gizlilik-oncelikli, KVKK/GDPR-guvenli) — cerezsiz, IP saklamayan saglayicilar (Plausible/Umami) icin admin-ayarlanabilir entegrasyon. initAnalytics (DOMContentLoaded) pochub_config/system.analytics okur; injectAnalytics yalniz enabled+yapilandirilmissa ilgili script-i <head>e defer enjekte eder (plausible: data-domain; umami: data-website-id; custom: https src). Yapilandirilmazsa HICBIR script yuklenmez = sifir veri toplama, cerez onay bandi gerekmez. Kisi/IP bazli izleme platformda TUTULMAZ (kendi loglama yok). Admin > Sistem Ayarlari > "📊 Ziyaret Analitigi": saglayici secimi + alan adi/website id/opsiyonel https script url, alanlar saglayiciya gore gizlenir/gosterilir. UI/config — RULES degismedi (analytics alani pochub_config/system, write admin/read public).'],
@@ -3812,6 +3814,7 @@ function buildNav() {
     ['home',    t('nav.home', 'Ana Sayfa')],
     ['events',  t('nav.events', 'Etkinlikler')],
     ['catalog', t('nav.catalog', 'Katalog')],
+    ['leaderboard', t('nav.leaderboard', '🏆 Liderler')],
     ['about',   t('nav.about', 'Biz Kimiz')],
   ];
   if (CUR_PROFILE?.role === 'customer') tabItems.push(['customer', t('nav.customer_panel', 'Panelim')]);
@@ -4405,6 +4408,7 @@ function renderScreen(s) {
   else if (s==='about') renderAbout();
   else if (s==='events') renderEvents();
   else if (s==='catalog') renderCatalog();
+  else if (s==='leaderboard') renderLeaderboard();
   else if (s==='customer') renderCustomer();
   else if (s==='vendor') renderVendor();
   else if (s==='admin') renderAdmin();
@@ -5080,6 +5084,51 @@ async function renderAbout(){
     + '</div>'
     + '</div>';
   el('about-cta-catalog')?.addEventListener('click', function(){ go('catalog'); });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.89: Kategori Liderleri — kamuya açık, Kanıt Skoru sıralaması
+// ════════════════════════════════════════════════════════════════════
+async function renderLeaderboard(){
+  var scr = el('scr-leaderboard'); if(!scr) return;
+  scr.innerHTML = '<div class="wrap"><div class="empty"><div class="empty-icon">⏳</div>Liderler yükleniyor...</div></div>';
+  try {
+    await ensureTaxonomy();
+    var snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
+    var prods = snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; });
+    var byCat={};
+    prods.forEach(function(p){ var e=computeEvidenceScore(p); if(!e) return; var c=p.category||'Diğer'; (byCat[c]=byCat[c]||[]).push({p:p,e:e}); });
+    var cats=Object.keys(byCat).sort(function(a,b){ return byCat[b].length-byCat[a].length || a.localeCompare(b,'tr'); });
+    var html='<div class="wrap" style="max-width:980px">'
+      + '<div style="text-align:center;margin:8px 0 22px"><div style="font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;margin-bottom:8px">🏆 KATEGORİ LİDERLERİ</div>'
+      + '<h1 style="font-size:30px;font-weight:900;margin:0 0 10px;color:var(--text)">Kanıtla belirlenen liderler</h1>'
+      + '<p style="font-size:14px;color:var(--text-muted);max-width:620px;margin:0 auto;line-height:1.6">Her kategoride sıralama, gerçek PoC değerlendirmelerinden hesaplanan <b>Kanıt Skoru</b>’na göredir. Analist görüşü değil; ölçülmüş sonuç. <b>Ücretli sıralama yoktur.</b></p></div>';
+    if(!cats.length){
+      html += '<div class="empty" style="padding:50px 20px;text-align:center"><div class="empty-icon">🧭</div><div style="font-size:15px;font-weight:700;margin-bottom:4px">Henüz kanıtlanmış lider yok</div><div style="font-size:12.5px;color:var(--text-muted)">PoC değerlendirmeleri biriktikçe kategori liderleri burada belirir.</div></div></div>';
+      scr.innerHTML=html; return;
+    }
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:24px">'+cats.map(function(c,i){ return '<button class="lb-chip" data-i="'+i+'" style="font-size:12px;font-weight:600;padding:6px 12px;border:1px solid var(--border);border-radius:20px;color:var(--text-secondary);background:var(--bg-surface);cursor:pointer">'+escHtml(c)+' <span style="color:var(--text-muted)">'+byCat[c].length+'</span></button>'; }).join('')+'</div>';
+    cats.forEach(function(c,ci){
+      var list=byCat[c].sort(function(a,b){ return b.e.score-a.e.score || (b.p.ratingCount||0)-(a.p.ratingCount||0); }).slice(0,10);
+      html += '<div id="lb-cat-'+ci+'" style="margin-bottom:30px;scroll-margin-top:80px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px"><span style="font-size:16px;font-weight:800;color:var(--text)">'+escHtml(c)+'</span><span style="font-size:11.5px;color:var(--text-muted)">'+byCat[c].length+' kanıtlanmış çözüm</span></div>';
+      html += list.map(function(x,i){
+        var p=x.p, e=x.e, col=evidenceColor(e.score);
+        var medal = i===0?'🥇':(i===1?'🥈':(i===2?'🥉':'<span style="display:inline-block;width:22px;text-align:center;color:var(--text-muted);font-weight:700">'+(i+1)+'</span>'));
+        return '<div class="lb-row" data-id="'+p.id+'" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:var(--bg-surface)">'
+          + '<div style="flex:0 0 24px;font-size:18px;text-align:center">'+medal+'</div>'
+          + '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.name||'')+'</div><div style="font-size:11.5px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.vendorName||'—')+(p.origin==='domestic'?' · 🇹🇷 Yerli':'')+' · '+(p.ratingCount||0)+' değerlendirme</div></div>'
+          + '<div style="flex:0 0 100px;height:7px;background:var(--bg-elevated);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+e.score+'%;background:'+col+'"></div></div>'
+          + '<div style="flex:0 0 46px;text-align:right;font-size:17px;font-weight:900;color:'+col+'">'+e.score+'</div>'
+          + '</div>';
+      }).join('');
+      html += '</div>';
+    });
+    html += '<div style="text-align:center;margin:10px 0 34px"><button id="lb-quad" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:800;cursor:pointer">🧭 Haritada keşfet → PoCHub Quadrant</button></div></div>';
+    scr.innerHTML = html;
+    scr.querySelectorAll('.lb-row').forEach(function(r){ r.addEventListener('click', function(){ openProductDetailModal(r.dataset.id); }); });
+    scr.querySelectorAll('.lb-chip').forEach(function(b){ b.addEventListener('click', function(){ var t=document.getElementById('lb-cat-'+this.dataset.i); if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); }); });
+    var lq=scr.querySelector('#lb-quad'); if(lq) lq.addEventListener('click', function(){ window._pendingCatView='quadrant'; go('catalog'); });
+  } catch(e){ scr.innerHTML='<div class="wrap"><div class="empty"><div class="empty-icon">⚠️</div>Liderler yüklenemedi: '+escHtml((e&&e.message)||'')+'</div></div>'; }
 }
 
 // ── Admin: Biz Kimiz editörü ──
@@ -33936,6 +33985,7 @@ function updatePageSEO(screen) {
     customer:'Müşteri Paneli | PoCHub',
     admin:   'Admin Paneli | PoCHub',
     about:   'Biz Kimiz | PoCHub — Misyon, Vizyon ve Manifesto',
+    leaderboard: 'Kategori Liderleri | PoCHub — Kanıtla Belirlenen IT Çözüm Sıralaması',
   };
   var descs = {
     home:    'Türkiye\'nin IT PoC pazaryeri. Müşteriler PoC açar, vendor\'lar teklif gönderir. Süreç hızlanır, zaman ve maliyet tasarrufu.',
@@ -33944,6 +33994,7 @@ function updatePageSEO(screen) {
     demo:    'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı öğrenin.',
     help:    'PoCHub kullanım rehberi. Vendor ve müşteri için sık sorulan sorular, paketler, ödeme, davet sistemi.',
     about:   'PoCHub kimdir? Misyonumuz, vizyonumuz ve ilkelerimiz. IT satın alma kararını sezgiden kanıta taşıyan bağımsız PoC platformu.',
+    leaderboard: 'Her IT kategorisinde kanıtla belirlenen liderler. Gerçek PoC değerlendirmelerinden hesaplanan Kanıt Skoru sıralaması. Analist görüşü değil, ölçülmüş sonuç. Ücretli sıralama yok.',
   };
 
   if (titles[screen]) document.title = titles[screen];
@@ -34708,7 +34759,7 @@ function parseAndNavigate(hash) {
     return;
   }
 
-  if (!['home','events','catalog','customer','vendor','admin','demo','help'].includes(screen)) return;
+  if (!['home','events','catalog','leaderboard','about','customer','vendor','admin','demo','help'].includes(screen)) return;
   if (screen !== CUR_SCREEN) { CUR_SCREEN = screen; buildNav(); renderScreen(screen); }
   setTimeout(function() {
     if (screen === 'vendor'   && tab !== CUR_VEND_TAB) { CUR_VEND_TAB = tab; loadVendTab(); }
