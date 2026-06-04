@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.99 | pochub.co -->
+<!-- PoCHub v6.00 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.99';
+const VERSION = 'v6.00';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.00': ['i18n FAZ 1 — Dil mekanizmasi CANLI. Mevcut i18n motoru (I18N_DICT tr/en, detectInitialLocale ?lang>localStorage>tarayici, t() TR-fallback, setLocale ekrani+nav yeniden render, nav TR/EN switcher) uzerine: (1) autoDetectBrowser VARSAYILAN ACIK > TR disi tarayici otomatik EN, manuel switcher override eder. (2) Liderler public hero+bos-durum+sektor+CTA stringleri t()-e sarildi ve lb.* anahtarlari EN doldu (CATEGORY LEADERS / Leaders defined by evidence...). NOT: uygulamanin cogu hala gomulu TR; tam EN coverage sonraki fazlarda surface-by-surface t()-e sarilarak gelecek. RULES degismedi.'],
   'v5.99': ['KATEGORI LIDERI KARTI (PNG) — Liderler sayfasinda her kategorinin #1 satirina 📷 buton: generateLeaderCard canvasta (600x340 @2x) markali "Kategori Lideri" karti cizer — altin aksan + #1 rozeti, KATEGORI LIDERI etiketi, kategori adi, urun + satici, Kanit Skoru +/100 + bar, alt bilgi pochub.co. PNG iner + navigator.share. Buton satir tiklamasini engeller (stopPropagation). Skor yoksa uyari. ASCII metin. Off-site marka/geri-baglanti. Paylasilabilir gorsel kumesi tamam (Quadrant+UrunKart+KategoriLider). UI — RULES degismedi.'],
   'v5.98': ['WEB SITESI ROZETI (embed) — buyume dongusu, v5.96 deep-linkin tamamlayicisi. Urun detayinda YALNIZ urun sahibi saticiya gorunen "🛡 Rozet" butonu > openBadgeModal: kendi sitesine yapistiracagi hazir HTML rozet kodu (inline-styled <a>, https://pochub.co/?p=<id> hedefli), canli onizleme + textarea + Kopyala. Skor canli sayfada guncel gosterilir (rozette statik sayi yok > eskimez). Ucuncu-taraf dogrulama + geri-baglanti (G2/Capterra mantigi). Rozet kodunda apostrof yok, kalkan icin &#128737; entity. Functions GEREKMEZ (statik snippet). UI — RULES degismedi.'],
   'v5.97': ['URUN KANIT KARTI (PNG) — satici/alicinin paylasacagi markali kanit gorseli. Urun detayi Kanit panelinde "📷 Kanit Karti (PNG)" butonu: generateEvidenceCard canvasta (600x340 @2x) beyaz kart cizer — ust aksan cubugu evidenceColor, urun adi (_fitText ile kisaltma), satici·kategori, buyuk Kanit Skoru +/100 + skor bari, 3 istatistik (Genel Memnuniyet/Tavsiye/PoC->Satin Alma), alt bilgi "Analist gorusu degil; olculmus sonuc · pochub.co". PNG iner + destekleyen cihazda navigator.share. Skor yoksa uyari. Canvasta ASCII metin (emoji render sorunlarindan kacinmak icin). Off-site marka/geri-baglanti. UI — RULES degismedi.'],
@@ -5116,15 +5117,15 @@ async function renderLeaderboard(){
     var byCat={};
     filtered.forEach(function(x){ var c=x.p.category||'Diğer'; (byCat[c]=byCat[c]||[]).push(x); });
     var cats=Object.keys(byCat).sort(function(a,b){ return byCat[b].length-byCat[a].length || a.localeCompare(b,'tr'); });
-    var secSel = secOpts.length ? ('<div style="margin:6px 0 0;text-align:center"><select id="lb-sector" class="inp" style="width:auto;font-size:13px;padding:6px 12px"><option value="">Tüm sektörler</option>'+secOpts.map(function(s){ return '<option value="'+escHtml(s)+'"'+(LB_SECTOR===s?' selected':'')+'>'+escHtml(SECTOR_LABEL[s]||s)+' ('+secSet[s]+')</option>'; }).join('')+'</select></div>') : '';
-    var secHeading = LB_SECTOR ? ' · '+escHtml(SECTOR_LABEL[LB_SECTOR]||LB_SECTOR)+' sektörü' : '';
+    var secSel = secOpts.length ? ('<div style="margin:6px 0 0;text-align:center"><select id="lb-sector" class="inp" style="width:auto;font-size:13px;padding:6px 12px"><option value="">'+t('lb.all_sectors','Tüm sektörler')+'</option>'+secOpts.map(function(s){ return '<option value="'+escHtml(s)+'"'+(LB_SECTOR===s?' selected':'')+'>'+escHtml(SECTOR_LABEL[s]||s)+' ('+secSet[s]+')</option>'; }).join('')+'</select></div>') : '';
+    var secHeading = LB_SECTOR ? ' · '+escHtml(SECTOR_LABEL[LB_SECTOR]||LB_SECTOR)+t('lb.sector_suffix',' sektörü') : '';
     var html='<div class="wrap" style="max-width:980px">'
-      + '<div style="text-align:center;margin:8px 0 22px"><div style="font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;margin-bottom:8px">🏆 KATEGORİ LİDERLERİ'+secHeading+'</div>'
-      + '<h1 style="font-size:30px;font-weight:900;margin:0 0 10px;color:var(--text)">Kanıtla belirlenen liderler</h1>'
-      + '<p style="font-size:14px;color:var(--text-muted);max-width:620px;margin:0 auto;line-height:1.6">Her kategoride sıralama, gerçek PoC değerlendirmelerinden hesaplanan <b>Kanıt Skoru</b>’na göredir. Analist görüşü değil; ölçülmüş sonuç. <b>Ücretli sıralama yoktur.</b></p>'
+      + '<div style="text-align:center;margin:8px 0 22px"><div style="font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;margin-bottom:8px">🏆 '+t('lb.badge','KATEGORİ LİDERLERİ')+secHeading+'</div>'
+      + '<h1 style="font-size:30px;font-weight:900;margin:0 0 10px;color:var(--text)">'+t('lb.title','Kanıtla belirlenen liderler')+'</h1>'
+      + '<p style="font-size:14px;color:var(--text-muted);max-width:620px;margin:0 auto;line-height:1.6">'+t('lb.desc','Her kategoride sıralama, gerçek PoC değerlendirmelerinden hesaplanan Kanıt Skoru’na göredir. Analist görüşü değil; ölçülmüş sonuç. Ücretli sıralama yoktur.')+'</p>'
       + secSel + '</div>';
     if(!cats.length){
-      html += '<div class="empty" style="padding:50px 20px;text-align:center"><div class="empty-icon">🧭</div><div style="font-size:15px;font-weight:700;margin-bottom:4px">'+(LB_SECTOR?'Bu sektörde kanıtlanmış lider yok':'Henüz kanıtlanmış lider yok')+'</div><div style="font-size:12.5px;color:var(--text-muted)">'+(LB_SECTOR?'Başka bir sektör seç veya "Tüm sektörler"e dön.':'PoC değerlendirmeleri biriktikçe kategori liderleri burada belirir.')+'</div></div></div>';
+      html += '<div class="empty" style="padding:50px 20px;text-align:center"><div class="empty-icon">🧭</div><div style="font-size:15px;font-weight:700;margin-bottom:4px">'+(LB_SECTOR?t('lb.empty_sector','Bu sektörde kanıtlanmış lider yok'):t('lb.empty','Henüz kanıtlanmış lider yok'))+'</div><div style="font-size:12.5px;color:var(--text-muted)">'+(LB_SECTOR?t('lb.empty_sector_desc','Başka bir sektör seç veya Tüm sektörlere dön.'):t('lb.empty_desc','PoC değerlendirmeleri biriktikçe kategori liderleri burada belirir.'))+'</div></div></div>';
       scr.innerHTML=html;
       var ss0=scr.querySelector('#lb-sector'); if(ss0) ss0.addEventListener('change', function(){ LB_SECTOR=this.value; renderLeaderboard(); });
       return;
@@ -5132,7 +5133,7 @@ async function renderLeaderboard(){
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:24px">'+cats.map(function(c,i){ return '<button class="lb-chip" data-i="'+i+'" style="font-size:12px;font-weight:600;padding:6px 12px;border:1px solid var(--border);border-radius:20px;color:var(--text-secondary);background:var(--bg-surface);cursor:pointer">'+escHtml(c)+' <span style="color:var(--text-muted)">'+byCat[c].length+'</span></button>'; }).join('')+'</div>';
     cats.forEach(function(c,ci){
       var list=byCat[c].sort(function(a,b){ return b.e.score-a.e.score || (b.p.ratingCount||0)-(a.p.ratingCount||0); }).slice(0,10);
-      html += '<div id="lb-cat-'+ci+'" style="margin-bottom:30px;scroll-margin-top:80px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px"><span style="font-size:16px;font-weight:800;color:var(--text)">'+escHtml(c)+'</span><span style="font-size:11.5px;color:var(--text-muted)">'+byCat[c].length+' kanıtlanmış çözüm</span></div>';
+      html += '<div id="lb-cat-'+ci+'" style="margin-bottom:30px;scroll-margin-top:80px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px"><span style="font-size:16px;font-weight:800;color:var(--text)">'+escHtml(c)+'</span><span style="font-size:11.5px;color:var(--text-muted)">'+byCat[c].length+' '+t('lb.proven_solutions','kanıtlanmış çözüm')+'</span></div>';
       html += list.map(function(x,i){
         var p=x.p, e=x.e, col=evidenceColor(e.score);
         var medal = i===0?'🥇':(i===1?'🥈':(i===2?'🥉':'<span style="display:inline-block;width:22px;text-align:center;color:var(--text-muted);font-weight:700">'+(i+1)+'</span>'));
@@ -5146,7 +5147,7 @@ async function renderLeaderboard(){
       }).join('');
       html += '</div>';
     });
-    html += '<div style="text-align:center;margin:10px 0 34px"><button id="lb-quad" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:800;cursor:pointer">🧭 Haritada keşfet → PoCHub Quadrant</button></div></div>';
+    html += '<div style="text-align:center;margin:10px 0 34px"><button id="lb-quad" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:800;cursor:pointer">🧭 '+t('lb.quad_cta','Haritada keşfet → PoCHub Quadrant')+'</button></div></div>';
     scr.innerHTML = html;
     scr.querySelectorAll('.lb-row').forEach(function(r){ r.addEventListener('click', function(){ openProductDetailModal(r.dataset.id); }); });
     scr.querySelectorAll('.lb-card-btn').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); var arr=byCat[b.dataset.cat]; if(arr&&arr[0]) generateLeaderCard(arr[0].p, b.dataset.cat); }); });
@@ -28694,7 +28695,7 @@ const DEFAULT_CONFIG = {
     defaultLocale: 'tr',              // tr | en
     availableLocales: ['tr', 'en'],   // Aktif diller
     showLocaleSwitcher: true,         // Header'da TR/EN dropdown
-    autoDetectBrowser: false,         // true: browser dilini otomatik kullan (TR Türk kullanıcı için kapalı)
+    autoDetectBrowser: true,          // v6.00: tarayıci dili otomatik (TR disi > EN); manuel switcher override eder
   },
   // v5.03: Vendor Analytics
   vendorAnalytics: {
@@ -28915,6 +28916,18 @@ const I18N_DICT = {
     'common.next':        'İleri',
     'common.search':      'Ara',
     'common.error':       'Hata',
+    // Liderler (v6.00)
+    'lb.badge':            'KATEGORİ LİDERLERİ',
+    'lb.title':            'Kanıtla belirlenen liderler',
+    'lb.desc':             'Her kategoride sıralama, gerçek PoC değerlendirmelerinden hesaplanan Kanıt Skoru’na göredir. Analist görüşü değil; ölçülmüş sonuç. Ücretli sıralama yoktur.',
+    'lb.all_sectors':      'Tüm sektörler',
+    'lb.sector_suffix':    ' sektörü',
+    'lb.empty':            'Henüz kanıtlanmış lider yok',
+    'lb.empty_sector':     'Bu sektörde kanıtlanmış lider yok',
+    'lb.empty_desc':       'PoC değerlendirmeleri biriktikçe kategori liderleri burada belirir.',
+    'lb.empty_sector_desc':'Başka bir sektör seç veya Tüm sektörlere dön.',
+    'lb.proven_solutions': 'kanıtlanmış çözüm',
+    'lb.quad_cta':         'Haritada keşfet → PoCHub Quadrant',
   },
   en: {
     // Hero / Home
@@ -28957,6 +28970,18 @@ const I18N_DICT = {
     'common.next':        'Next',
     'common.search':      'Search',
     'common.error':       'Error',
+    // Leaders (v6.00)
+    'lb.badge':            'CATEGORY LEADERS',
+    'lb.title':            'Leaders defined by evidence',
+    'lb.desc':             'In every category, ranking is based on the Evidence Score computed from real PoC evaluations. Not analyst opinion; a measured outcome. No paid placement.',
+    'lb.all_sectors':      'All sectors',
+    'lb.sector_suffix':    ' sector',
+    'lb.empty':            'No proven leader yet',
+    'lb.empty_sector':     'No proven leader in this sector',
+    'lb.empty_desc':       'As PoC evaluations accumulate, category leaders will appear here.',
+    'lb.empty_sector_desc':'Pick another sector or return to All sectors.',
+    'lb.proven_solutions': 'proven solutions',
+    'lb.quad_cta':         'Explore on the map → PoCHub Quadrant',
   }
 };
 
