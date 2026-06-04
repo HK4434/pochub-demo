@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.81 | pochub.co -->
+<!-- PoCHub v5.82 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -684,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.81';
+const VERSION = 'v5.82';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.82': ['AKRAN KOHORTU (kisisellestirilmis kanit) — urun detayinda, giris yapmis musterinin KENDI sektoru ve sirket buyuklugundeki kurumlarin gercek PoC sonuclari. renderProductReviews icinde, zaten cekilen reviews uzerinden hesaplanir (yeni okuma/rules yok). Iki lens: <sektor> sektoru + <buyukluk>; her biri icin n, Tavsiye %, Satin Alma %, Puan — genel ortalamaya gore Δ (▲/▼) ok ile. Panel "👥 SENIN AKRAN KOHORTUN" (cohort > Win/Loss > bireysel sirasinda). Profilinde sektor/buyukluk olmayan musteriye nazik nudge (profilini tamamla). Vendor/eslesme yoksa gizli. CUR_PROFILE.sector/.companySize kullanir. UI/turetilmis — RULES degismedi.'],
   'v5.81': ['ANA SAYFA KANIT VITRINI — differensiyatorler artik her ziyaretciye gorunur (anonim dahil; products public-read). renderHomeda featured carouselin altina "🛡 Kanitlanmis Liderler" seridi: aktif urunler arasinda Kanit Skoru hesaplanir, en yuksek 6 urun yatay kart seridinde (kategori + 🛡 rozet + skor bari, tikla > urun detayi). Seridin sonunda gradient "🧭 PoCHub Quadrant" CTA karti. "Tumu →" katalogu Kanit Skoruna gore siralar; Quadrant CTA dogrudan katalog quadrant gorunumune dusurur (window._pendingCatView/_pendingCatSort tek-seferlik intent; readCatalogURL bunlari URL uzerine yazip uygular). Degerlendirilmis urun yoksa serit gizlenir. UI/turetilmis veri — RULES degismedi.'],
   'v5.80': ['WIN/LOSS KARAR NEDENLERI (Gartnerda olmayan veri) + Quadrant gorunurlugu. (1) Quadrant promosu: katalog grid/list gorunumunde dikkat ceken gradient afis (🧭 Haritayi Ac) — yalnizca degerlendirilmis urun varsa, kapatilabilir. (2) Win/Loss: PoC degerlendirmesinde Satin Alindi/Alinmadi secilince KARAR NEDENI sorulur (admin-yonetilebilir win/loss listeleri, pochub_config.decisionReasons). Neden review dokumanina yazilir (decisionReason — serbest alan, kural degismez). Urun detayinda (giris yapmis) KARAR ANALIZI paneli: karar veren kurumlarin %kaci satin aldi + Kazandiran/Kaybettiren nedenler bar dagilimi; her yorumda neden etiketi. Admin > Sistem Ayarlari > Karar Nedenleri editoru (iki liste ekle/cikar/duzenle/sirala). UI — RULES degismedi.'],
   'v5.79': ['POCHUB QUADRANT — gercek PoC verisinden canli, seffaf konumlandirma haritasi (bizim Magic Quadrant). Katalogda 3. gorunum modu (🧭, grid/list yaninda). SVG balon grafik: eksenler SECILEBILIR (Kanit Skoru / Genel Memnuniyet / Tavsiye % / PoC→Satin Alma + tum degerlendirme kriterleri), balon boyutu = degerlendirme sayisi, renk = Kanit Skoru. 4 ceyrek: Liderler / Vizyonerler / Uzmanlar / Nis. Balona tiklayinca urun detayi. Yalnizca degerlendirilmis urunler haritalanir; tek kategori secince kategori-ici karsilastirma en anlamli. Eksen state CAT_QX/CAT_QY, gorunum URLe yazilir (view=quadrant). Seffaflik notu: ucretli yerlesim yok, analist gorusu degil kanit. UI — RULES degismedi.'],
@@ -5797,6 +5798,42 @@ async function renderProductReviews(productId, host){
         +   '<div><div style="font-size:11.5px;font-weight:700;color:#dc2626;margin-bottom:8px">⊘ Kaybettiren nedenler</div>'+reasonList(lossC,'#dc2626')+'</div>'
         + '</div></div>';
     }
+    // v5.82: Akran Kohortu — kullanıcının sektör/büyüklük profilindeki gerçek sonuçlar
+    function _agg(list){
+      if(!list.length) return null;
+      var rt=list.map(function(d){return d.rating;}).filter(Boolean);
+      var avg=rt.length?Math.round(rt.reduce(function(a,b){return a+b;},0)/rt.length*10)/10:null;
+      var rc=list.map(function(d){return d.recommend;}).filter(function(v){return v===true||v===false;});
+      var rec=rc.length?Math.round(rc.filter(Boolean).length/rc.length*100):null;
+      var dc=list.filter(function(d){return d.purchaseDecision==='purchased'||d.purchaseDecision==='not_purchased';});
+      var cv=dc.length?Math.round(dc.filter(function(d){return d.purchaseDecision==='purchased';}).length/dc.length*100):null;
+      return {n:list.length, avg:avg, rec:rec, conv:cv};
+    }
+    var _ov=_agg(all), _prof=CUR_PROFILE||{}, _mySec=_prof.sector, _mySz=_prof.companySize;
+    function _chip(title,val,ov,suf){
+      if(val==null) return '<div style="flex:1;min-width:84px"><div style="font-size:10px;color:#64748b;margin-bottom:2px">'+title+'</div><div style="font-size:14px;font-weight:800;color:#475569">—</div></div>';
+      var d='';
+      if(ov!=null){ var diff=Math.round((val-ov)*10)/10; var col=diff>0?'#16a34a':(diff<0?'#dc2626':'#94a3b8'); var ar=diff>0?'▲':(diff<0?'▼':'–'); d='<span style="font-size:10px;color:'+col+';font-weight:700;margin-left:4px">'+ar+(diff>0?'+':'')+diff+'</span>'; }
+      return '<div style="flex:1;min-width:84px"><div style="font-size:10px;color:#64748b;margin-bottom:2px">'+title+'</div><div style="font-size:14px;font-weight:800;color:#c8cfdb">'+val+suf+d+'</div></div>';
+    }
+    var _lenses=[];
+    if(_mySec){ var _ls=_agg(all.filter(function(d){return d.customerSector===_mySec;})); if(_ls&&_ls.n) _lenses.push({label:(PROFILE_SECTOR_LABEL[_mySec]||_mySec)+' sektörü', a:_ls}); }
+    if(_mySz){ var _lz=_agg(all.filter(function(d){return d.customerCompanySize===_mySz;})); if(_lz&&_lz.n) _lenses.push({label:'👥 '+(COMPANY_SIZE_LABEL[_mySz]||_mySz), a:_lz}); }
+    var cohortHtml='';
+    if(_lenses.length){
+      var _rows=_lenses.map(function(L){
+        return '<div style="padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;margin-bottom:8px;background:rgba(255,255,255,.02)">'
+          + '<div style="font-size:11.5px;font-weight:700;color:#a5b4fc;margin-bottom:8px">'+escHtml(L.label)+' · '+L.a.n+' değerlendirme</div>'
+          + '<div style="display:flex;gap:14px;flex-wrap:wrap">'+_chip('Tavsiye',L.a.rec,_ov?_ov.rec:null,'%')+_chip('Satın Alma',L.a.conv,_ov?_ov.conv:null,'%')+_chip('Puan',L.a.avg,_ov?_ov.avg:null,'')+'</div>'
+          + '</div>';
+      }).join('');
+      cohortHtml = '<div style="margin-top:18px;padding:16px;border:1px solid rgba(124,58,237,.28);border-radius:12px;background:rgba(124,58,237,.07)">'
+        + '<div style="font-size:11px;color:#c4b5fd;font-weight:700;letter-spacing:.6px;margin-bottom:4px">👥 SENİN AKRAN KOHORTUN</div>'
+        + '<div style="font-size:12px;color:#94a3b8;margin-bottom:12px">Seninle aynı profildeki kurumların gerçek PoC sonuçları. Δ = genel ortalamaya göre fark.</div>'
+        + _rows + '</div>';
+    } else if (_prof && _prof.role && _prof.role!=='vendor' && !_mySec && !_mySz) {
+      cohortHtml = '<div style="margin-top:18px;padding:12px 14px;border:1px dashed rgba(124,58,237,.3);border-radius:10px;background:rgba(124,58,237,.04);font-size:12px;color:#94a3b8">👥 <b style="color:#c4b5fd">Akran kohortu</b> için profilinde sektör ve şirket büyüklüğünü belirt — seninle aynı profildeki kurumların sonuçlarını burada görürsün.</div>';
+    }
     var ds = all.slice().sort(function(a,b){ return (b.createdAt&&b.createdAt.seconds||0)-(a.createdAt&&a.createdAt.seconds||0); }).slice(0,12);
     var rows = ds.map(function(r){
       var rr = Math.round(r.rating||0);
@@ -5820,7 +5857,7 @@ async function renderProductReviews(productId, host){
         + (rec ? '<div style="margin-top:6px">'+rec+'</div>' : '')
         + '</div>';
     }).join('');
-    host.innerHTML = winLossHtml
+    host.innerHTML = cohortHtml + winLossHtml
       + '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)">'
       + '<div style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.6px;margin-bottom:12px">BİREYSEL DEĞERLENDİRMELER ('+all.length+')</div>'
       + rows + '</div>';
