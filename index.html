@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.94 | pochub.co -->
+<!-- PoCHub v5.95 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.94';
+const VERSION = 'v5.95';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.95': ['QUADRANT GORSEL INDIR / PAYLAS — haritayi markali PNG olarak disa aktar (viral/off-site). Quadrant kontrollerine "📷 Gorsel" butonu: exportQuadrantPng SVGyi klonlar, CSS degiskenlerini (var(--...)) getComputedStyle ile cozer, 2x canvasa cizer, alt bilgi seridi ekler (PoCHub Quadrant · pochub.co), PNG olarak indirir; destekleyen cihazda navigator.share ile paylasim. Harici kaynak yok > canvas taintlenmez. Tamamen client-side. RULES degismedi.'],
   'v5.94': ['ADMIN ARAC: Urun Kanit Agregalari — Yeniden Hesapla (Veri Sagligi). Tum urunlerin avgRating/ratingCount/criteriaAvg/recommendPct/purchaseRate/lastEvaluatedAt alanlarini reviews verisinden yeniden hesaplar (_peAgg). Eski degerlendirilmis urunlerde lastEvaluatedAt-i doldurur (Son Hareketler aninda canlanir) + drift duzeltir. Tek getDocs(reviews) > productId grupla > urun basina updateDoc (sirali, ilerleme). Idempotent; review-i olmayana dokunmaz. Admin update izni rules-ta var — RULES degismedi.'],
   'v5.93': ['CANLI IVME / SON HAREKETLER — ana sayfada gercek 30-gunluk canlilik. Her degerlendirmede urune public lastEvaluatedAt (serverTimestamp) yazilir (aggregation). renderEvidenceStats: son 30 gunde degerlendirilen urun sayisi 4. sayac olarak + "🔥 SON HAREKETLER" seridi (en son degerlendirilen 4 urun, goreli zaman -bugun/dun/N gun once-, tikla>detay). Anonim ziyaretciye de gorunur (lastEvaluatedAt public). RULES DEGISTI: products musteri rating update lastEvaluatedAt kapsar (Console + repo guncellenmeli).'],
   'v5.92': ['KATEGORI LIDERLERI SEKTOR FILTRESI — Liderler sayfasina kamuya acik sektor filtresi (urunun hitap ettigi sektorlere gore, product.sectors public). Degerlendirilmis urunlerden sektor evreni cikarilir (sayilarla), dropdown ile secilen sektore hitap eden urunler kategori bazinda Kanit Skoruna gore siralanir. Baslik secili sektoru yansitir; o sektorde lider yoksa nazik bos-durum (dropdown kalir, sifirlanabilir). LB_SECTOR state. Reviews gerekmez (anonim de kullanir); SEO icin sektor-bazli kesif. UI/public — RULES degismedi.'],
@@ -7857,6 +7858,44 @@ function wireQuadControls(host){
   var sx=host.querySelector('#quad-x'), sy=host.querySelector('#quad-y');
   if(sx) sx.addEventListener('change', function(){ CAT_QX=this.value; loadCatalog(); });
   if(sy) sy.addEventListener('change', function(){ CAT_QY=this.value; loadCatalog(); });
+  var pb=host.querySelector('#quad-png'); if(pb) pb.addEventListener('click', function(){ var svg=host.querySelector('svg'); if(svg) exportQuadrantPng(svg); else showToast('Önce haritada değerlendirilmiş ürün olmalı.','err'); });
+}
+function exportQuadrantPng(svgEl){
+  try {
+    var cs = getComputedStyle(document.documentElement);
+    function rv(n){ var v=(cs.getPropertyValue(n)||'').trim(); return v||'#888'; }
+    var vb = (svgEl.getAttribute('viewBox')||'0 0 720 520').split(/\s+/);
+    var W=parseInt(vb[2])||720, H=parseInt(vb[3])||520, footerH=34;
+    var clone = svgEl.cloneNode(true);
+    clone.setAttribute('width', W); clone.setAttribute('height', H);
+    clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+    clone.setAttribute('font-family','system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif');
+    var str = new XMLSerializer().serializeToString(clone).replace(/var\((--[a-z0-9-]+)\)/gi, function(_,n){ return rv(n); });
+    var bg = rv('--bg-surface') || '#ffffff';
+    var img = new Image();
+    var url = URL.createObjectURL(new Blob([str], {type:'image/svg+xml;charset=utf-8'}));
+    img.onload = function(){
+      var scale=2;
+      var canvas=document.createElement('canvas'); canvas.width=W*scale; canvas.height=(H+footerH)*scale;
+      var ctx=canvas.getContext('2d'); ctx.scale(scale,scale);
+      ctx.fillStyle=bg; ctx.fillRect(0,0,W,H+footerH);
+      ctx.drawImage(img,0,0,W,H);
+      ctx.fillStyle=rv('--text-muted'); ctx.font='bold 13px system-ui,Segoe UI,Roboto,sans-serif'; ctx.textBaseline='middle';
+      ctx.fillText('PoCHub Quadrant — kanita dayali konumlandirma  ·  pochub.co', 14, H+footerH/2);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(function(blob){
+        if(!blob){ showToast('Görsel oluşturulamadı.','err'); return; }
+        try {
+          var f=new File([blob],'pochub-quadrant.png',{type:'image/png'});
+          if(navigator.canShare && navigator.canShare({files:[f]})){ navigator.share({files:[f], title:'PoCHub Quadrant', text:'Kanıta dayalı konumlandırma — pochub.co'}).catch(function(){}); }
+        } catch(e){}
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='pochub-quadrant.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1500);
+        showToast('Quadrant görseli indirildi.');
+      }, 'image/png');
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); showToast('Görsel oluşturulamadı.','err'); };
+    img.src = url;
+  } catch(e){ showToast('Görsel hatası: '+((e&&e.message)||''),'err'); }
 }
 function renderQuadrant(prods, host){
   var mx = quadMetric(CAT_QX), my = quadMetric(CAT_QY);
@@ -7870,7 +7909,8 @@ function renderQuadrant(prods, host){
   if(elig){ var cp=CUR_PROFILE||{}; cohortCtrl='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:11.5px;color:var(--text-muted)">👥 Lens:</span>'+seg('','Genel')+(cp.sector?seg('sector','Sektörüm'):'')+(cp.companySize?seg('size','Büyüklüğüm'):'')+(cohortOn?'<span style="font-size:11px;color:#a78bfa;font-weight:700">· '+escHtml(quadCohortLabel())+'</span>':'')+'</div>'; }
   var controls = cohortCtrl + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--text-secondary)">'
     + '<span>Yatay:</span>'+sel('quad-x',CAT_QX) + '<span>Dikey:</span>'+sel('quad-y',CAT_QY)
-    + '<span style="color:var(--text-muted);font-size:11px;margin-left:auto">⬤ boyut = değerlendirme sayısı</span></div>';
+    + '<span style="color:var(--text-muted);font-size:11px;margin-left:auto">⬤ boyut = değerlendirme sayısı</span>'
+    + '<button id="quad-png" title="Görsel olarak indir / paylaş" style="font-size:11.5px;font-weight:700;padding:5px 10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text-secondary);border-radius:7px;cursor:pointer">📷 Görsel</button></div>';
 
   if(cohortOn){
     var ckey = QUAD_COHORT+'|'+quadCohortAttrVal()+'|'+prods.map(function(p){return p.id;}).slice().sort().join(',');
