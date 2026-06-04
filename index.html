@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.92 | pochub.co -->
+<!-- PoCHub v5.93 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.92';
+const VERSION = 'v5.93';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.93': ['CANLI IVME / SON HAREKETLER — ana sayfada gercek 30-gunluk canlilik. Her degerlendirmede urune public lastEvaluatedAt (serverTimestamp) yazilir (aggregation). renderEvidenceStats: son 30 gunde degerlendirilen urun sayisi 4. sayac olarak + "🔥 SON HAREKETLER" seridi (en son degerlendirilen 4 urun, goreli zaman -bugun/dun/N gun once-, tikla>detay). Anonim ziyaretciye de gorunur (lastEvaluatedAt public). RULES DEGISTI: products musteri rating update lastEvaluatedAt kapsar (Console + repo guncellenmeli).'],
   'v5.92': ['KATEGORI LIDERLERI SEKTOR FILTRESI — Liderler sayfasina kamuya acik sektor filtresi (urunun hitap ettigi sektorlere gore, product.sectors public). Degerlendirilmis urunlerden sektor evreni cikarilir (sayilarla), dropdown ile secilen sektore hitap eden urunler kategori bazinda Kanit Skoruna gore siralanir. Baslik secili sektoru yansitir; o sektorde lider yoksa nazik bos-durum (dropdown kalir, sifirlanabilir). LB_SECTOR state. Reviews gerekmez (anonim de kullanir); SEO icin sektor-bazli kesif. UI/public — RULES degismedi.'],
   'v5.91': ['PROFIL TAMAMLAMA TESVIKI (veri-kalitesi carki) — kohort/kisisel kanit ozelliklerini besleyen veriyi artirmak icin. Musteri dashboardinda (sektor VEYA sirket buyuklugu eksikse) nazik banner: "Profilini tamamla, kisisel kaniti gor" + Profili Tamamla butonu > profil sekmesine gecer, #pf-sector alanina kaydirip odaklar. Tamamsa banner gizli. Boylece akran kohortu (urun detayi + Quadrant lensi) ve customerSector/companySize tabanli tum kanit zenginlesir. UI — RULES degismedi.'],
   'v5.90': ['KARAR RAPORU PDF ZENGINLESTIRME — yonetime sunulan PoC Karar Raporu artik sadece skor degil GEREKCE de icerir. generateDecisionPdf basinda karsilastirilan urunlerin reviewlari tek sorguda cekilir (where productId in, <=10), urun basina en cok kazandiran/kaybettiren neden hesaplanir. PDFe "Karar Gerekcesi" bolumu: her urun icin Tavsiye % + PoC->Satin Alma % (public agregalardan) + Kazandiran/Kaybettiren neden (reviewlardan). Sayfa tasmasi icin _ensure ile otomatik addPage. Boylece belge alici organizasyonunda "neden bu urun" sorusunu da yanitlar, markamizi tasir. RULES degismedi (reviews signed-in; rapor giris yapmis alici tarafindan uretilir).'],
@@ -5233,19 +5234,29 @@ function renderEvidenceStats(prods){
   (prods||[]).forEach(function(p){ var n=p.ratingCount||0; if(n>0){ totalEval+=n; evaluated++; if(p.recommendPct!=null){ recSum+=p.recommendPct*n; recW+=n; } } });
   if(totalEval<=0){ host.innerHTML=''; return; }
   var avgRec = recW? Math.round(recSum/recW) : null;
-  function tile(id, pre, label){ return '<div style="flex:1;min-width:130px"><div style="font-size:30px;font-weight:900;color:var(--text);line-height:1">'+(pre||'')+'<span id="'+id+'">0</span></div><div style="font-size:11.5px;color:var(--text-muted);margin-top:5px;line-height:1.35">'+label+'</div></div>'; }
+  // v5.93: 30-günlük ivme (public lastEvaluatedAt)
+  var cutoff = Date.now() - 30*86400000;
+  var recentList = (prods||[]).filter(function(p){ var t=p.lastEvaluatedAt&&p.lastEvaluatedAt.seconds; return t && (t*1000)>=cutoff && (p.ratingCount||0)>0; }).sort(function(a,b){ return (b.lastEvaluatedAt.seconds)-(a.lastEvaluatedAt.seconds); });
+  var recent30 = recentList.length;
+  function tile(id, pre, label){ return '<div style="flex:1;min-width:120px"><div style="font-size:30px;font-weight:900;color:var(--text);line-height:1">'+(pre||'')+'<span id="'+id+'">0</span></div><div style="font-size:11.5px;color:var(--text-muted);margin-top:5px;line-height:1.35">'+label+'</div></div>'; }
+  function ago(sec){ var d=Math.floor((Date.now()-sec*1000)/86400000); return d<=0?'bugün':(d===1?'dün':d+' gün önce'); }
+  var hareketler = recentList.slice(0,4).map(function(p){ return '<button class="ev-recent" data-id="'+p.id+'" style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--text-secondary);background:var(--bg-surface);border:1px solid var(--border);border-radius:20px;padding:4px 11px;cursor:pointer">🔥 '+escHtml(p.name||'')+' <span style="color:var(--text-muted);font-weight:400">· '+ago(p.lastEvaluatedAt.seconds)+'</span></button>'; }).join(' ');
   host.innerHTML = '<div class="card" style="padding:18px 22px;background:linear-gradient(120deg, rgba(37,99,235,.06), rgba(22,163,74,.05))">'
     + '<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--text-muted);margin-bottom:14px">🛡 POCHUB’DA KANIT KONUŞUYOR</div>'
     + '<div style="display:flex;gap:18px;flex-wrap:wrap">'
     +   tile('stat-eval','', 'doğrulanmış PoC değerlendirmesi')
     +   tile('stat-prod','', 'kanıtlanmış çözüm')
     +   (avgRec!=null ? tile('stat-rec','%', 'ortalama tavsiye oranı') : '')
+    +   (recent30>0 ? tile('stat-recent','', 'son 30 günde değerlendirilen ürün') : '')
     + '</div>'
+    + (hareketler ? '<div style="margin-top:16px"><div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">🔥 SON HAREKETLER</div><div style="display:flex;gap:8px;flex-wrap:wrap">'+hareketler+'</div></div>' : '')
     + '<div style="font-size:11px;color:var(--text-muted);margin-top:14px;line-height:1.5">Tüm rakamlar gerçek PoC değerlendirmelerinden gelir. Analist görüşü değil; ölçülmüş sonuç.</div>'
     + '</div>';
   _countUp(host.querySelector('#stat-eval'), totalEval, '');
   _countUp(host.querySelector('#stat-prod'), evaluated, '');
   if(avgRec!=null) _countUp(host.querySelector('#stat-rec'), avgRec, '');
+  if(recent30>0) _countUp(host.querySelector('#stat-recent'), recent30, '');
+  host.querySelectorAll('.ev-recent').forEach(function(b){ b.addEventListener('click', function(){ openProductDetailModal(b.dataset.id); }); });
 }
 async function loadEvidenceLeaders(){
   var host = el('home-evidence-leaders');
@@ -6115,6 +6126,7 @@ async function openPocEvalModal(poc) {
         if (recs.length) upd.recommendPct = Math.round(recs.filter(Boolean).length/recs.length*100);
         var decided = ds.filter(function(d){ return d.purchaseDecision==='purchased' || d.purchaseDecision==='not_purchased'; });
         if (decided.length) upd.purchaseRate = Math.round(decided.filter(function(d){ return d.purchaseDecision==='purchased'; }).length/decided.length*100);
+        upd.lastEvaluatedAt = serverTimestamp();
         if (Object.keys(upd).length) await updateDoc(doc(db,'products',poc.productId), upd);
       }
       modal.remove();
