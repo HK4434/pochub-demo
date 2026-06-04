@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.85 | pochub.co -->
+<!-- PoCHub v5.86 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -684,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.85';
+const VERSION = 'v5.86';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.86': ['ZIYARET ANALITIGI (gizlilik-oncelikli, KVKK/GDPR-guvenli) — cerezsiz, IP saklamayan saglayicilar (Plausible/Umami) icin admin-ayarlanabilir entegrasyon. initAnalytics (DOMContentLoaded) pochub_config/system.analytics okur; injectAnalytics yalniz enabled+yapilandirilmissa ilgili script-i <head>e defer enjekte eder (plausible: data-domain; umami: data-website-id; custom: https src). Yapilandirilmazsa HICBIR script yuklenmez = sifir veri toplama, cerez onay bandi gerekmez. Kisi/IP bazli izleme platformda TUTULMAZ (kendi loglama yok). Admin > Sistem Ayarlari > "📊 Ziyaret Analitigi": saglayici secimi + alan adi/website id/opsiyonel https script url, alanlar saglayiciya gore gizlenir/gosterilir. UI/config — RULES degismedi (analytics alani pochub_config/system, write admin/read public).'],
   'v5.85': ['CANLI KANIT AKISI — ana sayfada her ziyaretciye (anonim dahil) gercek public veriden hesaplanan, sayac animasyonlu guven bandi: "🛡 POCHUBDA KANIT KONUSUYOR". renderEvidenceStats(prods): aktif urunlerin agregalarindan toplam dogrulanmis PoC degerlendirmesi (Σ ratingCount), kanitlanmis cozum sayisi (ratingCount>0 urun), agirlikli ortalama tavsiye orani (recommendPct, ratingCount agirlikli). _countUp ile 0dan hedefe ease-out sayac (tr-TR binlik ayraci). loadEvidenceLeaders tek fetchle hem istatistigi hem Liderler seridini doldurur (ekstra okuma yok). Veri yoksa band gizli. Hero ustunde, featured carouselin once. UI/turetilmis public — RULES degismedi. NOT: "son 30 gun" trendi review timestamplari signed-in oldugu icin v1de yok (ileride lastReviewAt ile).'],
   'v5.84': ['MARKA BUTUNLUGU DUZELTMELERI (kullanici notlari). (1) Alici tarafinda saticinin TICARI plan rozeti (Pro/Business/Enterprise/Trial) artik GOSTERILMIYOR — getVendorBadgeRow yalniz "✓ Dogrulanmis" guven rozetini dondurur. Gerekce: abonelik duzeyi alim karariyla ilgisiz ve "kanit>gorus, ucretli gorunurluk yok" ilkesiyle celisir; plan admin/satici panelinde kalir (getVendorBadgeHtml duruyor, cagrilmiyor). Etki: katalog grid/list kart, musteri mesaj listesi, PoC detay vendor satiri. (2) Ana sayfa Sponsorlu/One Cikan kartinda kampanya BITIS TARIHI ("... tarihine kadar") alicidan kaldirildi — ic/ticari meta. UI — RULES degismedi.'],
   'v5.83': ['KARAR MATRISI + YONETIM PDF RAPORU — karsilastirma modalinda alici kendi onceliklerine gore agirlik verir, agirlikli karar skoru canli hesaplanir, tek tikla PDF iner. Toolbarda "🎯 Karar Matrisi" toggle > panel: her faktore 0-5 agirlik slider (degerlendirme kriterleri + Kanit Skoru + Tavsiye % + PoC->Satin Alma; yalniz veri olan faktorler) + canli siralama (🥇 kazanan, skor barlari). mxScores: faktor degerleri 0-100 normalize (kriter*20), agirlikli ortalama, eksik veri 0. generateDecisionPdf: jsPDF (lazy loadJsPDF, _sanitizeForPdf ile Latin-guvenli, ASCII-only) tek sayfa A4 "PoC Karar Raporu" — faktor x urun tablosu + agirliklar + Agirlikli Karar Skoru + Onerilen kazanan + metodoloji notu, poc-karar-raporu.pdf. UI/turetilmis — RULES degismedi.'],
@@ -29648,7 +29649,56 @@ function openPackageEditor(pkgId, allPackages) {
 
 // Admin: Sistem Ayarları Sayfası
 // ════════════════════════════════════════════════════════════════════
-// v5.80: Admin — Karar Nedenleri (Win/Loss) yönetimi
+// v5.86: Admin — Ziyaret Analitiği yapılandırma
+// ════════════════════════════════════════════════════════════════════
+function openAnalyticsConfigModal(){
+  getDoc(doc(db,'pochub_config','system')).then(function(cs){
+    var a = (cs.exists() && cs.data().analytics) ? cs.data().analytics : {};
+    var modal=document.createElement('div'); modal.className='modal-overlay';
+    modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:500px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;position:relative">'
+      + '<button id="an-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
+      + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">📊 Ziyaret Analitiği</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.55">Çerezsiz sağlayıcı önerilir (Plausible / Umami) — çerez onay bandı gerekmez, IP saklanmaz. Boş bırakırsan izleme kapalıdır.</div>'
+      + '<label class="lbl">Sağlayıcı</label>'
+      + '<select class="inp" id="an-provider" style="width:100%;font-size:13px;margin-bottom:14px">'
+      +   ['off:Kapalı (izleme yok)','plausible:Plausible (çerezsiz)','umami:Umami (çerezsiz)','custom:Özel script'].map(function(o){ var kv=o.split(':'); var v=kv[0]==='off'?'':kv[0]; return '<option value="'+v+'"'+(((a.provider||'')===v)?' selected':'')+'>'+kv[1]+'</option>'; }).join('')
+      + '</select>'
+      + '<div id="an-domain-wrap" style="margin-bottom:14px"><label class="lbl">Alan adı (data-domain)</label><input class="inp" id="an-domain" value="'+escHtml(a.domain||'')+'" placeholder="pochub.co" style="width:100%;font-size:13px"></div>'
+      + '<div id="an-wid-wrap" style="margin-bottom:14px"><label class="lbl">Website ID (Umami)</label><input class="inp" id="an-wid" value="'+escHtml(a.websiteId||'')+'" placeholder="xxxxxxxx-xxxx-..." style="width:100%;font-size:13px"></div>'
+      + '<div id="an-src-wrap" style="margin-bottom:14px"><label class="lbl">Script URL (opsiyonel / özel)</label><input class="inp" id="an-src" value="'+escHtml(a.src||'')+'" placeholder="https://plausible.io/js/script.js" style="width:100%;font-size:13px"><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Boşsa sağlayıcının varsayılan URL’i kullanılır. Yalnız https.</div></div>'
+      + '<div style="display:flex;gap:8px;margin-top:6px"><button class="btn-p" id="an-save" style="flex:1">💾 Kaydet</button></div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:14px;line-height:1.5">Değişiklik bir sonraki sayfa yenilemesinde etkin olur. Kişi/IP bazlı izleme yapılmaz; yalnız toplu sayfa görüntüleme/cihaz/ülke düzeyinde veri sağlayıcıda kalır.</div>'
+      + '</div>';
+    document.body.appendChild(modal);
+    function sync(){ var p=modal.querySelector('#an-provider').value;
+      modal.querySelector('#an-domain-wrap').style.display=(p==='plausible'||p==='custom')?'block':'none';
+      modal.querySelector('#an-wid-wrap').style.display=(p==='umami'||p==='custom')?'block':'none';
+      modal.querySelector('#an-src-wrap').style.display=(p==='plausible'||p==='umami'||p==='custom')?'block':'none';
+    }
+    sync();
+    modal.querySelector('#an-provider').addEventListener('change', sync);
+    modal.querySelector('#an-close').addEventListener('click', function(){ modal.remove(); });
+    modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+    modal.querySelector('#an-save').addEventListener('click', async function(){
+      var btn=this; var p=modal.querySelector('#an-provider').value;
+      var src=modal.querySelector('#an-src').value.trim();
+      if(src && !/^https:\/\//.test(src)){ showToast('Script URL yalnız https olabilir.','err'); return; }
+      var obj = { enabled: !!p, provider: p||'', domain: modal.querySelector('#an-domain').value.trim(), websiteId: modal.querySelector('#an-wid').value.trim(), src: src };
+      if(p==='plausible' && !obj.domain){ showToast('Plausible için alan adı gerekli.','err'); return; }
+      if(p==='umami' && !obj.websiteId){ showToast('Umami için Website ID gerekli.','err'); return; }
+      if(p==='custom' && !obj.src){ showToast('Özel sağlayıcı için script URL gerekli.','err'); return; }
+      btn.disabled=true; btn.textContent='⏳ Kaydediliyor...';
+      try {
+        await setDoc(doc(db,'pochub_config','system'), { analytics: obj }, {merge:true});
+        showToast(p?'Analitik kaydedildi (yenilemede etkin).':'Analitik kapatıldı.');
+        modal.remove();
+      } catch(e){ showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='💾 Kaydet'; }
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// v5.86: Admin — Karar Nedenleri (Win/Loss) yönetimi
 // ════════════════════════════════════════════════════════════════════
 function openDecisionReasonsModal(){
   ensureTaxonomy().then(function(){
@@ -30225,6 +30275,16 @@ async function admSettings(m) {
     drBtn.addEventListener('click', function(){ openDecisionReasonsModal(); });
     sDr.appendChild(drBtn);
     m.appendChild(sDr);
+
+    // v5.86: Ziyaret Analitiği (gizlilik-öncelikli)
+    var sAn = section('📊 Ziyaret Analitiği', '#0891b2');
+    var anInfo = document.createElement('div'); anInfo.style.cssText='font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6';
+    anInfo.innerHTML = 'Çerezsiz, IP saklamayan, KVKK/GDPR-uyumlu analitik (Plausible / Umami). Çerez onay bandı gerektirmez. Yapılandırılmazsa hiçbir izleme yüklenmez — sıfır veri toplama. Kişi/IP bazlı izleme platformda <b>tutulmaz</b>.';
+    sAn.appendChild(anInfo);
+    var anBtn = document.createElement('button'); anBtn.className='btn-g'; anBtn.textContent='📊 Analitiği Yapılandır';
+    anBtn.addEventListener('click', function(){ openAnalyticsConfigModal(); });
+    sAn.appendChild(anBtn);
+    m.appendChild(sAn);
 
     // v5.77: Biz Kimiz / Misyon-Vizyon yönetimi
     var sAbout = section('📖 Biz Kimiz / Misyon-Vizyon', '#1e40af');
@@ -34807,7 +34867,39 @@ window.addEventListener('DOMContentLoaded', () => {
   if (yearEl) yearEl.textContent = new Date().getFullYear();
   initCookieConsent();
   initLegalLinks();
+  initAnalytics();
 });
+
+// ════════════════════════════════════════════════════════════════════
+// v5.86: ZİYARET ANALİTİĞİ — gizlilik-öncelikli (çerezsiz), admin-ayarlanabilir
+// Plausible/Umami gibi çerezsiz, IP saklamayan sağlayıcılar. Admin yapılandırmazsa
+// hiçbir script yüklenmez (sıfır veri toplama → KVKK/GDPR güvenli, onay bandı gerekmez).
+// ════════════════════════════════════════════════════════════════════
+function injectAnalytics(cfg){
+  if(!cfg || !cfg.enabled || window._analyticsInjected) return;
+  var s=document.createElement('script'); s.defer=true;
+  if(cfg.provider==='plausible'){
+    if(!cfg.domain) return;
+    s.setAttribute('data-domain', cfg.domain);
+    s.src = (cfg.src && /^https:\/\//.test(cfg.src)) ? cfg.src : 'https://plausible.io/js/script.js';
+  } else if(cfg.provider==='umami'){
+    if(!cfg.websiteId) return;
+    s.setAttribute('data-website-id', cfg.websiteId);
+    s.src = (cfg.src && /^https:\/\//.test(cfg.src)) ? cfg.src : 'https://cloud.umami.is/script.js';
+  } else if(cfg.provider==='custom'){
+    if(!cfg.src || !/^https:\/\//.test(cfg.src)) return;
+    s.src = cfg.src;
+    if(cfg.domain) s.setAttribute('data-domain', cfg.domain);
+    if(cfg.websiteId) s.setAttribute('data-website-id', cfg.websiteId);
+  } else { return; }
+  s.onerror=function(){ window._analyticsInjected=false; };
+  document.head.appendChild(s);
+  window._analyticsInjected=true;
+}
+async function initAnalytics(){
+  if(window._analyticsInit) return; window._analyticsInit=true;
+  try { var cs=await getDoc(doc(db,'pochub_config','system')); if(cs.exists()) injectAnalytics(cs.data().analytics); } catch(e){}
+}
 
 // ════════════════════════════════════════════════════════════════════
 // v5.16: COOKIE CONSENT — KVKK/GDPR Uyumlu
