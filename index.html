@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.93 | pochub.co -->
+<!-- PoCHub v5.94 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.93';
+const VERSION = 'v5.94';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.94': ['ADMIN ARAC: Urun Kanit Agregalari — Yeniden Hesapla (Veri Sagligi). Tum urunlerin avgRating/ratingCount/criteriaAvg/recommendPct/purchaseRate/lastEvaluatedAt alanlarini reviews verisinden yeniden hesaplar (_peAgg). Eski degerlendirilmis urunlerde lastEvaluatedAt-i doldurur (Son Hareketler aninda canlanir) + drift duzeltir. Tek getDocs(reviews) > productId grupla > urun basina updateDoc (sirali, ilerleme). Idempotent; review-i olmayana dokunmaz. Admin update izni rules-ta var — RULES degismedi.'],
   'v5.93': ['CANLI IVME / SON HAREKETLER — ana sayfada gercek 30-gunluk canlilik. Her degerlendirmede urune public lastEvaluatedAt (serverTimestamp) yazilir (aggregation). renderEvidenceStats: son 30 gunde degerlendirilen urun sayisi 4. sayac olarak + "🔥 SON HAREKETLER" seridi (en son degerlendirilen 4 urun, goreli zaman -bugun/dun/N gun once-, tikla>detay). Anonim ziyaretciye de gorunur (lastEvaluatedAt public). RULES DEGISTI: products musteri rating update lastEvaluatedAt kapsar (Console + repo guncellenmeli).'],
   'v5.92': ['KATEGORI LIDERLERI SEKTOR FILTRESI — Liderler sayfasina kamuya acik sektor filtresi (urunun hitap ettigi sektorlere gore, product.sectors public). Degerlendirilmis urunlerden sektor evreni cikarilir (sayilarla), dropdown ile secilen sektore hitap eden urunler kategori bazinda Kanit Skoruna gore siralanir. Baslik secili sektoru yansitir; o sektorde lider yoksa nazik bos-durum (dropdown kalir, sifirlanabilir). LB_SECTOR state. Reviews gerekmez (anonim de kullanir); SEO icin sektor-bazli kesif. UI/public — RULES degismedi.'],
   'v5.91': ['PROFIL TAMAMLAMA TESVIKI (veri-kalitesi carki) — kohort/kisisel kanit ozelliklerini besleyen veriyi artirmak icin. Musteri dashboardinda (sektor VEYA sirket buyuklugu eksikse) nazik banner: "Profilini tamamla, kisisel kaniti gor" + Profili Tamamla butonu > profil sekmesine gecer, #pf-sector alanina kaydirip odaklar. Tamamsa banner gizli. Boylece akran kohortu (urun detayi + Quadrant lensi) ve customerSector/companySize tabanli tum kanit zenginlesir. UI — RULES degismedi.'],
@@ -26358,6 +26359,51 @@ async function admDataHealth(m) {
         '<div style="margin-top:4px;color:var(--text-muted)">Vendorlar artık bu eski kayıtların katılımcılarını görebilir. Tekrar "Tara" ile doğrulayabilirsin.</div>';
       showToast(ok+' kayıt backfill edildi'+(fail?', '+fail+' hata':''), fail?'err':'ok');
       bfApplyBtn.style.display = 'none'; bfPending = [];
+    });
+
+    // v5.94: Ürün Kanıt Agregaları — review'lardan yeniden hesapla (backfill + drift fix)
+    var peSection = document.createElement('div');
+    peSection.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px';
+    peSection.innerHTML =
+      '<div style="font-size:14px;font-weight:700;margin-bottom:8px">🛡 Ürün Kanıt Agregaları — Yeniden Hesapla</div>' +
+      '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">' +
+        'Tüm ürünlerin kanıt alanlarını (<code>avgRating, ratingCount, criteriaAvg, recommendPct, purchaseRate, lastEvaluatedAt</code>) ' +
+        '<code>reviews</code> verisinden <strong>yeniden hesaplar</strong>. Eski değerlendirilmiş ürünlerde <code>lastEvaluatedAt</code>\'i doldurur (Son Hareketler anında canlanır) ve olası tutarsızlıkları (drift) düzeltir. ' +
+        '<strong>İdempotent:</strong> kaynak review olduğu için defalarca çalıştırılabilir; review\'ı olmayan ürünlere dokunmaz.' +
+      '</div>' +
+      '<div id="pe-result" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--text-muted);min-height:36px;display:none"></div>' +
+      '<button id="pe-run" class="btn-p btn-sm" style="padding:8px 14px">🔄 Yeniden Hesapla</button>';
+    m.appendChild(peSection);
+
+    var peRun = peSection.querySelector('#pe-run');
+    var peResult = peSection.querySelector('#pe-result');
+    function _peAgg(L){
+      var upd={ ratingCount:L.length, updatedAt: serverTimestamp() };
+      var rt=L.map(function(d){return d.rating;}).filter(function(v){return v>0;}); if(rt.length) upd.avgRating=Math.round(rt.reduce(function(a,b){return a+b;},0)/rt.length*10)/10;
+      var ca={}; (REVIEW_CRITERIA||[]).forEach(function(c){ var vv=L.map(function(d){return d.criteriaRatings&&d.criteriaRatings[c.id];}).filter(function(v){return v>0;}); if(vv.length) ca[c.id]=Math.round(vv.reduce(function(a,b){return a+b;},0)/vv.length*10)/10; });
+      if(Object.keys(ca).length) upd.criteriaAvg=ca;
+      var recs=L.map(function(d){return d.recommend;}).filter(function(v){return v===true||v===false;}); if(recs.length) upd.recommendPct=Math.round(recs.filter(Boolean).length/recs.length*100);
+      var dec=L.filter(function(d){return d.purchaseDecision==='purchased'||d.purchaseDecision==='not_purchased';}); if(dec.length) upd.purchaseRate=Math.round(dec.filter(function(d){return d.purchaseDecision==='purchased';}).length/dec.length*100);
+      var maxSec=0; L.forEach(function(d){ var s=d.createdAt&&d.createdAt.seconds; if(s&&s>maxSec) maxSec=s; }); if(maxSec) upd.lastEvaluatedAt=Timestamp.fromMillis(maxSec*1000);
+      return upd;
+    }
+    peRun?.addEventListener('click', async function(){
+      if(!confirm('Tüm ürünlerin kanıt agregaları review verisinden yeniden hesaplanıp yazılacak. Devam edilsin mi?')) return;
+      peRun.disabled=true; peRun.textContent='⏳ Hesaplanıyor...'; peResult.style.display='block'; peResult.innerHTML='Review verisi yükleniyor...';
+      try {
+        await ensureTaxonomy();
+        var rs = await getDocs(collection(db,'reviews'));
+        var byp={}; rs.docs.forEach(function(d){ var r=d.data(); if(!r.productId) return; (byp[r.productId]=byp[r.productId]||[]).push(r); });
+        var pids=Object.keys(byp); var ok=0, fail=0;
+        if(!pids.length){ peResult.innerHTML='<div style="color:var(--text-muted)">Hesaplanacak review bulunamadı.</div>'; peRun.disabled=false; peRun.textContent='🔄 Yeniden Hesapla'; return; }
+        for (var i=0;i<pids.length;i++){
+          try { await updateDoc(doc(db,'products',pids[i]), _peAgg(byp[pids[i]])); ok++; } catch(e){ fail++; }
+          if((ok+fail)%10===0 || (ok+fail)===pids.length){ peResult.innerHTML='<div>Yazılıyor... '+(ok+fail)+'/'+pids.length+' (✓'+ok+(fail?' ✗'+fail:'')+')</div>'; }
+        }
+        peResult.innerHTML='<div style="color:'+(fail?'#d97706':'#16a34a')+';font-weight:700">✓ '+ok+' ürün yeniden hesaplandı'+(fail?' · '+fail+' başarısız':'')+'</div><div style="margin-top:4px;color:var(--text-muted)">Kanıt Skoru, Win/Loss, Liderler ve Son Hareketler artık güncel ve tutarlı.</div>';
+        showToast(ok+' ürün yeniden hesaplandı'+(fail?', '+fail+' hata':''), fail?'err':'ok');
+      } catch(e){ peResult.innerHTML='<div style="color:#dc2626">Hata: '+((e&&e.message)||e)+'</div>'; }
+      peRun.disabled=false; peRun.textContent='🔄 Yeniden Hesapla';
     });
 
     // Tara butonu
