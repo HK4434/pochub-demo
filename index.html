@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.87 | pochub.co -->
+<!-- PoCHub v5.88 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -684,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.87';
+const VERSION = 'v5.88';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.88': ['QUADRANT KOHORT LENSI — harita artik "senin akran segmentin" gozuyle yeniden cizilebilir (Gartnerda imkansiz). Giris yapmis musteriye Quadrant ustunde lens segmenti: Genel / 👥 Sektorum / 👥 Buyuklugum (profilde olana gore). Kohort secilince ensureQuadCohort yalniz HARITADAKI urunlerin reviewlarini ceker (where productId in, 10luk chunk), izleyicinin sektor/buyukluk kohortuna gore filtreler, urun basina kohort agregasi hesaplar (avg/recommend/conversion/kriter). quadCohortMetric bu agregadan eksen degerlerini ve kohort Kanit Skorunu uretir; balon boyutu=kohort n, renk=kohort evidence. Onbellek imzasi (lens+attr+urun-id-seti) ile gereksiz fetch yok; eksen degisiminde refetch yok. Kohortta veri yoksa nazik bos-durum. Okuma maliyeti haritadaki urunlerle sinirli. RULES degismedi (reviews signed-in).'],
   'v5.87': ['SATICI KANIT PANELI — vendor Urunlerim listesinde her aktif urunde "📊" butonu > openVendorEvidenceModal: urunun gercek PoC degerlendirmelerinden (reviews, signed-in okunur) arz-tarafi icgoru. (1) Ozet: Kanit Skoru + Tavsiye + PoC->Satin Alma + n; her biri AKRAN (ayni kategori, public agregalar) ortalamasina gore Δ. (2) Kriter Performansi: kriter bazli ortalama bar + akran farki, EN ZAYIF kriter kirmizi isaretli. (3) Kazanma/Kaybetme Nedenleri: win/loss reason bar dagilimi (deal kaybettiren nedenler). (4) Sektor Performansi: sektor bazli n/tavsiye/satin alma. Akran kiyasi peers=query(products category==) status active, self haric. Yalniz saticiya gorunur; saticiyi urunu iyilestirmeye ve platforma icerik uretmeye tesvik eden arz-tarafi cark. RULES degismedi.'],
   'v5.86': ['ZIYARET ANALITIGI (gizlilik-oncelikli, KVKK/GDPR-guvenli) — cerezsiz, IP saklamayan saglayicilar (Plausible/Umami) icin admin-ayarlanabilir entegrasyon. initAnalytics (DOMContentLoaded) pochub_config/system.analytics okur; injectAnalytics yalniz enabled+yapilandirilmissa ilgili script-i <head>e defer enjekte eder (plausible: data-domain; umami: data-website-id; custom: https src). Yapilandirilmazsa HICBIR script yuklenmez = sifir veri toplama, cerez onay bandi gerekmez. Kisi/IP bazli izleme platformda TUTULMAZ (kendi loglama yok). Admin > Sistem Ayarlari > "📊 Ziyaret Analitigi": saglayici secimi + alan adi/website id/opsiyonel https script url, alanlar saglayiciya gore gizlenir/gosterilir. UI/config — RULES degismedi (analytics alani pochub_config/system, write admin/read public).'],
   'v5.85': ['CANLI KANIT AKISI — ana sayfada her ziyaretciye (anonim dahil) gercek public veriden hesaplanan, sayac animasyonlu guven bandi: "🛡 POCHUBDA KANIT KONUSUYOR". renderEvidenceStats(prods): aktif urunlerin agregalarindan toplam dogrulanmis PoC degerlendirmesi (Σ ratingCount), kanitlanmis cozum sayisi (ratingCount>0 urun), agirlikli ortalama tavsiye orani (recommendPct, ratingCount agirlikli). _countUp ile 0dan hedefe ease-out sayac (tr-TR binlik ayraci). loadEvidenceLeaders tek fetchle hem istatistigi hem Liderler seridini doldurur (ekstra okuma yok). Veri yoksa band gizli. Hero ustunde, featured carouselin once. UI/turetilmis public — RULES degismedi. NOT: "son 30 gun" trendi review timestamplari signed-in oldugu icin v1de yok (ileride lastReviewAt ile).'],
@@ -7469,6 +7470,9 @@ var TAX_LICENSES = TAXONOMY_DEFAULTS.licenses.map(function(d){ return {value:d.v
 var CAT_FILTERS = { category:[], sector:[], deployment:[], license:[], origin:[], verified:[], rating:[] }; // çok-gruplu facet seçimleri
 var CAT_VIEW = 'grid';        // grid | list | quadrant
 var CAT_QX = 'evidence', CAT_QY = 'recommend';  // Quadrant eksenleri
+var QUAD_COHORT = false;       // false | 'sector' | 'size'
+var QUAD_COHORT_AGG = {};      // productId -> {n,avg,rec,conv,crit}
+var QUAD_COHORT_KEY = '';      // önbellek imzası
 var CAT_COMPARE = new Set();  // karşılaştırma/PoC için seçili ürün id'leri
 var CAT_SORT = 'rating';      // sıralama
 var CAT_PROD_MAP = {};        // id → ürün (seçim filtre dışı kalsa da çözülsün)
@@ -7726,6 +7730,40 @@ function quadPromoHtml(){
     + '<button id="cat-quad-dismiss" title="Gizle" style="position:absolute;top:8px;right:10px;background:none;border:none;color:rgba(255,255,255,.7);font-size:16px;cursor:pointer">×</button>'
     + '</div>';
 }
+function quadCohortEligible(){ var p=CUR_PROFILE||{}; return !!(CUR_USER && p.role!=='vendor' && (p.sector||p.companySize)); }
+function quadCohortAttrVal(){ var p=CUR_PROFILE||{}; return QUAD_COHORT==='sector'?(p.sector||''):(QUAD_COHORT==='size'?(p.companySize||''):''); }
+function quadCohortLabel(){ var p=CUR_PROFILE||{}; if(QUAD_COHORT==='sector') return (PROFILE_SECTOR_LABEL[p.sector]||p.sector||'Sektörüm'); if(QUAD_COHORT==='size') return '👥 '+(COMPANY_SIZE_LABEL[p.companySize]||p.companySize||'Büyüklüğüm'); return ''; }
+function quadCohortMetric(key, p){
+  var a = QUAD_COHORT_AGG[p.id]; if(!a||!a.n) return null;
+  if(key==='evidence'){ var w=EVIDENCE_WEIGHTS; var r=(a.avg!=null?a.avg/5*100:0), rc=(a.rec!=null?a.rec:0), cv=(a.conv!=null?a.conv:0); return Math.round(w.rating*r+w.recommend*rc+w.conversion*cv); }
+  if(key==='rating') return a.avg!=null?Math.round(a.avg/5*100):null;
+  if(key==='recommend') return a.rec;
+  if(key==='conversion') return a.conv;
+  if(key.indexOf('crit:')===0){ var cid=key.slice(5); var v=a.crit&&a.crit[cid]; return v!=null?Math.round(v/5*100):null; }
+  return null;
+}
+async function ensureQuadCohort(prods, key){
+  var attr = quadCohortAttrVal(); QUAD_COHORT_AGG={};
+  if(!attr){ QUAD_COHORT_KEY=key; return; }
+  var ids = prods.map(function(p){return p.id;});
+  var bucket={};
+  try {
+    for(var i=0;i<ids.length;i+=10){
+      var chunk=ids.slice(i,i+10);
+      var rs=await getDocs(query(collection(db,'reviews'), where('productId','in',chunk)));
+      rs.docs.forEach(function(d){ var r=d.data(); var match = QUAD_COHORT==='sector' ? (r.customerSector===attr) : (r.customerCompanySize===attr); if(!match) return; (bucket[r.productId]=bucket[r.productId]||[]).push(r); });
+    }
+  } catch(e){}
+  Object.keys(bucket).forEach(function(pid){
+    var L=bucket[pid];
+    var rt=L.map(function(d){return d.rating;}).filter(Boolean); var avg=rt.length?rt.reduce(function(a,b){return a+b;},0)/rt.length:null;
+    var rc=L.map(function(d){return d.recommend;}).filter(function(v){return v===true||v===false;}); var rec=rc.length?Math.round(rc.filter(Boolean).length/rc.length*100):null;
+    var dc=L.filter(function(d){return d.purchaseDecision==='purchased'||d.purchaseDecision==='not_purchased';}); var conv=dc.length?Math.round(dc.filter(function(d){return d.purchaseDecision==='purchased';}).length/dc.length*100):null;
+    var crit={}; (REVIEW_CRITERIA||[]).forEach(function(c){ var vv=L.map(function(d){return d.criteriaRatings&&d.criteriaRatings[c.id];}).filter(function(v){return v>0;}); if(vv.length) crit[c.id]=vv.reduce(function(a,b){return a+b;},0)/vv.length; });
+    QUAD_COHORT_AGG[pid]={n:L.length, avg:avg, rec:rec, conv:conv, crit:crit};
+  });
+  QUAD_COHORT_KEY=key;
+}
 function quadrantMetrics(){
   var m = [
     {key:'evidence',   label:'Kanıt Skoru',      get:function(p){ var e=computeEvidenceScore(p); return e?e.score:null; }},
@@ -7747,14 +7785,33 @@ function renderQuadrant(prods, host){
   CAT_QX = mx.key; CAT_QY = my.key;
   var opts = quadrantMetrics();
   function sel(id, cur){ return '<select class="inp" id="'+id+'" style="width:auto;font-size:12px;padding:4px 8px">'+opts.map(function(o){ return '<option value="'+o.key+'"'+(o.key===cur?' selected':'')+'>'+escHtml(o.label)+'</option>'; }).join('')+'</select>'; }
-  var controls = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--text-secondary)">'
+  var elig = quadCohortEligible();
+  var cohortOn = !!(QUAD_COHORT && elig && quadCohortAttrVal());
+  function seg(mode,label){ var on=(QUAD_COHORT||'')===mode; return '<button class="quad-coh" data-m="'+mode+'" style="padding:4px 10px;border:1px solid '+(on?'#7c3aed':'var(--border)')+';background:'+(on?'#7c3aed':'transparent')+';color:'+(on?'#fff':'var(--text-secondary)')+';border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer">'+label+'</button>'; }
+  var cohortCtrl='';
+  if(elig){ var cp=CUR_PROFILE||{}; cohortCtrl='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:11.5px;color:var(--text-muted)">👥 Lens:</span>'+seg('','Genel')+(cp.sector?seg('sector','Sektörüm'):'')+(cp.companySize?seg('size','Büyüklüğüm'):'')+(cohortOn?'<span style="font-size:11px;color:#a78bfa;font-weight:700">· '+escHtml(quadCohortLabel())+'</span>':'')+'</div>'; }
+  var controls = cohortCtrl + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--text-secondary)">'
     + '<span>Yatay:</span>'+sel('quad-x',CAT_QX) + '<span>Dikey:</span>'+sel('quad-y',CAT_QY)
     + '<span style="color:var(--text-muted);font-size:11px;margin-left:auto">⬤ boyut = değerlendirme sayısı</span></div>';
 
-  var pts = prods.map(function(p){ var x=mx.get(p), y=my.get(p); return (x!=null&&y!=null)?{p:p,x:x,y:y,n:p.ratingCount||0}:null; }).filter(Boolean);
+  if(cohortOn){
+    var ckey = QUAD_COHORT+'|'+quadCohortAttrVal()+'|'+prods.map(function(p){return p.id;}).slice().sort().join(',');
+    if(QUAD_COHORT_KEY!==ckey){
+      host.innerHTML = controls + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px">👥 Akran verisi hesaplanıyor…</div>';
+      wireQuadControls(host); wireQuadCohort(host, prods);
+      ensureQuadCohort(prods, ckey).then(function(){ renderQuadrant(prods, host); });
+      return;
+    }
+  }
+  function qget(metric,p){ return cohortOn ? quadCohortMetric(metric.key,p) : metric.get(p); }
+  function qn(p){ return cohortOn ? ((QUAD_COHORT_AGG[p.id]&&QUAD_COHORT_AGG[p.id].n)||0) : (p.ratingCount||0); }
+  var pts = prods.map(function(p){ var x=qget(mx,p), y=qget(my,p); return (x!=null&&y!=null)?{p:p,x:x,y:y,n:qn(p)}:null; }).filter(Boolean);
   if(!pts.length){
-    host.innerHTML = controls + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:36px 20px;text-align:center"><div style="font-size:34px;margin-bottom:10px">🧭</div><div style="font-size:15px;font-weight:700;margin-bottom:4px">Haritada gösterilecek değerlendirilmiş ürün yok</div><div style="font-size:12.5px;color:var(--text-muted);max-width:420px;margin:0 auto;line-height:1.5">PoCHub Quadrant yalnızca gerçek PoC değerlendirmesi olan ürünleri konumlandırır. Bir kategori seçerek benzer ürünleri karşılaştır.</div></div>';
-    wireQuadControls(host); return;
+    var emptyMsg = cohortOn
+      ? '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Akran kohortunda veri yok</div><div style="font-size:12.5px;color:var(--text-muted);max-width:440px;margin:0 auto;line-height:1.5">Seçtiğin lens ('+escHtml(quadCohortLabel())+') için bu ürünlerde henüz değerlendirme yok. "Genel" lense dönebilir veya başka kategori seçebilirsin.</div>'
+      : '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Haritada gösterilecek değerlendirilmiş ürün yok</div><div style="font-size:12.5px;color:var(--text-muted);max-width:420px;margin:0 auto;line-height:1.5">PoCHub Quadrant yalnızca gerçek PoC değerlendirmesi olan ürünleri konumlandırır. Bir kategori seçerek benzer ürünleri karşılaştır.</div>';
+    host.innerHTML = controls + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:36px 20px;text-align:center"><div style="font-size:34px;margin-bottom:10px">🧭</div>'+emptyMsg+'</div>';
+    wireQuadControls(host); wireQuadCohort(host, prods); return;
   }
   var W=720,H=520, padL=64,padR=70,padT=42,padB=58;
   var plotW=W-padL-padR, plotH=H-padT-padB;
@@ -7779,7 +7836,7 @@ function renderQuadrant(prods, host){
   pts.sort(function(a,b){ return b.n-a.n; });
   pts.forEach(function(t){
     var cx=px(t.x), cy=py(t.y), r=rad(t.n);
-    var e=computeEvidenceScore(t.p); var col=evidenceColor(e?e.score:50);
+    var _es=cohortOn?quadCohortMetric('evidence',t.p):(computeEvidenceScore(t.p)?computeEvidenceScore(t.p).score:50); var col=evidenceColor(_es==null?50:_es);
     var nm=(t.p.name||''); if(nm.length>18) nm=nm.slice(0,17)+'…';
     svg += '<g class="quad-pt" data-id="'+t.p.id+'" style="cursor:pointer">'
       + '<title>'+escHtml(t.p.name||'')+' — '+escHtml(mx.label)+': '+t.x+' · '+escHtml(my.label)+': '+t.y+' ('+t.n+' değerlendirme)</title>'
@@ -7788,10 +7845,13 @@ function renderQuadrant(prods, host){
       + '</g>';
   });
   svg += '</svg>';
-  var caption = '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">🧭 <b>PoCHub Quadrant</b> — konumlar gerçek PoC değerlendirmelerinden hesaplanır. Ücretli yerleşim yoktur; analist görüşü değil, kanıt. Haritada yalnızca değerlendirilmiş '+pts.length+' ürün var.</div>';
+  var caption = '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">🧭 <b>PoCHub Quadrant</b>'+(cohortOn?' · 👥 '+escHtml(quadCohortLabel())+' lensi':'')+' — konumlar gerçek PoC değerlendirmelerinden hesaplanır. Ücretli yerleşim yoktur; analist görüşü değil, kanıt. Haritada '+(cohortOn?'bu kohortta ':'')+'yalnızca değerlendirilmiş '+pts.length+' ürün var.</div>';
   host.innerHTML = controls + svg + caption;
   host.querySelectorAll('.quad-pt').forEach(function(g){ g.addEventListener('click', function(){ openProductDetailModal(g.dataset.id); }); });
-  wireQuadControls(host);
+  wireQuadControls(host); wireQuadCohort(host, prods);
+}
+function wireQuadCohort(host, prods){
+  host.querySelectorAll('.quad-coh').forEach(function(b){ b.addEventListener('click', function(){ QUAD_COHORT = this.dataset.m || false; renderQuadrant(prods, host); }); });
 }
 function syncCatalogURL(){
   try {
