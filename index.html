@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.00 | pochub.co -->
+<!-- PoCHub v6.01 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.00';
+const VERSION = 'v6.01';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.01': ['i18n FAZ 2 (public landing) — anasayfa gorunur UI etiketleri EN. Hero trust-bar (Bagimsiz PoC Degerlendirme>Independent PoC Evaluation vb.), istatistik etiketleri (Aktif Etkinlik>Active Events vb.), hero.cta.about, ve Kanit bandi (renderEvidenceStats: POCHUBDA KANIT KONUSUYOR>EVIDENCE SPEAKS AT POCHUB, sayac etiketleri, SON HAREKETLER>RECENT ACTIVITY, bugun/dun/gun once goreli zaman) t()-e sarildi + home.*/evstat.* anahtarlari EN doldu. NOT: hero metni (ABOUT.hero.*) Firestore icerigi > bilingual veri-modeli Faz 6. RULES degismedi.'],
   'v6.00': ['i18n FAZ 1 — Dil mekanizmasi CANLI. Mevcut i18n motoru (I18N_DICT tr/en, detectInitialLocale ?lang>localStorage>tarayici, t() TR-fallback, setLocale ekrani+nav yeniden render, nav TR/EN switcher) uzerine: (1) autoDetectBrowser VARSAYILAN ACIK > TR disi tarayici otomatik EN, manuel switcher override eder. (2) Liderler public hero+bos-durum+sektor+CTA stringleri t()-e sarildi ve lb.* anahtarlari EN doldu (CATEGORY LEADERS / Leaders defined by evidence...). NOT: uygulamanin cogu hala gomulu TR; tam EN coverage sonraki fazlarda surface-by-surface t()-e sarilarak gelecek. RULES degismedi.'],
   'v5.99': ['KATEGORI LIDERI KARTI (PNG) — Liderler sayfasinda her kategorinin #1 satirina 📷 buton: generateLeaderCard canvasta (600x340 @2x) markali "Kategori Lideri" karti cizer — altin aksan + #1 rozeti, KATEGORI LIDERI etiketi, kategori adi, urun + satici, Kanit Skoru +/100 + bar, alt bilgi pochub.co. PNG iner + navigator.share. Buton satir tiklamasini engeller (stopPropagation). Skor yoksa uyari. ASCII metin. Off-site marka/geri-baglanti. Paylasilabilir gorsel kumesi tamam (Quadrant+UrunKart+KategoriLider). UI — RULES degismedi.'],
   'v5.98': ['WEB SITESI ROZETI (embed) — buyume dongusu, v5.96 deep-linkin tamamlayicisi. Urun detayinda YALNIZ urun sahibi saticiya gorunen "🛡 Rozet" butonu > openBadgeModal: kendi sitesine yapistiracagi hazir HTML rozet kodu (inline-styled <a>, https://pochub.co/?p=<id> hedefli), canli onizleme + textarea + Kopyala. Skor canli sayfada guncel gosterilir (rozette statik sayi yok > eskimez). Ucuncu-taraf dogrulama + geri-baglanti (G2/Capterra mantigi). Rozet kodunda apostrof yok, kalkan icin &#128737; entity. Functions GEREKMEZ (statik snippet). UI — RULES degismedi.'],
@@ -5248,18 +5249,18 @@ function renderEvidenceStats(prods){
   var recentList = (prods||[]).filter(function(p){ var t=p.lastEvaluatedAt&&p.lastEvaluatedAt.seconds; return t && (t*1000)>=cutoff && (p.ratingCount||0)>0; }).sort(function(a,b){ return (b.lastEvaluatedAt.seconds)-(a.lastEvaluatedAt.seconds); });
   var recent30 = recentList.length;
   function tile(id, pre, label){ return '<div style="flex:1;min-width:120px"><div style="font-size:30px;font-weight:900;color:var(--text);line-height:1">'+(pre||'')+'<span id="'+id+'">0</span></div><div style="font-size:11.5px;color:var(--text-muted);margin-top:5px;line-height:1.35">'+label+'</div></div>'; }
-  function ago(sec){ var d=Math.floor((Date.now()-sec*1000)/86400000); return d<=0?'bugün':(d===1?'dün':d+' gün önce'); }
+  function ago(sec){ var d=Math.floor((Date.now()-sec*1000)/86400000); return d<=0?t('evstat.today','bugün'):(d===1?t('evstat.yesterday','dün'):d+' '+t('evstat.days_ago','gün önce')); }
   var hareketler = recentList.slice(0,4).map(function(p){ return '<button class="ev-recent" data-id="'+p.id+'" style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--text-secondary);background:var(--bg-surface);border:1px solid var(--border);border-radius:20px;padding:4px 11px;cursor:pointer">🔥 '+escHtml(p.name||'')+' <span style="color:var(--text-muted);font-weight:400">· '+ago(p.lastEvaluatedAt.seconds)+'</span></button>'; }).join(' ');
   host.innerHTML = '<div class="card" style="padding:18px 22px;background:linear-gradient(120deg, rgba(37,99,235,.06), rgba(22,163,74,.05))">'
-    + '<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--text-muted);margin-bottom:14px">🛡 POCHUB’DA KANIT KONUŞUYOR</div>'
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--text-muted);margin-bottom:14px">🛡 '+t('evstat.band_title','POCHUB’DA KANIT KONUŞUYOR')+'</div>'
     + '<div style="display:flex;gap:18px;flex-wrap:wrap">'
-    +   tile('stat-eval','', 'doğrulanmış PoC değerlendirmesi')
-    +   tile('stat-prod','', 'kanıtlanmış çözüm')
-    +   (avgRec!=null ? tile('stat-rec','%', 'ortalama tavsiye oranı') : '')
-    +   (recent30>0 ? tile('stat-recent','', 'son 30 günde değerlendirilen ürün') : '')
+    +   tile('stat-eval','', t('evstat.evaluations','doğrulanmış PoC değerlendirmesi'))
+    +   tile('stat-prod','', t('evstat.proven','kanıtlanmış çözüm'))
+    +   (avgRec!=null ? tile('stat-rec','%', t('evstat.avg_recommend','ortalama tavsiye oranı')) : '')
+    +   (recent30>0 ? tile('stat-recent','', t('evstat.recent30','son 30 günde değerlendirilen ürün')) : '')
     + '</div>'
-    + (hareketler ? '<div style="margin-top:16px"><div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">🔥 SON HAREKETLER</div><div style="display:flex;gap:8px;flex-wrap:wrap">'+hareketler+'</div></div>' : '')
-    + '<div style="font-size:11px;color:var(--text-muted);margin-top:14px;line-height:1.5">Tüm rakamlar gerçek PoC değerlendirmelerinden gelir. Analist görüşü değil; ölçülmüş sonuç.</div>'
+    + (hareketler ? '<div style="margin-top:16px"><div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">🔥 '+t('evstat.recent_moves','SON HAREKETLER')+'</div><div style="display:flex;gap:8px;flex-wrap:wrap">'+hareketler+'</div></div>' : '')
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:14px;line-height:1.5">'+t('evstat.footer','Tüm rakamlar gerçek PoC değerlendirmelerinden gelir. Analist görüşü değil; ölçülmüş sonuç.')+'</div>'
     + '</div>';
   _countUp(host.querySelector('#stat-eval'), totalEval, '');
   _countUp(host.querySelector('#stat-prod'), evaluated, '');
@@ -5322,10 +5323,10 @@ async function renderHome() {
         ${!CUR_USER ? '<button id="home-vendor-signup-btn" style="padding:12px 22px;font-size:13.5px;font-weight:700;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 12px rgba(22,163,74,.22);transition:all .2s">' + t('hero.cta.vendor_signup', '🎁 Vendor Olarak Ücretsiz Katıl') + '</button>' : ''}
       </div>
       <div class="trust-bar">
-        <div class="trust-item"><span>✓</span> Bağımsız PoC Değerlendirme</div>
-        <div class="trust-item"><span>✓</span> Onaylı Vendor Ağı</div>
-        <div class="trust-item"><span>✓</span> Şeffaf Teknik Karşılaştırma</div>
-        <div class="trust-item"><span>✓</span> Kurumsal Güvenlik</div>
+        <div class="trust-item"><span>✓</span> ${t('home.trust1','Bağımsız PoC Değerlendirme')}</div>
+        <div class="trust-item"><span>✓</span> ${t('home.trust2','Onaylı Vendor Ağı')}</div>
+        <div class="trust-item"><span>✓</span> ${t('home.trust3','Şeffaf Teknik Karşılaştırma')}</div>
+        <div class="trust-item"><span>✓</span> ${t('home.trust4','Kurumsal Güvenlik')}</div>
       </div>
     </div>
 
@@ -5339,7 +5340,7 @@ async function renderHome() {
     <div id="home-evidence-leaders" style="margin-bottom:24px"></div>
 
     <div class="g4" style="margin-bottom:20px" id="home-stats">
-      ${['Aktif Etkinlik','Toplam Kullanıcı','PoC Talebi','Aktif Ürün'].map((lbl,i)=>'<div class="stat-card" data-i="'+i+'"><div class="stat-num skel skel-line w50" style="height:28px"></div><div class="stat-lbl" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:6px">'+lbl+'</div></div>').join('')}
+      ${[t('home.stat_events','Aktif Etkinlik'),t('home.stat_users','Toplam Kullanıcı'),t('home.stat_pocs','PoC Talebi'),t('home.stat_products','Aktif Ürün')].map((lbl,i)=>'<div class="stat-card" data-i="'+i+'"><div class="stat-num skel skel-line w50" style="height:28px"></div><div class="stat-lbl" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:6px">'+lbl+'</div></div>').join('')}
     </div>
 
     <!-- v4.87: VENDOR LOGO BAR -->
@@ -28928,6 +28929,26 @@ const I18N_DICT = {
     'lb.empty_sector_desc':'Başka bir sektör seç veya Tüm sektörlere dön.',
     'lb.proven_solutions': 'kanıtlanmış çözüm',
     'lb.quad_cta':         'Haritada keşfet → PoCHub Quadrant',
+    // Anasayfa + Kanit bandi (v6.00 Faz 2)
+    'home.trust1':         'Bağımsız PoC Değerlendirme',
+    'home.trust2':         'Onaylı Vendor Ağı',
+    'home.trust3':         'Şeffaf Teknik Karşılaştırma',
+    'home.trust4':         'Kurumsal Güvenlik',
+    'home.stat_events':    'Aktif Etkinlik',
+    'home.stat_users':     'Toplam Kullanıcı',
+    'home.stat_pocs':      'PoC Talebi',
+    'home.stat_products':  'Aktif Ürün',
+    'hero.cta.about':      'Biz Kimiz →',
+    'evstat.band_title':   'POCHUB’DA KANIT KONUŞUYOR',
+    'evstat.evaluations':  'doğrulanmış PoC değerlendirmesi',
+    'evstat.proven':       'kanıtlanmış çözüm',
+    'evstat.avg_recommend':'ortalama tavsiye oranı',
+    'evstat.recent30':     'son 30 günde değerlendirilen ürün',
+    'evstat.recent_moves': 'SON HAREKETLER',
+    'evstat.footer':       'Tüm rakamlar gerçek PoC değerlendirmelerinden gelir. Analist görüşü değil; ölçülmüş sonuç.',
+    'evstat.today':        'bugün',
+    'evstat.yesterday':    'dün',
+    'evstat.days_ago':     'gün önce',
   },
   en: {
     // Hero / Home
@@ -28982,6 +29003,26 @@ const I18N_DICT = {
     'lb.empty_sector_desc':'Pick another sector or return to All sectors.',
     'lb.proven_solutions': 'proven solutions',
     'lb.quad_cta':         'Explore on the map → PoCHub Quadrant',
+    // Home + Evidence band (v6.00 Phase 2)
+    'home.trust1':         'Independent PoC Evaluation',
+    'home.trust2':         'Verified Vendor Network',
+    'home.trust3':         'Transparent Technical Comparison',
+    'home.trust4':         'Enterprise Security',
+    'home.stat_events':    'Active Events',
+    'home.stat_users':     'Total Users',
+    'home.stat_pocs':      'PoC Requests',
+    'home.stat_products':  'Active Products',
+    'hero.cta.about':      'About Us →',
+    'evstat.band_title':   'EVIDENCE SPEAKS AT POCHUB',
+    'evstat.evaluations':  'verified PoC evaluations',
+    'evstat.proven':       'proven solutions',
+    'evstat.avg_recommend':'average recommendation rate',
+    'evstat.recent30':     'products evaluated in last 30 days',
+    'evstat.recent_moves': 'RECENT ACTIVITY',
+    'evstat.footer':       'All figures come from real PoC evaluations. Not analyst opinion; a measured outcome.',
+    'evstat.today':        'today',
+    'evstat.yesterday':    'yesterday',
+    'evstat.days_ago':     'days ago',
   }
 };
 
