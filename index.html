@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.84 | pochub.co -->
+<!-- PoCHub v5.85 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -684,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.84';
+const VERSION = 'v5.85';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.85': ['CANLI KANIT AKISI — ana sayfada her ziyaretciye (anonim dahil) gercek public veriden hesaplanan, sayac animasyonlu guven bandi: "🛡 POCHUBDA KANIT KONUSUYOR". renderEvidenceStats(prods): aktif urunlerin agregalarindan toplam dogrulanmis PoC degerlendirmesi (Σ ratingCount), kanitlanmis cozum sayisi (ratingCount>0 urun), agirlikli ortalama tavsiye orani (recommendPct, ratingCount agirlikli). _countUp ile 0dan hedefe ease-out sayac (tr-TR binlik ayraci). loadEvidenceLeaders tek fetchle hem istatistigi hem Liderler seridini doldurur (ekstra okuma yok). Veri yoksa band gizli. Hero ustunde, featured carouselin once. UI/turetilmis public — RULES degismedi. NOT: "son 30 gun" trendi review timestamplari signed-in oldugu icin v1de yok (ileride lastReviewAt ile).'],
   'v5.84': ['MARKA BUTUNLUGU DUZELTMELERI (kullanici notlari). (1) Alici tarafinda saticinin TICARI plan rozeti (Pro/Business/Enterprise/Trial) artik GOSTERILMIYOR — getVendorBadgeRow yalniz "✓ Dogrulanmis" guven rozetini dondurur. Gerekce: abonelik duzeyi alim karariyla ilgisiz ve "kanit>gorus, ucretli gorunurluk yok" ilkesiyle celisir; plan admin/satici panelinde kalir (getVendorBadgeHtml duruyor, cagrilmiyor). Etki: katalog grid/list kart, musteri mesaj listesi, PoC detay vendor satiri. (2) Ana sayfa Sponsorlu/One Cikan kartinda kampanya BITIS TARIHI ("... tarihine kadar") alicidan kaldirildi — ic/ticari meta. UI — RULES degismedi.'],
   'v5.83': ['KARAR MATRISI + YONETIM PDF RAPORU — karsilastirma modalinda alici kendi onceliklerine gore agirlik verir, agirlikli karar skoru canli hesaplanir, tek tikla PDF iner. Toolbarda "🎯 Karar Matrisi" toggle > panel: her faktore 0-5 agirlik slider (degerlendirme kriterleri + Kanit Skoru + Tavsiye % + PoC->Satin Alma; yalniz veri olan faktorler) + canli siralama (🥇 kazanan, skor barlari). mxScores: faktor degerleri 0-100 normalize (kriter*20), agirlikli ortalama, eksik veri 0. generateDecisionPdf: jsPDF (lazy loadJsPDF, _sanitizeForPdf ile Latin-guvenli, ASCII-only) tek sayfa A4 "PoC Karar Raporu" — faktor x urun tablosu + agirliklar + Agirlikli Karar Skoru + Onerilen kazanan + metodoloji notu, poc-karar-raporu.pdf. UI/turetilmis — RULES degismedi.'],
   'v5.82': ['AKRAN KOHORTU (kisisellestirilmis kanit) — urun detayinda, giris yapmis musterinin KENDI sektoru ve sirket buyuklugundeki kurumlarin gercek PoC sonuclari. renderProductReviews icinde, zaten cekilen reviews uzerinden hesaplanir (yeni okuma/rules yok). Iki lens: <sektor> sektoru + <buyukluk>; her biri icin n, Tavsiye %, Satin Alma %, Puan — genel ortalamaya gore Δ (▲/▼) ok ile. Panel "👥 SENIN AKRAN KOHORTUN" (cohort > Win/Loss > bireysel sirasinda). Profilinde sektor/buyukluk olmayan musteriye nazik nudge (profilini tamamla). Vendor/eslesme yoksa gizli. CUR_PROFILE.sector/.companySize kullanir. UI/turetilmis — RULES degismedi.'],
@@ -5152,13 +5153,42 @@ function _openAboutEditor(){
   });
 }
 
+// v5.85: Canlı Kanıt Akışı — ana sayfa güven istatistikleri (public veriden)
+function _countUp(node, target, suffix){
+  if(!node) return; var dur=900, t0=null, sfx=suffix||'';
+  function step(ts){ if(!t0)t0=ts; var p=Math.min(1,(ts-t0)/dur); var eased=1-Math.pow(1-p,3); var val=Math.floor(target*eased); node.textContent=val.toLocaleString('tr-TR')+sfx; if(p<1) requestAnimationFrame(step); else node.textContent=target.toLocaleString('tr-TR')+sfx; }
+  requestAnimationFrame(step);
+}
+function renderEvidenceStats(prods){
+  var host = el('home-evidence-stats'); if(!host) return;
+  var totalEval=0, evaluated=0, recSum=0, recW=0;
+  (prods||[]).forEach(function(p){ var n=p.ratingCount||0; if(n>0){ totalEval+=n; evaluated++; if(p.recommendPct!=null){ recSum+=p.recommendPct*n; recW+=n; } } });
+  if(totalEval<=0){ host.innerHTML=''; return; }
+  var avgRec = recW? Math.round(recSum/recW) : null;
+  function tile(id, pre, label){ return '<div style="flex:1;min-width:130px"><div style="font-size:30px;font-weight:900;color:var(--text);line-height:1">'+(pre||'')+'<span id="'+id+'">0</span></div><div style="font-size:11.5px;color:var(--text-muted);margin-top:5px;line-height:1.35">'+label+'</div></div>'; }
+  host.innerHTML = '<div class="card" style="padding:18px 22px;background:linear-gradient(120deg, rgba(37,99,235,.06), rgba(22,163,74,.05))">'
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--text-muted);margin-bottom:14px">🛡 POCHUB’DA KANIT KONUŞUYOR</div>'
+    + '<div style="display:flex;gap:18px;flex-wrap:wrap">'
+    +   tile('stat-eval','', 'doğrulanmış PoC değerlendirmesi')
+    +   tile('stat-prod','', 'kanıtlanmış çözüm')
+    +   (avgRec!=null ? tile('stat-rec','%', 'ortalama tavsiye oranı') : '')
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:14px;line-height:1.5">Tüm rakamlar gerçek PoC değerlendirmelerinden gelir. Analist görüşü değil; ölçülmüş sonuç.</div>'
+    + '</div>';
+  _countUp(host.querySelector('#stat-eval'), totalEval, '');
+  _countUp(host.querySelector('#stat-prod'), evaluated, '');
+  if(avgRec!=null) _countUp(host.querySelector('#stat-rec'), avgRec, '');
+}
 async function loadEvidenceLeaders(){
-  var host = el('home-evidence-leaders'); if(!host) return;
+  var host = el('home-evidence-leaders');
   try {
     await ensureTaxonomy();
     var snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
     var prods = snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; });
+    // v5.85: Canlı Kanıt Akışı — public ürün agregalarından güven istatistikleri
+    renderEvidenceStats(prods);
     var scored = prods.map(function(p){ var e=computeEvidenceScore(p); return e?{p:p,e:e}:null; }).filter(Boolean);
+    if(!host) return;
     if(!scored.length){ host.innerHTML=''; return; }
     scored.sort(function(a,b){ return b.e.score-a.e.score; });
     var top = scored.slice(0,6);
@@ -5210,6 +5240,9 @@ async function renderHome() {
         <div class="trust-item"><span>✓</span> Kurumsal Güvenlik</div>
       </div>
     </div>
+
+    <!-- v5.85: Canlı Kanıt Akışı (güven istatistikleri) -->
+    <div id="home-evidence-stats" style="margin-bottom:20px"></div>
 
     <!-- Featured Products Carousel -->
     <div id="featured-carousel-section" style="margin-bottom:24px"></div>
