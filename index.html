@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.95 | pochub.co -->
+<!-- PoCHub v5.96 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.95';
+const VERSION = 'v5.96';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.96': ['URUN DERIN BAGLANTI + PAYLAS — urun detayi artik paylasilabilir. Detay basligina 🔗 buton: location.origin+pathname+?p=<id> baglantisini navigator.share ile paylasir veya panoya kopyalar. Sayfa yuklenince ?p parametresi okunur ve ilgili urun detayi otomatik acilir (auth otursun diye 1.2sn gecikme; urun public-read oldugu icin anonim de acar). Modal kapaninca ?p replaceState ile URLden temizlenir (geri tusu/router bozulmaz). Boylece urunler paylasilabilir/linklenebilir (Liderler/Quadrant/sosyal), ileride Dogrulanmis rozet icin URL hedefi hazir, SEO icin urun bazli giris. UI/public — RULES degismedi.'],
   'v5.95': ['QUADRANT GORSEL INDIR / PAYLAS — haritayi markali PNG olarak disa aktar (viral/off-site). Quadrant kontrollerine "📷 Gorsel" butonu: exportQuadrantPng SVGyi klonlar, CSS degiskenlerini (var(--...)) getComputedStyle ile cozer, 2x canvasa cizer, alt bilgi seridi ekler (PoCHub Quadrant · pochub.co), PNG olarak indirir; destekleyen cihazda navigator.share ile paylasim. Harici kaynak yok > canvas taintlenmez. Tamamen client-side. RULES degismedi.'],
   'v5.94': ['ADMIN ARAC: Urun Kanit Agregalari — Yeniden Hesapla (Veri Sagligi). Tum urunlerin avgRating/ratingCount/criteriaAvg/recommendPct/purchaseRate/lastEvaluatedAt alanlarini reviews verisinden yeniden hesaplar (_peAgg). Eski degerlendirilmis urunlerde lastEvaluatedAt-i doldurur (Son Hareketler aninda canlanir) + drift duzeltir. Tek getDocs(reviews) > productId grupla > urun basina updateDoc (sirali, ilerleme). Idempotent; review-i olmayana dokunmaz. Admin update izni rules-ta var — RULES degismedi.'],
   'v5.93': ['CANLI IVME / SON HAREKETLER — ana sayfada gercek 30-gunluk canlilik. Her degerlendirmede urune public lastEvaluatedAt (serverTimestamp) yazilir (aggregation). renderEvidenceStats: son 30 gunde degerlendirilen urun sayisi 4. sayac olarak + "🔥 SON HAREKETLER" seridi (en son degerlendirilen 4 urun, goreli zaman -bugun/dun/N gun once-, tikla>detay). Anonim ziyaretciye de gorunur (lastEvaluatedAt public). RULES DEGISTI: products musteri rating update lastEvaluatedAt kapsar (Console + repo guncellenmeli).'],
@@ -5756,7 +5757,10 @@ async function openProductDetailModal(productId) {
       '<div style="font-size:20px;font-weight:700;margin-bottom:4px">'+(p.name||'')+'</div>' +
       '<div style="font-size:13px;color:#64748b">'+(p.vendorName||'')+'</div>' +
       '</div>' +
+      '<div style="display:flex;gap:6px;align-items:flex-start;flex-shrink:0">' +
+      '<button id="share-prod-detail" title="Bağlantıyı kopyala / paylaş" style="background:none;border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-size:13px;padding:5px 9px;border-radius:7px;flex-shrink:0">🔗</button>' +
       '<button id="close-prod-detail" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:22px;padding:4px;flex-shrink:0">×</button>' +
+      '</div>' +
       '</div>' +
 
       // İçerik — scrollable
@@ -5799,8 +5803,18 @@ async function openProductDetailModal(productId) {
     document.body.appendChild(modal);
     if (CUR_USER) renderProductReviews(productId, modal.querySelector('#pd-reviews-list'));
 
-    modal.querySelector('#close-prod-detail').addEventListener('click', function(){ modal.remove(); });
-    modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+    function _stripProductParam(){ try{ var u=new URL(location.href); if(u.searchParams.has('p')){ u.searchParams.delete('p'); history.replaceState(history.state, '', u.pathname+(u.search||'')+(u.hash||'')); } }catch(e){} }
+    modal.querySelector('#close-prod-detail').addEventListener('click', function(){ modal.remove(); _stripProductParam(); });
+    modal.addEventListener('click', function(e){ if(e.target===modal){ modal.remove(); _stripProductParam(); } });
+    var shareBtn = modal.querySelector('#share-prod-detail');
+    if (shareBtn) shareBtn.addEventListener('click', async function(){
+      var shareUrl = location.origin + location.pathname + '?p=' + encodeURIComponent(p.id);
+      try {
+        if (navigator.share) { await navigator.share({ title: p.name||'PoCHub', text: (p.name||'')+' — PoCHub’da kanıta dayalı değerlendirme', url: shareUrl }); return; }
+      } catch(e){ if(e && e.name==='AbortError') return; }
+      try { await navigator.clipboard.writeText(shareUrl); showToast('Bağlantı kopyalandı.'); }
+      catch(e){ window.prompt('Bağlantıyı kopyala:', shareUrl); }
+    });
 
     var pocBtn = modal.querySelector('#prod-detail-poc-btn');
     if (pocBtn) {
@@ -35190,6 +35204,17 @@ if (location.hash && location.hash.length > 1) {
     setTimeout(function() { parseAndNavigate(location.hash); }, 1000);
   });
 }
+
+// v5.96: paylaşılan ürün derin bağlantısı (?p=<productId>)
+window.addEventListener('load', function() {
+  try {
+    var pid = new URLSearchParams(location.search).get('p');
+    if (pid && !window._sharedProductOpened) {
+      window._sharedProductOpened = true;
+      setTimeout(function(){ try { openProductDetailModal(pid); } catch(e){} }, 1200);
+    }
+  } catch(e){}
+});
 
 // EmailJS public key — sonradan eklenecek
 window.addEventListener('DOMContentLoaded', () => {
