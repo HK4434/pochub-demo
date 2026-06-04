@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.02 | pochub.co -->
+<!-- PoCHub v6.03 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.02';
+const VERSION = 'v6.03';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.03': ['i18n SECENEK 3 TAMAM (Hakkimizda tam bilingual) — About sayfasinin kalan icerigi de iki dilli. ABOUTa values_en/differentiators_en/stats_en dizileri (satir-hizali, sadece title/text/label EN; icon ve stat value TR-ortak). valuesL()/diffsL()/statsL() locale-bilincli secer (EN bos satir > TR fallback). renderAbout bu helperlari kullanir; bolum basliklari (ILKELERIMIZ>OUR PRINCIPLES, NEDEN FARKLIYIZ>WHY WE ARE DIFFERENT) + CTA (baslik/alt/buton) t()-e sarildi. Admin editorde her ilke/farklilastiricida Title/Description (EN), her statte Label (EN) alanlari; save *_en dizilerini yazar (satir sirasiyla hizali). Boylece public landing (hero + tum Hakkimizda) tam EN. about admin-write/public-read — RULES degismedi.'],
   'v6.02': ['i18n SECENEK 3 (bilingual icerik — hero + Hakkimizda) — public landing icerigi artik iki dilli. ABOUT dokumanina opsiyonel EN katmani: hero_en{badge,title,subtitle,description} + whoWeAre_en/mission_en/vision_en. applyAbout bunlari yukler; heroF()/aboutTxt() locale-bilincli secer (EN varsa EN, yoksa TR fallback). Anasayfa hero + #about sayfasi (hero + Biz Kimiz/Misyon/Vizyon icerik ve 3 baslik) EN gosterir. Admin Biz Kimiz editorune "🌐 INGILIZCE (EN)" bolumu (7 alan) + save hero_en/*_en yazar + reset temizler. Diger About bolumleri (ilkeler/farklilastiricilar/stats) ileride ayni desenle. about dokumani admin-write/public-read — RULES degismedi.'],
   'v6.01': ['i18n FAZ 2 (public landing) — anasayfa gorunur UI etiketleri EN. Hero trust-bar (Bagimsiz PoC Degerlendirme>Independent PoC Evaluation vb.), istatistik etiketleri (Aktif Etkinlik>Active Events vb.), hero.cta.about, ve Kanit bandi (renderEvidenceStats: POCHUBDA KANIT KONUSUYOR>EVIDENCE SPEAKS AT POCHUB, sayac etiketleri, SON HAREKETLER>RECENT ACTIVITY, bugun/dun/gun once goreli zaman) t()-e sarildi + home.*/evstat.* anahtarlari EN doldu. NOT: hero metni (ABOUT.hero.*) Firestore icerigi > bilingual veri-modeli Faz 6. RULES degismedi.'],
   'v6.00': ['i18n FAZ 1 — Dil mekanizmasi CANLI. Mevcut i18n motoru (I18N_DICT tr/en, detectInitialLocale ?lang>localStorage>tarayici, t() TR-fallback, setLocale ekrani+nav yeniden render, nav TR/EN switcher) uzerine: (1) autoDetectBrowser VARSAYILAN ACIK > TR disi tarayici otomatik EN, manuel switcher override eder. (2) Liderler public hero+bos-durum+sektor+CTA stringleri t()-e sarildi ve lb.* anahtarlari EN doldu (CATEGORY LEADERS / Leaders defined by evidence...). NOT: uygulamanin cogu hala gomulu TR; tam EN coverage sonraki fazlarda surface-by-surface t()-e sarilarak gelecek. RULES degismedi.'],
@@ -5057,6 +5058,9 @@ var _aboutLoaded = false;
 // v6.02: locale-bilinçli içerik seçimi (EN varsa EN, yoksa TR)
 function heroF(k){ return (window.CUR_LOCALE==='en' && ABOUT.hero_en && ABOUT.hero_en[k]) ? ABOUT.hero_en[k] : (ABOUT.hero[k]||''); }
 function aboutTxt(k){ return (window.CUR_LOCALE==='en' && ABOUT[k+'_en']) ? ABOUT[k+'_en'] : (ABOUT[k]||''); }
+function valuesL(){ var tr=ABOUT.values||[]; if(window.CUR_LOCALE!=='en') return tr; var en=ABOUT.values_en||[]; return tr.map(function(v,i){ var e=en[i]||{}; return {icon:v.icon, title:e.title||v.title, text:e.text||v.text}; }); }
+function diffsL(){ var tr=ABOUT.differentiators||[]; if(window.CUR_LOCALE!=='en') return tr; var en=ABOUT.differentiators_en||[]; return tr.map(function(v,i){ var e=en[i]||{}; return {title:e.title||v.title, text:e.text||v.text}; }); }
+function statsL(){ var tr=ABOUT.stats||[]; if(window.CUR_LOCALE!=='en') return tr; var en=ABOUT.stats_en||[]; return tr.map(function(v,i){ var e=en[i]||{}; return {value:v.value, label:e.label||v.label}; }); }
 function applyAbout(d){
   ABOUT = JSON.parse(JSON.stringify(ABOUT_DEFAULT));
   if (!d || typeof d!=='object') return;
@@ -5067,6 +5071,9 @@ function applyAbout(d){
   if (Array.isArray(d.values)) ABOUT.values = d.values.filter(function(v){return v&&(v.title||v.text);}).map(function(v){ return {icon:String(v.icon||'✦'), title:String(v.title||''), text:String(v.text||'')}; });
   if (Array.isArray(d.differentiators)) ABOUT.differentiators = d.differentiators.filter(function(v){return v&&(v.title||v.text);}).map(function(v){ return {title:String(v.title||''), text:String(v.text||'')}; });
   if (Array.isArray(d.stats)) ABOUT.stats = d.stats.filter(function(v){return v&&(v.value||v.label);}).map(function(v){ return {value:String(v.value||''), label:String(v.label||'')}; });
+  if (Array.isArray(d.values_en)) ABOUT.values_en = d.values_en.map(function(v){ return {title:String(v&&v.title||''), text:String(v&&v.text||'')}; });
+  if (Array.isArray(d.differentiators_en)) ABOUT.differentiators_en = d.differentiators_en.map(function(v){ return {title:String(v&&v.title||''), text:String(v&&v.text||'')}; });
+  if (Array.isArray(d.stats_en)) ABOUT.stats_en = d.stats_en.map(function(v){ return {label:String(v&&v.label||'')}; });
 }
 async function ensureAbout(force){
   if (_aboutLoaded && !force) return;
@@ -5077,9 +5084,9 @@ async function renderAbout(){
   await ensureAbout();
   var a = ABOUT, wrap = el('scr-about'); if(!wrap) return;
   var heroTitle = escHtml(heroF('title')).replace(/\n/g,'<br>');
-  var values = (a.values||[]).map(function(v){ return '<div class="card" style="padding:22px;border-color:rgba(37,99,235,.12)"><div style="font-size:26px;margin-bottom:10px">'+(v.icon||'✦')+'</div><div style="font-size:15px;font-weight:800;margin-bottom:6px">'+escHtml(v.title||'')+'</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+escHtml(v.text||'')+'</div></div>'; }).join('');
-  var diffs = (a.differentiators||[]).map(function(d,i){ return '<div style="display:flex;gap:16px;align-items:flex-start;padding:18px 0;border-top:1px solid var(--border)"><div style="font-size:14px;font-weight:900;color:#2563eb;min-width:34px">0'+(i+1)+'</div><div><div style="font-size:16px;font-weight:800;margin-bottom:4px">'+escHtml(d.title||'')+'</div><div style="font-size:13.5px;color:var(--text-secondary);line-height:1.65">'+escHtml(d.text||'')+'</div></div></div>'; }).join('');
-  var stats = (a.stats||[]).map(function(s){ return '<div style="text-align:center;flex:1;min-width:120px"><div style="font-size:30px;font-weight:900;background:linear-gradient(135deg,#2563eb,#16a34a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">'+escHtml(s.value||'')+'</div><div style="font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:4px">'+escHtml(s.label||'')+'</div></div>'; }).join('');
+  var values = valuesL().map(function(v){ return '<div class="card" style="padding:22px;border-color:rgba(37,99,235,.12)"><div style="font-size:26px;margin-bottom:10px">'+(v.icon||'✦')+'</div><div style="font-size:15px;font-weight:800;margin-bottom:6px">'+escHtml(v.title||'')+'</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+escHtml(v.text||'')+'</div></div>'; }).join('');
+  var diffs = diffsL().map(function(d,i){ return '<div style="display:flex;gap:16px;align-items:flex-start;padding:18px 0;border-top:1px solid var(--border)"><div style="font-size:14px;font-weight:900;color:#2563eb;min-width:34px">0'+(i+1)+'</div><div><div style="font-size:16px;font-weight:800;margin-bottom:4px">'+escHtml(d.title||'')+'</div><div style="font-size:13.5px;color:var(--text-secondary);line-height:1.65">'+escHtml(d.text||'')+'</div></div></div>'; }).join('');
+  var stats = statsL().map(function(s){ return '<div style="text-align:center;flex:1;min-width:120px"><div style="font-size:30px;font-weight:900;background:linear-gradient(135deg,#2563eb,#16a34a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">'+escHtml(s.value||'')+'</div><div style="font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:4px">'+escHtml(s.label||'')+'</div></div>'; }).join('');
   wrap.innerHTML = '<div class="wrap">'
     + '<div class="card" style="padding:54px 40px;margin-bottom:22px;text-align:center;background:linear-gradient(160deg,rgba(37,99,235,.07),rgba(22,163,74,.04));border-color:rgba(37,99,235,.18)">'
     +   '<div style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;background:rgba(37,99,235,.10);padding:6px 14px;border-radius:20px;margin-bottom:18px">'+escHtml(heroF('badge'))+'</div>'
@@ -5093,12 +5100,12 @@ async function renderAbout(){
     +   '<div class="card" style="padding:28px;border-top:3px solid #2563eb"><div style="font-size:22px;margin-bottom:10px">🎯</div><div style="font-size:17px;font-weight:800;margin-bottom:8px">'+t('about.mission','Misyonumuz')+'</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7">'+escHtml(aboutTxt('mission'))+'</div></div>'
     +   '<div class="card" style="padding:28px;border-top:3px solid #16a34a"><div style="font-size:22px;margin-bottom:10px">🚀</div><div style="font-size:17px;font-weight:800;margin-bottom:8px">'+t('about.vision','Vizyonumuz')+'</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7">'+escHtml(aboutTxt('vision'))+'</div></div>'
     + '</div>'
-    + (values ? '<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:14px;text-align:center">İLKELERİMİZ</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:22px">'+values+'</div></div>' : '')
-    + (diffs ? '<div class="card" style="padding:32px;margin-bottom:22px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:6px">NEDEN FARKLIYIZ</div>'+diffs+'</div>' : '')
+    + (values ? '<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:14px;text-align:center">'+t('about.values_label','İLKELERİMİZ')+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:22px">'+values+'</div></div>' : '')
+    + (diffs ? '<div class="card" style="padding:32px;margin-bottom:22px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:6px">'+t('about.diff_label','NEDEN FARKLIYIZ')+'</div>'+diffs+'</div>' : '')
     + '<div class="card" style="padding:36px;text-align:center;background:linear-gradient(135deg,#2563eb,#1e40af);border:none">'
-    +   '<div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:8px">Kararını kanıtla ver.</div>'
-    +   '<div style="font-size:14px;color:rgba(255,255,255,.85);margin-bottom:18px">Gerçek ortamda test et, şeffaf karşılaştır, doğru teknolojiyi seç.</div>'
-    +   '<button id="about-cta-catalog" style="padding:12px 28px;font-size:14px;font-weight:700;background:#fff;color:#2563eb;border:none;border-radius:8px;cursor:pointer">Kataloğu Keşfet →</button>'
+    +   '<div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:8px">'+t('about.cta_title','Kararını kanıtla ver.')+'</div>'
+    +   '<div style="font-size:14px;color:rgba(255,255,255,.85);margin-bottom:18px">'+t('about.cta_sub','Gerçek ortamda test et, şeffaf karşılaştır, doğru teknolojiyi seç.')+'</div>'
+    +   '<button id="about-cta-catalog" style="padding:12px 28px;font-size:14px;font-weight:700;background:#fff;color:#2563eb;border:none;border-radius:8px;cursor:pointer">'+t('about.cta_btn','Kataloğu Keşfet →')+'</button>'
     + '</div>'
     + '</div>';
   el('about-cta-catalog')?.addEventListener('click', function(){ go('catalog'); });
@@ -5206,13 +5213,13 @@ function _openAboutEditor(){
   }
   function ctrls(){ return '<div style="display:flex;flex-direction:column;gap:1px"><button class="abe-up" title="Yukarı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▲</button><button class="abe-down" title="Aşağı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▼</button></div>'; }
   function del(){ return '<button class="abe-del" title="Sil" style="background:none;border:none;cursor:pointer;font-size:13px">🗑</button>'; }
-  function valueRow(v){ var r=document.createElement('div'); r.className='abe-vrow'; r.style.cssText='display:flex;gap:7px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<input class="inp abe-v-icon" value="'+escHtml(v.icon||'')+'" placeholder="✦" style="width:42px;font-size:14px;text-align:center"><div style="flex:1"><input class="inp abe-v-title" value="'+escHtml(v.title||'')+'" placeholder="Başlık" style="width:100%;font-size:12.5px;margin-bottom:5px"><textarea class="inp abe-v-text" rows="2" placeholder="Açıklama" style="width:100%;font-size:12px;resize:vertical">'+escHtml(v.text||'')+'</textarea></div>'+del(); return r; }
-  function diffRow(d){ var r=document.createElement('div'); r.className='abe-drow'; r.style.cssText='display:flex;gap:7px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<div style="flex:1"><input class="inp abe-d-title" value="'+escHtml(d.title||'')+'" placeholder="Başlık" style="width:100%;font-size:12.5px;margin-bottom:5px"><textarea class="inp abe-d-text" rows="2" placeholder="Açıklama" style="width:100%;font-size:12px;resize:vertical">'+escHtml(d.text||'')+'</textarea></div>'+del(); return r; }
-  function statRow(s){ var r=document.createElement('div'); r.className='abe-srow'; r.style.cssText='display:flex;gap:7px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<input class="inp abe-s-value" value="'+escHtml(s.value||'')+'" placeholder="Değer" style="width:90px;font-size:12.5px;font-weight:700"><input class="inp abe-s-label" value="'+escHtml(s.label||'')+'" placeholder="Etiket" style="flex:1;font-size:12.5px">'+del(); return r; }
-  function fill(hostId, arr, mk){ var h=modal.querySelector(hostId); h.innerHTML=''; (arr||[]).forEach(function(x){ var r=mk(x); h.appendChild(r); wireRow(r); }); }
-  fill('#abe-values', a.values, valueRow);
-  fill('#abe-diffs', a.differentiators, diffRow);
-  fill('#abe-stats', a.stats, statRow);
+  function valueRow(v, ven){ var r=document.createElement('div'); r.className='abe-vrow'; r.style.cssText='display:flex;gap:7px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<input class="inp abe-v-icon" value="'+escHtml(v.icon||'')+'" placeholder="✦" style="width:42px;font-size:14px;text-align:center"><div style="flex:1"><input class="inp abe-v-title" value="'+escHtml(v.title||'')+'" placeholder="Başlık" style="width:100%;font-size:12.5px;margin-bottom:5px"><textarea class="inp abe-v-text" rows="2" placeholder="Açıklama" style="width:100%;font-size:12px;resize:vertical">'+escHtml(v.text||'')+'</textarea><input class="inp abe-v-title-en" value="'+escHtml((ven&&ven.title)||'')+'" placeholder="Title (EN)" style="width:100%;font-size:12px;margin-top:5px"><textarea class="inp abe-v-text-en" rows="2" placeholder="Description (EN)" style="width:100%;font-size:12px;resize:vertical;margin-top:4px">'+escHtml((ven&&ven.text)||'')+'</textarea></div>'+del(); return r; }
+  function diffRow(d, den){ var r=document.createElement('div'); r.className='abe-drow'; r.style.cssText='display:flex;gap:7px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<div style="flex:1"><input class="inp abe-d-title" value="'+escHtml(d.title||'')+'" placeholder="Başlık" style="width:100%;font-size:12.5px;margin-bottom:5px"><textarea class="inp abe-d-text" rows="2" placeholder="Açıklama" style="width:100%;font-size:12px;resize:vertical">'+escHtml(d.text||'')+'</textarea><input class="inp abe-d-title-en" value="'+escHtml((den&&den.title)||'')+'" placeholder="Title (EN)" style="width:100%;font-size:12px;margin-top:5px"><textarea class="inp abe-d-text-en" rows="2" placeholder="Description (EN)" style="width:100%;font-size:12px;resize:vertical;margin-top:4px">'+escHtml((den&&den.text)||'')+'</textarea></div>'+del(); return r; }
+  function statRow(s, sen){ var r=document.createElement('div'); r.className='abe-srow'; r.style.cssText='display:flex;gap:7px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)'; r.innerHTML=ctrls()+'<input class="inp abe-s-value" value="'+escHtml(s.value||'')+'" placeholder="Değer" style="width:90px;font-size:12.5px;font-weight:700"><input class="inp abe-s-label" value="'+escHtml(s.label||'')+'" placeholder="Etiket" style="flex:1;font-size:12.5px"><input class="inp abe-s-label-en" value="'+escHtml((sen&&sen.label)||'')+'" placeholder="Label (EN)" style="flex:1;font-size:12.5px">'+del(); return r; }
+  function fill(hostId, arr, mk, enArr){ var h=modal.querySelector(hostId); h.innerHTML=''; (arr||[]).forEach(function(x,i){ var r=mk(x, enArr&&enArr[i]); h.appendChild(r); wireRow(r); }); }
+  fill('#abe-values', a.values, valueRow, a.values_en);
+  fill('#abe-diffs', a.differentiators, diffRow, a.differentiators_en);
+  fill('#abe-stats', a.stats, statRow, a.stats_en);
   function addTo(hostId, mk, obj){ var h=modal.querySelector(hostId); var r=mk(obj); h.appendChild(r); wireRow(r); }
   modal.querySelector('#abe-add-value').addEventListener('click', function(){ addTo('#abe-values', valueRow, {icon:'✦',title:'',text:''}); });
   modal.querySelector('#abe-add-diff').addEventListener('click', function(){ addTo('#abe-diffs', diffRow, {title:'',text:''}); });
@@ -5236,7 +5243,10 @@ function _openAboutEditor(){
       whoWeAre_en: modal.querySelector('#abe-who-en').value, mission_en: modal.querySelector('#abe-mission-en').value.trim(), vision_en: modal.querySelector('#abe-vision-en').value.trim(),
       values: [].slice.call(modal.querySelectorAll('#abe-values .abe-vrow')).map(function(r){ return {icon:r.querySelector('.abe-v-icon').value.trim()||'✦', title:r.querySelector('.abe-v-title').value.trim(), text:r.querySelector('.abe-v-text').value.trim()}; }).filter(function(v){return v.title||v.text;}),
       differentiators: [].slice.call(modal.querySelectorAll('#abe-diffs .abe-drow')).map(function(r){ return {title:r.querySelector('.abe-d-title').value.trim(), text:r.querySelector('.abe-d-text').value.trim()}; }).filter(function(v){return v.title||v.text;}),
-      stats: [].slice.call(modal.querySelectorAll('#abe-stats .abe-srow')).map(function(r){ return {value:r.querySelector('.abe-s-value').value.trim(), label:r.querySelector('.abe-s-label').value.trim()}; }).filter(function(v){return v.value||v.label;})
+      stats: [].slice.call(modal.querySelectorAll('#abe-stats .abe-srow')).map(function(r){ return {value:r.querySelector('.abe-s-value').value.trim(), label:r.querySelector('.abe-s-label').value.trim()}; }).filter(function(v){return v.value||v.label;}),
+      values_en: [].slice.call(modal.querySelectorAll('#abe-values .abe-vrow')).map(function(r){ return {title:r.querySelector('.abe-v-title-en').value.trim(), text:r.querySelector('.abe-v-text-en').value.trim()}; }),
+      differentiators_en: [].slice.call(modal.querySelectorAll('#abe-diffs .abe-drow')).map(function(r){ return {title:r.querySelector('.abe-d-title-en').value.trim(), text:r.querySelector('.abe-d-text-en').value.trim()}; }),
+      stats_en: [].slice.call(modal.querySelectorAll('#abe-stats .abe-srow')).map(function(r){ return {label:r.querySelector('.abe-s-label-en').value.trim()}; })
     };
     try {
       await setDoc(doc(db,'pochub_config','about'), obj, {merge:true});
@@ -28969,6 +28979,11 @@ const I18N_DICT = {
     'about.who_label':     'BİZ KİMİZ',
     'about.mission':       'Misyonumuz',
     'about.vision':        'Vizyonumuz',
+    'about.values_label':  'İLKELERİMİZ',
+    'about.diff_label':    'NEDEN FARKLIYIZ',
+    'about.cta_title':     'Kararını kanıtla ver.',
+    'about.cta_sub':       'Gerçek ortamda test et, şeffaf karşılaştır, doğru teknolojiyi seç.',
+    'about.cta_btn':       'Kataloğu Keşfet →',
   },
   en: {
     // Hero / Home
@@ -29046,6 +29061,11 @@ const I18N_DICT = {
     'about.who_label':     'WHO WE ARE',
     'about.mission':       'Our Mission',
     'about.vision':        'Our Vision',
+    'about.values_label':  'OUR PRINCIPLES',
+    'about.diff_label':    'WHY WE ARE DIFFERENT',
+    'about.cta_title':     'Decide with evidence.',
+    'about.cta_sub':       'Test in a real environment, compare transparently, choose the right technology.',
+    'about.cta_btn':       'Explore the Catalog →',
   }
 };
 
