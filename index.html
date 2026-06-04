@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.91 | pochub.co -->
+<!-- PoCHub v5.92 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.91';
+const VERSION = 'v5.92';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.92': ['KATEGORI LIDERLERI SEKTOR FILTRESI — Liderler sayfasina kamuya acik sektor filtresi (urunun hitap ettigi sektorlere gore, product.sectors public). Degerlendirilmis urunlerden sektor evreni cikarilir (sayilarla), dropdown ile secilen sektore hitap eden urunler kategori bazinda Kanit Skoruna gore siralanir. Baslik secili sektoru yansitir; o sektorde lider yoksa nazik bos-durum (dropdown kalir, sifirlanabilir). LB_SECTOR state. Reviews gerekmez (anonim de kullanir); SEO icin sektor-bazli kesif. UI/public — RULES degismedi.'],
   'v5.91': ['PROFIL TAMAMLAMA TESVIKI (veri-kalitesi carki) — kohort/kisisel kanit ozelliklerini besleyen veriyi artirmak icin. Musteri dashboardinda (sektor VEYA sirket buyuklugu eksikse) nazik banner: "Profilini tamamla, kisisel kaniti gor" + Profili Tamamla butonu > profil sekmesine gecer, #pf-sector alanina kaydirip odaklar. Tamamsa banner gizli. Boylece akran kohortu (urun detayi + Quadrant lensi) ve customerSector/companySize tabanli tum kanit zenginlesir. UI — RULES degismedi.'],
   'v5.90': ['KARAR RAPORU PDF ZENGINLESTIRME — yonetime sunulan PoC Karar Raporu artik sadece skor degil GEREKCE de icerir. generateDecisionPdf basinda karsilastirilan urunlerin reviewlari tek sorguda cekilir (where productId in, <=10), urun basina en cok kazandiran/kaybettiren neden hesaplanir. PDFe "Karar Gerekcesi" bolumu: her urun icin Tavsiye % + PoC->Satin Alma % (public agregalardan) + Kazandiran/Kaybettiren neden (reviewlardan). Sayfa tasmasi icin _ensure ile otomatik addPage. Boylece belge alici organizasyonunda "neden bu urun" sorusunu da yanitlar, markamizi tasir. RULES degismedi (reviews signed-in; rapor giris yapmis alici tarafindan uretilir).'],
   'v5.89': ['KATEGORI LIDERLERI — kamuya acik, Kanit Skoru siralamasi (Gartner MQin seffaf, ucretsiz, herkese acik cevabi). Yeni #leaderboard ekrani + navda "🏆 Liderler" (public). renderLeaderboard: aktif urunler (public) kategoriye gore gruplanir, yalniz degerlendirilmis olanlar Kanit Skoruna gore siralanir; kategori basina ilk 10, madalyali (🥇🥈🥉), skor bari + yerli rozeti + degerlendirme sayisi, satira tikla>urun detayi. Ust kisimda kategori cipleri (tikla>scroll). Quadrant CTA. Hero: "Kanitla belirlenen liderler — analist gorusu degil, olculmus sonuc; ucretli siralama yok". parseAndNavigate whitelistine leaderboard+about eklendi; updatePageSEO title/desc (SEO landing). Bos: kanitlanmis lider yoksa nazik durum. UI/public — RULES degismedi.'],
@@ -5091,6 +5092,7 @@ async function renderAbout(){
 // ════════════════════════════════════════════════════════════════════
 // v5.89: Kategori Liderleri — kamuya açık, Kanıt Skoru sıralaması
 // ════════════════════════════════════════════════════════════════════
+var LB_SECTOR = '';  // v5.92: leaderboard sektör filtresi
 async function renderLeaderboard(){
   var scr = el('scr-leaderboard'); if(!scr) return;
   scr.innerHTML = '<div class="wrap"><div class="empty"><div class="empty-icon">⏳</div>Liderler yükleniyor...</div></div>';
@@ -5098,16 +5100,27 @@ async function renderLeaderboard(){
     await ensureTaxonomy();
     var snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
     var prods = snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; });
+    function prodSectors(p){ return (p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]); }
+    var evaluatedAll = prods.map(function(p){ var e=computeEvidenceScore(p); return e?{p:p,e:e}:null; }).filter(Boolean);
+    var secSet={}; evaluatedAll.forEach(function(x){ prodSectors(x.p).forEach(function(s){ if(s) secSet[s]=(secSet[s]||0)+1; }); });
+    var secOpts=Object.keys(secSet).sort(function(a,b){ return (SECTOR_LABEL[a]||a).localeCompare(SECTOR_LABEL[b]||b,'tr'); });
+    if(LB_SECTOR && !secSet[LB_SECTOR]) LB_SECTOR='';
+    var filtered = LB_SECTOR ? evaluatedAll.filter(function(x){ return prodSectors(x.p).indexOf(LB_SECTOR)>=0; }) : evaluatedAll;
     var byCat={};
-    prods.forEach(function(p){ var e=computeEvidenceScore(p); if(!e) return; var c=p.category||'Diğer'; (byCat[c]=byCat[c]||[]).push({p:p,e:e}); });
+    filtered.forEach(function(x){ var c=x.p.category||'Diğer'; (byCat[c]=byCat[c]||[]).push(x); });
     var cats=Object.keys(byCat).sort(function(a,b){ return byCat[b].length-byCat[a].length || a.localeCompare(b,'tr'); });
+    var secSel = secOpts.length ? ('<div style="margin:6px 0 0;text-align:center"><select id="lb-sector" class="inp" style="width:auto;font-size:13px;padding:6px 12px"><option value="">Tüm sektörler</option>'+secOpts.map(function(s){ return '<option value="'+escHtml(s)+'"'+(LB_SECTOR===s?' selected':'')+'>'+escHtml(SECTOR_LABEL[s]||s)+' ('+secSet[s]+')</option>'; }).join('')+'</select></div>') : '';
+    var secHeading = LB_SECTOR ? ' · '+escHtml(SECTOR_LABEL[LB_SECTOR]||LB_SECTOR)+' sektörü' : '';
     var html='<div class="wrap" style="max-width:980px">'
-      + '<div style="text-align:center;margin:8px 0 22px"><div style="font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;margin-bottom:8px">🏆 KATEGORİ LİDERLERİ</div>'
+      + '<div style="text-align:center;margin:8px 0 22px"><div style="font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;margin-bottom:8px">🏆 KATEGORİ LİDERLERİ'+secHeading+'</div>'
       + '<h1 style="font-size:30px;font-weight:900;margin:0 0 10px;color:var(--text)">Kanıtla belirlenen liderler</h1>'
-      + '<p style="font-size:14px;color:var(--text-muted);max-width:620px;margin:0 auto;line-height:1.6">Her kategoride sıralama, gerçek PoC değerlendirmelerinden hesaplanan <b>Kanıt Skoru</b>’na göredir. Analist görüşü değil; ölçülmüş sonuç. <b>Ücretli sıralama yoktur.</b></p></div>';
+      + '<p style="font-size:14px;color:var(--text-muted);max-width:620px;margin:0 auto;line-height:1.6">Her kategoride sıralama, gerçek PoC değerlendirmelerinden hesaplanan <b>Kanıt Skoru</b>’na göredir. Analist görüşü değil; ölçülmüş sonuç. <b>Ücretli sıralama yoktur.</b></p>'
+      + secSel + '</div>';
     if(!cats.length){
-      html += '<div class="empty" style="padding:50px 20px;text-align:center"><div class="empty-icon">🧭</div><div style="font-size:15px;font-weight:700;margin-bottom:4px">Henüz kanıtlanmış lider yok</div><div style="font-size:12.5px;color:var(--text-muted)">PoC değerlendirmeleri biriktikçe kategori liderleri burada belirir.</div></div></div>';
-      scr.innerHTML=html; return;
+      html += '<div class="empty" style="padding:50px 20px;text-align:center"><div class="empty-icon">🧭</div><div style="font-size:15px;font-weight:700;margin-bottom:4px">'+(LB_SECTOR?'Bu sektörde kanıtlanmış lider yok':'Henüz kanıtlanmış lider yok')+'</div><div style="font-size:12.5px;color:var(--text-muted)">'+(LB_SECTOR?'Başka bir sektör seç veya "Tüm sektörler"e dön.':'PoC değerlendirmeleri biriktikçe kategori liderleri burada belirir.')+'</div></div></div>';
+      scr.innerHTML=html;
+      var ss0=scr.querySelector('#lb-sector'); if(ss0) ss0.addEventListener('change', function(){ LB_SECTOR=this.value; renderLeaderboard(); });
+      return;
     }
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:24px">'+cats.map(function(c,i){ return '<button class="lb-chip" data-i="'+i+'" style="font-size:12px;font-weight:600;padding:6px 12px;border:1px solid var(--border);border-radius:20px;color:var(--text-secondary);background:var(--bg-surface);cursor:pointer">'+escHtml(c)+' <span style="color:var(--text-muted)">'+byCat[c].length+'</span></button>'; }).join('')+'</div>';
     cats.forEach(function(c,ci){
@@ -5130,6 +5143,7 @@ async function renderLeaderboard(){
     scr.querySelectorAll('.lb-row').forEach(function(r){ r.addEventListener('click', function(){ openProductDetailModal(r.dataset.id); }); });
     scr.querySelectorAll('.lb-chip').forEach(function(b){ b.addEventListener('click', function(){ var t=document.getElementById('lb-cat-'+this.dataset.i); if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); }); });
     var lq=scr.querySelector('#lb-quad'); if(lq) lq.addEventListener('click', function(){ window._pendingCatView='quadrant'; go('catalog'); });
+    var ss=scr.querySelector('#lb-sector'); if(ss) ss.addEventListener('change', function(){ LB_SECTOR=this.value; renderLeaderboard(); });
   } catch(e){ scr.innerHTML='<div class="wrap"><div class="empty"><div class="empty-icon">⚠️</div>Liderler yüklenemedi: '+escHtml((e&&e.message)||'')+'</div></div>'; }
 }
 
