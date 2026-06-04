@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.01 | pochub.co -->
+<!-- PoCHub v6.02 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.01';
+const VERSION = 'v6.02';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.02': ['i18n SECENEK 3 (bilingual icerik — hero + Hakkimizda) — public landing icerigi artik iki dilli. ABOUT dokumanina opsiyonel EN katmani: hero_en{badge,title,subtitle,description} + whoWeAre_en/mission_en/vision_en. applyAbout bunlari yukler; heroF()/aboutTxt() locale-bilincli secer (EN varsa EN, yoksa TR fallback). Anasayfa hero + #about sayfasi (hero + Biz Kimiz/Misyon/Vizyon icerik ve 3 baslik) EN gosterir. Admin Biz Kimiz editorune "🌐 INGILIZCE (EN)" bolumu (7 alan) + save hero_en/*_en yazar + reset temizler. Diger About bolumleri (ilkeler/farklilastiricilar/stats) ileride ayni desenle. about dokumani admin-write/public-read — RULES degismedi.'],
   'v6.01': ['i18n FAZ 2 (public landing) — anasayfa gorunur UI etiketleri EN. Hero trust-bar (Bagimsiz PoC Degerlendirme>Independent PoC Evaluation vb.), istatistik etiketleri (Aktif Etkinlik>Active Events vb.), hero.cta.about, ve Kanit bandi (renderEvidenceStats: POCHUBDA KANIT KONUSUYOR>EVIDENCE SPEAKS AT POCHUB, sayac etiketleri, SON HAREKETLER>RECENT ACTIVITY, bugun/dun/gun once goreli zaman) t()-e sarildi + home.*/evstat.* anahtarlari EN doldu. NOT: hero metni (ABOUT.hero.*) Firestore icerigi > bilingual veri-modeli Faz 6. RULES degismedi.'],
   'v6.00': ['i18n FAZ 1 — Dil mekanizmasi CANLI. Mevcut i18n motoru (I18N_DICT tr/en, detectInitialLocale ?lang>localStorage>tarayici, t() TR-fallback, setLocale ekrani+nav yeniden render, nav TR/EN switcher) uzerine: (1) autoDetectBrowser VARSAYILAN ACIK > TR disi tarayici otomatik EN, manuel switcher override eder. (2) Liderler public hero+bos-durum+sektor+CTA stringleri t()-e sarildi ve lb.* anahtarlari EN doldu (CATEGORY LEADERS / Leaders defined by evidence...). NOT: uygulamanin cogu hala gomulu TR; tam EN coverage sonraki fazlarda surface-by-surface t()-e sarilarak gelecek. RULES degismedi.'],
   'v5.99': ['KATEGORI LIDERI KARTI (PNG) — Liderler sayfasinda her kategorinin #1 satirina 📷 buton: generateLeaderCard canvasta (600x340 @2x) markali "Kategori Lideri" karti cizer — altin aksan + #1 rozeti, KATEGORI LIDERI etiketi, kategori adi, urun + satici, Kanit Skoru +/100 + bar, alt bilgi pochub.co. PNG iner + navigator.share. Buton satir tiklamasini engeller (stopPropagation). Skor yoksa uyari. ASCII metin. Off-site marka/geri-baglanti. Paylasilabilir gorsel kumesi tamam (Quadrant+UrunKart+KategoriLider). UI — RULES degismedi.'],
@@ -5053,11 +5054,16 @@ var ABOUT_DEFAULT = {
 };
 var ABOUT = JSON.parse(JSON.stringify(ABOUT_DEFAULT));
 var _aboutLoaded = false;
+// v6.02: locale-bilinçli içerik seçimi (EN varsa EN, yoksa TR)
+function heroF(k){ return (window.CUR_LOCALE==='en' && ABOUT.hero_en && ABOUT.hero_en[k]) ? ABOUT.hero_en[k] : (ABOUT.hero[k]||''); }
+function aboutTxt(k){ return (window.CUR_LOCALE==='en' && ABOUT[k+'_en']) ? ABOUT[k+'_en'] : (ABOUT[k]||''); }
 function applyAbout(d){
   ABOUT = JSON.parse(JSON.stringify(ABOUT_DEFAULT));
   if (!d || typeof d!=='object') return;
   if (d.hero && typeof d.hero==='object') { ['badge','title','subtitle','description'].forEach(function(k){ if(typeof d.hero[k]==='string') ABOUT.hero[k]=d.hero[k]; }); }
+  if (d.hero_en && typeof d.hero_en==='object') { ABOUT.hero_en={}; ['badge','title','subtitle','description'].forEach(function(k){ if(typeof d.hero_en[k]==='string') ABOUT.hero_en[k]=d.hero_en[k]; }); }
   ['whoWeAre','mission','vision'].forEach(function(k){ if(typeof d[k]==='string') ABOUT[k]=d[k]; });
+  ['whoWeAre','mission','vision'].forEach(function(k){ if(typeof d[k+'_en']==='string') ABOUT[k+'_en']=d[k+'_en']; });
   if (Array.isArray(d.values)) ABOUT.values = d.values.filter(function(v){return v&&(v.title||v.text);}).map(function(v){ return {icon:String(v.icon||'✦'), title:String(v.title||''), text:String(v.text||'')}; });
   if (Array.isArray(d.differentiators)) ABOUT.differentiators = d.differentiators.filter(function(v){return v&&(v.title||v.text);}).map(function(v){ return {title:String(v.title||''), text:String(v.text||'')}; });
   if (Array.isArray(d.stats)) ABOUT.stats = d.stats.filter(function(v){return v&&(v.value||v.label);}).map(function(v){ return {value:String(v.value||''), label:String(v.label||'')}; });
@@ -5070,22 +5076,22 @@ async function ensureAbout(force){
 async function renderAbout(){
   await ensureAbout();
   var a = ABOUT, wrap = el('scr-about'); if(!wrap) return;
-  var heroTitle = escHtml(a.hero.title||'').replace(/\n/g,'<br>');
+  var heroTitle = escHtml(heroF('title')).replace(/\n/g,'<br>');
   var values = (a.values||[]).map(function(v){ return '<div class="card" style="padding:22px;border-color:rgba(37,99,235,.12)"><div style="font-size:26px;margin-bottom:10px">'+(v.icon||'✦')+'</div><div style="font-size:15px;font-weight:800;margin-bottom:6px">'+escHtml(v.title||'')+'</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+escHtml(v.text||'')+'</div></div>'; }).join('');
   var diffs = (a.differentiators||[]).map(function(d,i){ return '<div style="display:flex;gap:16px;align-items:flex-start;padding:18px 0;border-top:1px solid var(--border)"><div style="font-size:14px;font-weight:900;color:#2563eb;min-width:34px">0'+(i+1)+'</div><div><div style="font-size:16px;font-weight:800;margin-bottom:4px">'+escHtml(d.title||'')+'</div><div style="font-size:13.5px;color:var(--text-secondary);line-height:1.65">'+escHtml(d.text||'')+'</div></div></div>'; }).join('');
   var stats = (a.stats||[]).map(function(s){ return '<div style="text-align:center;flex:1;min-width:120px"><div style="font-size:30px;font-weight:900;background:linear-gradient(135deg,#2563eb,#16a34a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">'+escHtml(s.value||'')+'</div><div style="font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:4px">'+escHtml(s.label||'')+'</div></div>'; }).join('');
   wrap.innerHTML = '<div class="wrap">'
     + '<div class="card" style="padding:54px 40px;margin-bottom:22px;text-align:center;background:linear-gradient(160deg,rgba(37,99,235,.07),rgba(22,163,74,.04));border-color:rgba(37,99,235,.18)">'
-    +   '<div style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;background:rgba(37,99,235,.10);padding:6px 14px;border-radius:20px;margin-bottom:18px">'+escHtml(a.hero.badge||'')+'</div>'
+    +   '<div style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:1px;color:#2563eb;background:rgba(37,99,235,.10);padding:6px 14px;border-radius:20px;margin-bottom:18px">'+escHtml(heroF('badge'))+'</div>'
     +   '<h1 style="font-size:38px;line-height:1.15;font-weight:900;margin:0 0 16px;letter-spacing:-.5px">'+heroTitle+'</h1>'
-    +   '<p style="font-size:16px;color:var(--text-secondary);max-width:680px;margin:0 auto 8px;line-height:1.6">'+escHtml(a.hero.subtitle||'')+'</p>'
-    +   '<p style="font-size:14px;color:var(--text-muted);max-width:640px;margin:0 auto;line-height:1.6">'+escHtml(a.hero.description||'')+'</p>'
+    +   '<p style="font-size:16px;color:var(--text-secondary);max-width:680px;margin:0 auto 8px;line-height:1.6">'+escHtml(heroF('subtitle'))+'</p>'
+    +   '<p style="font-size:14px;color:var(--text-muted);max-width:640px;margin:0 auto;line-height:1.6">'+escHtml(heroF('description'))+'</p>'
     + '</div>'
     + (stats ? '<div class="card" style="padding:26px;margin-bottom:22px;display:flex;gap:18px;flex-wrap:wrap;justify-content:space-around">'+stats+'</div>' : '')
-    + (a.whoWeAre ? '<div class="card" style="padding:32px;margin-bottom:22px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:12px">BİZ KİMİZ</div><div style="font-size:15.5px;color:var(--text-secondary);line-height:1.8">'+escHtml(a.whoWeAre).replace(/\n/g,'<br><br>')+'</div></div>' : '')
+    + (aboutTxt('whoWeAre') ? '<div class="card" style="padding:32px;margin-bottom:22px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:12px">'+t('about.who_label','BİZ KİMİZ')+'</div><div style="font-size:15.5px;color:var(--text-secondary);line-height:1.8">'+escHtml(aboutTxt('whoWeAre')).replace(/\n/g,'<br><br>')+'</div></div>' : '')
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-bottom:22px">'
-    +   '<div class="card" style="padding:28px;border-top:3px solid #2563eb"><div style="font-size:22px;margin-bottom:10px">🎯</div><div style="font-size:17px;font-weight:800;margin-bottom:8px">Misyonumuz</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7">'+escHtml(a.mission||'')+'</div></div>'
-    +   '<div class="card" style="padding:28px;border-top:3px solid #16a34a"><div style="font-size:22px;margin-bottom:10px">🚀</div><div style="font-size:17px;font-weight:800;margin-bottom:8px">Vizyonumuz</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7">'+escHtml(a.vision||'')+'</div></div>'
+    +   '<div class="card" style="padding:28px;border-top:3px solid #2563eb"><div style="font-size:22px;margin-bottom:10px">🎯</div><div style="font-size:17px;font-weight:800;margin-bottom:8px">'+t('about.mission','Misyonumuz')+'</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7">'+escHtml(aboutTxt('mission'))+'</div></div>'
+    +   '<div class="card" style="padding:28px;border-top:3px solid #16a34a"><div style="font-size:22px;margin-bottom:10px">🚀</div><div style="font-size:17px;font-weight:800;margin-bottom:8px">'+t('about.vision','Vizyonumuz')+'</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7">'+escHtml(aboutTxt('vision'))+'</div></div>'
     + '</div>'
     + (values ? '<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:14px;text-align:center">İLKELERİMİZ</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:22px">'+values+'</div></div>' : '')
     + (diffs ? '<div class="card" style="padding:32px;margin-bottom:22px"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:6px">NEDEN FARKLIYIZ</div>'+diffs+'</div>' : '')
@@ -5178,6 +5184,14 @@ function _openAboutEditor(){
     + lbl('Biz Kimiz (paragraf arası için boş satır)') + ta('abe-who', a.whoWeAre, '', 5)
     + lbl('Misyon') + ta('abe-mission', a.mission, '', 3)
     + lbl('Vizyon') + ta('abe-vision', a.vision, '', 3)
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#16a34a;margin:16px 0 10px">🌐 İNGİLİZCE (EN) — opsiyonel; boş bırakılırsa o alanda TR gösterilir</div>'
+    + lbl('Badge (EN)') + inp('abe-badge-en', (a.hero_en&&a.hero_en.badge)||'')
+    + lbl('Title (EN)') + ta('abe-title-en', (a.hero_en&&a.hero_en.title)||'', '', 2)
+    + lbl('Subtitle (EN)') + ta('abe-subtitle-en', (a.hero_en&&a.hero_en.subtitle)||'', '', 2)
+    + lbl('Description (EN)') + ta('abe-desc-en', (a.hero_en&&a.hero_en.description)||'', '', 2)
+    + lbl('Who We Are (EN)') + ta('abe-who-en', a.whoWeAre_en||'', '', 5)
+    + lbl('Mission (EN)') + ta('abe-mission-en', a.mission_en||'', '', 3)
+    + lbl('Vision (EN)') + ta('abe-vision-en', a.vision_en||'', '', 3)
     + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#2563eb;margin:14px 0 8px">İLKELER</div><div id="abe-values"></div><button class="btn-g btn-sm" id="abe-add-value">+ İlke Ekle</button>'
     + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#2563eb;margin:14px 0 8px">FARKLILAŞTIRICILAR</div><div id="abe-diffs"></div><button class="btn-g btn-sm" id="abe-add-diff">+ Madde Ekle</button>'
     + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#2563eb;margin:14px 0 8px">İSTATİSTİKLER</div><div id="abe-stats"></div><button class="btn-g btn-sm" id="abe-add-stat">+ İstatistik Ekle</button>'
@@ -5210,6 +5224,7 @@ function _openAboutEditor(){
     var d=ABOUT_DEFAULT;
     modal.querySelector('#abe-badge').value=d.hero.badge; modal.querySelector('#abe-title').value=d.hero.title; modal.querySelector('#abe-subtitle').value=d.hero.subtitle; modal.querySelector('#abe-desc').value=d.hero.description;
     modal.querySelector('#abe-who').value=d.whoWeAre; modal.querySelector('#abe-mission').value=d.mission; modal.querySelector('#abe-vision').value=d.vision;
+    ['abe-badge-en','abe-title-en','abe-subtitle-en','abe-desc-en','abe-who-en','abe-mission-en','abe-vision-en'].forEach(function(id){ var ex=modal.querySelector('#'+id); if(ex) ex.value=''; });
     fill('#abe-values', d.values, valueRow); fill('#abe-diffs', d.differentiators, diffRow); fill('#abe-stats', d.stats, statRow);
   });
   modal.querySelector('#abe-save').addEventListener('click', async function(){
@@ -5217,6 +5232,8 @@ function _openAboutEditor(){
     var obj = {
       hero: { badge:modal.querySelector('#abe-badge').value.trim(), title:modal.querySelector('#abe-title').value, subtitle:modal.querySelector('#abe-subtitle').value.trim(), description:modal.querySelector('#abe-desc').value.trim() },
       whoWeAre: modal.querySelector('#abe-who').value, mission: modal.querySelector('#abe-mission').value.trim(), vision: modal.querySelector('#abe-vision').value.trim(),
+      hero_en: { badge:modal.querySelector('#abe-badge-en').value.trim(), title:modal.querySelector('#abe-title-en').value, subtitle:modal.querySelector('#abe-subtitle-en').value.trim(), description:modal.querySelector('#abe-desc-en').value.trim() },
+      whoWeAre_en: modal.querySelector('#abe-who-en').value, mission_en: modal.querySelector('#abe-mission-en').value.trim(), vision_en: modal.querySelector('#abe-vision-en').value.trim(),
       values: [].slice.call(modal.querySelectorAll('#abe-values .abe-vrow')).map(function(r){ return {icon:r.querySelector('.abe-v-icon').value.trim()||'✦', title:r.querySelector('.abe-v-title').value.trim(), text:r.querySelector('.abe-v-text').value.trim()}; }).filter(function(v){return v.title||v.text;}),
       differentiators: [].slice.call(modal.querySelectorAll('#abe-diffs .abe-drow')).map(function(r){ return {title:r.querySelector('.abe-d-title').value.trim(), text:r.querySelector('.abe-d-text').value.trim()}; }).filter(function(v){return v.title||v.text;}),
       stats: [].slice.call(modal.querySelectorAll('#abe-stats .abe-srow')).map(function(r){ return {value:r.querySelector('.abe-s-value').value.trim(), label:r.querySelector('.abe-s-label').value.trim()}; }).filter(function(v){return v.value||v.label;})
@@ -5311,10 +5328,10 @@ async function renderHome() {
 
   wrap.innerHTML = `<div class="wrap">
     <div class="hero-section card" style="padding:40px 40px 36px;margin-bottom:20px;border-color:rgba(37,99,235,.15)">
-      <div class="hero-eyebrow">${escHtml(ABOUT.hero.badge||'')}</div>
-      <h1 class="hero-title">${escHtml(ABOUT.hero.title||'').replace(/\n/g,'<br>')}</h1>
-      <p class="hero-sub">${escHtml(ABOUT.hero.subtitle||'')}</p>
-      <p class="hero-sub2">${escHtml(ABOUT.hero.description||'')}</p>
+      <div class="hero-eyebrow">${escHtml(heroF('badge'))}</div>
+      <h1 class="hero-title">${escHtml(heroF('title')).replace(/\n/g,'<br>')}</h1>
+      <p class="hero-sub">${escHtml(heroF('subtitle'))}</p>
+      <p class="hero-sub2">${escHtml(heroF('description'))}</p>
       <div class="hero-cta-row" style="display:flex;gap:10px;flex-wrap:wrap">
         ${!CUR_USER ? '<button id="home-demo-btn" style="padding:12px 26px;font-size:14px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.25),0 1px 3px rgba(37,99,235,.15);transition:all .2s">' + t('hero.cta.demo', '📅 Ücretsiz 15dk Demo İste') + '</button>' : ''}
         <button id="home-events-btn" style="padding:12px 24px;font-size:13.5px;font-weight:600;background:#fff;color:#2563eb;border:1.5px solid #2563eb;border-radius:8px;cursor:pointer;transition:all .2s">${t('hero.cta.events', 'PoC Etkinliklerini İncele →')}</button>
@@ -28949,6 +28966,9 @@ const I18N_DICT = {
     'evstat.today':        'bugün',
     'evstat.yesterday':    'dün',
     'evstat.days_ago':     'gün önce',
+    'about.who_label':     'BİZ KİMİZ',
+    'about.mission':       'Misyonumuz',
+    'about.vision':        'Vizyonumuz',
   },
   en: {
     // Hero / Home
@@ -29023,6 +29043,9 @@ const I18N_DICT = {
     'evstat.today':        'today',
     'evstat.yesterday':    'yesterday',
     'evstat.days_ago':     'days ago',
+    'about.who_label':     'WHO WE ARE',
+    'about.mission':       'Our Mission',
+    'about.vision':        'Our Vision',
   }
 };
 
