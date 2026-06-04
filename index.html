@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.82 | pochub.co -->
+<!-- PoCHub v5.83 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -684,7 +684,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.82';
+const VERSION = 'v5.83';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -919,6 +919,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.83': ['KARAR MATRISI + YONETIM PDF RAPORU — karsilastirma modalinda alici kendi onceliklerine gore agirlik verir, agirlikli karar skoru canli hesaplanir, tek tikla PDF iner. Toolbarda "🎯 Karar Matrisi" toggle > panel: her faktore 0-5 agirlik slider (degerlendirme kriterleri + Kanit Skoru + Tavsiye % + PoC->Satin Alma; yalniz veri olan faktorler) + canli siralama (🥇 kazanan, skor barlari). mxScores: faktor degerleri 0-100 normalize (kriter*20), agirlikli ortalama, eksik veri 0. generateDecisionPdf: jsPDF (lazy loadJsPDF, _sanitizeForPdf ile Latin-guvenli, ASCII-only) tek sayfa A4 "PoC Karar Raporu" — faktor x urun tablosu + agirliklar + Agirlikli Karar Skoru + Onerilen kazanan + metodoloji notu, poc-karar-raporu.pdf. UI/turetilmis — RULES degismedi.'],
   'v5.82': ['AKRAN KOHORTU (kisisellestirilmis kanit) — urun detayinda, giris yapmis musterinin KENDI sektoru ve sirket buyuklugundeki kurumlarin gercek PoC sonuclari. renderProductReviews icinde, zaten cekilen reviews uzerinden hesaplanir (yeni okuma/rules yok). Iki lens: <sektor> sektoru + <buyukluk>; her biri icin n, Tavsiye %, Satin Alma %, Puan — genel ortalamaya gore Δ (▲/▼) ok ile. Panel "👥 SENIN AKRAN KOHORTUN" (cohort > Win/Loss > bireysel sirasinda). Profilinde sektor/buyukluk olmayan musteriye nazik nudge (profilini tamamla). Vendor/eslesme yoksa gizli. CUR_PROFILE.sector/.companySize kullanir. UI/turetilmis — RULES degismedi.'],
   'v5.81': ['ANA SAYFA KANIT VITRINI — differensiyatorler artik her ziyaretciye gorunur (anonim dahil; products public-read). renderHomeda featured carouselin altina "🛡 Kanitlanmis Liderler" seridi: aktif urunler arasinda Kanit Skoru hesaplanir, en yuksek 6 urun yatay kart seridinde (kategori + 🛡 rozet + skor bari, tikla > urun detayi). Seridin sonunda gradient "🧭 PoCHub Quadrant" CTA karti. "Tumu →" katalogu Kanit Skoruna gore siralar; Quadrant CTA dogrudan katalog quadrant gorunumune dusurur (window._pendingCatView/_pendingCatSort tek-seferlik intent; readCatalogURL bunlari URL uzerine yazip uygular). Degerlendirilmis urun yoksa serit gizlenir. UI/turetilmis veri — RULES degismedi.'],
   'v5.80': ['WIN/LOSS KARAR NEDENLERI (Gartnerda olmayan veri) + Quadrant gorunurlugu. (1) Quadrant promosu: katalog grid/list gorunumunde dikkat ceken gradient afis (🧭 Haritayi Ac) — yalnizca degerlendirilmis urun varsa, kapatilabilir. (2) Win/Loss: PoC degerlendirmesinde Satin Alindi/Alinmadi secilince KARAR NEDENI sorulur (admin-yonetilebilir win/loss listeleri, pochub_config.decisionReasons). Neden review dokumanina yazilir (decisionReason — serbest alan, kural degismez). Urun detayinda (giris yapmis) KARAR ANALIZI paneli: karar veren kurumlarin %kaci satin aldi + Kazandiran/Kaybettiren nedenler bar dagilimi; her yorumda neden etiketi. Admin > Sistem Ayarlari > Karar Nedenleri editoru (iki liste ekle/cikar/duzenle/sirala). UI — RULES degismedi.'],
@@ -8115,10 +8116,12 @@ function openCompareModal(ids){
     +   '<div style="font-size:17px;font-weight:800">⚖ Ürün Karşılaştırma <span style="font-size:12px;font-weight:500;color:var(--text-muted)">('+prods.length+' ürün)</span></div>'
     +   '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
     +     '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer"><input type="checkbox" id="cmp-diff"> Sadece farkları göster</label>'
+    +     '<button id="cmp-matrix-btn" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--text-secondary)">🎯 Karar Matrisi</button>'
     +     '<button id="cmp-copy" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--text-secondary)">🔗 Bağlantıyı kopyala</button>'
     +     '<button id="cmp-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
     +   '</div>'
     + '</div>'
+    + '<div id="cmp-matrix" style="display:none;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg-elevated)"></div>'
     + '<div style="overflow:auto;flex:1"><table style="width:100%;border-collapse:collapse;min-width:'+(160+ncols*160)+'px"><thead><tr id="cmp-head" style="position:sticky;top:0;background:var(--bg-surface);z-index:3"></tr></thead><tbody id="cmp-body"></tbody></table></div>'
     + '</div>';
   document.body.appendChild(modal);
@@ -8131,6 +8134,53 @@ function openCompareModal(ids){
   function refresh(){ modal.querySelector('#cmp-body').innerHTML = buildBody(); }
   refresh();
   modal.querySelector('#cmp-diff').addEventListener('change', function(){ diffOnly=this.checked; refresh(); });
+  // v5.83: Karar Matrisi + Yönetim PDF
+  var MX_ON=false;
+  var MX_FACTORS=(function(){
+    var f=[];
+    REVIEW_CRITERIA.forEach(function(c){ if(prods.some(function(p){return p.criteriaAvg&&p.criteriaAvg[c.id];})) f.push({key:'crit:'+c.id, label:c.label, get:(function(cid){return function(p){var v=p.criteriaAvg&&p.criteriaAvg[cid]; return v?v*20:null;};})(c.id)}); });
+    if(prods.some(function(p){return computeEvidenceScore(p);})) f.push({key:'evidence', label:'Kanıt Skoru', get:function(p){var e=computeEvidenceScore(p);return e?e.score:null;}});
+    if(prods.some(function(p){return p.recommendPct!=null;})) f.push({key:'recommend', label:'Tavsiye %', get:function(p){return p.recommendPct!=null?p.recommendPct:null;}});
+    if(prods.some(function(p){return p.purchaseRate!=null;})) f.push({key:'conversion', label:'PoC → Satın Alma', get:function(p){return p.purchaseRate!=null?p.purchaseRate:null;}});
+    return f;
+  })();
+  var MX_W={}; MX_FACTORS.forEach(function(f){ MX_W[f.key]=3; });
+  function mxScores(){
+    var totW=MX_FACTORS.reduce(function(a,f){return a+(MX_W[f.key]||0);},0);
+    return prods.map(function(p){ var s=0; MX_FACTORS.forEach(function(f){ var w=MX_W[f.key]||0; if(!w) return; var v=f.get(p); s+=w*(v==null?0:v); }); return {p:p, score: totW>0?Math.round(s/totW):0}; });
+  }
+  function mxRankHtml(){
+    var scores=mxScores(); var maxS=Math.max.apply(null, scores.map(function(s){return s.score;}).concat([1]));
+    return scores.slice().sort(function(a,b){return b.score-a.score;}).map(function(s,i){
+      var c=evidenceColor(s.score); var win=i===0&&s.score>0;
+      return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">'
+        + '<div style="flex:0 0 150px;font-size:12.5px;font-weight:'+(win?'800':'600')+';color:'+(win?'#16a34a':'var(--text)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(win?'🥇 ':(i+1)+'. ')+escHtml(s.p.name||'')+'</div>'
+        + '<div style="flex:1;height:8px;background:var(--bg-surface);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+Math.round(s.score/maxS*100)+'%;background:'+c+'"></div></div>'
+        + '<div style="flex:0 0 34px;text-align:right;font-size:13px;font-weight:900;color:'+c+'">'+s.score+'</div></div>';
+    }).join('');
+  }
+  function renderMatrix(){
+    var host=modal.querySelector('#cmp-matrix'); if(!host) return;
+    if(!MX_FACTORS.length){ host.innerHTML='<div style="font-size:12.5px;color:var(--text-muted)">Karar matrisi için puanlı (PoC değerlendirmesi olan) ürün gerekiyor. Seçili ürünlerde henüz yeterli veri yok.</div>'; return; }
+    var ctrls=MX_FACTORS.map(function(f){
+      return '<div class="mx-row" style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="flex:0 0 150px;font-size:12px;color:var(--text-secondary)">'+escHtml(f.label)+'</div>'
+        + '<input type="range" class="mx-w" data-k="'+f.key+'" min="0" max="5" step="1" value="'+(MX_W[f.key]||0)+'" style="flex:1">'
+        + '<div class="mx-wv" style="flex:0 0 16px;text-align:right;font-size:12px;font-weight:700;color:var(--text)">'+(MX_W[f.key]||0)+'</div></div>';
+    }).join('');
+    host.innerHTML = '<div style="display:flex;gap:24px;flex-wrap:wrap">'
+      + '<div style="flex:1;min-width:260px"><div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">ÖNCELİK AĞIRLIKLARI (0–5)</div>'+ctrls+'</div>'
+      + '<div style="flex:1;min-width:260px"><div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">AĞIRLIKLI KARAR SKORU</div><div id="mx-rank">'+mxRankHtml()+'</div></div>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap"><div style="font-size:11px;color:var(--text-muted);max-width:560px;line-height:1.5">Skorlar gerçek PoC verisinden türetilir (kriter puanları, Kanıt Skoru, tavsiye, satın alma); eksik veri 0 sayılır. Ağırlıkları önceliklerine göre ayarla.</div>'
+      + '<button id="mx-pdf" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap">📄 Yönetim PDF Raporu</button></div>';
+    host.querySelectorAll('.mx-w').forEach(function(r){ r.addEventListener('input', function(){ MX_W[this.dataset.k]=Number(this.value); this.parentNode.querySelector('.mx-wv').textContent=this.value; var rk=modal.querySelector('#mx-rank'); if(rk) rk.innerHTML=mxRankHtml(); }); });
+    var pb=host.querySelector('#mx-pdf'); if(pb) pb.addEventListener('click', function(){ generateDecisionPdf(prods, MX_FACTORS, MX_W, mxScores()); });
+  }
+  modal.querySelector('#cmp-matrix-btn').addEventListener('click', function(){
+    MX_ON=!MX_ON; var h=modal.querySelector('#cmp-matrix'); h.style.display=MX_ON?'block':'none';
+    this.style.background=MX_ON?'#2563eb':'var(--bg-elevated)'; this.style.color=MX_ON?'#fff':'var(--text-secondary)';
+    if(MX_ON) renderMatrix();
+  });
   modal.querySelector('#cmp-close').addEventListener('click', function(){ modal.remove(); });
   modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
   modal.querySelector('#cmp-copy').addEventListener('click', function(){
@@ -27471,6 +27521,46 @@ function _sanitizeForPdf(text) {
     .replace(/ş/g,'s').replace(/Ş/g,'S')
     .replace(/ö/g,'o').replace(/Ö/g,'O')
     .replace(/ç/g,'c').replace(/Ç/g,'C');
+}
+
+// v5.83: PoC Karar Raporu PDF (karar matrisi)
+async function generateDecisionPdf(prods, factors, weights, scores){
+  try {
+    await loadJsPDF();
+    if(!window.jspdf || !window.jspdf.jsPDF){ showToast('PDF kütüphanesi yüklenemedi.','err'); return; }
+    var S=_sanitizeForPdf, T=function(s,n){ s=String(s||''); return s.length>n?s.slice(0,n-1)+'.':s; };
+    var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+    var W=210, M=14, x0=M, y=20;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(18); pdf.setTextColor(20,20,20);
+    pdf.text(S('PoC Karar Raporu'), x0, y); y+=7;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(10); pdf.setTextColor(110,110,110);
+    pdf.text(S('PoCHub - kanita dayali karar matrisi   '+new Date().toLocaleDateString('tr-TR')), x0, y); y+=11;
+    var labelW=62, colW=(W-2*M-labelW)/prods.length;
+    pdf.setTextColor(20,20,20); pdf.setFont('helvetica','bold'); pdf.setFontSize(9);
+    prods.forEach(function(p,i){ pdf.text(S(T(p.name,16)), x0+labelW+i*colW, y); });
+    y+=2; pdf.setDrawColor(200,200,200); pdf.line(x0,y,W-M,y); y+=5;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5);
+    factors.forEach(function(f){
+      pdf.setTextColor(70,70,70); pdf.text(S(T(f.label,28)+'  (a:'+(weights[f.key]||0)+')'), x0, y);
+      pdf.setTextColor(20,20,20);
+      prods.forEach(function(p,i){ var v=f.get(p); pdf.text(v==null?'-':String(Math.round(v)), x0+labelW+i*colW, y); });
+      y+=5.4;
+    });
+    y+=1; pdf.setDrawColor(150,150,150); pdf.line(x0,y,W-M,y); y+=5.6;
+    var maxScore=Math.max.apply(null, scores.map(function(s){return s.score;}).concat([0]));
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(10);
+    pdf.setTextColor(20,20,20); pdf.text(S('Agirlikli Karar Skoru'), x0, y);
+    scores.forEach(function(s,i){ var win=s.score===maxScore && maxScore>0; if(win){ pdf.setTextColor(22,163,74); } else { pdf.setTextColor(20,20,20); } pdf.text(String(s.score)+(win?' *':''), x0+labelW+i*colW, y); });
+    pdf.setTextColor(20,20,20); y+=11;
+    var winner=scores.slice().sort(function(a,b){return b.score-a.score;})[0];
+    if(winner && maxScore>0){ pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(22,163,74);
+      pdf.text(S('Onerilen: '+T(winner.p.name,40)+'   ('+winner.score+'/100)'), x0, y); y+=9; }
+    pdf.setTextColor(110,110,110); pdf.setFont('helvetica','normal'); pdf.setFontSize(8);
+    var note='Skorlar gercek PoC degerlendirmelerinden turetilmistir: kriter puanlari, Kanit Skoru, tavsiye ve PoC->satin alma orani. (a:) bu rapor icin secilen oncelik agirligidir; * en yuksek skoru gosterir; eksik veri 0 sayilir. Bu rapor PoCHub uzerinde olusturulmustur - pochub.co';
+    pdf.text(pdf.splitTextToSize(S(note), W-2*M), x0, y);
+    pdf.save('poc-karar-raporu.pdf');
+    showToast('PDF raporu indirildi.');
+  } catch(e){ showToast('PDF olusturulamadi: '+((e&&e.message)||e),'err'); }
 }
 
 // Tek bir history kaydı için PDF makbuz oluştur ve indir
