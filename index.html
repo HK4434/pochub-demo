@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v5.90 | pochub.co -->
+<!-- PoCHub v5.91 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v5.90';
+const VERSION = 'v5.91';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v5.91': ['PROFIL TAMAMLAMA TESVIKI (veri-kalitesi carki) — kohort/kisisel kanit ozelliklerini besleyen veriyi artirmak icin. Musteri dashboardinda (sektor VEYA sirket buyuklugu eksikse) nazik banner: "Profilini tamamla, kisisel kaniti gor" + Profili Tamamla butonu > profil sekmesine gecer, #pf-sector alanina kaydirip odaklar. Tamamsa banner gizli. Boylece akran kohortu (urun detayi + Quadrant lensi) ve customerSector/companySize tabanli tum kanit zenginlesir. UI — RULES degismedi.'],
   'v5.90': ['KARAR RAPORU PDF ZENGINLESTIRME — yonetime sunulan PoC Karar Raporu artik sadece skor degil GEREKCE de icerir. generateDecisionPdf basinda karsilastirilan urunlerin reviewlari tek sorguda cekilir (where productId in, <=10), urun basina en cok kazandiran/kaybettiren neden hesaplanir. PDFe "Karar Gerekcesi" bolumu: her urun icin Tavsiye % + PoC->Satin Alma % (public agregalardan) + Kazandiran/Kaybettiren neden (reviewlardan). Sayfa tasmasi icin _ensure ile otomatik addPage. Boylece belge alici organizasyonunda "neden bu urun" sorusunu da yanitlar, markamizi tasir. RULES degismedi (reviews signed-in; rapor giris yapmis alici tarafindan uretilir).'],
   'v5.89': ['KATEGORI LIDERLERI — kamuya acik, Kanit Skoru siralamasi (Gartner MQin seffaf, ucretsiz, herkese acik cevabi). Yeni #leaderboard ekrani + navda "🏆 Liderler" (public). renderLeaderboard: aktif urunler (public) kategoriye gore gruplanir, yalniz degerlendirilmis olanlar Kanit Skoruna gore siralanir; kategori basina ilk 10, madalyali (🥇🥈🥉), skor bari + yerli rozeti + degerlendirme sayisi, satira tikla>urun detayi. Ust kisimda kategori cipleri (tikla>scroll). Quadrant CTA. Hero: "Kanitla belirlenen liderler — analist gorusu degil, olculmus sonuc; ucretli siralama yok". parseAndNavigate whitelistine leaderboard+about eklendi; updatePageSEO title/desc (SEO landing). Bos: kanitlanmis lider yoksa nazik durum. UI/public — RULES degismedi.'],
   'v5.88': ['QUADRANT KOHORT LENSI — harita artik "senin akran segmentin" gozuyle yeniden cizilebilir (Gartnerda imkansiz). Giris yapmis musteriye Quadrant ustunde lens segmenti: Genel / 👥 Sektorum / 👥 Buyuklugum (profilde olana gore). Kohort secilince ensureQuadCohort yalniz HARITADAKI urunlerin reviewlarini ceker (where productId in, 10luk chunk), izleyicinin sektor/buyukluk kohortuna gore filtreler, urun basina kohort agregasi hesaplar (avg/recommend/conversion/kriter). quadCohortMetric bu agregadan eksen degerlerini ve kohort Kanit Skorunu uretir; balon boyutu=kohort n, renk=kohort evidence. Onbellek imzasi (lens+attr+urun-id-seti) ile gereksiz fetch yok; eksen degisiminde refetch yok. Kohortta veri yoksa nazik bos-durum. Okuma maliyeti haritadaki urunlerle sinirli. RULES degismedi (reviews signed-in).'],
@@ -11007,6 +11008,21 @@ async function loadCustTab() {
       + '</div>'
       + welcomeRightD;
     m.appendChild(welcome);
+
+    // v5.91: Profil tamamlama teşviki (akran kohortu / kişisel kanıt için)
+    if (CUR_PROFILE && (!CUR_PROFILE.sector || !CUR_PROFILE.companySize)) {
+      var pnudge = document.createElement('div');
+      pnudge.style.cssText = 'background:linear-gradient(120deg,rgba(124,58,237,.10),rgba(37,99,235,.08));border:1px solid rgba(124,58,237,.28);border-radius:10px;padding:14px 16px;margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+      pnudge.innerHTML = '<div style="font-size:26px;line-height:1">👥</div>'
+        + '<div style="flex:1;min-width:200px"><div style="font-size:14px;font-weight:800;margin-bottom:2px">Profilini tamamla, kişisel kanıtı gör</div><div style="font-size:12.5px;color:var(--text-muted);line-height:1.5">Sektör ve şirket büyüklüğünü ekle; ürün detaylarında ve Quadrant’ta <b>senin gibi kurumların</b> gerçek PoC sonuçlarını (akran kohortu) görürsün.</div></div>'
+        + '<button id="cust-prof-nudge" style="padding:9px 16px;font-size:12.5px;font-weight:800;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;white-space:nowrap">Profili Tamamla →</button>';
+      m.appendChild(pnudge);
+      pnudge.querySelector('#cust-prof-nudge').addEventListener('click', function(){
+        CUR_CUST_TAB='profile'; loadCustTab();
+        el('scr-customer')?.querySelectorAll('.si').forEach(function(b){ b.classList.toggle('on', b.dataset.t==='profile'); });
+        setTimeout(function(){ var f=el('pf-sector'); if(f){ try{ f.scrollIntoView({behavior:'smooth',block:'center'}); f.focus(); }catch(e){} } }, 350);
+      });
+    }
 
     // ═══ v5.11: CUSTOMER ONBOARDING CHECKLIST ═══
     var custChecklistDismissed = false;
