@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.03 | pochub.co -->
+<!-- PoCHub v6.04 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.03';
+const VERSION = 'v6.04';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.04': ['i18n FAZ 3a (auth ekranlari) — giris/kayit formunun her kullanicida gorunen cekirdegi EN. renderAuthForm: baslik, rol etiketleri (Musteri/Uretici/Distributor/Entegrator), ortak alanlar (Ad Soyad/Sirket Adi/Telefon/Adres/Web/Vergi No) label+placeholder, kurumsal e-posta uyarisi, E-posta/Sifre, Gonder butonu, login/register gecis satiri t()-e sarildi + auth.* (tr/en) + common.optional dolduruldu. NOT: vendor-alt-tip bloklari (Uretici/Distributor/Entegrator detay alanlari + kategori listeleri) ve KVKK onay kutulari sonraki turda. UI — RULES degismedi.'],
   'v6.03': ['i18n SECENEK 3 TAMAM (Hakkimizda tam bilingual) — About sayfasinin kalan icerigi de iki dilli. ABOUTa values_en/differentiators_en/stats_en dizileri (satir-hizali, sadece title/text/label EN; icon ve stat value TR-ortak). valuesL()/diffsL()/statsL() locale-bilincli secer (EN bos satir > TR fallback). renderAbout bu helperlari kullanir; bolum basliklari (ILKELERIMIZ>OUR PRINCIPLES, NEDEN FARKLIYIZ>WHY WE ARE DIFFERENT) + CTA (baslik/alt/buton) t()-e sarildi. Admin editorde her ilke/farklilastiricida Title/Description (EN), her statte Label (EN) alanlari; save *_en dizilerini yazar (satir sirasiyla hizali). Boylece public landing (hero + tum Hakkimizda) tam EN. about admin-write/public-read — RULES degismedi.'],
   'v6.02': ['i18n SECENEK 3 (bilingual icerik — hero + Hakkimizda) — public landing icerigi artik iki dilli. ABOUT dokumanina opsiyonel EN katmani: hero_en{badge,title,subtitle,description} + whoWeAre_en/mission_en/vision_en. applyAbout bunlari yukler; heroF()/aboutTxt() locale-bilincli secer (EN varsa EN, yoksa TR fallback). Anasayfa hero + #about sayfasi (hero + Biz Kimiz/Misyon/Vizyon icerik ve 3 baslik) EN gosterir. Admin Biz Kimiz editorune "🌐 INGILIZCE (EN)" bolumu (7 alan) + save hero_en/*_en yazar + reset temizler. Diger About bolumleri (ilkeler/farklilastiricilar/stats) ileride ayni desenle. about dokumani admin-write/public-read — RULES degismedi.'],
   'v6.01': ['i18n FAZ 2 (public landing) — anasayfa gorunur UI etiketleri EN. Hero trust-bar (Bagimsiz PoC Degerlendirme>Independent PoC Evaluation vb.), istatistik etiketleri (Aktif Etkinlik>Active Events vb.), hero.cta.about, ve Kanit bandi (renderEvidenceStats: POCHUBDA KANIT KONUSUYOR>EVIDENCE SPEAKS AT POCHUB, sayac etiketleri, SON HAREKETLER>RECENT ACTIVITY, bugun/dun/gun once goreli zaman) t()-e sarildi + home.*/evstat.* anahtarlari EN doldu. NOT: hero metni (ABOUT.hero.*) Firestore icerigi > bilingual veri-modeli Faz 6. RULES degismedi.'],
@@ -4454,8 +4455,8 @@ function closeModal() {
 }
 
 function renderAuthForm() {
-  const roleLabels = {customer:'Müşteri', vendor: AUTH_VTYPE==='ureticid'?'Üretici':AUTH_VTYPE==='distributor'?'Distribütör':AUTH_VTYPE==='integrator'?'Entegratör':'Vendor', admin:'Admin'};
-  el('auth-title').textContent = (AUTH_MODE==='login'?'Giriş Yap':'Kayıt Ol') + ' — ' + (roleLabels[AUTH_ROLE]||AUTH_ROLE);
+  const roleLabels = {customer:t('auth.role_customer','Müşteri'), vendor: AUTH_VTYPE==='ureticid'?t('auth.role_manufacturer','Üretici'):AUTH_VTYPE==='distributor'?t('auth.role_distributor','Distribütör'):AUTH_VTYPE==='integrator'?t('auth.role_integrator','Entegratör'):'Vendor', admin:'Admin'};
+  el('auth-title').textContent = (AUTH_MODE==='login'?t('auth.login','Giriş Yap'):t('auth.register','Kayıt Ol')) + ' — ' + (roleLabels[AUTH_ROLE]||AUTH_ROLE);
 
   let html = '';
 
@@ -4469,12 +4470,12 @@ function renderAuthForm() {
 
   if (AUTH_MODE === 'register') {
     // ── Ortak temel alanlar ──────────────────────────────────────────
-    html += `<label class="lbl">Ad Soyad <span class="t-red">*</span></label><input class="inp" id="a-name" placeholder="Ad Soyad (zorunlu)"><br>`;
-    html += `<label class="lbl">Şirket Adı <span class="t-red">*</span></label><input class="inp" id="a-company" placeholder="Şirket adı (zorunlu)"><br>`;
-    html += `<label class="lbl">Şirket Telefonu <span class="t-red">*</span></label><input class="inp" id="a-phone" placeholder="+90 212 xxx xx xx (zorunlu)"><br>`;
-    html += `<label class="lbl">Şirket Adresi <span class="t-red">*</span></label><textarea class="inp" id="a-address" rows="2" placeholder="Mahalle, Sokak No, İlçe, İl (zorunlu)" style="resize:none"></textarea><br>`;
-    html += `<label class="lbl">Şirket Web Sitesi <span class="muted-fs11">(opsiyonel)</span></label><input class="inp" id="a-website" placeholder="https://www.sirket.com"><br>`;
-    html += `<label class="lbl">Vergi No / TC No <span class="muted-fs11">(opsiyonel)</span></label><input class="inp" id="a-taxno" placeholder="Vergi kimlik numarası"><br>`;
+    html += `<label class="lbl">${t('auth.fullname','Ad Soyad')} <span class="t-red">*</span></label><input class="inp" id="a-name" placeholder="${t('auth.fullname_ph','Ad Soyad (zorunlu)')}"><br>`;
+    html += `<label class="lbl">${t('auth.company','Şirket Adı')} <span class="t-red">*</span></label><input class="inp" id="a-company" placeholder="${t('auth.company_ph','Şirket adı (zorunlu)')}"><br>`;
+    html += `<label class="lbl">${t('auth.phone','Şirket Telefonu')} <span class="t-red">*</span></label><input class="inp" id="a-phone" placeholder="+90 212 xxx xx xx"><br>`;
+    html += `<label class="lbl">${t('auth.address','Şirket Adresi')} <span class="t-red">*</span></label><textarea class="inp" id="a-address" rows="2" placeholder="${t('auth.address_ph','Mahalle, Sokak No, İlçe, İl')}" style="resize:none"></textarea><br>`;
+    html += `<label class="lbl">${t('auth.website','Şirket Web Sitesi')} <span class="muted-fs11">(${t('common.optional','opsiyonel')})</span></label><input class="inp" id="a-website" placeholder="https://www.sirket.com"><br>`;
+    html += `<label class="lbl">${t('auth.taxno','Vergi No / TC No')} <span class="muted-fs11">(${t('common.optional','opsiyonel')})</span></label><input class="inp" id="a-taxno" placeholder="${t('auth.taxno_ph','Vergi kimlik numarası')}"><br>`;
 
     // ── ÜRETİCİ'ye özel alanlar ──────────────────────────────────────
     if (AUTH_VTYPE === 'ureticid') {
@@ -4566,10 +4567,10 @@ function renderAuthForm() {
       </div>`;
     }
 
-    html += `<div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.20);border-radius:7px;padding:10px;font-size:12px;color:#2563eb;margin-bottom:4px">ℹ Kayıt için kurumsal e-posta adresi zorunludur. (Gmail, Hotmail vb. kabul edilmez)</div>`;
+    html += `<div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.20);border-radius:7px;padding:10px;font-size:12px;color:#2563eb;margin-bottom:4px">${t('auth.corp_email_notice','ℹ Kayıt için kurumsal e-posta adresi zorunludur. (Gmail, Hotmail vb. kabul edilmez)')}</div>`;
   }
-  html += `<label class="lbl">E-posta *</label><input class="inp" id="a-email" type="email" placeholder="ornek@sirket.com"><br>`;
-  html += `<label class="lbl">Şifre *</label><input class="inp" id="a-pass" type="password" placeholder="En az 6 karakter"><br>`;
+  html += `<label class="lbl">${t('auth.email','E-posta')} *</label><input class="inp" id="a-email" type="email" placeholder="ornek@sirket.com"><br>`;
+  html += `<label class="lbl">${t('auth.password','Şifre')} *</label><input class="inp" id="a-pass" type="password" placeholder="${t('auth.password_ph','En az 6 karakter')}"><br>`;
 
   // v5.16: KVKK/GDPR Onay Kutucukları (sadece kayıt modunda)
   if (AUTH_MODE !== 'login') {
@@ -4598,11 +4599,11 @@ function renderAuthForm() {
     </div>`;
   }
 
-  html += `<button class="btn-p" id="a-submit" style="width:100%;padding:11px;font-size:14px;margin-top:16px">${AUTH_MODE==='login'?'Giriş Yap':'Kayıt Ol'}</button>`;
+  html += `<button class="btn-p" id="a-submit" style="width:100%;padding:11px;font-size:14px;margin-top:16px">${AUTH_MODE==='login'?t('auth.login','Giriş Yap'):t('auth.register','Kayıt Ol')}</button>`;
   html += `<div style="text-align:center;margin-top:12px;font-size:12.5px;color:#64748b">
-    ${AUTH_MODE==='login'?'Hesabın yok mu?':'Zaten hesabın var mı?'}
+    ${AUTH_MODE==='login'?t('auth.no_account','Hesabın yok mu?'):t('auth.have_account','Zaten hesabın var mı?')}
     <button onclick="toggleAuthMode()" style="background:none;border:none;color:#2563eb;cursor:pointer;font:inherit;font-size:12.5px">
-      ${AUTH_MODE==='login'?'Kayıt Ol':'Giriş Yap'}
+      ${AUTH_MODE==='login'?t('auth.register','Kayıt Ol'):t('auth.login','Giriş Yap')}
     </button>
   </div>`;
 
@@ -28984,6 +28985,30 @@ const I18N_DICT = {
     'about.cta_title':     'Kararını kanıtla ver.',
     'about.cta_sub':       'Gerçek ortamda test et, şeffaf karşılaştır, doğru teknolojiyi seç.',
     'about.cta_btn':       'Kataloğu Keşfet →',
+    // Auth (v6.04)
+    'auth.login':          'Giriş Yap',
+    'auth.register':       'Kayıt Ol',
+    'auth.role_customer':  'Müşteri',
+    'auth.role_manufacturer':'Üretici',
+    'auth.role_distributor':'Distribütör',
+    'auth.role_integrator':'Entegratör',
+    'auth.fullname':       'Ad Soyad',
+    'auth.fullname_ph':    'Ad Soyad (zorunlu)',
+    'auth.company':        'Şirket Adı',
+    'auth.company_ph':     'Şirket adı (zorunlu)',
+    'auth.phone':          'Şirket Telefonu',
+    'auth.address':        'Şirket Adresi',
+    'auth.address_ph':     'Mahalle, Sokak No, İlçe, İl',
+    'auth.website':        'Şirket Web Sitesi',
+    'auth.taxno':          'Vergi No / TC No',
+    'auth.taxno_ph':       'Vergi kimlik numarası',
+    'auth.corp_email_notice':'ℹ Kayıt için kurumsal e-posta adresi zorunludur. (Gmail, Hotmail vb. kabul edilmez)',
+    'auth.email':          'E-posta',
+    'auth.password':       'Şifre',
+    'auth.password_ph':    'En az 6 karakter',
+    'auth.no_account':     'Hesabın yok mu?',
+    'auth.have_account':   'Zaten hesabın var mı?',
+    'common.optional':     'opsiyonel',
   },
   en: {
     // Hero / Home
@@ -29066,6 +29091,30 @@ const I18N_DICT = {
     'about.cta_title':     'Decide with evidence.',
     'about.cta_sub':       'Test in a real environment, compare transparently, choose the right technology.',
     'about.cta_btn':       'Explore the Catalog →',
+    // Auth (v6.04)
+    'auth.login':          'Sign In',
+    'auth.register':       'Sign Up',
+    'auth.role_customer':  'Customer',
+    'auth.role_manufacturer':'Manufacturer',
+    'auth.role_distributor':'Distributor',
+    'auth.role_integrator':'Integrator',
+    'auth.fullname':       'Full Name',
+    'auth.fullname_ph':    'Full Name (required)',
+    'auth.company':        'Company Name',
+    'auth.company_ph':     'Company name (required)',
+    'auth.phone':          'Company Phone',
+    'auth.address':        'Company Address',
+    'auth.address_ph':     'District, Street No, City',
+    'auth.website':        'Company Website',
+    'auth.taxno':          'Tax No / ID No',
+    'auth.taxno_ph':       'Tax identification number',
+    'auth.corp_email_notice':'ℹ A corporate email address is required to register. (Gmail, Hotmail etc. not accepted)',
+    'auth.email':          'Email',
+    'auth.password':       'Password',
+    'auth.password_ph':    'At least 6 characters',
+    'auth.no_account':     'No account?',
+    'auth.have_account':   'Already have an account?',
+    'common.optional':     'optional',
   }
 };
 
