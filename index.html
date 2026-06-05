@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.08 | pochub.co -->
+<!-- PoCHub v6.09 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.08';
+const VERSION = 'v6.09';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.09': ['i18n FAZ 3f (musteri PoC Taleplerim sekmesi — discrete etiketler) — baslik, 5 stat karti (Toplam Talep/Bekleyen Yanit/Tamamlanan/Reddedilen/Ort. Yanit), lokasyon etiketleri (Online/Musteri Lok./Vendor Lok./Hibrit), durum filtre cubugu (status.* anahtarlarini yeniden kullanir), yerel rStL status map (status.*-e baglandi) ve bos-durum metinleri t()-e sarildi + creq.*/loc.*/common.all/common.clear_filters (tr/en). NOT: kart-ici interpolated goreli-zaman/rozet cumleleri bir sonraki dilimde. UI — RULES degismedi.'],
   'v6.08': ['i18n FAZ 3e (musteri dashboard istatistik kartlari + onboarding) — 8 stat karti etiketi (Aktif PoC/Bekleyen Teklif/Yeni Davet/Yaklasan Etkinlik/Toplam Yatirim/Bekleyen Tutar/Aktif Vendor/Tamamlanan PoC), alt-etiketler (bekliyor/revizyon/Yanit bekleniyor/kabul) ve onboarding adimlari (E-postani dogrula/Profilini tamamla/Ilk PoC/aksiyon linkleri) t()-e sarildi + cust.st_*/s_*/onb_* (tr/en). UI — RULES degismedi.'],
   'v6.07': ['i18n FAZ 3d (musteri dashboard genel-bakis dilimi) — karsilama (Gunaydin/Iyi gunler/aksamlar/geceler), "X aksiyon bekliyor" rozeti (musteri+vendor), acil aksiyon etiketleri (Davet/Teklif suresi yakin-doldu, Revizyon bekleniyor, PoC 3+ gun yanitsiz) ve onboarding ipuclari (Ilk PoC olustur / Teklif kabul et) t()-e sarildi + cust.* (tr/en). Dashboard sekme ICERIKLERI genis ve interpolated cumle yogun; surface-by-surface devam ediyor. UI — RULES degismedi.'],
   'v6.06': ['i18n FAZ 3c (durum etiketleri) — merkezi statusBadge() ve publishStatusBadge() label-lari t()-e yonlendirildi (status.<key> / pubstatus.<key>, eksikse TR fallback). Tum uygulamadaki status-pill-ler (Bekliyor/Aktif/Yayinda/Teklif Gonderildi/Tamamlandi/Iptal/Reddedildi/Kabul/Suresi Doldu/Arsiv/Taslak + zincir durumlari) tek noktadan EN. status.*/pubstatus.* (tr/en) doldu. NOT: ~20 dagumik yerel status map (stLabels/rStL/stOffL vb.) ayri; sonraki turlarda merkeze tasinacak. UI — RULES degismedi.'],
@@ -10614,8 +10615,8 @@ async function loadCustTab() {
     var reqs = rSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     reqs.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
     var rStC={pending:'#d97706',active:'#16a34a',completed:'#2563eb',rejected:'#dc2626',cancelled:'#64748b'};
-    var rStL={pending:'Bekliyor',active:'Aktif',completed:'Tamamlandı',rejected:'Reddedildi',cancelled:'İptal'};
-    var locL={online:'🌐 Online',customer:'📍 Müşteri Lok.',vendor:'🏢 Vendor Lok.',hybrid:'🔄 Hibrit'};
+    var rStL={pending:t('status.pending','Bekliyor'),active:t('status.active','Aktif'),completed:t('status.completed','Tamamlandı'),rejected:t('status.rejected','Reddedildi'),cancelled:t('status.cancelled','İptal')};
+    var locL={online:t('loc.online','🌐 Online'),customer:t('loc.customer','📍 Müşteri Lok.'),vendor:t('loc.vendor','🏢 Vendor Lok.'),hybrid:t('loc.hybrid','🔄 Hibrit')};
 
     // ── v4.58: İSTATİSTİK + İÇGÖRÜ HESAPLAMALARI ───────────────
     var nowMsRq = Date.now();
@@ -10744,7 +10745,7 @@ async function loadCustTab() {
       var hdr = document.createElement('div');
       hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
       hdr.innerHTML = '<div class="flx-c-g10">'
-        + '<h2 class="fs18-fw7">📋 PoC Taleplerim</h2>'
+        + '<h2 class="fs18-fw7">'+t('creq.title','📋 PoC Taleplerim')+'</h2>'
         + '<span class="txt-muted-12">'+statsRq.total+' toplam · '+statsRq.pending+' bekleyen · '+statsRq.active+' aktif</span></div>'
         + '<button class="btn-p btn-sm" id="rq-go-catalog">+ Katalogdan Başvur</button>';
       m.appendChild(hdr);
@@ -10754,13 +10755,13 @@ async function loadCustTab() {
       var statsRowRq = document.createElement('div');
       statsRowRq.className = 'stat-grid';
       var statCardsRq = [
-        ['Toplam Talep',   statsRq.total,                                       '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
-        ['Bekleyen Yanıt', statsRq.pending,                                     statsRq.pending>0?'#d97706':'#64748b', statsRq.pending>0?'rgba(217,119,6,.08)':'rgba(90,98,120,.06)', statsRq.pending>0?'rgba(217,119,6,.2)':'rgba(90,98,120,.18)'],
+        [t('creq.st_total','Toplam Talep'),   statsRq.total,                                       '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
+        [t('creq.st_pending','Bekleyen Yanıt'), statsRq.pending,                                     statsRq.pending>0?'#d97706':'#64748b', statsRq.pending>0?'rgba(217,119,6,.08)':'rgba(90,98,120,.06)', statsRq.pending>0?'rgba(217,119,6,.2)':'rgba(90,98,120,.18)'],
         ['Aktif PoC',      statsRq.active,                                      '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-        ['Tamamlanan',     statsRq.completed,                                   '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
-        ['Reddedilen',     statsRq.rejected,                                    '#dc2626', 'rgba(220,38,38,.08)','rgba(220,38,38,.2)'],
+        [t('creq.st_completed','Tamamlanan'),     statsRq.completed,                                   '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
+        [t('creq.st_rejected','Reddedilen'),     statsRq.rejected,                                    '#dc2626', 'rgba(220,38,38,.08)','rgba(220,38,38,.2)'],
         ['Bu Ay Yeni',     statsRq.thisMonth,                                   '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
-        ['Ort. Yanıt',     avgVendorRespLabel,                                  '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
+        [t('creq.st_avg_resp','Ort. Yanıt'),     avgVendorRespLabel,                                  '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
         ['Aktif Vendor',   activeVendorsRq,                                     '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
       ];
       statCardsRq.forEach(function(s){
@@ -10904,7 +10905,7 @@ async function loadCustTab() {
       // Status filtre butonları
       var fb = document.createElement('div');
       fb.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
-      fb.innerHTML = [['','Tümü'],['pending','Bekliyor'],['active','Aktif'],['completed','Tamamlandı'],['rejected','Reddedildi']].map(function(p){
+      fb.innerHTML = [['',t('common.all','Tümü')],['pending',t('status.pending','Bekliyor')],['active',t('status.active','Aktif')],['completed',t('status.completed','Tamamlandı')],['rejected',t('status.rejected','Reddedildi')]].map(function(p){
         return '<button class="rqf btn-'+(fs===p[0]?'p':'g')+' btn-sm fs12" data-v="'+p[0]+'">'+p[1]+'</button>';
       }).join('');
       m.appendChild(fb);
@@ -10916,8 +10917,8 @@ async function loadCustTab() {
           emptyDiv.innerHTML = renderEmpty({
             emoji: '🔍',
             title: 'Sonuç bulunamadı',
-            desc: 'Aramanızla eşleşen PoC talebi yok. Filtre ayarlarını değiştirin veya tümünü görüntüleyin.',
-            ctaText: 'Tüm Filtreleri Temizle'
+            desc: t('creq.empty_search','Aramanızla eşleşen PoC talebi yok. Filtre ayarlarını değiştirin veya tümünü görüntüleyin.'),
+            ctaText: t('common.clear_filters','Tüm Filtreleri Temizle')
           });
           emptyDiv.querySelector('[data-empty-cta]')?.addEventListener('click', function(){
             si.value = '';
@@ -10927,7 +10928,7 @@ async function loadCustTab() {
           emptyDiv.innerHTML = renderEmpty({
             emoji: '🚀',
             title: t('cust.onb_first_poc','İlk PoC talebini oluştur'),
-            desc: 'Henüz hiç PoC talebin yok. Katalogdan ürün seç, vendor\'lardan teklif al ve en uygun çözümü değerlendir.',
+            desc: t('creq.empty_none','Henüz hiç PoC talebin yok. Katalogdan ürün seç, vendorlardan teklif al ve en uygun çözümü değerlendir.'),
             ctaText: 'Katalog\'a Git'
           });
           emptyDiv.querySelector('[data-empty-cta]')?.addEventListener('click', function(){
@@ -29052,6 +29053,11 @@ const I18N_DICT = {
     'cust.s_waiting':'bekliyor','cust.s_revision':'revizyon','cust.s_awaiting_response':'Yanıt bekleniyor','cust.s_accepted':'kabul',
     'cust.onb_verify_email':'E-postanı doğrula','cust.onb_complete_profile':'Profilini tamamla (foto + iş bilgileri)',
     'cust.onb_a_profile':'→ Profilim','cust.onb_a_catalog':'→ Kataloğa Git','cust.onb_a_offers':'→ Teklifler',
+    'common.all':'Tümü','common.clear_filters':'Tüm Filtreleri Temizle',
+    'loc.online':'🌐 Online','loc.customer':'📍 Müşteri Lok.','loc.vendor':'🏢 Vendor Lok.','loc.hybrid':'🔄 Hibrit',
+    'creq.title':'📋 PoC Taleplerim','creq.st_total':'Toplam Talep','creq.st_pending':'Bekleyen Yanıt','creq.st_completed':'Tamamlanan','creq.st_rejected':'Reddedilen','creq.st_avg_resp':'Ort. Yanıt',
+    'creq.empty_search':'Aramanızla eşleşen PoC talebi yok. Filtre ayarlarını değiştirin veya tümünü görüntüleyin.',
+    'creq.empty_none':'Henüz hiç PoC talebin yok. Katalogdan ürün seç, vendorlardan teklif al ve en uygun çözümü değerlendir.',
   },
   en: {
     // Hero / Home
@@ -29197,6 +29203,11 @@ const I18N_DICT = {
     'cust.s_waiting':'waiting','cust.s_revision':'revision','cust.s_awaiting_response':'Awaiting response','cust.s_accepted':'accepted',
     'cust.onb_verify_email':'Verify your email','cust.onb_complete_profile':'Complete your profile (photo + job info)',
     'cust.onb_a_profile':'→ My Profile','cust.onb_a_catalog':'→ Go to Catalog','cust.onb_a_offers':'→ Offers',
+    'common.all':'All','common.clear_filters':'Clear All Filters',
+    'loc.online':'🌐 Online','loc.customer':'📍 Customer Loc.','loc.vendor':'🏢 Vendor Loc.','loc.hybrid':'🔄 Hybrid',
+    'creq.title':'📋 My PoC Requests','creq.st_total':'Total Requests','creq.st_pending':'Pending Response','creq.st_completed':'Completed','creq.st_rejected':'Rejected','creq.st_avg_resp':'Avg. Response',
+    'creq.empty_search':'No PoC requests match your search. Adjust the filters or view all.',
+    'creq.empty_none':'You have no PoC requests yet. Pick a product from the catalog, get offers from vendors, and evaluate the best fit.',
   }
 };
 
