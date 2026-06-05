@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.09 | pochub.co -->
+<!-- PoCHub v6.10 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.09';
+const VERSION = 'v6.10';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.10': ['i18n FAZ 3g (musteri PoC Taleplerim — kart-ici interpolated) — goreli zaman (dakika/saat/gun/ay once), tarih rozetleri (X gun once gecti / X gun sonra), performans rozetleri (Hizli Yanit/Aktif) ve vendor guven ipucu t()-e sarildi. Yeniden kullanilabilir time.* anahtarlari (min_ago/hour_ago/day_ago/month_ago/hours/days) + creq.* rozet/ipucu (tr/en). NOT: time.* diger sekmelerdeki goreli-zamanlarda da kullanilacak. UI — RULES degismedi.'],
   'v6.09': ['i18n FAZ 3f (musteri PoC Taleplerim sekmesi — discrete etiketler) — baslik, 5 stat karti (Toplam Talep/Bekleyen Yanit/Tamamlanan/Reddedilen/Ort. Yanit), lokasyon etiketleri (Online/Musteri Lok./Vendor Lok./Hibrit), durum filtre cubugu (status.* anahtarlarini yeniden kullanir), yerel rStL status map (status.*-e baglandi) ve bos-durum metinleri t()-e sarildi + creq.*/loc.*/common.all/common.clear_filters (tr/en). NOT: kart-ici interpolated goreli-zaman/rozet cumleleri bir sonraki dilimde. UI — RULES degismedi.'],
   'v6.08': ['i18n FAZ 3e (musteri dashboard istatistik kartlari + onboarding) — 8 stat karti etiketi (Aktif PoC/Bekleyen Teklif/Yeni Davet/Yaklasan Etkinlik/Toplam Yatirim/Bekleyen Tutar/Aktif Vendor/Tamamlanan PoC), alt-etiketler (bekliyor/revizyon/Yanit bekleniyor/kabul) ve onboarding adimlari (E-postani dogrula/Profilini tamamla/Ilk PoC/aksiyon linkleri) t()-e sarildi + cust.st_*/s_*/onb_* (tr/en). UI — RULES degismedi.'],
   'v6.07': ['i18n FAZ 3d (musteri dashboard genel-bakis dilimi) — karsilama (Gunaydin/Iyi gunler/aksamlar/geceler), "X aksiyon bekliyor" rozeti (musteri+vendor), acil aksiyon etiketleri (Davet/Teklif suresi yakin-doldu, Revizyon bekleniyor, PoC 3+ gun yanitsiz) ve onboarding ipuclari (Ilk PoC olustur / Teklif kabul et) t()-e sarildi + cust.* (tr/en). Dashboard sekme ICERIKLERI genis ve interpolated cumle yogun; surface-by-surface devam ediyor. UI — RULES degismedi.'],
@@ -10971,9 +10972,9 @@ async function loadCustTab() {
             var diffMs = p2.getTime() - nowMsRq;
             var diffDays = Math.ceil(diffMs/86400000);
             if (diffMs < 0) {
-              waitBadge = '<div class="tier-badge bg-red-pad-mt4">⏰ Tarih '+Math.abs(diffDays)+' gün önce geçti</div>';
+              waitBadge = '<div class="tier-badge bg-red-pad-mt4">'+t('creq.date_passed1','⏰ Tarih ')+Math.abs(diffDays)+t('creq.date_passed2',' gün önce geçti')+'</div>';
             } else if (diffDays <= 3) {
-              waitBadge = '<div class="tier-badge bg-amb-pad-mt4">📅 '+diffDays+' gün sonra</div>';
+              waitBadge = '<div class="tier-badge bg-amb-pad-mt4">📅 '+diffDays+t('creq.days_later',' gün sonra')+'</div>';
             }
           }
         }
@@ -10982,17 +10983,17 @@ async function loadCustTab() {
         if (r.status !== 'pending' && r.acceptedAt?.seconds && r.createdAt?.seconds) {
           var respHrR = (r.acceptedAt.seconds - r.createdAt.seconds)/3600;
           if (respHrR < 24) {
-            perfBadgeRq = ' <span class="stat-badge-sm bg-grn-pad" title="Vendor 24 saat içinde yanıtladı">🔥 Hızlı Yanıt</span>';
+            perfBadgeRq = ' <span class="stat-badge-sm bg-grn-pad" title="Vendor 24 saat içinde yanıtladı">'+t('creq.fast_response','🔥 Hızlı Yanıt')+'</span>';
           } else if (respHrR < 72) {
-            perfBadgeRq = ' <span class="stat-badge-sm" style="background:rgba(37,99,235,.15);color:#2563eb" title="Vendor 1-3 günde yanıtladı">⚡ Aktif</span>';
+            perfBadgeRq = ' <span class="stat-badge-sm" style="background:rgba(37,99,235,.15);color:#2563eb" title="Vendor 1-3 günde yanıtladı">'+t('creq.active_badge','⚡ Aktif')+'</span>';
           }
         }
 
         // Vendor güvenilirlik ipucu (vendor'ın bu müşteriye karşı geçmiş yanıt hızı)
         if (r.status === 'pending' && r.vendorName && vendorResponseTimes[r.vendorName] && vendorResponseTimes[r.vendorName].length >= 1) {
           var avgVendorHr = vendorResponseTimes[r.vendorName].reduce(function(s,h){return s+h;},0) / vendorResponseTimes[r.vendorName].length;
-          var trustLabel = avgVendorHr < 24 ? Math.round(avgVendorHr)+' saat' : Math.round(avgVendorHr/24)+' gün';
-          vendorTrustHint = '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;font-style:italic">💡 Bu vendor sana ortalama '+trustLabel+' içinde yanıtlıyor</div>';
+          var trustLabel = avgVendorHr < 24 ? Math.round(avgVendorHr)+' '+t('time.hours','saat') : Math.round(avgVendorHr/24)+' '+t('time.days','gün');
+          vendorTrustHint = '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;font-style:italic">'+t('creq.trust_hint1','💡 Bu vendor sana ortalama ')+trustLabel+t('creq.trust_hint2',' içinde yanıtlıyor')+'</div>';
         }
 
         // Geçen süre etiketi
@@ -11000,10 +11001,10 @@ async function loadCustTab() {
         if (r.createdAt?.seconds) {
           var diffMin = Math.floor((nowMsRq - r.createdAt.seconds*1000)/60000);
           var ago4;
-          if (diffMin < 60) ago4 = diffMin + ' dakika önce';
-          else if (diffMin < 1440) ago4 = Math.floor(diffMin/60) + ' saat önce';
-          else if (diffMin < 43200) ago4 = Math.floor(diffMin/1440) + ' gün önce';
-          else ago4 = Math.floor(diffMin/43200) + ' ay önce';
+          if (diffMin < 60) ago4 = diffMin + ' ' + t('time.min_ago','dakika önce');
+          else if (diffMin < 1440) ago4 = Math.floor(diffMin/60) + ' ' + t('time.hour_ago','saat önce');
+          else if (diffMin < 43200) ago4 = Math.floor(diffMin/1440) + ' ' + t('time.day_ago','gün önce');
+          else ago4 = Math.floor(diffMin/43200) + ' ' + t('time.month_ago','ay önce');
           sentAgoR = ' · 📅 '+ago4;
         }
 
@@ -29058,6 +29059,10 @@ const I18N_DICT = {
     'creq.title':'📋 PoC Taleplerim','creq.st_total':'Toplam Talep','creq.st_pending':'Bekleyen Yanıt','creq.st_completed':'Tamamlanan','creq.st_rejected':'Reddedilen','creq.st_avg_resp':'Ort. Yanıt',
     'creq.empty_search':'Aramanızla eşleşen PoC talebi yok. Filtre ayarlarını değiştirin veya tümünü görüntüleyin.',
     'creq.empty_none':'Henüz hiç PoC talebin yok. Katalogdan ürün seç, vendorlardan teklif al ve en uygun çözümü değerlendir.',
+    'time.min_ago':'dakika önce','time.hour_ago':'saat önce','time.day_ago':'gün önce','time.month_ago':'ay önce','time.hours':'saat','time.days':'gün',
+    'creq.date_passed1':'⏰ Tarih ','creq.date_passed2':' gün önce geçti','creq.days_later':' gün sonra',
+    'creq.fast_response':'🔥 Hızlı Yanıt','creq.active_badge':'⚡ Aktif',
+    'creq.trust_hint1':'💡 Bu vendor sana ortalama ','creq.trust_hint2':' içinde yanıtlıyor',
   },
   en: {
     // Hero / Home
@@ -29208,6 +29213,10 @@ const I18N_DICT = {
     'creq.title':'📋 My PoC Requests','creq.st_total':'Total Requests','creq.st_pending':'Pending Response','creq.st_completed':'Completed','creq.st_rejected':'Rejected','creq.st_avg_resp':'Avg. Response',
     'creq.empty_search':'No PoC requests match your search. Adjust the filters or view all.',
     'creq.empty_none':'You have no PoC requests yet. Pick a product from the catalog, get offers from vendors, and evaluate the best fit.',
+    'time.min_ago':'minutes ago','time.hour_ago':'hours ago','time.day_ago':'days ago','time.month_ago':'months ago','time.hours':'hours','time.days':'days',
+    'creq.date_passed1':'⏰ Date passed ','creq.date_passed2':' days ago','creq.days_later':' days later',
+    'creq.fast_response':'🔥 Fast Response','creq.active_badge':'⚡ Active',
+    'creq.trust_hint1':'💡 This vendor responds in ~','creq.trust_hint2':' on average',
   }
 };
 
