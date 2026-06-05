@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.07 | pochub.co -->
+<!-- PoCHub v6.08 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.07';
+const VERSION = 'v6.08';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.08': ['i18n FAZ 3e (musteri dashboard istatistik kartlari + onboarding) — 8 stat karti etiketi (Aktif PoC/Bekleyen Teklif/Yeni Davet/Yaklasan Etkinlik/Toplam Yatirim/Bekleyen Tutar/Aktif Vendor/Tamamlanan PoC), alt-etiketler (bekliyor/revizyon/Yanit bekleniyor/kabul) ve onboarding adimlari (E-postani dogrula/Profilini tamamla/Ilk PoC/aksiyon linkleri) t()-e sarildi + cust.st_*/s_*/onb_* (tr/en). UI — RULES degismedi.'],
   'v6.07': ['i18n FAZ 3d (musteri dashboard genel-bakis dilimi) — karsilama (Gunaydin/Iyi gunler/aksamlar/geceler), "X aksiyon bekliyor" rozeti (musteri+vendor), acil aksiyon etiketleri (Davet/Teklif suresi yakin-doldu, Revizyon bekleniyor, PoC 3+ gun yanitsiz) ve onboarding ipuclari (Ilk PoC olustur / Teklif kabul et) t()-e sarildi + cust.* (tr/en). Dashboard sekme ICERIKLERI genis ve interpolated cumle yogun; surface-by-surface devam ediyor. UI — RULES degismedi.'],
   'v6.06': ['i18n FAZ 3c (durum etiketleri) — merkezi statusBadge() ve publishStatusBadge() label-lari t()-e yonlendirildi (status.<key> / pubstatus.<key>, eksikse TR fallback). Tum uygulamadaki status-pill-ler (Bekliyor/Aktif/Yayinda/Teklif Gonderildi/Tamamlandi/Iptal/Reddedildi/Kabul/Suresi Doldu/Arsiv/Taslak + zincir durumlari) tek noktadan EN. status.*/pubstatus.* (tr/en) doldu. NOT: ~20 dagumik yerel status map (stLabels/rStL/stOffL vb.) ayri; sonraki turlarda merkeze tasinacak. UI — RULES degismedi.'],
   'v6.05': ['i18n FAZ 3b (dashboard sekmeleri) — musteri + vendor sol menu (sidebar) etiketleri EN. Musteri sekmeleri (Gelen Davetler/PoC Taleplerim/Etkinlik Kayitlarim/Teklifler/Mesajlar/Davet Et/Profilim) ve vendor sekmeleri (PoC Talepleri/Takvim/Urunlerim/Portfoyum/Reklamlarim/Etkinliklerim/Davetlerim/Tekliflerim/Mesajlar/Davet Et/Aboneligim/Cari Hesap/Profilim) t()-e sarildi; role-tag (Musteri/vtypeLabels) + panel basligi (Panelim/Vendor Paneli) da. tab.*/ctab.*/vtab.*/dash.* (tr/en) doldu. setLocale dashboardi yeniden render ettigi icin aninda gecer. UI — RULES degismedi.'],
@@ -11269,10 +11270,10 @@ async function loadCustTab() {
 
     if (!custChecklistDismissed) {
       var custChecks = [
-        { id: 'email_verified', label: 'E-postanı doğrula', done: !!(CUR_USER.emailVerified || CUR_PROFILE?.emailVerified), action: null, actionLabel: '' },
-        { id: 'profile_completed', label: 'Profilini tamamla (foto + iş bilgileri)', done: !!((CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl) && CUR_PROFILE?.jobTitle), action: 'profile_edit', actionLabel: '→ Profilim' },
-        { id: 'first_poc', label: 'İlk PoC talebini oluştur', done: pocs.length > 0, action: 'first_poc', actionLabel: '→ Katalog\'a Git' },
-        { id: 'first_accept', label: t('cust.onb_accept_offer','Bir teklifi kabul et'), done: acceptedOffers.length > 0, action: 'offers', actionLabel: '→ Teklifler' },
+        { id: 'email_verified', label: t('cust.onb_verify_email','E-postanı doğrula'), done: !!(CUR_USER.emailVerified || CUR_PROFILE?.emailVerified), action: null, actionLabel: '' },
+        { id: 'profile_completed', label: t('cust.onb_complete_profile','Profilini tamamla (foto + iş bilgileri)'), done: !!((CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl) && CUR_PROFILE?.jobTitle), action: 'profile_edit', actionLabel: t('cust.onb_a_profile','→ Profilim') },
+        { id: 'first_poc', label: t('cust.onb_first_poc','İlk PoC talebini oluştur'), done: pocs.length > 0, action: 'first_poc', actionLabel: t('cust.onb_a_catalog','→ Kataloğa Git') },
+        { id: 'first_accept', label: t('cust.onb_accept_offer','Bir teklifi kabul et'), done: acceptedOffers.length > 0, action: 'offers', actionLabel: t('cust.onb_a_offers','→ Teklifler') },
       ];
       var custDoneCount = custChecks.filter(function(c){ return c.done; }).length;
       var custTotalCount = custChecks.length;
@@ -11365,14 +11366,14 @@ async function loadCustTab() {
     var statsGridD = document.createElement('div');
     statsGridD.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px';
 
-    statsGridD.appendChild(makeCustStatCard(activePocs, 'Aktif PoC', pendingPocs?'+'+pendingPocs+' bekliyor':'', trendArrowD(thisMonthPocs, lastMonthPocs), '#16a34a','rgba(22,163,74,.07)','rgba(22,163,74,.2)','requests', {status:'active'}));
-    statsGridD.appendChild(makeCustStatCard(pendingOffers, 'Bekleyen Teklif', revisionOffers?revisionOffers+' revizyon':'', trendArrowD(thisMonthOffs, lastMonthOffs), '#2563eb','rgba(37,99,235,.07)','rgba(37,99,235,.2)','offers', {status:'pending'}));
-    statsGridD.appendChild(makeCustStatCard(pendingInvites, 'Yeni Davet', pendingInvites?'Yanıt bekleniyor':'', '', pendingInvites?'#d97706':'var(--text-muted)', pendingInvites?'rgba(217,119,6,.1)':'rgba(15,23,42,.03)', pendingInvites?'rgba(217,119,6,.3)':'var(--border)','invites'));
-    statsGridD.appendChild(makeCustStatCard(upcomingRegs, 'Yaklaşan Etkinlik', '', '', '#a855f7','rgba(168,85,247,.07)','rgba(168,85,247,.2)','registrations'));
-    statsGridD.appendChild(makeCustStatCard(totalSpentD>0?formatMoney(totalSpentD,'TRY'):'—', 'Toplam Yatırım', acceptedOffers.length+' kabul', trendArrowD(thisMonthSpent, lastMonthSpent), '#16a34a','rgba(22,163,74,.07)','rgba(22,163,74,.2)','offers', {status:'accepted'}));
-    statsGridD.appendChild(makeCustStatCard(pendingValueD>0?formatMoney(pendingValueD,'TRY'):'—', 'Bekleyen Tutar', '', '', '#d97706','rgba(217,119,6,.07)','rgba(217,119,6,.2)','offers', {status:'pending'}));
-    statsGridD.appendChild(makeCustStatCard(activeVendorsD, 'Aktif Vendor', '', '', '#a855f7','rgba(168,85,247,.05)','rgba(168,85,247,.15)','requests', {status:'active'}));
-    statsGridD.appendChild(makeCustStatCard(completedPocs, 'Tamamlanan PoC', '', trendArrowD(thisMonthCompleted, lastMonthCompleted), '#2563eb','rgba(37,99,235,.05)','rgba(37,99,235,.15)','requests', {status:'completed'}));
+    statsGridD.appendChild(makeCustStatCard(activePocs, t('cust.st_active_poc','Aktif PoC'), pendingPocs?'+'+pendingPocs+' '+t('cust.s_waiting','bekliyor'):'', trendArrowD(thisMonthPocs, lastMonthPocs), '#16a34a','rgba(22,163,74,.07)','rgba(22,163,74,.2)','requests', {status:'active'}));
+    statsGridD.appendChild(makeCustStatCard(pendingOffers, t('cust.st_pending_offer','Bekleyen Teklif'), revisionOffers?revisionOffers+' '+t('cust.s_revision','revizyon'):'', trendArrowD(thisMonthOffs, lastMonthOffs), '#2563eb','rgba(37,99,235,.07)','rgba(37,99,235,.2)','offers', {status:'pending'}));
+    statsGridD.appendChild(makeCustStatCard(pendingInvites, t('cust.st_new_invite','Yeni Davet'), pendingInvites?t('cust.s_awaiting_response','Yanıt bekleniyor'):'', '', pendingInvites?'#d97706':'var(--text-muted)', pendingInvites?'rgba(217,119,6,.1)':'rgba(15,23,42,.03)', pendingInvites?'rgba(217,119,6,.3)':'var(--border)','invites'));
+    statsGridD.appendChild(makeCustStatCard(upcomingRegs, t('cust.st_upcoming_event','Yaklaşan Etkinlik'), '', '', '#a855f7','rgba(168,85,247,.07)','rgba(168,85,247,.2)','registrations'));
+    statsGridD.appendChild(makeCustStatCard(totalSpentD>0?formatMoney(totalSpentD,'TRY'):'—', t('cust.st_total_invest','Toplam Yatırım'), acceptedOffers.length+' '+t('cust.s_accepted','kabul'), trendArrowD(thisMonthSpent, lastMonthSpent), '#16a34a','rgba(22,163,74,.07)','rgba(22,163,74,.2)','offers', {status:'accepted'}));
+    statsGridD.appendChild(makeCustStatCard(pendingValueD>0?formatMoney(pendingValueD,'TRY'):'—', t('cust.st_pending_amount','Bekleyen Tutar'), '', '', '#d97706','rgba(217,119,6,.07)','rgba(217,119,6,.2)','offers', {status:'pending'}));
+    statsGridD.appendChild(makeCustStatCard(activeVendorsD, t('cust.st_active_vendor','Aktif Vendor'), '', '', '#a855f7','rgba(168,85,247,.05)','rgba(168,85,247,.15)','requests', {status:'active'}));
+    statsGridD.appendChild(makeCustStatCard(completedPocs, t('cust.st_completed_poc','Tamamlanan PoC'), '', trendArrowD(thisMonthCompleted, lastMonthCompleted), '#2563eb','rgba(37,99,235,.05)','rgba(37,99,235,.15)','requests', {status:'completed'}));
     m.appendChild(statsGridD);
 
     // ═══ v4.60: 🚨 ACİL AKSİYONLAR BANNER ═══
@@ -29046,6 +29047,11 @@ const I18N_DICT = {
     'cust.act_invite_soon':'📨 Davet süresi yakın','cust.act_invite_expired':'📨 Davet süresi doldu',
     'cust.act_offer_soon':'💰 Teklif süresi yakın','cust.act_revision':'↩ Revizyon yanıtı bekleniyor','cust.act_poc_idle':'📋 PoC 3+ gündür yanıtsız',
     'cust.onb_first_poc':'İlk PoC talebini oluştur','cust.onb_accept_offer':'Bir teklifi kabul et',
+    'cust.st_active_poc':'Aktif PoC','cust.st_pending_offer':'Bekleyen Teklif','cust.st_new_invite':'Yeni Davet','cust.st_upcoming_event':'Yaklaşan Etkinlik',
+    'cust.st_total_invest':'Toplam Yatırım','cust.st_pending_amount':'Bekleyen Tutar','cust.st_active_vendor':'Aktif Vendor','cust.st_completed_poc':'Tamamlanan PoC',
+    'cust.s_waiting':'bekliyor','cust.s_revision':'revizyon','cust.s_awaiting_response':'Yanıt bekleniyor','cust.s_accepted':'kabul',
+    'cust.onb_verify_email':'E-postanı doğrula','cust.onb_complete_profile':'Profilini tamamla (foto + iş bilgileri)',
+    'cust.onb_a_profile':'→ Profilim','cust.onb_a_catalog':'→ Kataloğa Git','cust.onb_a_offers':'→ Teklifler',
   },
   en: {
     // Hero / Home
@@ -29186,6 +29192,11 @@ const I18N_DICT = {
     'cust.act_invite_soon':'📨 Invitation expiring','cust.act_invite_expired':'📨 Invitation expired',
     'cust.act_offer_soon':'💰 Offer expiring','cust.act_revision':'↩ Revision response awaited','cust.act_poc_idle':'📋 PoC unanswered 3+ days',
     'cust.onb_first_poc':'Create your first PoC request','cust.onb_accept_offer':'Accept an offer',
+    'cust.st_active_poc':'Active PoCs','cust.st_pending_offer':'Pending Offers','cust.st_new_invite':'New Invitations','cust.st_upcoming_event':'Upcoming Events',
+    'cust.st_total_invest':'Total Investment','cust.st_pending_amount':'Pending Amount','cust.st_active_vendor':'Active Vendors','cust.st_completed_poc':'Completed PoCs',
+    'cust.s_waiting':'waiting','cust.s_revision':'revision','cust.s_awaiting_response':'Awaiting response','cust.s_accepted':'accepted',
+    'cust.onb_verify_email':'Verify your email','cust.onb_complete_profile':'Complete your profile (photo + job info)',
+    'cust.onb_a_profile':'→ My Profile','cust.onb_a_catalog':'→ Go to Catalog','cust.onb_a_offers':'→ Offers',
   }
 };
 
