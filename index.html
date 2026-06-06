@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.10 | pochub.co -->
+<!-- PoCHub v6.11 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.10';
+const VERSION = 'v6.11';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.11': ['i18n FAZ 3h (musteri Gelen Davetler sekmesi) — stLabels (Yanit Bekliyor/Kabul Edildi/Reddedildi/Suresi Doldu; status.* yeniden kullanildi), 5 stat karti (Toplam Davet/Bekleyen Yanit/Kabul Ettigim/Reddettigim/Kabul Oranim), durum filtre cubugu, arama placeholder, bos-durum (arama yok / henuz davet yok) ve toast mesajlari (Kabul/Red/yukleniyor/hata) t()-e sarildi + inv.* + common.no_search_results (tr/en). NOT: icgoru kartlari (En cok davet PoC tipi/alan, Ort. karar suresi) + kart-ici detay sonraki dilim. UI — RULES degismedi.'],
   'v6.10': ['i18n FAZ 3g (musteri PoC Taleplerim — kart-ici interpolated) — goreli zaman (dakika/saat/gun/ay once), tarih rozetleri (X gun once gecti / X gun sonra), performans rozetleri (Hizli Yanit/Aktif) ve vendor guven ipucu t()-e sarildi. Yeniden kullanilabilir time.* anahtarlari (min_ago/hour_ago/day_ago/month_ago/hours/days) + creq.* rozet/ipucu (tr/en). NOT: time.* diger sekmelerdeki goreli-zamanlarda da kullanilacak. UI — RULES degismedi.'],
   'v6.09': ['i18n FAZ 3f (musteri PoC Taleplerim sekmesi — discrete etiketler) — baslik, 5 stat karti (Toplam Talep/Bekleyen Yanit/Tamamlanan/Reddedilen/Ort. Yanit), lokasyon etiketleri (Online/Musteri Lok./Vendor Lok./Hibrit), durum filtre cubugu (status.* anahtarlarini yeniden kullanir), yerel rStL status map (status.*-e baglandi) ve bos-durum metinleri t()-e sarildi + creq.*/loc.*/common.all/common.clear_filters (tr/en). NOT: kart-ici interpolated goreli-zaman/rozet cumleleri bir sonraki dilimde. UI — RULES degismedi.'],
   'v6.08': ['i18n FAZ 3e (musteri dashboard istatistik kartlari + onboarding) — 8 stat karti etiketi (Aktif PoC/Bekleyen Teklif/Yeni Davet/Yaklasan Etkinlik/Toplam Yatirim/Bekleyen Tutar/Aktif Vendor/Tamamlanan PoC), alt-etiketler (bekliyor/revizyon/Yanit bekleniyor/kabul) ve onboarding adimlari (E-postani dogrula/Profilini tamamla/Ilk PoC/aksiyon linkleri) t()-e sarildi + cust.st_*/s_*/onb_* (tr/en). UI — RULES degismedi.'],
@@ -2592,7 +2593,7 @@ async function loadMessagesTab(m, role) {
             + '<div class="fs125-red-fw7" style="margin-bottom:4px">🚨 Sıra Sende — Yanıtsız Mesajlar</div>'
             + '<div class="txt-muted-12">'+unansweredList.length+' kişi senden cevap bekliyor. Hızlı yanıt müşteri memnuniyeti için kritik.</div>'
             + '</div>'
-            + '<button id="msg-unans-toggle" class="btn-danger">Listeyi Gör</button>'
+            + '<button id="msg-unans-toggle" class="btn-danger">'+t('inv.show_list','Listeyi Gör')+'</button>'
             + '</div>';
           m.appendChild(unansBanner);
 
@@ -9332,7 +9333,7 @@ async function custInvites(m) {
     invites.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
     var stColors = {pending:'#d97706', accepted:'#16a34a', declined:'#dc2626', expired:'#64748b'};
-    var stLabels = {pending:'Yanıt Bekliyor', accepted:'Kabul Edildi', declined:'Reddedildi', expired:'Süresi Doldu'};
+    var stLabels = {pending:t('inv.pending_response','Yanıt Bekliyor'), accepted:t('status.accepted','Kabul Edildi'), declined:t('status.declined','Reddedildi'), expired:t('status.expired','Süresi Doldu')};
     var pendingCount = invites.filter(function(i){ return i.status==='pending'; }).length;
 
     // ── v4.59: İSTATİSTİK + İÇGÖRÜ HESAPLAMALARI ───────────────
@@ -9488,14 +9489,14 @@ async function custInvites(m) {
       var statsRowCi = document.createElement('div');
       statsRowCi.className = 'stat-grid';
       var statCardsCi = [
-        ['Toplam Davet',   statsCi.total,    '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
-        ['Bekleyen Yanıt', statsCi.pending,  statsCi.pending>0?'#d97706':'#64748b', statsCi.pending>0?'rgba(217,119,6,.08)':'rgba(90,98,120,.06)', statsCi.pending>0?'rgba(217,119,6,.2)':'rgba(90,98,120,.18)'],
-        ['Kabul Ettiğim',  statsCi.accepted, '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-        ['Reddettiğim',    statsCi.declined, '#dc2626', 'rgba(220,38,38,.08)','rgba(220,38,38,.2)'],
+        [t('inv.st_total','Toplam Davet'),   statsCi.total,    '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
+        [t('creq.st_pending','Bekleyen Yanıt'), statsCi.pending,  statsCi.pending>0?'#d97706':'#64748b', statsCi.pending>0?'rgba(217,119,6,.08)':'rgba(90,98,120,.06)', statsCi.pending>0?'rgba(217,119,6,.2)':'rgba(90,98,120,.18)'],
+        [t('inv.st_accepted','Kabul Ettiğim'),  statsCi.accepted, '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
+        [t('inv.st_declined','Reddettiğim'),    statsCi.declined, '#dc2626', 'rgba(220,38,38,.08)','rgba(220,38,38,.2)'],
         ['Bu Ay Yeni',     statsCi.thisMonth,'#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
         ['Süresi Yakın',   expiringSoon,     expiringSoon>0?'#dc2626':'#64748b', expiringSoon>0?'rgba(220,38,38,.08)':'rgba(90,98,120,.06)', expiringSoon>0?'rgba(220,38,38,.2)':'rgba(90,98,120,.18)'],
         ['Aktif Vendor',   activeVendorsCi,  '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
-        ['Kabul Oranım',   responseDecisions>0 ? acceptRate+'%' : '—', '#16a34a', 'rgba(22,163,74,.08)','rgba(22,163,74,.2)'],
+        [t('inv.st_rate','Kabul Oranım'),   responseDecisions>0 ? acceptRate+'%' : '—', '#16a34a', 'rgba(22,163,74,.08)','rgba(22,163,74,.2)'],
       ];
       statCardsCi.forEach(function(s){
         var card = document.createElement('div');
@@ -9631,9 +9632,9 @@ async function custInvites(m) {
       // Arama + Filtreler
       var filterBar = document.createElement('div');
       filterBar.innerHTML =
-        '<input id="ci-search" class="inp" placeholder="🔍 Vendor, şirket, ürün veya kapsam ara..." value="' + (searchVal||'') + '" style="margin-bottom:10px;font-size:13px">' +
+        '<input id="ci-search" class="inp" placeholder="'+t('inv.search_ph','🔍 Vendor, şirket, ürün veya kapsam ara...')+'" value="' + (searchVal||'') + '" style="margin-bottom:10px;font-size:13px">' +
         '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
-        [['','Tümü'],['pending','Yanıt Bekliyor'],['accepted','Kabul'],['declined','Reddedildi'],['expired','Süresi Doldu']].map(function(pair) {
+        [['',t('common.all','Tümü')],['pending',t('inv.pending_response','Yanıt Bekliyor')],['accepted',t('inv.f_accept','Kabul')],['declined',t('status.declined','Reddedildi')],['expired',t('status.expired','Süresi Doldu')]].map(function(pair) {
           return '<button class="ci-filter btn-' + (filterStatus===pair[0]?'p':'g') +  ' btn-sm fs12" data-val="' + pair[0] + '">' + pair[1] + '</button>';
         }).join('') +
         '</div>';
@@ -9641,7 +9642,7 @@ async function custInvites(m) {
 
       if (!filtered.length) {
         m.innerHTML += '<div class="empty"><div class="empty-icon">📨</div>' +
-          (searchVal||filterStatus||preset ? 'Arama sonucu bulunamadı.' : 'Henüz davet almadınız.') + '</div>';
+          (searchVal||filterStatus||preset ? t('common.no_search_results','Arama sonucu bulunamadı.') : t('inv.empty_none','Henüz davet almadınız.')) + '</div>';
       } else {
         var listEl = document.createElement('div');
         listEl.style.cssText = 'display:flex;flex-direction:column;gap:12px';
@@ -9763,7 +9764,7 @@ async function custInvites(m) {
         btn.addEventListener('click', async function() {
           var row = btn.closest('.ci-actions');
           if (!row) return;
-          btn.disabled = true; btn.textContent = 'Kabul ediliyor...';
+          btn.disabled = true; btn.textContent = t('inv.accepting','Kabul ediliyor...');
           try {
             await updateDoc(doc(db,'poc_invites',row.dataset.id), {
               status:'accepted', respondedAt:serverTimestamp()
@@ -9771,7 +9772,7 @@ async function custInvites(m) {
             if (row.dataset.vid) {
               await addDoc(collection(db,'notifications'), {
                 userId:row.dataset.vid, type:'invite_accepted',
-                title:'Davet Kabul Edildi! ✨',
+                title:t('inv.toast_accepted_title','Davet Kabul Edildi! ✨'),
                 message:(CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) +
                   ' "' + row.dataset.pname + '" davetinizi kabul etti.',
                 fromUserId:CUR_USER.uid,
@@ -9779,7 +9780,7 @@ async function custInvites(m) {
                 read:false, createdAt:serverTimestamp(),
               });
             }
-            showToast('Davet kabul edildi!');
+            showToast(t('inv.toast_accepted','Davet kabul edildi!'));
             loadCustTab();
           } catch(e) { showToast('Hata: '+e.message,'err'); btn.disabled=false; btn.textContent='✓ Kabul Et'; }
         });
@@ -9798,7 +9799,7 @@ async function custInvites(m) {
             if (row.dataset.vid) {
               await addDoc(collection(db,'notifications'), {
                 userId:row.dataset.vid, type:'invite_declined',
-                title:'Davet Reddedildi',
+                title:t('inv.toast_declined_title','Davet Reddedildi'),
                 message:(CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) +
                   ' "' + row.dataset.pname + '" davetinizi reddetti.',
                 fromUserId:CUR_USER.uid,
@@ -9806,7 +9807,7 @@ async function custInvites(m) {
                 read:false, createdAt:serverTimestamp(),
               });
             }
-            showToast('Davet reddedildi.');
+            showToast(t('inv.toast_declined','Davet reddedildi.'));
             loadCustTab();
           } catch(e) { showToast('Hata: '+e.message,'err'); btn.disabled=false; }
         });
@@ -29063,6 +29064,10 @@ const I18N_DICT = {
     'creq.date_passed1':'⏰ Tarih ','creq.date_passed2':' gün önce geçti','creq.days_later':' gün sonra',
     'creq.fast_response':'🔥 Hızlı Yanıt','creq.active_badge':'⚡ Aktif',
     'creq.trust_hint1':'💡 Bu vendor sana ortalama ','creq.trust_hint2':' içinde yanıtlıyor',
+    'common.no_search_results':'Arama sonucu bulunamadı.',
+    'inv.pending_response':'Yanıt Bekliyor','inv.f_accept':'Kabul','inv.st_total':'Toplam Davet','inv.st_accepted':'Kabul Ettiğim','inv.st_declined':'Reddettiğim','inv.st_rate':'Kabul Oranım',
+    'inv.search_ph':'🔍 Vendor, şirket, ürün veya kapsam ara...','inv.empty_none':'Henüz davet almadınız.','inv.show_list':'Listeyi Gör',
+    'inv.toast_accepted_title':'Davet Kabul Edildi! ✨','inv.toast_accepted':'Davet kabul edildi!','inv.toast_declined_title':'Davet Reddedildi','inv.toast_declined':'Davet reddedildi.','inv.accepting':'Kabul ediliyor...','inv.load_error':t('inv.load_error','Davetler yüklenemedi: '),
   },
   en: {
     // Hero / Home
@@ -29217,6 +29222,10 @@ const I18N_DICT = {
     'creq.date_passed1':'⏰ Date passed ','creq.date_passed2':' days ago','creq.days_later':' days later',
     'creq.fast_response':'🔥 Fast Response','creq.active_badge':'⚡ Active',
     'creq.trust_hint1':'💡 This vendor responds in ~','creq.trust_hint2':' on average',
+    'common.no_search_results':'No search results found.',
+    'inv.pending_response':'Awaiting Response','inv.f_accept':'Accepted','inv.st_total':'Total Invitations','inv.st_accepted':'Accepted','inv.st_declined':'Declined','inv.st_rate':'Acceptance Rate',
+    'inv.search_ph':'🔍 Search vendor, company, product or scope...','inv.empty_none':'You have no invitations yet.','inv.show_list':'Show List',
+    'inv.toast_accepted_title':'Invitation Accepted! ✨','inv.toast_accepted':'Invitation accepted!','inv.toast_declined_title':'Invitation Declined','inv.toast_declined':'Invitation declined.','inv.accepting':'Accepting...','inv.load_error':'Failed to load invitations: ',
   }
 };
 
