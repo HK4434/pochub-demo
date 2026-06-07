@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.33 | pochub.co -->
+<!-- PoCHub v6.34 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.33';
+const VERSION = 'v6.34';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.34': ['i18n FAZ 5e (FORM & MODALLAR — paket-karsilastirma / openPackageBrowser) — baslik (Paket Sec), MEVCUT rozeti, Aylik/Yillik toggle + INDIRIM rozeti, fiyat birimi (/ay /yil), Ucretsiz, PoC/davet kotalari (Sinirsiz/PoC-ay/davet-ay reuse), Asan-PoC fiyati, paket butonlari (Mevcut Paketin/Ucretsiz/Bu Paketi Al), odeme notu (test karti), Free-default + zaten-mevcut toast t()-e sarildi + vpkg.* (vsub.* reuse). NOT: paket fiyat/ozellik degerleri Firestore-data. node --check + harness OK. UI — RULES degismedi.'],
   'v6.33': ['i18n FAZ 5d (FORM & MODALLAR — urun ekle/duzenle modali / openAddProductModal) — baslik+alt-baslik, bolumler (TEMEL BILGILER / MENSEI & DAGITIM), alan etiketleri (Urun Adi/Kategori/Mensei Ulke/Kisa Aciklama/Uretici URL+ipucu/Sektorler+ipucu/Destek Modeli/Urun Mensei), destek opsiyonlari (Kendi Bunyesi/Dis Kaynak/Hibrit), kategori-sec opsiyonu, dogrudan-satis + distributor alani, placeholderlar, validasyon (urun adi/kategori/form hatasi), Admin Onayina Gonder butonu (3x), toast, panel-ipuclari t()-e sarildi + vpf.* (tr/en — edit/portfoy varyantiyla paylasimli). NOT: kategori-bazli teknik ozellik alanlari Firestore-data. node --check + harness OK. UI — RULES degismedi.'],
   'v6.32': ['i18n FAZ 5c (FORM & MODALLAR — teklif degerlendirme / musteri Kabul-Red-Revizyon) — teklif karti Vendor:/PoC: onekleri, mini etiketler (Toplam/Tip/Gecerlilik — off/voff reuse), Kabul Et + Revizyon Iste butonlari, revizyon notu prompt, revizyon bildirim basligi (voff.revision) t()-e sarildi. Cogu akis zaten v6.13-te off.*-ti; bu tur kalan kart/buton/prompt parcalarini tamamladi. off.vendor_prefix/poc_prefix/revision_btn/revision_prompt (tr/en). node --check + harness OK. UI — RULES degismedi.'],
   'v6.31': ['i18n FAZ 5b (FORM & MODALLAR — teklif gonderme / openSendOfferModal) — baslik, alan etiketleri (Teklif Tipi/Faturalama/Net Tutar/Para Birimi/KDV Orani/Gecerlilik/Teslimat-Kurulum/BTK/Garanti/Teknik Destek/Ek Notlar), TOPLAM, teklif-tipi + kanal opsiyonlari, gecerlilik/teslimat/destek opsiyonlari, placeholderlar, validasyon, e-posta konusu+bildirim, gonderildi/hata toast, offerTypeLabels + vtypeLabels (auth.role_* reuse) t()-e sarildi + sof.* (tr/en). NOT: Var/Yok + %N KDV oranlari + KDVsiz opsiyonu artik (residual). node --check + harness OK. UI — RULES degismedi.'],
@@ -21902,49 +21903,49 @@ function openPackageBrowser(allPackages, cfg, currentSub, highlightPkgId) {
     var pkgsHtml = visiblePackages.map(function(p){
       var color = TIER_COLORS[p.tier] || '#2563eb';
       var displayPrice = billingMode === 'yearly' && p.yearlyPrice ? p.yearlyPrice : p.price;
-      var perLabel = billingMode === 'yearly' ? '/yıl' : '/ay';
+      var perLabel = billingMode === 'yearly' ? t('vpkg.per_year','/yıl') : t('vpkg.per_month','/ay');
       var monthlyEq = billingMode === 'yearly' && p.yearlyPrice ? Math.round(p.yearlyPrice/12) : null;
       var isHighlight = p.id === highlightPkgId;
       var isCurrent = currentSub && currentSub.currentPackageId === p.id;
 
       return '<div style="background:var(--bg-surface);border:'+(isHighlight||isCurrent?'2px':'1px')+' solid '+(isCurrent?color:isHighlight?color+'80':color+'40')+';border-radius:12px;padding:14px;position:relative;display:flex;flex-direction:column;gap:8px">'
         + (isHighlight ? '<div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:'+color+';color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px;white-space:nowrap">⭐ ÖNERİLEN</div>' : '')
-        + (isCurrent ? '<div style="position:absolute;top:-10px;right:8px;background:'+color+';color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px">MEVCUT</div>' : '')
+        + (isCurrent ? '<div style="position:absolute;top:-10px;right:8px;background:'+color+';color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px">'+t('vpkg.current_badge','MEVCUT')+'</div>' : '')
         + '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+p.tier+'</div>'
         + '<div style="font-size:18px;font-weight:800">'+p.name+'</div>'
-        + '<div><span style="font-size:24px;font-weight:800;color:'+color+'">'+(displayPrice>0?'₺'+displayPrice.toLocaleString('tr-TR'):'Ücretsiz')+'</span><span class="fs11-muted"> '+(displayPrice>0?perLabel:'')+'</span></div>'
-        + (monthlyEq ? '<div style="font-size:10.5px;color:'+color+';font-weight:600">≈ ₺'+monthlyEq.toLocaleString('tr-TR')+'/ay</div>' : '')
+        + '<div><span style="font-size:24px;font-weight:800;color:'+color+'">'+(displayPrice>0?'₺'+displayPrice.toLocaleString('tr-TR'):t('vpkg.free','Ücretsiz'))+'</span><span class="fs11-muted"> '+(displayPrice>0?perLabel:'')+'</span></div>'
+        + (monthlyEq ? '<div style="font-size:10.5px;color:'+color+';font-weight:600">≈ ₺'+monthlyEq.toLocaleString('tr-TR')+t('vpkg.per_month','/ay')+'</div>' : '')
         + '<div style="font-size:11px;color:var(--text-muted);padding:8px 0;border-top:1px solid var(--border)">'
-        +   '<div><strong>'+(p.pocQuota===-1?'Sınırsız':p.pocQuota)+'</strong> PoC/ay</div>'
+        +   '<div><strong>'+(p.pocQuota===-1?t('vsub.unlimited','Sınırsız'):p.pocQuota)+'</strong>'+t('vsub.poc_per_month',' PoC/ay')+'</div>'
         +   '<div><strong>'+(p.productLimit===-1?'∞':p.productLimit)+'</strong> ürün</div>'
-        +   '<div><strong>'+(p.inviteQuotaPerMonth===-1?'∞':p.inviteQuotaPerMonth)+'</strong> davet/ay</div>'
-        +   (p.pocOverflowPrice>0 ? '<div>Aşan: ₺'+p.pocOverflowPrice+'/PoC</div>' : '')
+        +   '<div><strong>'+(p.inviteQuotaPerMonth===-1?'∞':p.inviteQuotaPerMonth)+'</strong>'+t('vsub.invite_per_month',' davet/ay')+'</div>'
+        +   (p.pocOverflowPrice>0 ? '<div>'+t('vpkg.overflow_a','Aşan: ₺')+p.pocOverflowPrice+t('vpkg.overflow_b','/PoC')+'</div>' : '')
         + '</div>'
         + '<ul style="list-style:none;padding:0;margin:0;font-size:11.5px;display:flex;flex-direction:column;gap:4px">'
         +   (Array.isArray(p.features) ? p.features.slice(0,5).map(function(f){ return '<li style="display:flex;gap:4px"><span style="color:'+color+'">✓</span><span>'+f+'</span></li>'; }).join('') : '')
         + '</ul>'
-        + '<button class="pkg-buy" data-pkg="'+p.id+'" style="margin-top:auto;background:'+(p.tier==='free'?'transparent':color)+';color:'+(p.tier==='free'?color:'#fff')+';border:1px solid '+color+';border-radius:6px;padding:8px;font-weight:700;cursor:pointer;font-size:13px">'+(isCurrent?'Mevcut Paketin':p.tier==='free'?'Ücretsiz':'Bu Paketi Al')+'</button>'
+        + '<button class="pkg-buy" data-pkg="'+p.id+'" style="margin-top:auto;background:'+(p.tier==='free'?'transparent':color)+';color:'+(p.tier==='free'?color:'#fff')+';border:1px solid '+color+';border-radius:6px;padding:8px;font-weight:700;cursor:pointer;font-size:13px">'+(isCurrent?t('vpkg.btn_current','Mevcut Paketin'):p.tier==='free'?t('vpkg.free','Ücretsiz'):t('vpkg.btn_buy','Bu Paketi Al'))+'</button>'
         + '</div>';
     }).join('');
 
     modal.innerHTML =
       '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:1200px;width:100%;max-height:95vh;overflow-y:auto">'
       + '<div class="flx-bw-c mb16">'
-      +   '<h3 class="fs18-fw7">💎 Paket Seç</h3>'
+      +   '<h3 class="fs18-fw7">'+t('vpkg.title','💎 Paket Seç')+'</h3>'
       +   '<button id="pb-close" class="btn-trans-x">×</button>'
       + '</div>'
       // Aylık/Yıllık toggle
       + (yearlyEnabled
         ? '<div style="display:flex;justify-content:center;gap:10px;margin-bottom:18px">'
-          + '<button id="pb-monthly" class="btn-'+(billingMode==='monthly'?'p':'g')+' btn-sm">Aylık</button>'
-          + '<button id="pb-yearly" class="btn-'+(billingMode==='yearly'?'p':'g')+' btn-sm">Yıllık <span style="background:#16a34a;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:4px">%'+yearlyPercent+' İNDİRİM</span></button>'
+          + '<button id="pb-monthly" class="btn-'+(billingMode==='monthly'?'p':'g')+' btn-sm">'+t('vpkg.monthly','Aylık')+'</button>'
+          + '<button id="pb-yearly" class="btn-'+(billingMode==='yearly'?'p':'g')+' btn-sm">'+t('vpkg.yearly','Yıllık')+' <span style="background:#16a34a;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:4px">%'+yearlyPercent+t('vpkg.discount_suffix',' İNDİRİM')+'</span></button>'
           + '</div>'
         : '')
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:24px">'
       + pkgsHtml
       + '</div>'
       + '<div style="margin-top:18px;padding:12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;font-size:11.5px;color:var(--text-secondary)">'
-      +   '💡 <strong>Not:</strong> Kredi kartı (iyzico, anında aktif) veya manuel havale (24 saat onay) ile ödeme yapabilirsin. <strong>Test modu:</strong> Kart 5528 7900 0000 0008 / 12/30 / CVV 123.'
+      +   t('vpkg.note','💡 <strong>Not:</strong> Kredi kartı (iyzico, anında aktif) veya manuel havale (24 saat onay) ile ödeme yapabilirsin. <strong>Test modu:</strong> Kart 5528 7900 0000 0008 / 12/30 / CVV 123.')
       + '</div>'
       + '</div>';
   }
@@ -21960,8 +21961,8 @@ function openPackageBrowser(allPackages, cfg, currentSub, highlightPkgId) {
         var pkgId = b.dataset.pkg;
         var pkg = allPackages.find(function(p){ return p.id===pkgId; });
         if (!pkg) return;
-        if (pkg.tier === 'free') { showToast('Free plan zaten varsayılandır.','warn'); return; }
-        if (currentSub && currentSub.currentPackageId === pkgId) { showToast('Bu zaten mevcut paketin.','warn'); return; }
+        if (pkg.tier === 'free') { showToast(t('vpkg.toast_free_default','Free plan zaten varsayılandır.'),'warn'); return; }
+        if (currentSub && currentSub.currentPackageId === pkgId) { showToast(t('vpkg.toast_already_current','Bu zaten mevcut paketin.'),'warn'); return; }
         modal.remove();
         openPaymentRequestModal(pkg, billingMode, cfg);
       });
@@ -29172,6 +29173,8 @@ const I18N_DICT = {
     'vbill.loading':'Cari hesap yükleniyor...','vbill.title':'💳 Cari Hesap','vbill.subtitle':'Ödenmemiş borçlar — override PoC + öne çıkan reklam','vbill.clean':'Cari Hesabın Temiz','vbill.clean_desc':'Ödenmemiş borcun yok. PoC kabul akışın normal şekilde devam ediyor.',
     'vbill.suspended':'⛔ Hesap Askıda','vbill.threshold':'⚠️ Suspend Eşiği','vbill.debt_poc':'Borçlu PoC','vbill.open_balance':'Açık Bakiye','vbill.msg_suspended':'Tüm borçları öde, hesabın anında aktif olur.','vbill.msg_critical':'Bu eşik aşıldı! Ödeme yapılana kadar yeni PoC kabul edemezsin.','vbill.msg_threshold':' borç daha eklenince hesabın askıya alınacak.','vbill.msg_ad_debt':'Öne çıkan reklam borcun bulunuyor.',
     'vbill.pay_all':'💰 Tümünü Öde — ₺','vbill.debt_items':'Borçlu Kalemler (','vbill.featured_ad':'Öne Çıkan Reklam','vbill.pay':'💰 Öde','vbill.load_error':'Cari hesap yükleme hatası: ',
+    'vpkg.title':'💎 Paket Seç','vpkg.per_year':'/yıl','vpkg.per_month':'/ay','vpkg.current_badge':'MEVCUT','vpkg.free':'Ücretsiz','vpkg.overflow_a':'Aşan: ₺','vpkg.overflow_b':'/PoC','vpkg.btn_current':'Mevcut Paketin','vpkg.btn_buy':'Bu Paketi Al',
+    'vpkg.monthly':'Aylık','vpkg.yearly':'Yıllık','vpkg.discount_suffix':' İNDİRİM','vpkg.note':'💡 <strong>Not:</strong> Kredi kartı (iyzico, anında aktif) veya manuel havale (24 saat onay) ile ödeme yapabilirsin. <strong>Test modu:</strong> Kart 5528 7900 0000 0008 / 12/30 / CVV 123.','vpkg.toast_free_default':'Free plan zaten varsayılandır.','vpkg.toast_already_current':'Bu zaten mevcut paketin.',
     'poc.title':'PoC Talebi Oluştur','poc.step1':'Adım 1 / 3 — Kategori Seçin','poc.step2':'Adım 2 / 3 — Ürün ve Vendor Seçin','poc.step3':'Adım 3 / 3 — Talep Detayları','poc.not_in_catalog':'Ürün katalogda yok mu?','poc.manual_entry':'Manuel Giriş →','poc.continue':'Devam Et →',
     'poc.f_title':'PoC Başlığı *','poc.ph_title':'Örn: 1000 kullanıcı için Firewall değerlendirmesi','poc.f_req':'Gereksinimler / Notlar','poc.ph_req':'Test ortamı, kullanıcı sayısı, özel gereksinimler...','poc.f_dates':'Tercih Edilen Tarih ve Saat *','poc.f_location':'PoC Lokasyonu',
     'poc.loc_customer':'Müşteri Lokasyonu','poc.loc_vendor':'Vendor / Üretici Lokasyonu','poc.loc_online':'Online / Uzaktan','poc.submit':'Talebi Gönder →','poc.sending':'Gönderiliyor...','poc.err_title':'Başlık zorunludur.','poc.err_dates':'Tercih edilen tarih ve saat zorunludur.','poc.email_new_subj':'Yeni PoC Talebi — PoCHub','poc.email_sent_subj':'PoC Talepleriniz Gönderildi — PoCHub',
@@ -29421,6 +29424,8 @@ const I18N_DICT = {
     'vbill.loading':'Loading account...','vbill.title':'💳 Account','vbill.subtitle':'Unpaid debts — override PoC + featured ads','vbill.clean':'Your Account is Clear','vbill.clean_desc':'You have no unpaid debts. Your PoC acceptance flow continues normally.',
     'vbill.suspended':'⛔ Account Suspended','vbill.threshold':'⚠️ Suspend Threshold','vbill.debt_poc':'PoC in Debt','vbill.open_balance':'Open Balance','vbill.msg_suspended':'Pay all debts and your account is instantly reactivated.','vbill.msg_critical':'This threshold is exceeded! You cannot accept new PoCs until payment is made.','vbill.msg_threshold':' more debts will suspend your account.','vbill.msg_ad_debt':'You have a featured ad debt.',
     'vbill.pay_all':'💰 Pay All — ₺','vbill.debt_items':'Items in Debt (','vbill.featured_ad':'Featured Ad','vbill.pay':'💰 Pay','vbill.load_error':'Account load error: ',
+    'vpkg.title':'💎 Choose Package','vpkg.per_year':'/yr','vpkg.per_month':'/mo','vpkg.current_badge':'CURRENT','vpkg.free':'Free','vpkg.overflow_a':'Overflow: ₺','vpkg.overflow_b':'/PoC','vpkg.btn_current':'Your Current Package','vpkg.btn_buy':'Get This Package',
+    'vpkg.monthly':'Monthly','vpkg.yearly':'Yearly','vpkg.discount_suffix':' OFF','vpkg.note':'💡 <strong>Note:</strong> You can pay by credit card (iyzico, instant activation) or manual bank transfer (24h approval). <strong>Test mode:</strong> Card 5528 7900 0000 0008 / 12/30 / CVV 123.','vpkg.toast_free_default':'Free plan is already the default.','vpkg.toast_already_current':'This is already your current package.',
     'poc.title':'Create PoC Request','poc.step1':'Step 1 / 3 — Choose Category','poc.step2':'Step 2 / 3 — Choose Product and Vendor','poc.step3':'Step 3 / 3 — Request Details','poc.not_in_catalog':'Product not in the catalog?','poc.manual_entry':'Manual Entry →','poc.continue':'Continue →',
     'poc.f_title':'PoC Title *','poc.ph_title':'e.g. Firewall evaluation for 1000 users','poc.f_req':'Requirements / Notes','poc.ph_req':'Test environment, number of users, special requirements...','poc.f_dates':'Preferred Date and Time *','poc.f_location':'PoC Location',
     'poc.loc_customer':'Customer Location','poc.loc_vendor':'Vendor / Manufacturer Location','poc.loc_online':'Online / Remote','poc.submit':'Send Request →','poc.sending':'Sending...','poc.err_title':'Title is required.','poc.err_dates':'Preferred date and time are required.','poc.email_new_subj':'New PoC Request — PoCHub','poc.email_sent_subj':'Your PoC Requests Have Been Sent — PoCHub',
