@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.14 | pochub.co -->
+<!-- PoCHub v6.15 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.14';
+const VERSION = 'v6.15';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.15': ['i18n FAZ 3k (musteri Davet Et / referrals sekmesi) — hero rozet basligi, rozet sistemi aciklamasi (3 seviye: Topluluk Uyesi/Destekcisi/Lideri + esik aciklamalari), sonraki hedef, avantaj metni, davet linki + Kopyala, paylasim ipucu, hazir-mesaj basligi + Mesaji Kopyala, davet edilenler listesi (bos-durum, AKTIF/SUPHELI rozetleri), kopyalama toast/hata ve loading/error t()-e sarildi + ref.* (tr/en). getCustomerReferralBadgeInfo helper label-lari da ref.badge_*-e baglandi (hero ile tutarli). Paylasilan stringler vendor referral sayfasinda da localize oldu (bonus). NOT: cok satirli hazir-mesaj GOVDESI (apostrof+interpolasyon riski) simdilik TR. node --check + harness OK. UI — RULES degismedi.'],
   'v6.14': ['i18n FAZ 3j (musteri Etkinlik Kayitlarim sekmesi) — baslik, 7 stat karti (Toplam Kayit/Yaklasan/Bugun-Yarin/Bu Hafta/Tamamladigim/Iptal Ettigim/Bu Ay Yeni), icgoru etiketleri (Favori format/En aktif ayim/Aktif vendor sayisi), preset sekmeleri (Yaklasan/Gecmis/Tumu), durum filtresi (Tum Durumlar/Onaylandi/Bekliyor/Iptal), bos-durumlar, iptal/kaldirma onay+toast t()-e sarildi + reg.* + common.no_results (tr/en). NOT: ay/gun adlari (~10 yerde tekrar) ayri bir reusable MONTHS_L/DOWS_L helper dilimi olarak yapilacak. node --check + harness ile dogrulandi. UI — RULES degismedi.'],
   'v6.13': ['i18n FAZ 3i (musteri Teklifler sekmesi — loadOffersWithComparison) — stat kartlari (Toplam/Bekleyen Karar/Kabul/Red/Toplam Yatirim/Bekleyen Tutar), icgoru etiketleri (Ort. karar suresi/teklif tutari, Kabul oranim, En cok teklif alinan urun, Bekleyen pipeline), durum filtresi (Tum Durumlar/Bekliyor/Kabul/Reddedildi/Revizyon), bos-durum, Detay Goruntule butonu, red onayi ve toast/e-posta konusu (Kabul/Red/Revizyon) t()-e sarildi + off.* (tr/en). Paylasilan metinler (Tumu/Filtreleri Sifirla/insight) tum kopyalarda guvenli sarildi. node --check + modul-yukleme harness ile dogrulandi. UI — RULES degismedi.'],
   'v6.12': ['HOTFIX (kritik) — v6.11de bos ekran cozuldu. I18N_DICT iceindeki inv.load_error DEGERI yanlislikla kendini cagiran t() haline gelmisti; modul I18N_DICT nesnesini kurarken t() henuz kurulmamis I18N_DICTe erisip TDZ ReferenceError firlatiyor, tum sayfa render durdugundan ekran bos kaliyordu. Dict degeri duz stringe geri cevrildi; custInvites load-error toasti dogru sekilde t(inv.load_error)-e baglandi. Ek: node --check disinda artik modul-yukleme harness (import-stub) ile calisma-zamani yuklemesi de dogrulaniyor. UI — RULES degismedi.'],
@@ -13038,7 +13039,7 @@ async function loadVendTab() {
         + '</div>'
         + '<div style="display:flex;gap:6px">'
         +   '<button id="vp-view" class="btn-g btn-sm" style="padding:7px 12px;font-size:11.5px">👁 Görüntüle</button>'
-        +   '<button id="vp-copy" class="btn-p btn-sm" style="padding:7px 12px;font-size:11.5px">📋 Kopyala</button>'
+        +   '<button id="vp-copy" class="btn-p btn-sm" style="padding:7px 12px;font-size:11.5px">'+t('ref.copy','📋 Kopyala')+'</button>'
         + '</div>';
       m.appendChild(publicCard);
       publicCard.querySelector('#vp-view').addEventListener('click', function(){
@@ -13048,7 +13049,7 @@ async function loadVendTab() {
         try {
           navigator.clipboard.writeText(publicUrl);
           showToast('🔗 Public profil URL kopyalandı');
-        } catch(e) { showToast('Kopyalama başarısız', 'err'); }
+        } catch(e) { showToast(t('ref.copy_fail','Kopyalama başarısız'), 'err'); }
       });
     }
 
@@ -20448,7 +20449,7 @@ async function vendAnalytics(m) {
 
 // ════════════════════════════════════════════════════════════════════
 async function vendReferrals(m) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Davet bilgileri yükleniyor...</div>';
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('ref.loading','Davet bilgileri yükleniyor...')+'</div>';
 
   try {
     var vendorSlug = CUR_PROFILE?.slug || generateSlug(CUR_PROFILE?.company || CUR_PROFILE?.displayName || 'vendor');
@@ -20575,10 +20576,10 @@ async function vendReferrals(m) {
 
       // LINK + COPY
       + '<div class="card" style="padding:20px;margin-bottom:18px">'
-      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:10px">📋 Davet Linkin</div>'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:10px">'+t('ref.your_link','📋 Davet Linkin')+'</div>'
       +   '<div style="display:flex;gap:8px;align-items:center;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:14px">'
       +     '<input id="ref-url-input" type="text" readonly value="'+referralUrl+'" style="flex:1;background:none;border:none;color:var(--text-primary);font-size:13px;font-family:monospace;outline:none">'
-      +     '<button id="ref-copy-btn" class="btn-p btn-sm" style="white-space:nowrap;padding:7px 14px;font-size:12px;font-weight:700">📋 Kopyala</button>'
+      +     '<button id="ref-copy-btn" class="btn-p btn-sm" style="white-space:nowrap;padding:7px 14px;font-size:12px;font-weight:700">'+t('ref.copy','📋 Kopyala')+'</button>'
       +   '</div>'
       +   '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:14px">Bu linki vendor olabilecek firmalarla paylaş. Linkten gelen ve <strong>onaylı kayıt</strong> olan her vendor için sana <strong>+1 PoC kotası/ay</strong> kalıcı bonus eklenir.</div>'
       +   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">'
@@ -20599,20 +20600,20 @@ async function vendReferrals(m) {
       +     '<div style="margin-top:8px">PoC süreçleri çok daha hızlı işliyor. Müşteri talepleri direkt size geliyor.</div>'
       +     '<div style="margin-top:10px;color:var(--text-muted);font-size:12px">— ' + (CUR_PROFILE.displayName || 'Vendor') + '</div>'
       +   '</div>'
-      +   '<button id="ref-msg-copy" class="btn-g btn-sm" style="margin-top:10px;font-size:12px;padding:7px 14px">📋 Mesajı Kopyala</button>'
+      +   '<button id="ref-msg-copy" class="btn-g btn-sm" style="margin-top:10px;font-size:12px;padding:7px 14px">'+t('ref.copy_msg','📋 Mesajı Kopyala')+'</button>'
       + '</div>'
 
       // DAVET ETTİKLERİN LİSTESİ
       + '<div class="card" style="padding:20px">'
-      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:14px">👥 Davet Ettiklerin ('+totalReferrals+')</div>'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:14px">'+t('ref.invited','👥 Davet Ettiklerin')+' ('+totalReferrals+')</div>'
       +   (totalReferrals === 0
-        ? '<div style="text-align:center;padding:30px;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:8px">📨</div>Henüz kimseyi davet etmedin. Yukarıdaki linkini paylaşmaya başla!</div>'
+        ? '<div style="text-align:center;padding:30px;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:8px">📨</div>'+t('ref.empty','Henuz kimseyi davet etmedin. Yukaridaki linkini paylasmaya basla!')+'</div>'
         : '<div style="display:grid;gap:10px">'
           + referrals.map(function(r){
               var statusBdg = r.status === 'active'
-                ? '<span style="background:rgba(22,163,74,.15);color:#16a34a;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">✓ AKTİF</span>'
+                ? '<span style="background:rgba(22,163,74,.15);color:#16a34a;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">'+t('ref.active','✓ AKTİF')+'</span>'
                 : r.status === 'suspicious'
-                ? '<span style="background:rgba(220,38,38,.15);color:#dc2626;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">⚠ ŞÜPHELİ</span>'
+                ? '<span style="background:rgba(220,38,38,.15);color:#dc2626;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">'+t('ref.suspicious','⚠ ŞÜPHELİ')+'</span>'
                 : '<span style="background:var(--bg-elevated);color:var(--text-muted);padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">'+(r.status||'?').toUpperCase()+'</span>';
               var dStr = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('tr-TR', {day:'2-digit',month:'short',year:'numeric'}) : '—';
               return '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
@@ -20635,10 +20636,10 @@ async function vendReferrals(m) {
       inp.select();
       try {
         navigator.clipboard.writeText(inp.value);
-        showToast('🔗 Davet linki kopyalandı');
+        showToast(t('ref.toast_link','🔗 Davet linki kopyalandı'));
       } catch(e) {
         document.execCommand('copy');
-        showToast('🔗 Davet linki kopyalandı');
+        showToast(t('ref.toast_link','🔗 Davet linki kopyalandı'));
       }
     });
 
@@ -20646,11 +20647,11 @@ async function vendReferrals(m) {
       var msg = 'Merhaba,\n\nTürkiye\'nin yeni IT PoC pazaryeri PoCHub\'a katılmanızı öneririm. ' + (CUR_PROFILE.company || 'Biz') + ' olarak burada aktifiz.\n\nVendor olarak ücretsiz kayıt olabilirsiniz: ' + referralUrl + '\n\nPoC süreçleri çok daha hızlı işliyor. Müşteri talepleri direkt size geliyor.\n\n— ' + (CUR_PROFILE.displayName || 'Vendor');
       try {
         navigator.clipboard.writeText(msg);
-        showToast('💬 Mesaj kopyalandı');
-      } catch(e) { showToast('Kopyalama başarısız', 'err'); }
+        showToast(t('ref.toast_msg','💬 Mesaj kopyalandı'));
+      } catch(e) { showToast(t('ref.copy_fail','Kopyalama başarısız'), 'err'); }
     });
   } catch(e) {
-    m.innerHTML = '<div class="alert alert-err">Davet sayfası yüklenirken hata: ' + e.message + '</div>';
+    m.innerHTML = '<div class="alert alert-err">'+t('ref.load_error','Davet sayfası yüklenirken hata: ')+e.message + '</div>';
   }
 }
 
@@ -20660,7 +20661,7 @@ async function vendReferrals(m) {
 // Yan etki: Vendor'lar PoC'a baktığında müşterinin rozetini görür
 // ════════════════════════════════════════════════════════════════════
 async function custReferrals(m) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Davet bilgileri yükleniyor...</div>';
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('ref.loading','Davet bilgileri yükleniyor...')+'</div>';
 
   try {
     var custSlug = CUR_PROFILE?.slug || 'cust-' + generateSlug(CUR_PROFILE?.company || CUR_PROFILE?.displayName || 'user');
@@ -20694,9 +20695,9 @@ async function custReferrals(m) {
 
     // Sonraki rozet
     var nextBadgeNeed = null;
-    if (!currentBadge) nextBadgeNeed = { count: 1, label: 'Topluluk Üyesi' };
-    else if (currentBadge === 'member') nextBadgeNeed = { count: 3 - customerCount, label: 'Topluluk Destekçisi' };
-    else if (currentBadge === 'supporter') nextBadgeNeed = { count: 6 - customerCount, label: 'Topluluk Lideri' };
+    if (!currentBadge) nextBadgeNeed = { count: 1, label: t('ref.badge_member','Topluluk Üyesi') };
+    else if (currentBadge === 'member') nextBadgeNeed = { count: 3 - customerCount, label: t('ref.badge_supporter','Topluluk Destekçisi') };
+    else if (currentBadge === 'supporter') nextBadgeNeed = { count: 6 - customerCount, label: t('ref.badge_leader','Topluluk Lideri') };
 
     // Paylaşım linkleri
     var shareText = encodeURIComponent('PoCHub - Türkiye IT PoC Pazaryeri. PoC süreçlerinizi hızlandırın: ' + referralUrl);
@@ -20713,33 +20714,33 @@ async function custReferrals(m) {
       +   '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap">'
       +     '<div style="font-size:42px">' + (badgeInfo?.icon || '🌱') + '</div>'
       +     '<div style="flex:1;min-width:240px">'
-      +       '<div style="font-size:11.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);font-weight:700;margin-bottom:4px">Topluluk Rozetin</div>'
-      +       '<h2 style="margin:0;font-size:22px;font-weight:800;color:var(--text-primary)">' + (badgeInfo?.label || 'Henüz Rozetin Yok') + '</h2>'
-      +       '<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">' + (customerCount > 0 ? customerCount + ' kurum davet ettin' : 'PoCHub topluluğuna katkıda bulun, rozet kazan') + '</div>'
+      +       '<div style="font-size:11.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);font-weight:700;margin-bottom:4px">'+t('ref.your_badge','Topluluk Rozetin')+'</div>'
+      +       '<h2 style="margin:0;font-size:22px;font-weight:800;color:var(--text-primary)">' + (badgeInfo?.label || t('ref.no_badge','Henüz Rozetin Yok')) + '</h2>'
+      +       '<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">' + (customerCount > 0 ? customerCount + ' ' + t('ref.invited_orgs','kurum davet ettin') : t('ref.contribute','PoCHub topluluğuna katkıda bulun, rozet kazan')) + '</div>'
       +     '</div>'
       +   '</div>'
-      +   (nextBadgeNeed ? '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-secondary)"><strong style="color:#a855f7">🎯 Bir Sonraki Hedef:</strong> ' + Math.max(1,nextBadgeNeed.count) + ' kurum daha davet et → <strong style="color:var(--text-primary)">' + nextBadgeNeed.label + '</strong> rozetini kazan</div>' : '')
+      +   (nextBadgeNeed ? '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-secondary)"><strong style="color:#a855f7">'+t('ref.next_goal','🎯 Bir Sonraki Hedef:')+'</strong> ' + Math.max(1,nextBadgeNeed.count) + ' ' + t('ref.invite_more','kurum daha davet et →') + ' <strong style="color:var(--text-primary)">' + nextBadgeNeed.label + '</strong> ' + t('ref.win_badge','rozetini kazan') + '</div>' : '')
       + '</div>'
 
       // ROZET SİSTEMİ AÇIKLAMA
       + '<div class="card" style="padding:20px;margin-bottom:18px">'
-      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:14px">🏆 Rozet Sistemi</div>'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:14px">'+t('ref.badge_system','🏆 Rozet Sistemi')+'</div>'
       +   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">'
-      +     '<div style="background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);border-radius:10px;padding:14px;text-align:center"><div style="font-size:32px;margin-bottom:6px">🌱</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">Topluluk Üyesi</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">1-2 başarılı davet</div></div>'
-      +     '<div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.25);border-radius:10px;padding:14px;text-align:center"><div style="font-size:32px;margin-bottom:6px">🌿</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">Topluluk Destekçisi</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">3-5 başarılı davet</div></div>'
-      +     '<div style="background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.25);border-radius:10px;padding:14px;text-align:center"><div style="font-size:32px;margin-bottom:6px">🌳</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">Topluluk Lideri</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">6+ başarılı davet</div></div>'
+      +     '<div style="background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);border-radius:10px;padding:14px;text-align:center"><div style="font-size:32px;margin-bottom:6px">🌱</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">'+t('ref.badge_member','Topluluk Üyesi')+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">'+t('ref.lvl1','1-2 başarılı davet')+'</div></div>'
+      +     '<div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.25);border-radius:10px;padding:14px;text-align:center"><div style="font-size:32px;margin-bottom:6px">🌿</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">'+t('ref.badge_supporter','Topluluk Destekçisi')+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">'+t('ref.lvl2','3-5 başarılı davet')+'</div></div>'
+      +     '<div style="background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.25);border-radius:10px;padding:14px;text-align:center"><div style="font-size:32px;margin-bottom:6px">🌳</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">'+t('ref.badge_leader','Topluluk Lideri')+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">'+t('ref.lvl3','6+ başarılı davet')+'</div></div>'
       +   '</div>'
-      +   '<div style="font-size:11.5px;color:var(--text-muted);margin-top:12px;line-height:1.5"><strong>💡 Avantaj:</strong> Rozet sahibi müşterilerin PoC talepleri vendor\'lara <strong>daha güvenilir referans</strong> olarak görünür. Vendor seçim sürecinde yukarıda yer alırsın.</div>'
+      +   '<div style="font-size:11.5px;color:var(--text-muted);margin-top:12px;line-height:1.5">'+t('ref.advantage','💡 Avantaj: Rozet sahibi musterilerin PoC talepleri vendorlara daha guvenilir referans olarak gorunur. Vendor secim surecinde yukarida yer alirsin.')+'</div>'
       + '</div>'
 
       // LINK + COPY
       + '<div class="card" style="padding:20px;margin-bottom:18px">'
-      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:10px">📋 Davet Linkin</div>'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:10px">'+t('ref.your_link','📋 Davet Linkin')+'</div>'
       +   '<div style="display:flex;gap:8px;align-items:center;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:14px">'
       +     '<input id="cref-url-input" type="text" readonly value="'+referralUrl+'" style="flex:1;background:none;border:none;color:var(--text-primary);font-size:13px;font-family:monospace;outline:none">'
-      +     '<button id="cref-copy-btn" class="btn-p btn-sm" style="white-space:nowrap;padding:7px 14px;font-size:12px;font-weight:700">📋 Kopyala</button>'
+      +     '<button id="cref-copy-btn" class="btn-p btn-sm" style="white-space:nowrap;padding:7px 14px;font-size:12px;font-weight:700">'+t('ref.copy','📋 Kopyala')+'</button>'
       +   '</div>'
-      +   '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:14px">CIO, CTO, IT Müdürü tanıdıklarınla paylaş. Linkten gelen ve <strong>müşteri olarak kayıt</strong> olan her kurum için <strong>rozet skorun artar</strong>.</div>'
+      +   '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:14px">'+t('ref.share_hint','CIO, CTO, IT Muduru tanidiklarinla paylas. Linkten gelen ve musteri olarak kayit olan her kurum icin rozet skorun artar.')+'</div>'
       +   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">'
       +     '<a href="'+linkedinShare+'" target="_blank" rel="noopener" style="background:rgba(10,102,194,.1);border:1px solid rgba(10,102,194,.3);color:#0a66c2;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font-size:18px">💼</span>LinkedIn</a>'
       +     '<a href="'+twitterShare+'" target="_blank" rel="noopener" style="background:rgba(29,161,242,.1);border:1px solid rgba(29,161,242,.3);color:#1da1f2;text-decoration:none;padding:12px 8px;border-radius:8px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font-size:18px">🐦</span>Twitter</a>'
@@ -20750,7 +20751,7 @@ async function custReferrals(m) {
 
       // ÖRNEK MESAJ
       + '<div class="card" style="padding:18px;margin-bottom:18px">'
-      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:10px">💬 Hazır Mesaj</div>'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:10px">'+t('ref.ready_msg','💬 Hazır Mesaj')+'</div>'
       +   '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;color:var(--text-secondary);line-height:1.6;font-family:Georgia, serif">'
       +     '<div>Merhaba,</div>'
       +     '<div style="margin-top:8px">PoC süreçlerinde sıkça yaşadığımız problem için bir çözüm buldum: <strong style="color:var(--text-primary)">PoCHub</strong>. ' + (CUR_PROFILE.company || 'Biz') + ' olarak burada PoC açıyoruz.</div>'
@@ -20758,20 +20759,20 @@ async function custReferrals(m) {
       +     '<div style="margin-top:8px">Birden fazla vendor\'la aynı anda paralel PoC değerlendirmesi yapabiliyorsunuz. Çok zaman kazandırıyor.</div>'
       +     '<div style="margin-top:10px;color:var(--text-muted);font-size:12px">— ' + (CUR_PROFILE.displayName || 'Müşteri') + '</div>'
       +   '</div>'
-      +   '<button id="cref-msg-copy" class="btn-g btn-sm" style="margin-top:10px;font-size:12px;padding:7px 14px">📋 Mesajı Kopyala</button>'
+      +   '<button id="cref-msg-copy" class="btn-g btn-sm" style="margin-top:10px;font-size:12px;padding:7px 14px">'+t('ref.copy_msg','📋 Mesajı Kopyala')+'</button>'
       + '</div>'
 
       // DAVET ETTİKLERİN LİSTESİ
       + '<div class="card" style="padding:20px">'
-      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:14px">👥 Davet Ettiklerin ('+totalReferrals+')</div>'
+      +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);margin-bottom:14px">'+t('ref.invited','👥 Davet Ettiklerin')+' ('+totalReferrals+')</div>'
       +   (totalReferrals === 0
-        ? '<div style="text-align:center;padding:30px;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:8px">📨</div>Henüz kimseyi davet etmedin. Yukarıdaki linkini paylaşmaya başla!</div>'
+        ? '<div style="text-align:center;padding:30px;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:8px">📨</div>'+t('ref.empty','Henuz kimseyi davet etmedin. Yukaridaki linkini paylasmaya basla!')+'</div>'
         : '<div style="display:grid;gap:10px">'
           + referrals.map(function(r){
               var statusBdg = r.status === 'active'
-                ? '<span style="background:rgba(22,163,74,.15);color:#16a34a;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">✓ AKTİF</span>'
+                ? '<span style="background:rgba(22,163,74,.15);color:#16a34a;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">'+t('ref.active','✓ AKTİF')+'</span>'
                 : r.status === 'suspicious'
-                ? '<span style="background:rgba(220,38,38,.15);color:#dc2626;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">⚠ ŞÜPHELİ</span>'
+                ? '<span style="background:rgba(220,38,38,.15);color:#dc2626;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">'+t('ref.suspicious','⚠ ŞÜPHELİ')+'</span>'
                 : '<span style="background:var(--bg-elevated);color:var(--text-muted);padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">'+(r.status||'?').toUpperCase()+'</span>';
               var dStr = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('tr-TR', {day:'2-digit',month:'short',year:'numeric'}) : '—';
               var roleIcon = r.referredRole === 'vendor' ? '🏢' : r.referredRole === 'customer' ? '🏛' : '👤';
@@ -20791,10 +20792,10 @@ async function custReferrals(m) {
       inp.select();
       try {
         navigator.clipboard.writeText(inp.value);
-        showToast('🔗 Davet linki kopyalandı');
+        showToast(t('ref.toast_link','🔗 Davet linki kopyalandı'));
       } catch(e) {
         document.execCommand('copy');
-        showToast('🔗 Davet linki kopyalandı');
+        showToast(t('ref.toast_link','🔗 Davet linki kopyalandı'));
       }
     });
 
@@ -20802,11 +20803,11 @@ async function custReferrals(m) {
       var msg = 'Merhaba,\n\nPoC süreçlerinde sıkça yaşadığımız problem için bir çözüm buldum: PoCHub. ' + (CUR_PROFILE.company || 'Biz') + ' olarak burada PoC açıyoruz.\n\nMüşteri olarak ücretsiz kayıt: ' + referralUrl + '\n\nBirden fazla vendor\'la aynı anda paralel PoC değerlendirmesi yapabiliyorsunuz. Çok zaman kazandırıyor.\n\n— ' + (CUR_PROFILE.displayName || 'Müşteri');
       try {
         navigator.clipboard.writeText(msg);
-        showToast('💬 Mesaj kopyalandı');
-      } catch(e) { showToast('Kopyalama başarısız', 'err'); }
+        showToast(t('ref.toast_msg','💬 Mesaj kopyalandı'));
+      } catch(e) { showToast(t('ref.copy_fail','Kopyalama başarısız'), 'err'); }
     });
   } catch(e) {
-    m.innerHTML = '<div class="alert alert-err">Davet sayfası yüklenirken hata: ' + e.message + '</div>';
+    m.innerHTML = '<div class="alert alert-err">'+t('ref.load_error','Davet sayfası yüklenirken hata: ')+e.message + '</div>';
   }
 }
 
@@ -21391,7 +21392,7 @@ function wizStep4() {
     + '</div>'
     + '<div style="background:rgba(15,23,42,.02);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:18px;display:flex;align-items:center;gap:8px">'
     +   '<input id="wiz-profile-url" type="text" readonly value="'+profileUrl+'" style="flex:1;background:none;border:none;color:var(--text-secondary);font-size:11.5px;font-family:monospace;outline:none">'
-    +   '<button id="wiz-copy-url" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.3);color:#2563eb;padding:6px 12px;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:600;white-space:nowrap">📋 Kopyala</button>'
+    +   '<button id="wiz-copy-url" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.3);color:#2563eb;padding:6px 12px;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:600;white-space:nowrap">'+t('ref.copy','📋 Kopyala')+'</button>'
     + '</div>'
     + '<div style="display:flex;gap:10px">'
     +   '<button id="wiz-back" style="flex:1;background:rgba(15,23,42,.03);border:1px solid rgba(255,255,255,.12);color:var(--text-secondary);padding:11px;border-radius:8px;font-size:13px;cursor:pointer">← Geri</button>'
@@ -28476,9 +28477,9 @@ function getCustomerReferralBadgeLevel(count) {
 }
 
 function getCustomerReferralBadgeInfo(level) {
-  if (level === 'leader') return { icon: '🌳', label: 'Topluluk Lideri', color: '#16a34a', bg: 'rgba(22,163,74,.12)', border: 'rgba(22,163,74,.4)' };
-  if (level === 'supporter') return { icon: '🌿', label: 'Topluluk Destekçisi', color: '#2563eb', bg: 'rgba(37,99,235,.12)', border: 'rgba(37,99,235,.4)' };
-  if (level === 'member') return { icon: '🌱', label: 'Topluluk Üyesi', color: '#a855f7', bg: 'rgba(168,85,247,.12)', border: 'rgba(168,85,247,.4)' };
+  if (level === 'leader') return { icon: '🌳', label: t('ref.badge_leader','Topluluk Lideri'), color: '#16a34a', bg: 'rgba(22,163,74,.12)', border: 'rgba(22,163,74,.4)' };
+  if (level === 'supporter') return { icon: '🌿', label: t('ref.badge_supporter','Topluluk Destekçisi'), color: '#2563eb', bg: 'rgba(37,99,235,.12)', border: 'rgba(37,99,235,.4)' };
+  if (level === 'member') return { icon: '🌱', label: t('ref.badge_member','Topluluk Üyesi'), color: '#a855f7', bg: 'rgba(168,85,247,.12)', border: 'rgba(168,85,247,.4)' };
   return null;
 }
 
@@ -29080,6 +29081,15 @@ const I18N_DICT = {
     'reg.title':'📅 Etkinlik Kayıtlarım','reg.st_total':'Toplam Kayıt','reg.st_upcoming':'Yaklaşan','reg.st_today':'Bugün/Yarın','reg.st_week':'Bu Hafta','reg.st_completed':'Tamamladığım','reg.st_cancelled':'İptal Ettiğim','reg.st_newmonth':'Bu Ay Yeni',
     'reg.fav_format':'Favori format','reg.top_month':'En aktif ayım','reg.active_vendors':'Aktif vendor sayısı','reg.tab_upcoming':'🗓 Yaklaşan','reg.tab_past':'⏮ Geçmiş','reg.confirmed':'Onaylandı','reg.cancelled_short':'İptal',
     'reg.empty_upcoming':'Yaklaşan etkinlik kayıdınız yok.','reg.empty_past':'Geçmiş etkinlik bulunamadı.','reg.cancelling':'İptal ediliyor...','reg.toast_cancelled':'Kayıt iptal edildi.','reg.confirm_remove':'Bu kayıt geçmişinizden kaldırılsın mı?','reg.toast_removed':'Kayıt kaldırıldı.',
+    'ref.loading':'Davet bilgileri yükleniyor...','ref.load_error':'Davet sayfası yüklenirken hata: ',
+    'ref.badge_member':'Topluluk Üyesi','ref.badge_supporter':'Topluluk Destekçisi','ref.badge_leader':'Topluluk Lideri',
+    'ref.your_badge':'Topluluk Rozetin','ref.no_badge':'Henüz Rozetin Yok','ref.invited_orgs':'kurum davet ettin','ref.contribute':'PoCHub topluluğuna katkıda bulun, rozet kazan',
+    'ref.next_goal':'🎯 Bir Sonraki Hedef:','ref.invite_more':'kurum daha davet et →','ref.win_badge':'rozetini kazan','ref.badge_system':'🏆 Rozet Sistemi',
+    'ref.lvl1':'1-2 başarılı davet','ref.lvl2':'3-5 başarılı davet','ref.lvl3':'6+ başarılı davet',
+    'ref.advantage':'💡 Avantaj: Rozet sahibi musterilerin PoC talepleri vendorlara daha guvenilir referans olarak gorunur. Vendor secim surecinde yukarida yer alirsin.',
+    'ref.your_link':'📋 Davet Linkin','ref.copy':'📋 Kopyala','ref.share_hint':'CIO, CTO, IT Muduru tanidiklarinla paylas. Linkten gelen ve musteri olarak kayit olan her kurum icin rozet skorun artar.',
+    'ref.ready_msg':'💬 Hazır Mesaj','ref.copy_msg':'📋 Mesajı Kopyala','ref.invited':'👥 Davet Ettiklerin','ref.empty':'Henuz kimseyi davet etmedin. Yukaridaki linkini paylasmaya basla!',
+    'ref.active':'✓ AKTİF','ref.suspicious':'⚠ ŞÜPHELİ','ref.toast_link':'🔗 Davet linki kopyalandı','ref.toast_msg':'💬 Mesaj kopyalandı','ref.copy_fail':'Kopyalama başarısız',
   },
   en: {
     // Hero / Home
@@ -29247,6 +29257,15 @@ const I18N_DICT = {
     'reg.title':'📅 My Event Registrations','reg.st_total':'Total Registrations','reg.st_upcoming':'Upcoming','reg.st_today':'Today/Tomorrow','reg.st_week':'This Week','reg.st_completed':'Completed','reg.st_cancelled':'Cancelled','reg.st_newmonth':'New This Month',
     'reg.fav_format':'Favorite format','reg.top_month':'My most active month','reg.active_vendors':'Active vendor count','reg.tab_upcoming':'🗓 Upcoming','reg.tab_past':'⏮ Past','reg.confirmed':'Confirmed','reg.cancelled_short':'Cancelled',
     'reg.empty_upcoming':'You have no upcoming event registrations.','reg.empty_past':'No past events found.','reg.cancelling':'Cancelling...','reg.toast_cancelled':'Registration cancelled.','reg.confirm_remove':'Remove this registration from your history?','reg.toast_removed':'Registration removed.',
+    'ref.loading':'Loading invitation info...','ref.load_error':'Error loading invitation page: ',
+    'ref.badge_member':'Community Member','ref.badge_supporter':'Community Supporter','ref.badge_leader':'Community Leader',
+    'ref.your_badge':'Your Community Badge','ref.no_badge':'No Badge Yet','ref.invited_orgs':'organizations invited','ref.contribute':'Contribute to the PoCHub community, earn badges',
+    'ref.next_goal':'🎯 Next Goal:','ref.invite_more':'more organizations →','ref.win_badge':'to earn that badge','ref.badge_system':'🏆 Badge System',
+    'ref.lvl1':'1-2 successful invites','ref.lvl2':'3-5 successful invites','ref.lvl3':'6+ successful invites',
+    'ref.advantage':'💡 Advantage: PoC requests from badge-holding customers appear more credible to vendors. You rank higher in the vendor selection process.',
+    'ref.your_link':'📋 Your Invite Link','ref.copy':'📋 Copy','ref.share_hint':'Share with your CIO, CTO, IT Manager contacts. Your badge score rises for each organization that registers as a customer via your link.',
+    'ref.ready_msg':'💬 Ready Message','ref.copy_msg':'📋 Copy Message','ref.invited':'👥 Your Invitees','ref.empty':'You have not invited anyone yet. Start sharing your link above!',
+    'ref.active':'✓ ACTIVE','ref.suspicious':'⚠ SUSPICIOUS','ref.toast_link':'🔗 Invite link copied','ref.toast_msg':'💬 Message copied','ref.copy_fail':'Copy failed',
   }
 };
 
@@ -34709,7 +34728,7 @@ function openSharePopup(vendor, shareUrl, linkedinUrl, twitterUrl, whatsappUrl) 
     + '</div>'
     + '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;margin-bottom:14px">'
     +   '<input id="vp-url-input" type="text" readonly value="'+shareUrl+'" style="flex:1;background:none;border:none;color:var(--text-primary);font-size:12px;font-family:monospace;outline:none">'
-    +   '<button id="vp-url-copy" class="btn-p btn-sm" style="white-space:nowrap;padding:6px 12px;font-size:11.5px">📋 Kopyala</button>'
+    +   '<button id="vp-url-copy" class="btn-p btn-sm" style="white-space:nowrap;padding:6px 12px;font-size:11.5px">'+t('ref.copy','📋 Kopyala')+'</button>'
     + '</div>'
     + '<button id="vp-share-close" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-secondary);padding:9px;border-radius:6px;font-size:12.5px;cursor:pointer;font-weight:600">Kapat</button>'
     + '</div>';
