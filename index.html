@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.26 | pochub.co -->
+<!-- PoCHub v6.27 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.26';
+const VERSION = 'v6.27';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.27': ['i18n FAZ 4h (vendor Tekliflerim / offers-sent branch) — loading, baslik, stMap status etiketleri (status.*/vinv.accepted/voff.revision-archived), mini chip-ler + 7 ana stat (Toplam/Bekleyen/Kabul/Red/Kabul Orani/Toplam Gelir/Bekleyen Pipeline), SUREC adimlari (Gonderildi/Revizyon Istendi/Yanit Bekleniyor), filtreler (Tumu+durum, Tum Musteriler/Urunler), icgoru, KDV onek/sonek/yok, Detay, bos-durum, arsivle onay + sil toast t()-e sarildi + voff.* + APP-WIDE common.toast_archived (Arsivlendi.). node --check + harness OK. UI — RULES degismedi.'],
   'v6.26': ['i18n FAZ 4g (vendor Davetlerim / vendInvites — vendor poc_invites) — statusLabels (status.*+vinv.accepted/expired/cancelled), baslik, 6 stat karti (Toplam/Bekliyor/Kabul/Red/Suresi Doldu/Kabul Orani), suresi-dolan bilgi bandi, filtre varsayilani, bos-durumlar, Yeniden Gonder butonu + kabul-edilen-silinmez ipucu, hatirlatma/yenilendi e-posta+bildirim basliklari, iptal onayi (tirnak-guvenli) + toast t()-e sarildi + vinv.* (status/off/vprod/common yeniden). node --check + harness OK. UI — RULES degismedi.'],
   'v6.25': ['i18n FAZ 4f (vendor Etkinliklerim / events branch) — evStatusLabels (status.*+vevt.draft), baslik, 7 stat karti (Toplam/Yaklasan/Aktif Kayit/Tamamlanan/Doluluk/Bu Ay/Ort. Katilimci), icgoru (En verimli format/ilgi goren kategori/en iyi gun-saat/gecmis performans), format filtresi (Tum Formatlar/Online/Yuz Yuze/Hibrit — loc.* yeniden), bos-durumlar, liste tablo basliklari, klonla/iptal/arsivle/sil toast+onay t()-e sarildi + vevt.* + APP-WIDE common.confirm (Emin misiniz? 4 onayda). NOT: gun adlari ortak tarih-slice-ina kaldi. node --check + harness OK. UI — RULES degismedi.'],
   'v6.24': ['i18n FAZ 4e (vendor Reklamlarim / vendFeatured) — loading, baslik+alt-baslik, 4 stat karti (Aktif Yerlesim/Toplam Harcama/Toplam Tik/Featured PoC), bos-durum+ipucu, yerlesim status map (Aktif/Onay Bekliyor/Iptal — status.* + vad.pending), Suresi Dolmus, error t()-e sarildi + vad.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
@@ -12394,7 +12395,7 @@ async function loadOffersWithComparison(m) {
           + '</div>'
           + '<div class="t-rgt">'
           + '<div class="fs20-grn">'+formatMoney(bestAmt, bestPriceOffer.currency || 'TRY')+'</div>'
-          + '<div class="fs105-muted">'+(typeof bestPriceOffer.vatRate === 'number' ? 'KDV %'+bestPriceOffer.vatRate+' dahil' : 'KDV bilgisi yok')+'</div>'
+          + '<div class="fs105-muted">'+(typeof bestPriceOffer.vatRate === 'number' ? 'KDV %'+bestPriceOffer.vatRate+' dahil' : t('voff.no_vat','KDV bilgisi yok'))+'</div>'
           + '</div>';
         m.appendChild(bestBan);
       }
@@ -12622,7 +12623,7 @@ async function loadOffersWithComparison(m) {
             '<div class="bg-elev-tile">' +
             '<div class="lbl-mini">Toplam</div>' +
             '<div style="font-size:16px;font-weight:800;color:var(--color-primary)">' + (o.totalAmount||o.amount||0).toLocaleString('tr-TR') + ' ' + (o.currency||'₺') + '</div>' +
-            '<div style="font-size:9.5px;color:var(--text-muted);margin-top:2px">' + (typeof o.vatRate === 'number' ? 'KDV %' + o.vatRate + ' dahil' : 'KDV bilgisi yok') + '</div>' +
+            '<div style="font-size:9.5px;color:var(--text-muted);margin-top:2px">' + (typeof o.vatRate === 'number' ? t('voff.vat_prefix','KDV %') + o.vatRate + t('voff.vat_suffix',' dahil') : t('voff.no_vat','KDV bilgisi yok')) + '</div>' +
             '</div>' +
             '<div class="bg-elev-tile">' +
             '<div class="lbl-mini">Tip</div>' +
@@ -15319,7 +15320,7 @@ async function loadVendTab() {
   }
 
   else if (CUR_VEND_TAB === 'offers-sent') {
-    m.innerHTML = '<div class="loading"><div class="spinner"></div>Teklifler yükleniyor...</div>';
+    m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('voff.loading','Teklifler yükleniyor...')+'</div>';
     const _allSnap = await getDocs(query(collection(db,'offers'), where('vendorId','==',CUR_USER.uid)));
     var _allOffers = _allSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var offers = _allOffers.filter(function(o){ return getLifecycleState(o) !== 'trash'; });
@@ -15338,11 +15339,11 @@ async function loadVendTab() {
     var prodList = [...new Set(offers.map(function(o){ return o.productName||''; }).filter(Boolean))].sort();
 
     var stMap = {
-      pending:            {l:'Bekliyor',          c:'#d97706', bg:'rgba(217,119,6,.12)'},
-      accepted:           {l:'Kabul Edildi',       c:'#16a34a', bg:'rgba(22,163,74,.12)'},
-      rejected:           {l:'Reddedildi',         c:'#dc2626', bg:'rgba(220,38,38,.12)'},
-      revision_requested: {l:'Revizyon İstendi',   c:'#d97706', bg:'rgba(217,119,6,.12)'},
-      archived:           {l:'Arşivlendi',         c:'#64748b', bg:'rgba(90,98,120,.12)'},
+      pending:            {l:t('status.pending','Bekliyor'),          c:'#d97706', bg:'rgba(217,119,6,.12)'},
+      accepted:           {l:t('vinv.accepted','Kabul Edildi'),       c:'#16a34a', bg:'rgba(22,163,74,.12)'},
+      rejected:           {l:t('status.rejected','Reddedildi'),         c:'#dc2626', bg:'rgba(220,38,38,.12)'},
+      revision_requested: {l:t('voff.revision','Revizyon İstendi'),   c:'#d97706', bg:'rgba(217,119,6,.12)'},
+      archived:           {l:t('voff.archived','Arşivlendi'),         c:'#64748b', bg:'rgba(90,98,120,.12)'},
     };
 
     var filters = {status:'', customer:'', product:'', dateFrom:'', dateTo:'', search:'', trashMode:false, preset:''};
@@ -15418,7 +15419,7 @@ async function loadVendTab() {
 
       if (!filtered.length) {
         listEl.innerHTML = '<div class="empty"><div class="empty-icon">💰</div>' +
-          (filters.status||filters.search||filters.customer||filters.product ? 'Filtre sonucu bulunamadı.' : 'Henüz teklif göndermediniz.') + '</div>';
+          (filters.status||filters.search||filters.customer||filters.product ? t('voff.empty_filtered','Filtre sonucu bulunamadı.') : t('voff.empty_none','Henüz teklif göndermediniz.')) + '</div>';
         return;
       }
 
@@ -15432,8 +15433,8 @@ async function loadVendTab() {
         revision: offers.filter(function(o){return o.status==='revision_requested';}).length,
       };
       var statsHtml = '<div class="flx-g8-mb14-wrap">' +
-        [['Toplam','#e9ecf3',stats.total],['Bekliyor','#d97706',stats.pending],
-         ['Kabul','#16a34a',stats.accepted],['Revizyon','#d97706',stats.revision]].map(function(s) {
+        [[t('off.st_total','Toplam'),'#e9ecf3',stats.total],[t('status.pending','Bekliyor'),'#d97706',stats.pending],
+         [t('vinv.st_accepted','Kabul'),'#16a34a',stats.accepted],[t('voff.revision_short','Revizyon'),'#d97706',stats.revision]].map(function(s) {
           return '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:70px">' +
             '<div style="font-size:18px;font-weight:800;color:'+s[1]+'">'+s[2]+'</div>' +
             '<div class="fs10-muted">'+s[0]+'</div></div>';
@@ -15456,19 +15457,19 @@ async function loadVendTab() {
 
         // Timeline HTML
         var timelineHtml = '<div style="margin:12px 0;padding:12px;background:rgba(15,23,42,.02);border-radius:8px;border-left:3px solid rgba(37,99,235,.3)">' +
-          '<div style="font-size:10px;color:var(--text-muted);font-weight:700;letter-spacing:.6px;margin-bottom:8px">SÜREÇ</div>';
+          '<div style="font-size:10px;color:var(--text-muted);font-weight:700;letter-spacing:.6px;margin-bottom:8px">'+t('voff.process','SÜREÇ')+'</div>';
 
         // Gönderildi
         timelineHtml += '<div class="flx-c-g8-mb6">' +
           '<div style="width:7px;height:7px;border-radius:50%;background:#16a34a;flex-shrink:0"></div>' +
-          '<div style="font-size:12px;color:#16a34a;font-weight:600">Gönderildi</div>' +
+          '<div style="font-size:12px;color:#16a34a;font-weight:600">'+t('voff.sent','Gönderildi')+'</div>' +
           '<div style="font-size:11px;color:rgba(255,255,255,.3);margin-left:auto">'+dateStr+'</div></div>';
 
         // Revizyon geçmişi
         revHistory.forEach(function(rv) {
           timelineHtml += '<div style="display:flex;align-items:start;gap:8px;margin-bottom:6px;padding-left:16px;border-left:1px dashed rgba(217,119,6,.3);margin-left:3px">' +
             '<div style="width:7px;height:7px;border-radius:50%;background:#d97706;flex-shrink:0;margin-top:4px"></div>' +
-            '<div><div style="font-size:12px;color:#d97706;font-weight:600">Revizyon İstendi</div>' +
+            '<div><div style="font-size:12px;color:#d97706;font-weight:600">'+t('voff.revision','Revizyon İstendi')+'</div>' +
             (rv.note ? '<div style="font-size:11.5px;color:#475569;margin-top:2px">'+rv.note+'</div>' : '') +
             (rv.at ? '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:2px">'+formatTSShort(rv.at)+'</div>' : '') +
             '</div></div>';
@@ -15492,7 +15493,7 @@ async function loadVendTab() {
         } else if (o.status === 'pending') {
           timelineHtml += '<div class="flx-c-g8">' +
             '<div style="width:9px;height:9px;border-radius:50%;background:#d97706;box-shadow:0 0 6px #d97706;animation:pulse 1.5s infinite;flex-shrink:0"></div>' +
-            '<div style="font-size:12px;color:#d97706;font-weight:600">Yanıt Bekleniyor</div></div>';
+            '<div style="font-size:12px;color:#d97706;font-weight:600">'+t('voff.awaiting_response','Yanıt Bekleniyor')+'</div></div>';
         }
 
         timelineHtml += '</div>';
@@ -15508,7 +15509,7 @@ async function loadVendTab() {
           var daysLeft = trashDaysLeft(o);
           actHtml += '<div style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.25);border-radius:6px;padding:6px 10px;font:inherit;font-size:11.5px;font-weight:700;align-self:center">🗑 ' + (daysLeft||0) + ' gün</div>';
           actHtml += '<button class="ofs-restore" data-id="'+o.id+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" style="background:rgba(22,163,74,.1);color:#16a34a;border:1px solid rgba(22,163,74,.25);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">↩ Geri Al</button>';
-          actHtml += '<button class="ofs-detail" data-id="'+o.id+'" style="background:rgba(37,99,235,.08);color:#2563eb;border:1px solid rgba(37,99,235,.20);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">Detay</button>';
+          actHtml += '<button class="ofs-detail" data-id="'+o.id+'" style="background:rgba(37,99,235,.08);color:#2563eb;border:1px solid rgba(37,99,235,.20);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">'+t('voff.detail','Detay')+'</button>';
           actHtml += '<button class="ofs-perm" data-id="'+o.id+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" style="background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.4);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">⊗ Hemen Sil</button>';
         } else {
           if (o.status === 'revision_requested') {
@@ -15517,7 +15518,7 @@ async function loadVendTab() {
           if (o.status === 'accepted' || o.status === 'rejected') {
             actHtml += '<button class="ofs-archive" data-id="'+o.id+'" style="background:rgba(15,23,42,.04);color:#475569;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">📦 Arşivle</button>';
           }
-          actHtml += '<button class="ofs-detail" data-id="'+o.id+'" style="background:rgba(37,99,235,.08);color:#2563eb;border:1px solid rgba(37,99,235,.20);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">Detay</button>';
+          actHtml += '<button class="ofs-detail" data-id="'+o.id+'" style="background:rgba(37,99,235,.08);color:#2563eb;border:1px solid rgba(37,99,235,.20);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer">'+t('voff.detail','Detay')+'</button>';
           if (o.status !== 'accepted') {
             actHtml += '<button class="ofs-delete" data-id="'+o.id+'" data-pname="'+(o.productName||'').replace(/"/g,"")+'" style="background:rgba(220,38,38,.06);color:#dc2626;border:1px solid rgba(220,38,38,.15);border-radius:6px;padding:7px 10px;font:inherit;font-size:12px;cursor:pointer">⊘ Sil</button>';
           }
@@ -15586,14 +15587,14 @@ async function loadVendTab() {
           '</div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">' +
           '<div style="background:rgba(37,99,235,.06);border-radius:6px;padding:8px;text-align:center">' +
-          '<div class="fs10-muted">Toplam</div>' +
+          '<div class="fs10-muted">'+t('off.st_total','Toplam')+'</div>' +
           '<div style="font-size:15px;font-weight:800;color:var(--color-primary)">'+totalAmt.toLocaleString('tr-TR')+' '+(o.currency||'₺')+'</div>' +
-          '<div style="font-size:9.5px;color:var(--text-muted);margin-top:2px">' + (typeof o.vatRate === 'number' ? 'KDV %' + o.vatRate + ' dahil' : 'KDV bilgisi yok') + '</div></div>' +
+          '<div style="font-size:9.5px;color:var(--text-muted);margin-top:2px">' + (typeof o.vatRate === 'number' ? t('voff.vat_prefix','KDV %') + o.vatRate + t('voff.vat_suffix',' dahil') : t('voff.no_vat','KDV bilgisi yok')) + '</div></div>' +
           '<div style="background:rgba(15,23,42,.02);border-radius:6px;padding:8px;text-align:center">' +
-          '<div class="fs10-muted">Tip</div>' +
+          '<div class="fs10-muted">'+t('voff.type','Tip')+'</div>' +
           '<div style="font-size:12px;font-weight:600">'+(o.offerTypeLabel||o.offerType||'—')+'</div></div>' +
           '<div style="background:rgba(15,23,42,.02);border-radius:6px;padding:8px;text-align:center">' +
-          '<div class="fs10-muted">Geçerlilik</div>' +
+          '<div class="fs10-muted">'+t('voff.validity','Geçerlilik')+'</div>' +
           '<div style="font-size:12px;font-weight:600">'+validStr+'</div></div>' +
           '</div>' +
           (o.notes ? '<div style="font-size:12px;color:rgba(200,210,230,.85);background:rgba(15,23,42,.02);border-radius:6px;padding:8px 10px;margin-bottom:6px">'+o.notes+'</div>' : '') +
@@ -15611,11 +15612,11 @@ async function loadVendTab() {
       });
       listEl.querySelectorAll('.ofs-archive').forEach(function(b) {
         b.addEventListener('click', async function() {
-          if (!confirm('Bu teklifi arşivlemek istiyor musunuz?')) return;
+          if (!confirm(t('voff.confirm_archive','Bu teklifi arşivlemek istiyor musunuz?'))) return;
           await updateDoc(doc(db,'offers',b.dataset.id), {status:'archived'});
           offers = offers.map(function(o){ return o.id===b.dataset.id?{...o,status:'archived'}:o; });
           renderList();
-          showToast('Arşivlendi.');
+          showToast(t('common.toast_archived','Arşivlendi.'));
         });
       });
       listEl.querySelectorAll('.ofs-delete').forEach(function(b) {
@@ -15653,7 +15654,7 @@ async function loadVendTab() {
           b.disabled = true;
           try {
             await permanentDelete('offers', b.dataset.id);
-            showToast('Teklif kalıcı olarak silindi.');
+            showToast(t('voff.toast_deleted','Teklif kalıcı olarak silindi.'));
             CUR_VEND_TAB = 'offers-sent'; loadVendTab();
           } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); b.disabled = false; }
         });
@@ -15751,7 +15752,7 @@ async function loadVendTab() {
     m.innerHTML =
       '<div class="flx-bw-c-mb14">' +
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
-      '<h2 class="fs18-fw7">💰 Tekliflerim</h2>' +
+      '<h2 class="fs18-fw7">'+t('voff.title','💰 Tekliflerim')+'</h2>' +
       '<span id="ofs-cnt" class="fs12-muted">'+offers.length+' teklif</span>' +
       '</div>' +
       '<button id="ofs-trash-toggle" style="background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.25);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">🗑 Çöp Kutusu ('+trashedOffers.length+')</button>' +
@@ -15762,17 +15763,17 @@ async function loadVendTab() {
       '<div id="ofs-filters">' +
       '<div id="ofs-presets" class="flx-g6-mb8-wrap"></div>' +
       '<div class="flx-g6-mb8-wrap">' +
-      [['','Tümü'],['pending','Bekliyor'],['accepted','Kabul'],['rejected','Reddedildi'],['revision_requested','Revizyon'],['archived','Arşiv']].map(function(p) {
+      [['',t('common.all','Tümü')],['pending',t('status.pending','Bekliyor')],['accepted',t('vinv.st_accepted','Kabul')],['rejected',t('status.rejected','Reddedildi')],['revision_requested',t('voff.revision_short','Revizyon')],['archived',t('vprod.lc_archived_plain','Arşiv')]].map(function(p) {
         return '<button class="ofs-sf btn-g btn-sm fs12" data-val="'+p[0]+'">'+p[1]+'</button>';
       }).join('') +
       '</div>' +
       '<div class="flx-g8-mb14-wrap">' +
       '<select id="ofs-cust" class="inp btn-w-auto">' +
-      '<option value="">Tüm Müşteriler</option>' +
+      '<option value="">'+t('voff.all_customers','Tüm Müşteriler')+'</option>' +
       custList.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('') +
       '</select>' +
       '<select id="ofs-prod" class="inp btn-w-auto">' +
-      '<option value="">Tüm Ürünler</option>' +
+      '<option value="">'+t('voff.all_products','Tüm Ürünler')+'</option>' +
       prodList.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('') +
       '</select>' +
       '<input id="ofs-date-from" type="date" class="inp btn-w-auto" title="Başlangıç tarihi">' +
@@ -15789,14 +15790,14 @@ async function loadVendTab() {
     var statsRowO = document.createElement('div');
     statsRowO.className = 'stat-grid';
     var statCardsO = [
-      ['Toplam',          statsO.total,                                                     '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
-      ['Bekleyen',        statsO.pending,                                                   '#d97706', 'rgba(217,119,6,.08)', 'rgba(217,119,6,.2)'],
-      ['Kabul',           statsO.accepted,                                                  '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-      ['Red',             statsO.rejected,                                                  '#dc2626', 'rgba(220,38,38,.08)','rgba(220,38,38,.2)'],
+      [t('off.st_total','Toplam'),          statsO.total,                                                     '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
+      [t('vreq.st_pending','Bekleyen'),        statsO.pending,                                                   '#d97706', 'rgba(217,119,6,.08)', 'rgba(217,119,6,.2)'],
+      [t('vinv.st_accepted','Kabul'),           statsO.accepted,                                                  '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
+      [t('vinv.st_declined','Red'),             statsO.rejected,                                                  '#dc2626', 'rgba(220,38,38,.08)','rgba(220,38,38,.2)'],
       ['Revizyon',        statsO.revision,                                                  '#d97706', 'rgba(217,119,6,.08)',  'rgba(217,119,6,.2)'],
-      ['Kabul Oranı',     responded > 0 ? acceptRateO+'%' : '—',                            '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-      ['Toplam Gelir',    totalRevenueO > 0 ? formatMoney(totalRevenueO,'TRY') : '—',       '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-      ['Bekleyen Pipeline',pendingPipeline > 0 ? formatMoney(pendingPipeline,'TRY') : '—',  '#d97706', 'rgba(217,119,6,.08)', 'rgba(217,119,6,.2)'],
+      [t('vprod.st_accept_rate','Kabul Oranı'),     responded > 0 ? acceptRateO+'%' : '—',                            '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
+      [t('voff.total_revenue','Toplam Gelir'),    totalRevenueO > 0 ? formatMoney(totalRevenueO,'TRY') : '—',       '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
+      [t('voff.pending_pipeline','Bekleyen Pipeline'),pendingPipeline > 0 ? formatMoney(pendingPipeline,'TRY') : '—',  '#d97706', 'rgba(217,119,6,.08)', 'rgba(217,119,6,.2)'],
     ];
     statCardsO.forEach(function(s){
       var card = document.createElement('div');
@@ -15822,7 +15823,7 @@ async function loadVendTab() {
         + '</div>'
         + '<div class="t-rgt">'
         + '<div class="fs20-grn">'+formatMoney(winAmt, biggestWin.currency || 'TRY')+'</div>'
-        + '<div class="fs105-muted">'+(typeof biggestWin.vatRate === 'number' ? 'KDV %'+biggestWin.vatRate+' dahil' : 'KDV bilgisi yok')+'</div>'
+        + '<div class="fs105-muted">'+(typeof biggestWin.vatRate === 'number' ? t('voff.vat_prefix','KDV %')+biggestWin.vatRate+t('voff.vat_suffix',' dahil') : t('voff.no_vat','KDV bilgisi yok'))+'</div>'
         + '</div>';
       statsArea.appendChild(winBanner);
     }
@@ -15870,13 +15871,13 @@ async function loadVendTab() {
         + '<div class="lbl-mini fw7-mb8">📊 Performans</div>';
       if (avgAcceptDays !== null) {
         insHtml2 += '<div  class="flx-bw-c row-bb">'
-          + '<span>Ort. kabul süresi</span>'
+          + '<span>'+t('voff.avg_accept_time','Ort. kabul süresi')+'</span>'
           + '<span class="fw7-blu">'+avgAcceptDays+' gün</span>'
           + '</div>';
       }
       if (avgAcceptedAmount > 0) {
         insHtml2 += '<div  class="flx-bw-c row-bb">'
-          + '<span>Ort. kabul tutarı</span>'
+          + '<span>'+t('voff.avg_accept_amount','Ort. kabul tutarı')+'</span>'
           + '<span class="fw7-grn">'+formatMoney(avgAcceptedAmount,'TRY')+'</span>'
           + '</div>';
       }
@@ -15890,7 +15891,7 @@ async function loadVendTab() {
         + '<div class="lbl-mini fw7-mb8">🎯 Strateji</div>';
       if (bestType) {
         insHtml2 += '<div  class="flx-bw-c row-bb">'
-          + '<span>En verimli teklif tipi</span>'
+          + '<span>'+t('voff.best_offer_type','En verimli teklif tipi')+'</span>'
           + '<span class="fw7-prp">'+bestType.label+' <span class="txt-muted-12">(%'+bestType.rate+')</span></span>'
           + '</div>';
       } else {
@@ -25402,7 +25403,7 @@ async function admUsers(m) {
             : '<span style="color:#dc2626;font-weight:600">✗ Bekliyor</span>')+
         '</td>'+
         '<td style="white-space:nowrap">'+
-          '<button class="btn-g btn-sm u-view fs11" data-id="'+u.id+'">Detay</button>'+
+          '<button class="btn-g btn-sm u-view fs11" data-id="'+u.id+'">'+t('voff.detail','Detay')+'</button>'+
           (u.emailVerified
             ? '<button class="u-unverify fs11" data-id="'+u.id+'" data-email="'+escHtml(u.email||'')+'" style="margin-left:4px;background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.30);color:#d97706;padding:4px 9px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer" title="E-posta doğrulamasını kaldır">⤴ Kaldır</button>'
             : '<button class="u-verify fs11" data-id="'+u.id+'" data-email="'+escHtml(u.email||'')+'" style="margin-left:4px;background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.30);color:#16a34a;padding:4px 9px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer" title="E-postayı manuel doğrula">✓ Doğrula</button>')+
@@ -25972,7 +25973,7 @@ async function admProducts(m) {
       b.addEventListener('click', async function() {
         if (!confirm('Bu ürünü arşivlemek istiyor musunuz?')) return;
         await updateDoc(doc(db,'products',b.dataset.id), {status:'archived'});
-        showToast('Arşivlendi.');
+        showToast(t('common.toast_archived','Arşivlendi.'));
         all = all.map(function(p){ return p.id===b.dataset.id ? {...p,status:'archived'} : p; });
         applyFilter();
       });
@@ -29148,6 +29149,11 @@ const I18N_DICT = {
     'vinv.expired_info_a':'ℹ️ Süresi dolan (','vinv.expired_info_b':'+ gün cevap alınamayan) davetler buraya otomatik taşınır. <strong>Yeniden Gönder</strong> ile aynı müşteriye yeni davet oluşturabilirsiniz.',
     'vinv.resend':'Yeniden Gönder','vinv.cannot_delete':'Kabul edilen davet silinemez (PoC oluşmuş olabilir)','vinv.reminder_subj':'PoC Daveti Hatırlatması — PoCHub','vinv.reminder_title':'PoC Daveti Hatırlatma','vinv.renewed_title':'PoC Daveti Yenilendi',
     'vinv.customer_fallback':'Müşteri','vinv.cancel_confirm':' kişisine gönderilen davet iptal edilsin mi? Davet "İptal Edildi" olarak işaretlenir, müşteri tarafında pasif olur.','vinv.empty_archived':'Arşivde davet yok.','vinv.empty_none':'Henüz davet göndermediniz.','vinv.toast_cancelled':'Davet iptal edildi.',
+    'common.toast_archived':'Arşivlendi.','vprod.lc_archived_plain':'Arşiv',
+    'voff.loading':'Teklifler yükleniyor...','voff.title':'💰 Tekliflerim','voff.revision':'Revizyon İstendi','voff.archived':'Arşivlendi','voff.revision_short':'Revizyon','voff.process':'SÜREÇ','voff.sent':'Gönderildi','voff.awaiting_response':'Yanıt Bekleniyor',
+    'voff.total_revenue':'Toplam Gelir','voff.pending_pipeline':'Bekleyen Pipeline','voff.avg_accept_time':'Ort. kabul süresi','voff.avg_accept_amount':'Ort. kabul tutarı','voff.best_offer_type':'En verimli teklif tipi',
+    'voff.all_customers':'Tüm Müşteriler','voff.all_products':'Tüm Ürünler','voff.empty_filtered':'Filtre sonucu bulunamadı.','voff.empty_none':'Henüz teklif göndermediniz.','voff.detail':'Detay','voff.type':'Tip','voff.validity':'Geçerlilik',
+    'voff.confirm_archive':'Bu teklifi arşivlemek istiyor musunuz?','voff.toast_deleted':'Teklif kalıcı olarak silindi.','voff.vat_prefix':'KDV %','voff.vat_suffix':' dahil','voff.no_vat':'KDV bilgisi yok',
   },
   en: {
     // Hero / Home
@@ -29371,6 +29377,11 @@ const I18N_DICT = {
     'vinv.expired_info_a':'ℹ️ Expired (','vinv.expired_info_b':'+ days no response) invitations move here automatically. Use <strong>Resend</strong> to create a new invitation for the same customer.',
     'vinv.resend':'Resend','vinv.cannot_delete':'Accepted invitations cannot be deleted (a PoC may have been created)','vinv.reminder_subj':'PoC Invitation Reminder — PoCHub','vinv.reminder_title':'PoC Invitation Reminder','vinv.renewed_title':'PoC Invitation Renewed',
     'vinv.customer_fallback':'Customer','vinv.cancel_confirm':' — cancel the invitation sent to this contact? The invitation will be marked "Cancelled" and become passive on the customer side.','vinv.empty_archived':'No archived invitations.','vinv.empty_none':'You have not sent any invitations yet.','vinv.toast_cancelled':'Invitation cancelled.',
+    'common.toast_archived':'Archived.','vprod.lc_archived_plain':'Archive',
+    'voff.loading':'Loading offers...','voff.title':'💰 My Offers','voff.revision':'Revision Requested','voff.archived':'Archived','voff.revision_short':'Revision','voff.process':'PROCESS','voff.sent':'Sent','voff.awaiting_response':'Awaiting Response',
+    'voff.total_revenue':'Total Revenue','voff.pending_pipeline':'Pending Pipeline','voff.avg_accept_time':'Avg. acceptance time','voff.avg_accept_amount':'Avg. acceptance amount','voff.best_offer_type':'Most effective offer type',
+    'voff.all_customers':'All Customers','voff.all_products':'All Products','voff.empty_filtered':'No results for filters.','voff.empty_none':'You have not sent any offers yet.','voff.detail':'Detail','voff.type':'Type','voff.validity':'Validity',
+    'voff.confirm_archive':'Do you want to archive this offer?','voff.toast_deleted':'Offer permanently deleted.','voff.vat_prefix':'VAT %','voff.vat_suffix':' incl.','voff.no_vat':'No VAT info',
   }
 };
 
