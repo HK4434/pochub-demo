@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.25 | pochub.co -->
+<!-- PoCHub v6.26 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.25';
+const VERSION = 'v6.26';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.26': ['i18n FAZ 4g (vendor Davetlerim / vendInvites — vendor poc_invites) — statusLabels (status.*+vinv.accepted/expired/cancelled), baslik, 6 stat karti (Toplam/Bekliyor/Kabul/Red/Suresi Doldu/Kabul Orani), suresi-dolan bilgi bandi, filtre varsayilani, bos-durumlar, Yeniden Gonder butonu + kabul-edilen-silinmez ipucu, hatirlatma/yenilendi e-posta+bildirim basliklari, iptal onayi (tirnak-guvenli) + toast t()-e sarildi + vinv.* (status/off/vprod/common yeniden). node --check + harness OK. UI — RULES degismedi.'],
   'v6.25': ['i18n FAZ 4f (vendor Etkinliklerim / events branch) — evStatusLabels (status.*+vevt.draft), baslik, 7 stat karti (Toplam/Yaklasan/Aktif Kayit/Tamamlanan/Doluluk/Bu Ay/Ort. Katilimci), icgoru (En verimli format/ilgi goren kategori/en iyi gun-saat/gecmis performans), format filtresi (Tum Formatlar/Online/Yuz Yuze/Hibrit — loc.* yeniden), bos-durumlar, liste tablo basliklari, klonla/iptal/arsivle/sil toast+onay t()-e sarildi + vevt.* + APP-WIDE common.confirm (Emin misiniz? 4 onayda). NOT: gun adlari ortak tarih-slice-ina kaldi. node --check + harness OK. UI — RULES degismedi.'],
   'v6.24': ['i18n FAZ 4e (vendor Reklamlarim / vendFeatured) — loading, baslik+alt-baslik, 4 stat karti (Aktif Yerlesim/Toplam Harcama/Toplam Tik/Featured PoC), bos-durum+ipucu, yerlesim status map (Aktif/Onay Bekliyor/Iptal — status.* + vad.pending), Suresi Dolmus, error t()-e sarildi + vad.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
   'v6.23': ['i18n FAZ 4d (vendor Portfoyum / vendPortfolio) — role-bazli baslik (Urun/Dagitim/Entegrasyon Portfoyum), 8 stat karti (Toplam/Yayinda/Onay Bekleyen/Kategori/Toplam PoC/Toplam Teklif/Kabul Orani/Pipeline), arama placeholder, filtreler (Tum Kategoriler/Ulkeler/Durumlar/Ureticiler), bos-durumlar, Distributorler/Uretici/Entegrator yok onekleri, loading/error t()-e sarildi + vport.* (off/vprod/creq/common yeniden kullanildi). NOT: distributor portfoyu (vendDistributorProducts) ayri. node --check + harness OK. UI — RULES degismedi.'],
@@ -16792,7 +16793,7 @@ async function vendInvites(m) {
     }).catch(function(){});
   }
 
-  var statusLabels = {pending:'Bekliyor', accepted:'Kabul Edildi', declined:'Reddedildi', expired:'Süresi Doldu', cancelled:'İptal Edildi'};
+  var statusLabels = {pending:t('status.pending','Bekliyor'), accepted:t('vinv.accepted','Kabul Edildi'), declined:t('status.rejected','Reddedildi'), expired:t('vinv.expired','Süresi Doldu'), cancelled:t('vinv.cancelled','İptal Edildi')};
   var statusColors = {pending:'#d97706', accepted:'#16a34a', declined:'#dc2626', expired:'#64748b', cancelled:'#64748b'};
   var statusIcons  = {pending:'⏳', accepted:'✓', declined:'✕', expired:'⏰', cancelled:'⊘'};
 
@@ -16862,7 +16863,7 @@ async function vendInvites(m) {
     var hdr = document.createElement('div');
     hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
     hdr.innerHTML = '<div class="flx-c-g10">'
-      + '<h2 class="fs18-fw7">📨 Davetlerim</h2>'
+      + '<h2 class="fs18-fw7">'+t('vinv.title','📨 Davetlerim')+'</h2>'
       + '<span class="txt-muted-12">' + counts.active + ' aktif · ' + counts.archived + ' arşiv · ' + counts.trash + ' çöp</span>'
       + '</div>'
       + '<button class="btn-p btn-sm" id="vend-new-invite-btn">+ Yeni Davet</button>';
@@ -16873,12 +16874,12 @@ async function vendInvites(m) {
       var statsRow = document.createElement('div');
       statsRow.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px';
       var statCards = [
-        ['Toplam',     stats.total,     '#2563eb', 'rgba(37,99,235,.08)', 'rgba(37,99,235,.2)'],
-        ['Bekliyor',   stats.pending,   '#d97706', 'rgba(217,119,6,.08)',  'rgba(217,119,6,.2)'],
-        ['Kabul',      stats.accepted,  '#16a34a', 'rgba(22,163,74,.08)',  'rgba(22,163,74,.2)'],
-        ['Red',        stats.declined,  '#dc2626', 'rgba(220,38,38,.08)', 'rgba(220,38,38,.2)'],
-        ['Süresi Doldu', stats.expired, '#64748b', 'rgba(90,98,120,.08)',   'rgba(90,98,120,.2)'],
-        ['Kabul Oranı', acceptRate + '%', '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
+        [t('off.st_total','Toplam'),     stats.total,     '#2563eb', 'rgba(37,99,235,.08)', 'rgba(37,99,235,.2)'],
+        [t('status.pending','Bekliyor'),   stats.pending,   '#d97706', 'rgba(217,119,6,.08)',  'rgba(217,119,6,.2)'],
+        [t('vinv.st_accepted','Kabul'),      stats.accepted,  '#16a34a', 'rgba(22,163,74,.08)',  'rgba(22,163,74,.2)'],
+        [t('vinv.st_declined','Red'),        stats.declined,  '#dc2626', 'rgba(220,38,38,.08)', 'rgba(220,38,38,.2)'],
+        [t('vinv.expired','Süresi Doldu'), stats.expired, '#64748b', 'rgba(90,98,120,.08)',   'rgba(90,98,120,.2)'],
+        [t('vprod.st_accept_rate','Kabul Oranı'), acceptRate + '%', '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
       ];
       statCards.forEach(function(s){
         var card = document.createElement('div');
@@ -16923,7 +16924,7 @@ async function vendInvites(m) {
       if (autoExpiredCount > 0) {
         var info = document.createElement('div');
         info.style.cssText = 'background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#2563eb';
-        info.innerHTML = 'ℹ️ Süresi dolan ('+INVITE_EXPIRY_DAYS+'+ gün cevap alınamayan) davetler buraya otomatik taşınır. <strong>Yeniden Gönder</strong> ile aynı müşteriye yeni davet oluşturabilirsiniz.';
+        info.innerHTML = t('vinv.expired_info_a','ℹ️ Süresi dolan (')+INVITE_EXPIRY_DAYS+t('vinv.expired_info_b','+ gün cevap alınamayan) davetler buraya otomatik taşınır. <strong>Yeniden Gönder</strong> ile aynı müşteriye yeni davet oluşturabilirsiniz.');
         m.appendChild(info);
       }
     }
@@ -16943,7 +16944,7 @@ async function vendInvites(m) {
       var sfRow = document.createElement('div');
       sfRow.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
       ['','pending','accepted','declined','expired','cancelled'].forEach(function(s){
-        var lbl = s ? statusLabels[s] : 'Tümü';
+        var lbl = s ? statusLabels[s] : t('common.all','Tümü');
         var b = document.createElement('button');
         b.className = 'btn-' + (filterStatus===s?'p':'g') + ' btn-sm';
         b.style.cssText = 'font-size:12px';
@@ -16960,8 +16961,8 @@ async function vendInvites(m) {
       emp.className = 'empty';
       var icon = filterLifecycle==='trash' ? '🗑' : filterLifecycle==='archived' ? '📦' : '📨';
       var msg2 = filterLifecycle==='trash' ? t('vprod.empty_trash','Çöp kutusu boş.')
-               : filterLifecycle==='archived' ? 'Arşivde davet yok.'
-               : (searchVal||filterStatus ? 'Arama sonucu bulunamadı.' : 'Henüz davet göndermediniz.');
+               : filterLifecycle==='archived' ? t('vinv.empty_archived','Arşivde davet yok.')
+               : (searchVal||filterStatus ? t('common.no_search_results','Arama sonucu bulunamadı.') : t('vinv.empty_none','Henüz davet göndermediniz.'));
       emp.innerHTML = '<div class="empty-icon">'+icon+'</div>' + msg2;
       m.appendChild(emp);
     } else {
@@ -17024,14 +17025,14 @@ async function vendInvites(m) {
           }
 
           if (inv.status === 'declined' || inv.status === 'expired' || inv.status === 'cancelled') {
-            actHtml += '<button class="vi-resend lc-act lc-act-act" data-id="'+inv.id+'">↻ Yeniden Gönder</button>';
+            actHtml += '<button class="vi-resend lc-act lc-act-act" data-id="'+inv.id+'">↻ '+t('vinv.resend','Yeniden Gönder')+'</button>';
           }
 
           if (inv.status !== 'accepted') {
             actHtml += '<button class="vi-arch lc-act lc-act-arch" data-id="'+inv.id+'" title="Arşive al">📦</button>';
             actHtml += '<button class="vi-trash lc-act lc-act-tr" data-id="'+inv.id+'" data-cn="'+(inv.customerName||'').replace(/"/g,"&quot;")+'" title="Çöpe at">🗑</button>';
           } else {
-            actHtml += '<span style="font-size:11px;color:var(--text-muted);align-self:center;font-style:italic">Kabul edilen davet silinemez (PoC oluşmuş olabilir)</span>';
+            actHtml += '<span style="font-size:11px;color:var(--text-muted);align-self:center;font-style:italic">'+t('vinv.cannot_delete','Kabul edilen davet silinemez (PoC oluşmuş olabilir)')+'</span>';
           }
 
           actHtml += '</div>';
@@ -17091,7 +17092,7 @@ async function vendInvites(m) {
           // E-posta + bildirim
           if (b.dataset.ce && typeof sendEmail === 'function') {
             sendEmail(b.dataset.ce, b.dataset.cn,
-              'PoC Daveti Hatırlatması — PoCHub',
+              t('vinv.reminder_subj','PoC Daveti Hatırlatması — PoCHub'),
               (CUR_PROFILE?.company || CUR_PROFILE?.displayName || CUR_USER.email) + ' size daha önce "' + b.dataset.pn + '" ürünü için PoC daveti göndermişti. Cevap bekliyoruz.',
               'pochub.co üzerinden davete cevap verebilirsiniz.'
             );
@@ -17101,7 +17102,7 @@ async function vendInvites(m) {
             await addDoc(collection(db,'notifications'), {
               userId: inv.customerId,
               type: 'invite_reminder',
-              title: 'PoC Daveti Hatırlatma',
+              title: t('vinv.reminder_title','PoC Daveti Hatırlatma'),
               message: (CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) + ' "' + b.dataset.pn + '" daveti için hatırlatma gönderdi.',
               fromUserId: CUR_USER.uid,
               read: false,
@@ -17117,14 +17118,14 @@ async function vendInvites(m) {
     // İptal et (pending)
     m.querySelectorAll('.vi-cancel').forEach(function(b){
       b.addEventListener('click', async function(){
-        if (!confirm((b.dataset.cn||'Müşteri') + ' kişisine gönderilen davet iptal edilsin mi? Davet "İptal Edildi" olarak işaretlenir, müşteri tarafında pasif olur.')) return;
+        if (!confirm((b.dataset.cn||t('vinv.customer_fallback','Müşteri')) + t('vinv.cancel_confirm',' kişisine gönderilen davet iptal edilsin mi? Davet "İptal Edildi" olarak işaretlenir, müşteri tarafında pasif olur.'))) return;
         b.disabled = true;
         try {
           await updateDoc(doc(db,'poc_invites',b.dataset.id), {
             status: 'cancelled',
             cancelledAt: serverTimestamp(),
           });
-          showToast('Davet iptal edildi.');
+          showToast(t('vinv.toast_cancelled','Davet iptal edildi.'));
           refresh();
         } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); b.disabled = false; }
       });
@@ -17164,7 +17165,7 @@ async function vendInvites(m) {
             await addDoc(collection(db,'notifications'), {
               userId: inv.customerId,
               type: 'poc_invite',
-              title: 'PoC Daveti Yenilendi',
+              title: t('vinv.renewed_title','PoC Daveti Yenilendi'),
               message: (CUR_PROFILE?.company||CUR_PROFILE?.displayName||CUR_USER.email) + ' "' + (inv.productName||'') + '" daveti yeniden gönderdi.',
               fromUserId: CUR_USER.uid,
               read: false,
@@ -17225,7 +17226,7 @@ async function vendInvites(m) {
 // Davet Detay Modal — vendor için (v4.41)
 // ════════════════════════════════════════════════════════════════
 function openInviteDetailModal(inv) {
-  var statusLabels = {pending:'Bekliyor', accepted:'Kabul Edildi', declined:'Reddedildi', expired:'Süresi Doldu', cancelled:'İptal Edildi'};
+  var statusLabels = {pending:t('status.pending','Bekliyor'), accepted:t('vinv.accepted','Kabul Edildi'), declined:t('status.rejected','Reddedildi'), expired:t('vinv.expired','Süresi Doldu'), cancelled:t('vinv.cancelled','İptal Edildi')};
   var statusColors = {pending:'#d97706', accepted:'#16a34a', declined:'#dc2626', expired:'#64748b', cancelled:'#64748b'};
   var locLabels = {online:'🌐 Online', customer:'📍 Müşteri Lokasyonu', vendor:'🏢 Vendor Lokasyonu', hybrid:'🔄 Hibrit'};
 
@@ -29143,6 +29144,10 @@ const I18N_DICT = {
     'vevt.best_format':'En verimli format','vevt.top_category':'En çok ilgi gören kategori','vevt.best_daytime':'En iyi gün/saat','vevt.best_perf':'Geçmiş verilerinize göre en iyi performans: ',
     'vevt.all_formats':'Tüm Formatlar','vevt.in_person':'Yüz Yüze','vevt.empty_archived':'Arşivde etkinlik yok.','vevt.empty_none':'Henüz etkinlik oluşturmadınız.',
     'vevt.col_title':'Başlık','vevt.col_format':'Format','vevt.col_registered':'Kayıtlı','vevt.toast_cancelled':'Etkinlik iptal edildi.','vevt.clone_error':'Klonlama hatası: ','vevt.toast_perm_deleted':'Kalıcı silindi.',
+    'vinv.title':'📨 Davetlerim','vinv.accepted':'Kabul Edildi','vinv.expired':'Süresi Doldu','vinv.cancelled':'İptal Edildi','vinv.st_accepted':'Kabul','vinv.st_declined':'Red',
+    'vinv.expired_info_a':'ℹ️ Süresi dolan (','vinv.expired_info_b':'+ gün cevap alınamayan) davetler buraya otomatik taşınır. <strong>Yeniden Gönder</strong> ile aynı müşteriye yeni davet oluşturabilirsiniz.',
+    'vinv.resend':'Yeniden Gönder','vinv.cannot_delete':'Kabul edilen davet silinemez (PoC oluşmuş olabilir)','vinv.reminder_subj':'PoC Daveti Hatırlatması — PoCHub','vinv.reminder_title':'PoC Daveti Hatırlatma','vinv.renewed_title':'PoC Daveti Yenilendi',
+    'vinv.customer_fallback':'Müşteri','vinv.cancel_confirm':' kişisine gönderilen davet iptal edilsin mi? Davet "İptal Edildi" olarak işaretlenir, müşteri tarafında pasif olur.','vinv.empty_archived':'Arşivde davet yok.','vinv.empty_none':'Henüz davet göndermediniz.','vinv.toast_cancelled':'Davet iptal edildi.',
   },
   en: {
     // Hero / Home
@@ -29362,6 +29367,10 @@ const I18N_DICT = {
     'vevt.best_format':'Most effective format','vevt.top_category':'Most popular category','vevt.best_daytime':'Best day/time','vevt.best_perf':'Best performance based on your past data: ',
     'vevt.all_formats':'All Formats','vevt.in_person':'In-Person','vevt.empty_archived':'No archived events.','vevt.empty_none':'You have not created any events yet.',
     'vevt.col_title':'Title','vevt.col_format':'Format','vevt.col_registered':'Registered','vevt.toast_cancelled':'Event cancelled.','vevt.clone_error':'Clone error: ','vevt.toast_perm_deleted':'Permanently deleted.',
+    'vinv.title':'📨 My Invitations','vinv.accepted':'Accepted','vinv.expired':'Expired','vinv.cancelled':'Cancelled','vinv.st_accepted':'Accepted','vinv.st_declined':'Declined',
+    'vinv.expired_info_a':'ℹ️ Expired (','vinv.expired_info_b':'+ days no response) invitations move here automatically. Use <strong>Resend</strong> to create a new invitation for the same customer.',
+    'vinv.resend':'Resend','vinv.cannot_delete':'Accepted invitations cannot be deleted (a PoC may have been created)','vinv.reminder_subj':'PoC Invitation Reminder — PoCHub','vinv.reminder_title':'PoC Invitation Reminder','vinv.renewed_title':'PoC Invitation Renewed',
+    'vinv.customer_fallback':'Customer','vinv.cancel_confirm':' — cancel the invitation sent to this contact? The invitation will be marked "Cancelled" and become passive on the customer side.','vinv.empty_archived':'No archived invitations.','vinv.empty_none':'You have not sent any invitations yet.','vinv.toast_cancelled':'Invitation cancelled.',
   }
 };
 
