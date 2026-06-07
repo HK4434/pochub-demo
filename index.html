@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.37 | pochub.co -->
+<!-- PoCHub v6.38 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.37';
+const VERSION = 'v6.38';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.38': ['i18n FAZ 6a (PAYLASILAN SLICE — tarih: ay/gun adlari locale-aware) — t() yanina 5 helper eklendi: MONTHS_L / MONTHS_SHORT_L / DOWS_L (Pazar-bazli) / DOWS_MON_L (Pazartesi-bazli) / DOWS_SHORT_MON_L (takvim grid Pt/Sa/Ca). Uygulamadaki 13 tekrar eden tam-ay/gun dizisi + 1 kisa-ay kullanimi + 5 kisa-gun grid basligi bu helperlara baglandi (assignment-context anchor ile helper govdesine dokunulmadan). Boylece takvim, etkinlik, dashboard ve tum tarih gosterimleri tek noktadan EN/TR. setLocale zaten ekrani yeniden render ettiginden canli gecis calisir. node --check + harness OK. UI — RULES degismedi.'],
   'v6.37': ['i18n FAZ 5h (FORM & MODALLAR — vendor müşteri-davet / openSendInviteModal) — premium/ucretsiz limit bandi + rozetler, baslik+alt-baslik, Davet Edilecek Urun + urun-sec, POC DETAYLARI, PoC Kapsami/Tahmini Sure/Lokasyon Tercihi/Ozel Mesaj/Davet Edilecekler etiketleri, sure opsiyonlari (1 Saat..Muzakereye Acik), lokasyon (vendor/hibrit — loc.* reuse), placeholderlar, validasyon (urun/alici/gunluk limit), bildirim basligi t()-e sarildi + sinv.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
   'v6.36': ['i18n FAZ 5g (FORM & MODALLAR — auth vendor-alt-tip + KVKK onaylari) — Yerli/Yabanci Uretici radyolari, distributor sec etiketi+ipucu+Ekle butonu, temsil edilen markalar, entegrator/is ortaklari+Ekle butonu+kural notu, calisilan markalar, KVKK/GDPR onay kutulari (Aydinlatma Metni/Kullanim Kosullari/Cerez Politikasi link+suffix, pazarlama, profil acik riza), zorunlu-onay hata mesaji, dist/int satir placeholderlari t()-e sarildi + auth.* (apostroflu suffixler cift-tirnak fallback). add-dist butonu auth(template)+vpf(concat) ayri sarildi. node --check + harness OK. AUTH FORMU TAMAM. UI — RULES degismedi.'],
   'v6.35': ['i18n FAZ 5f (FORM & MODALLAR — odeme modallari: odeme talebi + kart girisi + borc odeme) — openPaymentRequestModal (Siparis Ozeti/Tutar/Sure/gun/Odeme Yontemi Sec/Kredi Karti-iyzico/Yeni Kart/Manuel Havale+aciklama), openCardEntryModal (Test Modu+simulasyon notu/kart alanlari/placeholder/validasyon mesajlari), openBillingPaymentModal (Borc Odeme/Havale Bilgileri/transfer notu/Odeme Talebi Gonder/toast), PAYLASILAN banka bilgileri (Hesap Sahibi/IBAN/Aciklama) t()-e sarildi + pay.* (vpkg yeniden). NOT: kart marka tespiti (Visa/MC) literal. node --check + harness OK. UI — RULES degismedi.'],
@@ -5553,9 +5554,9 @@ async function renderHome() {
 
   // Takvim render
   async function renderCalendar(year, month) {
-    const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    const months = MONTHS_L();
     el('cal-title').textContent = months[month] + ' ' + year;
-    const dows = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
+    const dows = DOWS_SHORT_MON_L();
     const firstDay = new Date(year, month, 1).getDay();
     const offset = firstDay === 0 ? 6 : firstDay - 1;
     const daysInMonth = new Date(year, month+1, 0).getDate();
@@ -5687,7 +5688,7 @@ async function renderHome() {
   renderCalendar(calYear, calMonth);
 
   // Ay değişince listeyi güncelle — temiz listener
-  const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  const MONTHS_TR = MONTHS_L();
 
   async function changeMonth(delta) {
     calMonth += delta;
@@ -11527,7 +11528,7 @@ async function loadCustTab() {
     if (weekUpcomingD.length > 0) {
       var weekBanD = document.createElement('div');
       weekBanD.style.cssText = 'background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
-      var dows = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+      var dows = DOWS_L();
       var wHtml = '<div style="font-size:12.5px;color:#2563eb;font-weight:700;margin-bottom:8px">📅 BU HAFTA YAKLAŞAN ('+weekUpcomingD.length+' kayıt)</div>';
       weekUpcomingD.slice(0,5).forEach(function(w){
         var dow = dows[w.date.getDay()];
@@ -11756,7 +11757,7 @@ async function loadCustTab() {
 
     // En yoğun ay (geçmiş etkinlikler)
     var monthCount = {};
-    var monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    var monthNames = MONTHS_L();
     regs.forEach(function(r){
       var d = getEventDateMs(r);
       if (!d || r.status === 'cancelled') return;
@@ -11842,7 +11843,7 @@ async function loadCustTab() {
       if (weekItems.length > 0) {
         var weekBan = document.createElement('div');
         weekBan.style.cssText = 'background:linear-gradient(135deg,rgba(22,163,74,.08),rgba(37,99,235,.08));border:1px solid rgba(22,163,74,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px';
-        var dows = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+        var dows = DOWS_L();
         var wHtml = '<div style="font-size:12.5px;color:#16a34a;font-weight:700;margin-bottom:8px">🚨 BU HAFTA KATILACAKLARIM ('+weekItems.length+' etkinlik)</div>';
         weekItems.slice(0,5).forEach(function(w){
           var d2 = new Date(w._date);
@@ -13314,7 +13315,7 @@ async function loadVendTab() {
     if (weekUpcoming.length > 0) {
       var weekBan = document.createElement('div');
       weekBan.style.cssText = 'background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
-      var dows = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+      var dows = DOWS_L();
       var wHtml = '<div style="font-size:12.5px;color:#2563eb;font-weight:700;margin-bottom:8px">📅 BU HAFTA YAKLAŞAN ('+weekUpcoming.length+' kayıt)</div>';
       weekUpcoming.slice(0,5).forEach(function(w){
         var dow = dows[w.date.getDay()];
@@ -13638,8 +13639,8 @@ async function loadVendTab() {
 
     // ── Takvim grid renderer ────────────────────────────────────────
     function renderCalGrid(year, month) {
-      var months   = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-      var dows     = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
+      var months   = MONTHS_L();
+      var dows     = DOWS_SHORT_MON_L();
       var firstDay = new Date(year, month, 1).getDay();
       var offset   = firstDay === 0 ? 6 : firstDay - 1;
       var daysInMo = new Date(year, month+1, 0).getDate();
@@ -13877,7 +13878,7 @@ async function loadVendTab() {
       // ── 🔥 YAKLAŞAN 7 GÜN BANNER ──
       var weekItemsExceptToday = weekItems.filter(function(x){ return x.date >= todayEnd; });
       if (weekItemsExceptToday.length > 0) {
-        var dows2 = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+        var dows2 = DOWS_L();
         var weekBanner = document.createElement('div');
         weekBanner.style.cssText = 'background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
         var wHtml = '<div style="font-size:12.5px;color:#2563eb;font-weight:700;margin-bottom:8px">🔥 YAKLAŞAN 7 GÜN ('+weekItemsExceptToday.length+' kayıt)</div>';
@@ -14119,7 +14120,7 @@ async function loadVendTab() {
         });
         if (!dayItems.length) return;
         // Mini popup
-        var months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+        var months = MONTHS_L();
         var popup = document.createElement('div');
         popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
         popup.innerHTML = '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:360px;width:90%;max-height:80vh;overflow-y:auto">'
@@ -15030,7 +15031,7 @@ async function loadVendTab() {
               + '</div>';
           }
           if (bestHour) {
-            var dows = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
+            var dows = DOWS_SHORT_MON_L();
             insHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:12.5px">'
               + '<span>'+t('vevt.best_daytime','En iyi gün/saat')+'</span>'
               + '<span class="fw7-prp">'+dows[bestHour.dow]+' '+String(bestHour.hr).padStart(2,'0')+':00 <span class="txt-muted-12">· ort. '+Math.round(bestHour.avg)+' kayıt</span></span>'
@@ -15043,7 +15044,7 @@ async function loadVendTab() {
           if (Object.keys(hourMap).length >= 4) {
             var hmWrap = document.createElement('div');
             hmWrap.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;overflow-x:auto';
-            var dows2 = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
+            var dows2 = DOWS_SHORT_MON_L();
             var maxAvg = 1;
             Object.values(hourMap).forEach(function(c2){ var av = c2.reg/c2.cnt; if (av > maxAvg) maxAvg = av; });
 
@@ -15076,7 +15077,7 @@ async function loadVendTab() {
 
           // ─── Otomatik Öneri ─────
           if (bestHour && bestFmt && bestCat) {
-            var dows3 = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+            var dows3 = DOWS_MON_L();
             var sugWrap = document.createElement('div');
             sugWrap.style.cssText = 'background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(168,85,247,.08));border:1px solid rgba(37,99,235,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
             sugWrap.innerHTML = '<div style="font-size:11px;color:#2563eb;font-weight:700;margin-bottom:6px">💡 ÖNERİ</div>'
@@ -20168,7 +20169,7 @@ async function vendAnalytics(m) {
     for (var i = monthsToShow - 1; i >= 0; i--) {
       var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       var nextD = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-      var label = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()];
+      var label = MONTHS_SHORT_L()[d.getMonth()];
       var count = pocs.filter(function(p){
         var t = p.createdAt?.toMillis ? p.createdAt.toMillis() : 0;
         return t >= d.getTime() && t < nextD.getTime();
@@ -23987,8 +23988,8 @@ async function renderVendorCalendar(m) {
   }
 
   function renderCalView(items, container) {
-    var MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-    var DAYS = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
+    var MONTHS = MONTHS_L();
+    var DAYS = DOWS_SHORT_MON_L();
 
     // O aya ait item'ları gün bazında grupla
     var dayMap = {};
@@ -24085,7 +24086,7 @@ async function renderVendorCalendar(m) {
     '</div>' +
     '<div id="vcal-content"></div>';
 
-  var MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  var MONTHS_TR = MONTHS_L();
 
   function updateMonthLabel() {
     var lbl = document.getElementById('vcal-month-label');
@@ -29507,6 +29508,36 @@ function t(key, fallback) {
   if (locale !== 'tr' && I18N_DICT.tr && I18N_DICT.tr[key]) return I18N_DICT.tr[key];
   // Fallback parametresi veya key'in kendisi
   return fallback !== undefined ? fallback : key;
+}
+
+// ── Locale-aware tarih dizileri (paylaşılan slice) ──────────────────
+function MONTHS_L() {
+  return (window.CUR_LOCALE === 'en')
+    ? ['January','February','March','April','May','June','July','August','September','October','November','December']
+    : ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+}
+function MONTHS_SHORT_L() {
+  return (window.CUR_LOCALE === 'en')
+    ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    : ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+}
+// Pazar-bazli (index 0 = Pazar)
+function DOWS_L() {
+  return (window.CUR_LOCALE === 'en')
+    ? ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    : ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+}
+// Pazartesi-bazli (index 0 = Pazartesi)
+function DOWS_MON_L() {
+  return (window.CUR_LOCALE === 'en')
+    ? ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+    : ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+}
+// Kisa gun basliklari, Pazartesi-bazli (takvim grid)
+function DOWS_SHORT_MON_L() {
+  return (window.CUR_LOCALE === 'en')
+    ? ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+    : ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
 }
 
 // Dil değiştir
