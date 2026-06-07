@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.19 | pochub.co -->
+<!-- PoCHub v6.20 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.19';
+const VERSION = 'v6.20';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.20': ['i18n FAZ 4a (VENDOR tarafi basladi — PoC Talepleri / vendRequests) — baslik, 8 stat karti (Toplam/Bekleyen/Aktif/Tamamlanan/Reddedilen/Bu Ay Yeni/Ort. Yanit/Donusum), icgoru etiketleri (Ort. yanit-PoC suresi, Donusum orani, En cok talep gelen urun, Yogun saat, Bu hafta yeni), yerel stL status map (status.*-e), durum filtresi, bos-durumlar, Kapsam/Gereksinimler/Belirtilmemis, Reddet butonu + ret gerekce prompt + toast + tercih-tarihi rozeti t()-e sarildi + vreq.* (status/creq/reg/off/common yeniden kullanildi). node --check + harness OK. UI — RULES degismedi.'],
   'v6.19': ['i18n FAZ 3o (Mesajlar sekmesi — PAYLASILAN musteri+vendor) — loadMessagesTab: 7 stat karti (Toplam Yazisma/Okunmamis/Yanitsiz/Bugun Aktif/Bu Hafta Yeni/Toplam Mesaj/Ort. Bekleme), ust alt-filtre (Aktif/Arsiv/Silinen) + durum filtresi (Tumu/Okunmamis/Aktif PoC/Bu Ay), yazisma aksiyon buton title-lari (Sabitle/Kaldir/Aktife Al/Arsivle/Sil/Geri Al/Hemen sil), onizleme (Siz:/Henuz mesaj yok), bos-durumlar, arama placeholder, Tumunu Okundu Isaretle, PoC Taleplerime Git ve tum aksiyon toast-lari t()-e sarildi + msg.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
   'v6.18': ['i18n FAZ 3n (Profil formu — son kisim) — placeholder-lar (Ad/Firma/Departman/Telefon/Vergi-MERSIS/Uzmanlik/Detay/Sertifika/Pozisyon/Ilgi/kisa tanitim/adresler), bildirim tercih satirlari (7 satir: baslik+aciklama — Islemsel/Sistem/Pazarlama/Bulten/SMS Acil-Pazarlama/Uygulama-ici), KVKK/Goruntule butonlari, foto notu, GDPR veri-indirme notu, dosya-boyut hatasi t()-e sarildi + prof.ph_*/n_* (tr/en). AYRICA app-wide: common.view, common.must_login ve common.error_prefix (Hata: oneki ~86 yerde) baglandi. NOT: profil SEKTOR dropdownu taksonomi (PROFILE_SECTOR_LABEL/TAXONOMY_DEFAULTS) — ay/gun gibi ayri paylasilan slice-ta. node --check + harness OK. UI — RULES degismedi.'],
   'v6.17': ['i18n FAZ 3m (Profil formu — yapi+kontroller, PAYLASILAN 3 rol) — bolum basliklari (Musteri/Vendor/Admin Bilgileri, Public Profile, Adres & Sosyal, Tehlikeli Bolge, KVKK Haklariniz), notlar (Hesap yonet/E-posta degistirilemez/logo+public ipucu/tehlike notu/Sifre Degistir), e-posta dogrulama rozetleri, sirket-buyuklugu + vergi-turu + karar-rolu secenekleri, Seciniz, foto durum/onay/toast t()-e sarildi + prof.* (tr/en). AYRICA app-wide: tum Kaydet (16) ve Vazgec (22) butonlari common.save/common.cancel-e baglandi. NOT: placeholder + sektor listesi + bildirim/KVKK onay satirlari + Goruntule butonlari v6.18de. node --check + harness OK. UI — RULES degismedi.'],
@@ -9586,7 +9587,7 @@ async function custInvites(m) {
             + '</div>';
         }
         insHtmlCi += '<div class="flx-bw-c fs115-p5y">'
-          + '<span>Bu hafta yeni</span>'
+          + '<span>'+t('vreq.week_new','Bu hafta yeni')+'</span>'
           + '<span style="font-weight:700;color:#d97706">'+statsCi.newThisWeek+'</span>'
           + '</div>'
           + '</div>';
@@ -10695,7 +10696,7 @@ async function loadCustTab() {
           var p1 = r.preferredDateTime1.toDate ? r.preferredDateTime1.toDate() : new Date(r.preferredDateTime1);
           if (!isNaN(p1.getTime()) && p1.getTime() < nowMsRq) {
             var pastDays = Math.floor((nowMsRq - p1.getTime())/86400000);
-            actionReqs.push({r:r, reason:'Tercih tarihi '+pastDays+' gün önce geçti', priority:3});
+            actionReqs.push({r:r, reason:t('vreq.pref_date1','Tercih tarihi ')+pastDays+t('vreq.pref_date2',' gün önce geçti'), priority:3});
           }
         }
       }
@@ -10926,7 +10927,7 @@ async function loadCustTab() {
         if (q || fs || preset) {
           emptyDiv.innerHTML = renderEmpty({
             emoji: '🔍',
-            title: 'Sonuç bulunamadı',
+            title: t('common.no_results','Sonuç bulunamadı'),
             desc: t('creq.empty_search','Aramanızla eşleşen PoC talebi yok. Filtre ayarlarını değiştirin veya tümünü görüntüleyin.'),
             ctaText: t('common.clear_filters','Tüm Filtreleri Temizle')
           });
@@ -12518,7 +12519,7 @@ async function loadOffersWithComparison(m) {
         if (filters.search || filters.status || filters.vendor) {
           empty.innerHTML = renderEmpty({
             emoji: '🔍',
-            title: 'Sonuç bulunamadı',
+            title: t('common.no_results','Sonuç bulunamadı'),
             desc: 'Filtre kriterlerinize uyan teklif yok. Filtreleri sıfırlayıp tüm teklifleri görüntüleyin.',
             ctaText: t('off.reset_filters','Filtreleri Sıfırla')
           });
@@ -14042,7 +14043,7 @@ async function loadVendTab() {
         } else {
           var pocList = document.createElement('div');
           var stC = {pending:'#d97706',active:'#16a34a',completed:'#2563eb',rejected:'#dc2626',cancelled:'#64748b'};
-          var stL = {pending:'Bekliyor',active:'Aktif',completed:'Tamamlandı',rejected:'Reddedildi',cancelled:'İptal'};
+          var stL = {pending:t('status.pending','Bekliyor'),active:t('status.active','Aktif'),completed:t('status.completed','Tamamlandı'),rejected:t('status.rejected','Reddedildi'),cancelled:t('status.cancelled','İptal')};
           pocSorted.forEach(function(p) {
             var sc  = stC[p.status]||'#64748b';
             var sl  = stL[p.status]||p.status;
@@ -16174,7 +16175,7 @@ async function vendRequests(m) {
   } catch(e) {}
 
   var stC = {pending:'#d97706',active:'#16a34a',completed:'#2563eb',rejected:'#dc2626',cancelled:'#64748b'};
-  var stL = {pending:'Bekliyor',active:'Aktif',completed:'Tamamlandı',rejected:'Reddedildi',cancelled:'İptal'};
+  var stL = {pending:t('status.pending','Bekliyor'),active:t('status.active','Aktif'),completed:t('status.completed','Tamamlandı'),rejected:t('status.rejected','Reddedildi'),cancelled:t('status.cancelled','İptal')};
   var locL = {online:'🌐 Online',customer:'📍 Müşteri Lok.',vendor:'🏢 Vendor Lok.',hybrid:'🔄 Hibrit'};
 
   var nowMs = Date.now();
@@ -16237,7 +16238,7 @@ async function vendRequests(m) {
         var p1 = r.preferredDateTime1.toDate ? r.preferredDateTime1.toDate() : new Date(r.preferredDateTime1);
         if (!isNaN(p1.getTime()) && p1.getTime() < nowMs) {
           var pastDays = Math.floor((nowMs - p1.getTime())/86400000);
-          actionPoCs.push({r:r, reason:'Tercih tarihi '+pastDays+' gün önce geçti', priority:3});
+          actionPoCs.push({r:r, reason:t('vreq.pref_date1','Tercih tarihi ')+pastDays+t('vreq.pref_date2',' gün önce geçti'), priority:3});
         }
       }
     }
@@ -16303,7 +16304,7 @@ async function vendRequests(m) {
     var hdr = document.createElement('div');
     hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
     hdr.innerHTML = '<div class="flx-c-g10">'
-      + '<h2 class="fs18-fw7">📋 PoC Talepleri</h2>'
+      + '<h2 class="fs18-fw7">'+t('vreq.title','📋 PoC Talepleri')+'</h2>'
       + '<span class="txt-muted-12">'+stats.total+' toplam · '+stats.pending+' bekleyen · '+stats.active+' aktif</span>'
       + '</div>';
     m.appendChild(hdr);
@@ -16312,14 +16313,14 @@ async function vendRequests(m) {
     var statsRow = document.createElement('div');
     statsRow.className = 'stat-grid';
     var statCards = [
-      ['Toplam',         stats.total,        '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
-      ['Bekleyen',       stats.pending,      '#d97706', 'rgba(217,119,6,.08)', 'rgba(217,119,6,.2)'],
-      ['Aktif',          stats.active,       '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-      ['Tamamlanan',     stats.completed,    '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
-      ['Reddedilen',     stats.rejected,     '#dc2626', 'rgba(220,38,38,.08)','rgba(220,38,38,.2)'],
-      ['Bu Ay Yeni',     stats.thisMonth,    '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
-      ['Ort. Yanıt',     avgResponseLabel,   '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-      ['Dönüşüm',        conversionDenom > 0 ? conversionPct+'%' : '—', '#16a34a', 'rgba(22,163,74,.08)','rgba(22,163,74,.2)'],
+      [t('off.st_total','Toplam'),         stats.total,        '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
+      [t('vreq.st_pending','Bekleyen'),       stats.pending,      '#d97706', 'rgba(217,119,6,.08)', 'rgba(217,119,6,.2)'],
+      [t('status.active','Aktif'),          stats.active,       '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
+      [t('creq.st_completed','Tamamlanan'),     stats.completed,    '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
+      [t('creq.st_rejected','Reddedilen'),     stats.rejected,     '#dc2626', 'rgba(220,38,38,.08)','rgba(220,38,38,.2)'],
+      [t('reg.st_newmonth','Bu Ay Yeni'),     stats.thisMonth,    '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
+      [t('creq.st_avg_resp','Ort. Yanıt'),     avgResponseLabel,   '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
+      [t('vreq.st_conversion','Dönüşüm'),        conversionDenom > 0 ? conversionPct+'%' : '—', '#16a34a', 'rgba(22,163,74,.08)','rgba(22,163,74,.2)'],
     ];
     statCards.forEach(function(s){
       var card = document.createElement('div');
@@ -16394,7 +16395,7 @@ async function vendRequests(m) {
         + '<div class="lbl-mini fw7-mb8">📊 Performans</div>';
       if (avgResponseHr !== null) {
         insHtml += '<div  class="flx-bw-c row-bb">'
-          + '<span>Ort. yanıt süresi</span>'
+          + '<span>'+t('vreq.avg_resp_time','Ort. yanıt süresi')+'</span>'
           + '<span style="font-weight:700;color:'+(avgResponseHr<24?'#16a34a':avgResponseHr<72?'#d97706':'#dc2626')+'">'+avgResponseLabel+'</span>'
           + '</div>';
       }
@@ -16405,12 +16406,12 @@ async function vendRequests(m) {
       if (pocDurations.length > 0) {
         avgPocDays = Math.round(pocDurations.reduce(function(s,d){return s+d;},0) / pocDurations.length);
         insHtml += '<div  class="flx-bw-c row-bb">'
-          + '<span>Ort. PoC süresi</span>'
+          + '<span>'+t('vreq.avg_poc_time','Ort. PoC süresi')+'</span>'
           + '<span class="fw7-blu">'+avgPocDays+' gün</span>'
           + '</div>';
       }
       insHtml += '<div class="flx-bw-c fs115-p5y">'
-        + '<span>Dönüşüm oranı</span>'
+        + '<span>'+t('vreq.conversion_rate','Dönüşüm oranı')+'</span>'
         + '<span class="fw7-grn">'+(conversionDenom>0?conversionPct+'%':'—')+'</span>'
         + '</div>';
       insHtml += '</div>';
@@ -16419,16 +16420,16 @@ async function vendRequests(m) {
         + '<div class="lbl-mini fw7-mb8">🎯 Talep Paterni</div>';
       if (topProd) {
         insHtml += '<div  class="flx-bw-c row-bb">'
-          + '<span>En çok talep gelen ürün</span>'
+          + '<span>'+t('vreq.top_product','En çok talep gelen ürün')+'</span>'
           + '<span class="fw7-prp">'+topProd[0]+' <span class="txt-muted-12">('+topProd[1].cnt+')</span></span>'
           + '</div>';
       }
       insHtml += '<div  class="flx-bw-c row-bb">'
-        + '<span>Yoğun saat dilimi</span>'
+        + '<span>'+t('vreq.peak_hour','Yoğun saat dilimi')+'</span>'
         + '<span class="fw7-blu">'+topHourLabel+'</span>'
         + '</div>';
       insHtml += '<div class="flx-bw-c fs115-p5y">'
-        + '<span>Bu hafta yeni</span>'
+        + '<span>'+t('vreq.week_new','Bu hafta yeni')+'</span>'
         + '<span style="font-weight:700;color:#d97706">'+reqs.filter(function(r){return r.createdAt?.seconds && r.createdAt.seconds*1000>=thisWeekStart.getTime();}).length+'</span>'
         + '</div>';
       insHtml += '</div>';
@@ -16468,7 +16469,7 @@ async function vendRequests(m) {
     // Status filtre butonları
     var fb = document.createElement('div');
     fb.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
-    fb.innerHTML = [['','Tümü'],['pending','Bekliyor'],['active','Aktif'],['completed','Tamamlandı'],['rejected','Reddedildi'],['cancelled','İptal']].map(function(p){
+    fb.innerHTML = [['',t('common.all','Tümü')],['pending',t('status.pending','Bekliyor')],['active',t('status.active','Aktif')],['completed',t('status.completed','Tamamlandı')],['rejected',t('status.rejected','Reddedildi')],['cancelled',t('status.cancelled','İptal')]].map(function(p){
       return '<button class="rqf btn-'+(filterStatus===p[0]?'p':'g')+' btn-sm fs12" data-v="'+p[0]+'">'+p[1]+'</button>';
     }).join('');
     m.appendChild(fb);
@@ -16481,7 +16482,7 @@ async function vendRequests(m) {
       if (searchVal || filterStatus || filterPreset) {
         emp.innerHTML = renderEmpty({
           emoji: '🔍',
-          title: 'Sonuç bulunamadı',
+          title: t('common.no_results','Sonuç bulunamadı'),
           desc: 'Arama veya filtre kriterlerinize uyan PoC talebi yok. Filtreleri sıfırlayıp yeniden deneyin.',
           ctaText: t('off.reset_filters','Filtreleri Sıfırla')
         });
@@ -16491,7 +16492,7 @@ async function vendRequests(m) {
       } else {
         emp.innerHTML = renderEmpty({
           emoji: '🌱',
-          title: 'Henüz PoC talebi yok',
+          title: t('vreq.empty','Henüz PoC talebi yok'),
           desc: 'Müşteriler kataloğunuzdan size PoC talebi gönderdiğinde burada görünecek. Ürünlerinizi ekleyip görünürlük artırın.',
           ctaText: 'Ürün Ekle',
           secondaryText: 'Davet Et'
@@ -16638,14 +16639,14 @@ async function vendRequests(m) {
         + '</div>'
         // ── ÜRÜN chip + KAPSAM + GEREKSİNİMLER ──
         + (showProductChip?'<div style="margin-bottom:10px"><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--color-primary);background:rgba(0,102,204,.08);border:1px solid rgba(0,102,204,.2);border-radius:7px;padding:5px 11px">📦 '+r.productName+'</span></div>':'')
-        + (r.scope?'<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;line-height:1.55"><strong style="color:var(--text-primary)">Kapsam:</strong> '+r.scope+'</div>':'')
-        + '<div style="font-size:12.5px;color:'+(r.requirements?'var(--text-secondary)':'var(--text-muted)')+';margin-bottom:12px;line-height:1.55"><strong style="color:var(--text-primary)">Gereksinimler:</strong> '+(r.requirements?r.requirements:'<span style="font-style:italic">Belirtilmemiş — müşteriyle mesajlaşarak detay isteyebilirsiniz.</span>')+'</div>'
+        + (r.scope?'<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;line-height:1.55"><strong style="color:var(--text-primary)">'+t('vreq.scope','Kapsam:')+'</strong> '+r.scope+'</div>':'')
+        + '<div style="font-size:12.5px;color:'+(r.requirements?'var(--text-secondary)':'var(--text-muted)')+';margin-bottom:12px;line-height:1.55"><strong style="color:var(--text-primary)">'+t('vreq.requirements','Gereksinimler:')+'</strong> '+(r.requirements?r.requirements:'<span style="font-style:italic">'+t('vreq.unspecified','Belirtilmemiş — müşteriyle mesajlaşarak detay isteyebilirsiniz.')+'</span>')+'</div>'
         // ── META pill'leri (lokasyon, tercih tarihleri, süre) ──
         + (metaChips?'<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:'+(r.status==='pending'||r.status==='active'?'14px':'0')+'">'+metaChips+'</div>':'')
         // ── AKSİYONLAR (ayraç + butonlar) ──
         + (r.status==='pending'?'<div style="border-top:1px solid var(--border);padding-top:12px"><div class="flx-g8-wrap">'
             + '<button class="rq-acc btn-gr btn-sm" data-id="'+r.id+'" style="flex:1;min-width:130px">✓ Kabul Et</button>'
-            + '<button class="rq-rej btn-red btn-sm" data-id="'+r.id+'">Reddet</button>'
+            + '<button class="rq-rej btn-red btn-sm" data-id="'+r.id+'">'+t('vreq.reject','Reddet')+'</button>'
             + '<button class="rq-msg btn-g btn-sm" data-id="'+r.id+'" data-title="'+(r.productName||r.title||'').replace(/"/g,"'")+'" data-cn="'+(r.customerName||r.customerEmail||'').replace(/"/g,"'")+'">💬 Mesaj</button>'
           + '</div></div>':'')
         + (r.status==='active'?'<div style="border-top:1px solid var(--border);padding-top:12px"><div class="flx-g8-wrap">'
@@ -16670,7 +16671,7 @@ async function vendRequests(m) {
     });
     lst.querySelectorAll('.rq-rej').forEach(function(b){
       b.addEventListener('click', async function(){
-        var reason = prompt('Ret gerekçesi (müşteriye iletilecek):');
+        var reason = prompt(t('vreq.reject_reason','Ret gerekçesi (müşteriye iletilecek):'));
         if (reason===null) return;
         try {
           await updateDoc(doc(db,'poc_requests',b.dataset.id), { status:'rejected', rejectionReason: reason||'', rejectedAt: serverTimestamp() });
@@ -16690,7 +16691,7 @@ async function vendRequests(m) {
               createdAt: serverTimestamp(),
             });
           }
-          showToast('PoC talebi reddedildi.');
+          showToast(t('vreq.toast_rejected','PoC talebi reddedildi.'));
           await vendRequests(m);
         } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); }
       });
@@ -16727,7 +16728,7 @@ async function vendRequests(m) {
             CUR_PROFILE?.vendorType
           );
         } else {
-          showToast('Teklif gönderme fonksiyonu bulunamadı.','err');
+          showToast(t('vreq.offer_fn_missing','Teklif gönderme fonksiyonu bulunamadı.'),'err');
         }
       });
     });
@@ -29117,6 +29118,8 @@ const I18N_DICT = {
     'msg.you':'Siz: ','msg.no_messages':'Henüz mesaj yok','msg.empty_deleted':'Silinmiş yazışma yok.','msg.empty_archived':'Arşivlenmiş yazışma yok.',
     'msg.toast_unpinned':'Sabitleme kaldırıldı.','msg.toast_pinned':'⭐ Yazışma sabitlendi.','msg.toast_activated':'Yazışma aktife alındı.','msg.toast_archived':'📦 Yazışma arşivlendi.','msg.toast_restored':'Yazışma geri alındı.','msg.toast_deleted':'🗑 Yazışma silindi. 30 gün içinde geri alabilirsiniz.','msg.toast_removed':'Yazışma sizden kalıcı kaldırıldı.',
     'msg.mark_all_read':'Tümünü Okundu İşaretle','msg.search_ph':'🔍 Kişi veya ürün ara...','msg.empty_active':'Henüz aktif yazışma yok.','msg.empty_active_hint':'PoC talepleriniz aktifleşince burada görünür.','msg.goto_poc':'PoC Taleplerime Git →',
+    'vreq.title':'📋 PoC Talepleri','vreq.st_pending':'Bekleyen','vreq.st_conversion':'Dönüşüm','vreq.avg_resp_time':'Ort. yanıt süresi','vreq.avg_poc_time':'Ort. PoC süresi','vreq.conversion_rate':'Dönüşüm oranı','vreq.top_product':'En çok talep gelen ürün','vreq.peak_hour':'Yoğun saat dilimi','vreq.week_new':'Bu hafta yeni',
+    'vreq.empty':'Henüz PoC talebi yok','vreq.scope':'Kapsam:','vreq.requirements':'Gereksinimler:','vreq.unspecified':'Belirtilmemiş — müşteriyle mesajlaşarak detay isteyebilirsiniz.','vreq.reject':'Reddet','vreq.reject_reason':'Ret gerekçesi (müşteriye iletilecek):','vreq.toast_rejected':'PoC talebi reddedildi.','vreq.offer_fn_missing':'Teklif gönderme fonksiyonu bulunamadı.','vreq.pref_date1':'Tercih tarihi ','vreq.pref_date2':' gün önce geçti',
   },
   en: {
     // Hero / Home
@@ -29316,6 +29319,8 @@ const I18N_DICT = {
     'msg.you':'You: ','msg.no_messages':'No messages yet','msg.empty_deleted':'No deleted conversations.','msg.empty_archived':'No archived conversations.',
     'msg.toast_unpinned':'Pin removed.','msg.toast_pinned':'⭐ Conversation pinned.','msg.toast_activated':'Conversation activated.','msg.toast_archived':'📦 Conversation archived.','msg.toast_restored':'Conversation restored.','msg.toast_deleted':'🗑 Conversation deleted. You can restore within 30 days.','msg.toast_removed':'Conversation permanently removed from your side.',
     'msg.mark_all_read':'Mark All Read','msg.search_ph':'🔍 Search person or product...','msg.empty_active':'No active conversations yet.','msg.empty_active_hint':'They appear here once your PoC requests become active.','msg.goto_poc':'Go to My PoC Requests →',
+    'vreq.title':'📋 PoC Requests','vreq.st_pending':'Pending','vreq.st_conversion':'Conversion','vreq.avg_resp_time':'Avg. response time','vreq.avg_poc_time':'Avg. PoC duration','vreq.conversion_rate':'Conversion rate','vreq.top_product':'Most-requested product','vreq.peak_hour':'Peak hour','vreq.week_new':'New this week',
+    'vreq.empty':'No PoC requests yet','vreq.scope':'Scope:','vreq.requirements':'Requirements:','vreq.unspecified':'Not specified — you can request details by messaging the customer.','vreq.reject':'Reject','vreq.reject_reason':'Rejection reason (will be sent to the customer):','vreq.toast_rejected':'PoC request rejected.','vreq.offer_fn_missing':'Offer submission function not found.','vreq.pref_date1':'Preferred date ','vreq.pref_date2':' days ago passed',
   }
 };
 
