@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.24 | pochub.co -->
+<!-- PoCHub v6.25 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.24';
+const VERSION = 'v6.25';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.25': ['i18n FAZ 4f (vendor Etkinliklerim / events branch) — evStatusLabels (status.*+vevt.draft), baslik, 7 stat karti (Toplam/Yaklasan/Aktif Kayit/Tamamlanan/Doluluk/Bu Ay/Ort. Katilimci), icgoru (En verimli format/ilgi goren kategori/en iyi gun-saat/gecmis performans), format filtresi (Tum Formatlar/Online/Yuz Yuze/Hibrit — loc.* yeniden), bos-durumlar, liste tablo basliklari, klonla/iptal/arsivle/sil toast+onay t()-e sarildi + vevt.* + APP-WIDE common.confirm (Emin misiniz? 4 onayda). NOT: gun adlari ortak tarih-slice-ina kaldi. node --check + harness OK. UI — RULES degismedi.'],
   'v6.24': ['i18n FAZ 4e (vendor Reklamlarim / vendFeatured) — loading, baslik+alt-baslik, 4 stat karti (Aktif Yerlesim/Toplam Harcama/Toplam Tik/Featured PoC), bos-durum+ipucu, yerlesim status map (Aktif/Onay Bekliyor/Iptal — status.* + vad.pending), Suresi Dolmus, error t()-e sarildi + vad.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
   'v6.23': ['i18n FAZ 4d (vendor Portfoyum / vendPortfolio) — role-bazli baslik (Urun/Dagitim/Entegrasyon Portfoyum), 8 stat karti (Toplam/Yayinda/Onay Bekleyen/Kategori/Toplam PoC/Toplam Teklif/Kabul Orani/Pipeline), arama placeholder, filtreler (Tum Kategoriler/Ulkeler/Durumlar/Ureticiler), bos-durumlar, Distributorler/Uretici/Entegrator yok onekleri, loading/error t()-e sarildi + vport.* (off/vprod/creq/common yeniden kullanildi). NOT: distributor portfoyu (vendDistributorProducts) ayri. node --check + harness OK. UI — RULES degismedi.'],
   'v6.22': ['i18n FAZ 4c (vendor Urunlerim listesi) — psLabels (Yayinda/Admin Onayi/Entegrator Bekleniyor), baslik, 7 stat karti (Toplam Urun/Yayinda/Admin Onayi/Reddedilen/Toplam PoC/Kabul Orani/Pipeline), aksiyon gerekceleri, icgoru (Verimli mensei/Ort. onay/Ortalama kabul/PoC Talebi), yasam-dongusu sekmeleri (Aktif/Arsiv/Cop Kutusu — products+portfolio+featured paylasimli), Tum Kategoriler, bos-durumlar, liste tablo basliklari (Urun/Kategori/Teklif/Yayin/Durum), arsivle/sil hata+onay+toast t()-e sarildi + vprod.* (creq/common/vcal yeniden kullanildi). NOT: urun-ekle/duzenle modali ayri. node --check + harness OK. UI — RULES degismedi.'],
@@ -2987,7 +2988,7 @@ async function loadMessagesTab(m, role) {
           permBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             if (!confirm('Bu yazışma KALICI olarak silinsin mi? Tüm mesajlar bu hesabınızdan silinir, geri alınamaz!')) return;
-            if (!confirm('Emin misiniz?')) return;
+            if (!confirm(t('common.confirm','Emin misiniz?'))) return;
             permBtn.disabled = true;
             try {
               // v4.55: permanentlyDeletedBy listesine ekle — bu list filter olarak çalışır
@@ -14020,7 +14021,7 @@ async function loadVendTab() {
             b.disabled=true;
             await updateDoc(doc(db,'public_events',b.dataset.id), {status:'cancelled'});
             evs = evs.map(function(x){ return x.id===b.dataset.id?{...x,status:'cancelled'}:x; });
-            showToast('Etkinlik iptal edildi.');
+            showToast(t('vevt.toast_cancelled','Etkinlik iptal edildi.'));
             renderMain();
           });
         });
@@ -14764,7 +14765,7 @@ async function loadVendTab() {
     // Arka planda 30 gün geçmiş çöp temizle
     cleanupExpiredTrash('public_events','vendorId',CUR_USER.uid).catch(function(){});
 
-    var evStatusLabels = {active:'Aktif', draft:'Taslak', cancelled:'İptal', completed:'Tamamlandı'};
+    var evStatusLabels = {active:t('status.active','Aktif'), draft:t('vevt.draft','Taslak'), cancelled:t('status.cancelled','İptal'), completed:t('status.completed','Tamamlandı')};
     var evStatusColors = {active:'#16a34a', draft:'#d97706', cancelled:'#dc2626', completed:'#2563eb'};
 
     var renderEvents = function(searchVal, filterStatus, filterFormat, filterLifecycle) {
@@ -14791,7 +14792,7 @@ async function loadVendTab() {
       var hdr = document.createElement('div');
       hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px';
       hdr.innerHTML = '<div class="flx-c-g10">'
-        + '<h2 class="fs18-fw7">🎯 Etkinliklerim</h2>'
+        + '<h2 class="fs18-fw7">'+t('vevt.title','🎯 Etkinliklerim')+'</h2>'
         + '<span class="txt-muted-12">' + counts.active + ' aktif · ' + counts.archived + ' arşiv · ' + counts.trash + ' çöp</span>'
         + '</div>'
         + '<button class="btn-p btn-sm" id="v-add-ev2">+ Etkinlik Oluştur</button>';
@@ -14868,14 +14869,14 @@ async function loadVendTab() {
         var statsRow = document.createElement('div');
         statsRow.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px';
         var statCards = [
-          ['Toplam',        stat.total,                '',                '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
-          ['Yaklaşan',      stat.upcoming,             '',                '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-          ['Aktif Kayıt',   stat.totalReg,             thisMonthRegTrend, '#d97706', 'rgba(217,119,6,.08)', 'rgba(217,119,6,.2)'],
-          ['Tamamlanan',    stat.completed,            '',                '#64748b', 'rgba(90,98,120,.08)',  'rgba(90,98,120,.2)'],
-          ['Doluluk %',     stat.totalCap?fillRate+'%':'—', '',           '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
-          ['Bu Ay',         stat.thisMonth,            thisMonthTrend,    '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
+          [t('off.st_total','Toplam'),        stat.total,                '',                '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
+          [t('reg.st_upcoming','Yaklaşan'),      stat.upcoming,             '',                '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
+          [t('vevt.st_active_reg','Aktif Kayıt'),   stat.totalReg,             thisMonthRegTrend, '#d97706', 'rgba(217,119,6,.08)', 'rgba(217,119,6,.2)'],
+          [t('creq.st_completed','Tamamlanan'),    stat.completed,            '',                '#64748b', 'rgba(90,98,120,.08)',  'rgba(90,98,120,.2)'],
+          [t('vevt.st_fill','Doluluk %'),     stat.totalCap?fillRate+'%':'—', '',           '#a855f7', 'rgba(168,85,247,.08)','rgba(168,85,247,.2)'],
+          [t('msg.f_thismonth','Bu Ay'),         stat.thisMonth,            thisMonthTrend,    '#2563eb', 'rgba(37,99,235,.08)','rgba(37,99,235,.2)'],
           ['Format',        dominantFormat,            '',                '#16a34a', 'rgba(22,163,74,.08)', 'rgba(22,163,74,.2)'],
-          ['Ort. Katılımcı',stat.total?Math.round(stat.totalReg/stat.total):0, '', '#d97706', 'rgba(217,119,6,.08)','rgba(217,119,6,.2)'],
+          [t('vevt.st_avg_attend','Ort. Katılımcı'),stat.total?Math.round(stat.totalReg/stat.total):0, '', '#d97706', 'rgba(217,119,6,.08)','rgba(217,119,6,.2)'],
         ];
         statCards.forEach(function(s){
           var card = document.createElement('div');
@@ -15006,20 +15007,20 @@ async function loadVendTab() {
           if (bestFmt) {
             var fmtLbl = bestFmt.fmt === 'online' ? '🌐 Online' : bestFmt.fmt === 'hybrid' ? '🔄 Hibrit' : '📍 Yüz Yüze';
             insHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(168,85,247,.1);font-size:12.5px">'
-              + '<span>En verimli format</span>'
+              + '<span>'+t('vevt.best_format','En verimli format')+'</span>'
               + '<span class="fw7-prp">'+fmtLbl+' <span class="txt-muted-12">· ort. '+Math.round(bestFmt.avg)+' kayıt/etkinlik</span></span>'
               + '</div>';
           }
           if (bestCat && bestCat.cnt >= 2) {
             insHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(168,85,247,.1);font-size:12.5px">'
-              + '<span>En çok ilgi gören kategori</span>'
+              + '<span>'+t('vevt.top_category','En çok ilgi gören kategori')+'</span>'
               + '<span class="fw7-prp">'+bestCat.cat+' <span class="txt-muted-12">· ort. '+Math.round(bestCat.avg)+' kayıt</span></span>'
               + '</div>';
           }
           if (bestHour) {
             var dows = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'];
             insHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:12.5px">'
-              + '<span>En iyi gün/saat</span>'
+              + '<span>'+t('vevt.best_daytime','En iyi gün/saat')+'</span>'
               + '<span class="fw7-prp">'+dows[bestHour.dow]+' '+String(bestHour.hr).padStart(2,'0')+':00 <span class="txt-muted-12">· ort. '+Math.round(bestHour.avg)+' kayıt</span></span>'
               + '</div>';
           }
@@ -15067,7 +15068,7 @@ async function loadVendTab() {
             var sugWrap = document.createElement('div');
             sugWrap.style.cssText = 'background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(168,85,247,.08));border:1px solid rgba(37,99,235,.25);border-radius:8px;padding:12px 14px;margin-bottom:12px';
             sugWrap.innerHTML = '<div style="font-size:11px;color:#2563eb;font-weight:700;margin-bottom:6px">💡 ÖNERİ</div>'
-              + '<div style="font-size:12.5px;line-height:1.6">Geçmiş verilerinize göre en iyi performans: <strong>'+dows3[bestHour.dow]+' '+String(bestHour.hr).padStart(2,'0')+':00</strong>, '
+              + '<div style="font-size:12.5px;line-height:1.6">'+t('vevt.best_perf','Geçmiş verilerinize göre en iyi performans: ')+'<strong>'+dows3[bestHour.dow]+' '+String(bestHour.hr).padStart(2,'0')+':00</strong>, '
               + '<strong>'+(bestFmt.fmt==='online'?'🌐 Online':bestFmt.fmt==='hybrid'?'🔄 Hibrit':'📍 Yüz Yüze')+'</strong> formatında, <strong>'+bestCat.cat+'</strong> kategorisinde. '
               + 'Yeni etkinlik oluştururken bu zaman dilimi ve formatı tercih edebilirsiniz.</div>';
             m.appendChild(sugWrap);
@@ -15128,7 +15129,7 @@ async function loadVendTab() {
       // Format filtresi
       var ffRow = document.createElement('div');
       ffRow.style.cssText = 'display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap';
-      [['','Tüm Formatlar'],['online','Online'],['in-person','Yüz Yüze'],['hybrid','Hibrit']].forEach(function(f){
+      [['',t('vevt.all_formats','Tüm Formatlar')],['online',t('loc.online','Online')],['in-person',t('vevt.in_person','Yüz Yüze')],['hybrid',t('loc.hybrid','Hibrit')]].forEach(function(f){
         var fb = document.createElement('button');
         fb.className = 'btn-' + (filterFormat===f[0]?'p':'g') + ' btn-sm';
         fb.style.cssText = 'font-size:11px';
@@ -15144,13 +15145,13 @@ async function loadVendTab() {
         emp.className = 'empty';
         var icon = filterLifecycle==='trash' ? '🗑' : filterLifecycle==='archived' ? '📦' : '🎯';
         var msg2 = filterLifecycle==='trash' ? t('vprod.empty_trash','Çöp kutusu boş.')
-                 : filterLifecycle==='archived' ? 'Arşivde etkinlik yok.'
-                 : (searchVal||filterStatus||filterFormat ? 'Arama sonucu bulunamadı.' : 'Henüz etkinlik oluşturmadınız.');
+                 : filterLifecycle==='archived' ? t('vevt.empty_archived','Arşivde etkinlik yok.')
+                 : (searchVal||filterStatus||filterFormat ? t('common.no_search_results','Arama sonucu bulunamadı.') : t('vevt.empty_none','Henüz etkinlik oluşturmadınız.'));
         emp.innerHTML = '<div class="empty-icon">'+icon+'</div>' + msg2;
         m.appendChild(emp);
       } else {
         var tbl = document.createElement('table');
-        tbl.innerHTML = '<thead><tr><th>Başlık</th><th>Tarih</th><th>Format</th><th>Kayıtlı</th><th>Durum</th><th></th></tr></thead>';
+        tbl.innerHTML = '<thead><tr><th>'+t('vevt.col_title','Başlık')+'</th><th>'+t('vcal.col_date','Tarih')+'</th><th>'+t('vevt.col_format','Format')+'</th><th>'+t('vevt.col_registered','Kayıtlı')+'</th><th>'+t('vcal.col_status','Durum')+'</th><th></th></tr></thead>';
         var tbody = document.createElement('tbody');
 
         filtered.forEach(function(e){
@@ -15218,7 +15219,7 @@ async function loadVendTab() {
           if (!confirm('"' + b.dataset.title + '" etkinliğini iptal etmek istiyor musunuz?' +
             (parseInt(b.dataset.count) > 0 ? ' ' + b.dataset.count + ' kayıtlı katılımcı var.' : ''))) return;
           await updateDoc(doc(db,'public_events',b.dataset.id), {status:'cancelled'});
-          showToast('Etkinlik iptal edildi.');
+          showToast(t('vevt.toast_cancelled','Etkinlik iptal edildi.'));
           loadVendTab();
         });
       });
@@ -15252,7 +15253,7 @@ async function loadVendTab() {
             showToast('📋 Etkinlik klonlandı — Etkinliklerim\'de "Taslak" olarak listelendi.');
             loadVendTab();
           } catch(err) {
-            showToast('Klonlama hatası: ' + err.message, 'err');
+            showToast(t('vevt.clone_error','Klonlama hatası: ') + err.message, 'err');
             b.disabled = false;
           }
         });
@@ -15267,7 +15268,7 @@ async function loadVendTab() {
           b.disabled = true;
           try {
             var dep = await hasActiveDependencies('public_events', b.dataset.id);
-            if (!dep.ok) { showToast('Arşivlenemedi: '+dep.reason,'err'); b.disabled = false; return; }
+            if (!dep.ok) { showToast(t('vprod.archive_fail','Arşivlenemedi: ')+dep.reason,'err'); b.disabled = false; return; }
             await archiveItem('public_events', b.dataset.id);
             showToast('📦 Etkinlik arşive alındı.');
             refresh();
@@ -15289,7 +15290,7 @@ async function loadVendTab() {
           b.disabled = true;
           try {
             var dep = await hasActiveDependencies('public_events', b.dataset.id);
-            if (!dep.ok) { showToast('Silinemedi: '+dep.reason,'err'); b.disabled = false; return; }
+            if (!dep.ok) { showToast(t('vprod.delete_fail','Silinemedi: ')+dep.reason,'err'); b.disabled = false; return; }
             await softDeleteItem('public_events', b.dataset.id);
             showToast('🗑 Etkinlik çöp kutusuna taşındı.');
             refresh();
@@ -15306,9 +15307,9 @@ async function loadVendTab() {
       m.querySelectorAll('.ev-perm').forEach(function(b){
         b.addEventListener('click', async function(){
           if (!confirm('"'+b.dataset.title+'" KALICI olarak silinsin mi? Geri alınamaz!')) return;
-          if (!confirm('Emin misiniz?')) return;
+          if (!confirm(t('common.confirm','Emin misiniz?'))) return;
           b.disabled = true;
-          try { await permanentDelete('public_events', b.dataset.id); showToast('Kalıcı silindi.'); refresh(); }
+          try { await permanentDelete('public_events', b.dataset.id); showToast(t('vevt.toast_perm_deleted','Kalıcı silindi.')); refresh(); }
           catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); b.disabled = false; }
         });
       });
@@ -15647,7 +15648,7 @@ async function loadVendTab() {
       listEl.querySelectorAll('.ofs-perm').forEach(function(b) {
         b.addEventListener('click', async function() {
           if (!confirm('"'+b.dataset.pname+'" teklifi KALICI olarak silinsin mi? Geri alınamaz!')) return;
-          if (!confirm('Emin misiniz?')) return;
+          if (!confirm(t('common.confirm','Emin misiniz?'))) return;
           b.disabled = true;
           try {
             await permanentDelete('offers', b.dataset.id);
@@ -17209,9 +17210,9 @@ async function vendInvites(m) {
     m.querySelectorAll('.vi-perm').forEach(function(b){
       b.addEventListener('click', async function(){
         if (!confirm('"'+(b.dataset.cn||'Müşteri')+'" daveti KALICI olarak silinsin mi? Geri alınamaz!')) return;
-        if (!confirm('Emin misiniz?')) return;
+        if (!confirm(t('common.confirm','Emin misiniz?'))) return;
         b.disabled = true;
-        try { await permanentDelete('poc_invites', b.dataset.id); showToast('Kalıcı silindi.'); refresh(); }
+        try { await permanentDelete('poc_invites', b.dataset.id); showToast(t('vevt.toast_perm_deleted','Kalıcı silindi.')); refresh(); }
         catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); b.disabled = false; }
       });
     });
@@ -26222,7 +26223,7 @@ async function admEvents(m) {
       e.stopPropagation();
       if(!confirm('Bu etkinliği iptal etmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) return;
       await updateDoc(doc(db,'public_events',b.dataset.id),{status:'cancelled'});
-      showToast('Etkinlik iptal edildi.'); admEvents(m);
+      showToast(t('vevt.toast_cancelled','Etkinlik iptal edildi.')); admEvents(m);
     });});
   }
   function applyFilter() {
@@ -29137,6 +29138,11 @@ const I18N_DICT = {
     'vport.pending_approval':'Onay Bekleyen','vport.total_offers':'Toplam Teklif','vport.st_categories':'Kategori','vport.search_ph':'🔍 Ürün, kategori veya üretici ara...',
     'vport.all_countries':'Tüm Ülkeler','vport.all_manufacturers':'Tüm Üreticiler','vport.empty_filtered':'Filtrelere uygun ürün bulunamadı.','vport.empty_none':'Portföyünüzde henüz ürün yok.','vport.distributors':'Distribütörler:','vport.no_integrator':'Entegratör yok',
     'vad.loading':'Reklam verileri yükleniyor...','vad.title':'📢 Reklamlarım','vad.subtitle':'Öne çıkan ürün yerleşimlerin ve performansı','vad.st_active':'Aktif Yerleşim','vad.st_spend':'Toplam Harcama','vad.st_clicks':'Toplam Tık','vad.st_poc':'Featured PoC','vad.empty':'Henüz öne çıkan yerleşimin yok.','vad.empty_hint':'Ürünlerim sekmesinde bir ürünün 📢 butonuyla ürününü ana sayfada öne çıkarabilirsin.','vad.pending':'Onay Bekliyor','vad.expired':'Süresi Dolmuş','vad.load_error':'Yükleme hatası: ',
+    'common.confirm':'Emin misiniz?',
+    'vevt.draft':'Taslak','vevt.title':'🎯 Etkinliklerim','vevt.st_active_reg':'Aktif Kayıt','vevt.st_fill':'Doluluk %','vevt.st_avg_attend':'Ort. Katılımcı',
+    'vevt.best_format':'En verimli format','vevt.top_category':'En çok ilgi gören kategori','vevt.best_daytime':'En iyi gün/saat','vevt.best_perf':'Geçmiş verilerinize göre en iyi performans: ',
+    'vevt.all_formats':'Tüm Formatlar','vevt.in_person':'Yüz Yüze','vevt.empty_archived':'Arşivde etkinlik yok.','vevt.empty_none':'Henüz etkinlik oluşturmadınız.',
+    'vevt.col_title':'Başlık','vevt.col_format':'Format','vevt.col_registered':'Kayıtlı','vevt.toast_cancelled':'Etkinlik iptal edildi.','vevt.clone_error':'Klonlama hatası: ','vevt.toast_perm_deleted':'Kalıcı silindi.',
   },
   en: {
     // Hero / Home
@@ -29351,6 +29357,11 @@ const I18N_DICT = {
     'vport.pending_approval':'Pending Approval','vport.total_offers':'Total Offers','vport.st_categories':'Categories','vport.search_ph':'🔍 Search product, category or manufacturer...',
     'vport.all_countries':'All Countries','vport.all_manufacturers':'All Manufacturers','vport.empty_filtered':'No products match the filters.','vport.empty_none':'No products in your portfolio yet.','vport.distributors':'Distributors:','vport.no_integrator':'No integrator',
     'vad.loading':'Loading ad data...','vad.title':'📢 My Ads','vad.subtitle':'Your featured product placements and performance','vad.st_active':'Active Placements','vad.st_spend':'Total Spend','vad.st_clicks':'Total Clicks','vad.st_poc':'Featured PoC','vad.empty':'You have no featured placements yet.','vad.empty_hint':'Use the 📢 button on a product in the My Products tab to feature it on the homepage.','vad.pending':'Pending Approval','vad.expired':'Expired','vad.load_error':'Load error: ',
+    'common.confirm':'Are you sure?',
+    'vevt.draft':'Draft','vevt.title':'🎯 My Events','vevt.st_active_reg':'Active Registrations','vevt.st_fill':'Fill %','vevt.st_avg_attend':'Avg. Attendees',
+    'vevt.best_format':'Most effective format','vevt.top_category':'Most popular category','vevt.best_daytime':'Best day/time','vevt.best_perf':'Best performance based on your past data: ',
+    'vevt.all_formats':'All Formats','vevt.in_person':'In-Person','vevt.empty_archived':'No archived events.','vevt.empty_none':'You have not created any events yet.',
+    'vevt.col_title':'Title','vevt.col_format':'Format','vevt.col_registered':'Registered','vevt.toast_cancelled':'Event cancelled.','vevt.clone_error':'Clone error: ','vevt.toast_perm_deleted':'Permanently deleted.',
   }
 };
 
