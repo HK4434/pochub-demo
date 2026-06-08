@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.42 | pochub.co -->
+<!-- PoCHub v6.43 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.42';
+const VERSION = 'v6.43';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.43': ['i18n FAZ 7d (ADMIN Urun Onaylari / admProducts) — loading, baslik, ozet cipleri (Aktif/Admin Onayi/Zincir Bekleniyor), arama, durum+yayin+mensei+vendor filtreleri (status.* reuse), tablo basliklari, bos-durum ipuclari (5 varyant), onayla (Onaylaniyor+bildirim+e-posta), reddet (gerekce prompt+toast), arsivle onay t()-e sarildi + aprod.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
   'v6.42': ['i18n FAZ 7c (ADMIN Kullanicilar / admUsers) — loading, baslik, ozet cipleri (Toplam/Musteri/Vendor/Premium/Dogrulanmis), arama placeholder, filtreler (Tum Roller/Tipler/Uyelik — auth.role_*/loc.customer reuse), tablo basliklari (Ad-Eposta/Rol/Sirket/Ulke/Uyelik/Kayit/Son Gorulme/Dogrulama), kullanici detay modali (Ad Soyad/Sirket/Rol/Ulke/Telefon/Kayit/EPosta Dogrulama/UID/Kapat) t()-e sarildi + ausr.* (tr/en). AYRICA app-wide: common.close (3 modal) + common.no_results (5 admin tablosu). node --check + harness OK. UI — RULES degismedi.'],
   'v6.41': ['i18n FAZ 7b (ADMIN dashboard govdesi) — Platform Dashboard basligi, Son 30 Gun Gelir highlight, 9 stat karti (Toplam Kullanici/Urun, Aktif Urun, Admin Onayi Bekleyen, Zincir Bekleyen, Bekleyen PoC, Aktif PoC, Aktif Etkinlik, Kabul Edilen Teklif) t()-e sarildi + adash.* (tr/en). Aktif PoC etiketi app-wide repall. node --check + harness OK. UI — RULES degismedi.'],
   'v6.40': ['i18n FAZ 7a (ADMIN basladi — sidebar sekme etiketleri) — admin panelindeki 21 sekme etiketi (Dashboard/Kullanicilar/Rol Yonetimi/Kategoriler/Urun Onaylari/PoC Talepleri/Etkinlikler/Teklifler/Gelir/Vendor Abonelikler/Vendor Onaylari/Demo Talepleri/Paketler/Odeme Onaylari/Acil Onay/Reklam/Icerik Yonetimi/KVKK-Yasal/Sistem Ayarlari/Veri Sagligi/Profilim) t()-e sarildi + atab.* (tr/en). Boylece admin nav tek seferde EN/TR. node --check + harness OK. UI — RULES degismedi.'],
@@ -12527,7 +12528,7 @@ async function loadOffersWithComparison(m) {
       filterRow2.style.cssText = 'display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap';
       filterRow2.innerHTML =
         '<select id="of-vendor-f" class="inp btn-w-auto">' +
-        '<option value="">Tüm Vendorlar</option>' +
+        '<option value="">'+t('aprod.all_vendors','Tüm Vendorlar')+'</option>' +
         vendors.map(function(v){ return '<option value="' + v + '"' + (filters.vendor===v?' selected':'') + '>' + v + '</option>'; }).join('') +
         '</select>' +
         '<input id="of-date-from" type="date" class="inp btn-w-auto" value="' + (filters.dateFrom||'') + '" title="Başlangıç tarihi">' +
@@ -25679,7 +25680,7 @@ async function openAdmProdEditModal(prodId, name, cat, desc, country) {
       if (prod.vendorId) {
         await addDoc(collection(db,'notifications'), {
           userId: prod.vendorId, type:'product_approved',
-          title:'Ürününüz Onaylandı 🎉',
+          title:t('aprod.notif_approved','Ürününüz Onaylandı 🎉'),
           message:'"'+name+'" ürününüz incelendi ve PoCHub kataloğunda yayınlandı!',
           productId: prodId, productName: name,
           senderId: CUR_USER.uid,
@@ -25783,7 +25784,7 @@ async function openAdmProdEditModal(prodId, name, cat, desc, country) {
 }
 
 async function admProducts(m) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Ürünler yükleniyor...</div>';
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('aprod.loading','Ürünler yükleniyor...')+'</div>';
   const snap = await getDocs(collection(db,'products'));
   var allRaw = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
   // Admin için çöptekileri filtreyle ayır — varsayılan görünümde gizli
@@ -25850,22 +25851,22 @@ async function admProducts(m) {
       var hint = '';
       if (f.publishStatus === 'awaiting_admin') {
         emptyMsg = '✅ Onay bekleyen ürün yok';
-        hint = 'Tüm ürünler onaylanmış veya henüz vendor\'lardan onay talebi gelmedi.';
+        hint = t('aprod.hint_none_pending','Tüm ürünler onaylanmis veya henuz vendorlardan onay talebi gelmedi.');
       } else if (f.publishStatus === 'awaiting_integrator') {
         emptyMsg = '🔗 Zincir bekleyen ürün yok';
         hint = 'Tüm vendor zinciri tamamlandı.';
       } else if (f.publishStatus === 'ready') {
         emptyMsg = '📭 Yayında ürün yok';
-        hint = 'Henüz hiçbir ürün admin tarafından onaylanmadı.';
+        hint = t('aprod.hint_none_active','Henüz hiçbir ürün admin tarafından onaylanmadı.');
       } else if (f.status === 'rejected') {
         emptyMsg = '👍 Reddedilen ürün yok';
-        hint = 'Tüm ürünler ya bekliyor ya da aktif.';
+        hint = t('aprod.hint_none_rejected','Tüm ürünler ya bekliyor ya da aktif.');
       } else if (f.status === 'pending') {
         emptyMsg = '✅ Bekleyen ürün yok';
-        hint = 'Tüm ürünler işlenmiş durumda.';
+        hint = t('aprod.hint_all_processed','Tüm ürünler işlenmiş durumda.');
       } else if (f.search || f.category || f.origin || f.vendor || f.dateFrom || f.dateTo) {
         emptyMsg = '🔍 Arama sonucu yok';
-        hint = 'Filtre veya arama kriterlerini değiştirin.';
+        hint = t('aprod.hint_change_filter','Filtre veya arama kriterlerini değiştirin.');
       }
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">' +
         '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:6px">'+emptyMsg+'</div>' +
@@ -25929,14 +25930,14 @@ async function admProducts(m) {
     tbody.querySelectorAll('.ap-appr').forEach(function(b) {
       b.addEventListener('click', async function() {
         if (!confirm('"'+b.dataset.pn+'" ürününü onaylamak istiyor musunuz?')) return;
-        b.disabled=true; b.textContent='Onaylanıyor...';
+        b.disabled=true; b.textContent=t('aprod.approving','Onaylanıyor...');
         try {
           await updateDoc(doc(db,'products',b.dataset.id), {status:'active', publishStatus:'ready', approvedAt:serverTimestamp()});
           // Vendor bildirimi
           if (b.dataset.vid) {
             await addDoc(collection(db,'notifications'), {
               userId:b.dataset.vid, type:'product_approved',
-              title:'Ürününüz Onaylandı 🎉',
+              title:t('aprod.notif_approved','Ürününüz Onaylandı 🎉'),
               message:'"'+b.dataset.pn+'" ürününüz incelendi ve PoCHub kataloğunda yayınlandı!',
               productId:b.dataset.id, productName:b.dataset.pn,
               fromUserId:CUR_USER.uid,
@@ -25947,7 +25948,7 @@ async function admProducts(m) {
               read:false, createdAt:serverTimestamp(),
             });
           }
-          if (b.dataset.ve) sendEmail(b.dataset.ve, b.dataset.vn, 'Ürününüz Onaylandı — PoCHub',
+          if (b.dataset.ve) sendEmail(b.dataset.ve, b.dataset.vn, t('aprod.email_approved','Ürününüz Onaylandı — PoCHub'),
             b.dataset.pn+' ürününüz onaylandı ve PoCHub katalogunda yayınlandı!', '');
           showToast('✓ Ürün onaylandı!');
           all = all.map(function(p){ return p.id===b.dataset.id ? {...p,status:'active',publishStatus:'ready'} : p; });
@@ -25957,7 +25958,7 @@ async function admProducts(m) {
     });
     tbody.querySelectorAll('.ap-rej').forEach(function(b) {
       b.addEventListener('click', async function() {
-        var reason = prompt('Ret gerekçesi (opsiyonel):');
+        var reason = prompt(t('aprod.reject_reason','Ret gerekçesi (opsiyonel):'));
         if (reason === null) return;
         b.disabled=true;
         try {
@@ -25978,7 +25979,7 @@ async function admProducts(m) {
           }
           if (b.dataset.ve) sendEmail(b.dataset.ve, b.dataset.vn, 'Ürün Başvurusu Hakkında — PoCHub',
             b.dataset.pn+' ürününüz incelendi ancak onaylanamadı.'+(reason?' Gerekçe: '+reason:''), '');
-          showToast('Ürün reddedildi.');
+          showToast(t('aprod.toast_rejected','Ürün reddedildi.'));
           all = all.map(function(p){ return p.id===b.dataset.id ? {...p,status:'rejected'} : p; });
           applyFilter();
         } catch(e) { showToast(t('common.error_prefix','Hata: ')+e.message,'err'); b.disabled=false; }
@@ -25986,7 +25987,7 @@ async function admProducts(m) {
     });
     tbody.querySelectorAll('.ap-arc').forEach(function(b) {
       b.addEventListener('click', async function() {
-        if (!confirm('Bu ürünü arşivlemek istiyor musunuz?')) return;
+        if (!confirm(t('aprod.confirm_archive','Bu ürünü arşivlemek istiyor musunuz?'))) return;
         await updateDoc(doc(db,'products',b.dataset.id), {status:'archived'});
         showToast(t('common.toast_archived','Arşivlendi.'));
         all = all.map(function(p){ return p.id===b.dataset.id ? {...p,status:'archived'} : p; });
@@ -26025,27 +26026,27 @@ async function admProducts(m) {
     // Başlık + istatistik
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">' +
     '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
-    '<h2 class="fs18-fw7">Ürün Yönetimi</h2>' +
+    '<h2 class="fs18-fw7">'+t('aprod.title','Ürün Yönetimi')+'</h2>' +
     '<span id="ap-cnt" class="fs12-muted"></span>' +
     '</div>' +
     '<div class="flx-g8-wrap">' +
-    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(37,99,235,.12);color:#2563eb">Toplam: '+all.length+'</span>' +
-    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(22,163,74,.12);color:#16a34a">Aktif: '+activeCount+'</span>' +
-    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(217,119,6,.12);color:#d97706">Admin Onayı: '+awaitingAdmin+'</span>' +
-    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(168,85,247,.12);color:#a855f7">Zincir Bekleniyor: '+awaitingInt+'</span>' +
+    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(37,99,235,.12);color:#2563eb">'+t('ausr.sum_total','Toplam: ')+all.length+'</span>' +
+    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(22,163,74,.12);color:#16a34a">'+t('aprod.sum_active','Aktif: ')+activeCount+'</span>' +
+    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(217,119,6,.12);color:#d97706">'+t('aprod.sum_admin','Admin Onayı: ')+awaitingAdmin+'</span>' +
+    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(168,85,247,.12);color:#a855f7">'+t('aprod.sum_chain','Zincir Bekleniyor: ')+awaitingInt+'</span>' +
     (trashedAdminProds.length ? '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(220,38,38,.12);color:#dc2626">🗑 Çöp: '+trashedAdminProds.length+'</span>' : '') +
     '</div></div>' +
 
     // Arama
-    '<input id="ap-search" class="inp" placeholder="🔍 Ürün adı, vendor, kategori, ülke veya açıklama..." style="margin-bottom:10px;font-size:13px">' +
+    '<input id="ap-search" class="inp" placeholder="'+t('aprod.search_ph','🔍 Ürün adı, vendor, kategori, ülke veya açıklama...')+'" style="margin-bottom:10px;font-size:13px">' +
 
     // Filtreler — satır 1: durum bazlı
     '<div class="flx-g6-mb8-wrap">' +
-    [['','Tüm Durumlar'],['pending','Bekliyor'],['active','Aktif'],['rejected','Reddedildi'],['archived','Arşiv']].map(function(pair) {
+    [['',t('off.f_all','Tüm Durumlar')],['pending',t('status.pending','Bekliyor')],['active',t('status.active','Aktif')],['rejected',t('status.rejected','Reddedildi')],['archived',t('vprod.lc_archived_plain','Arşiv')]].map(function(pair) {
       return '<button class="ap-sf btn-g btn-sm fs12" data-val="'+pair[0]+'">'+pair[1]+'</button>';
     }).join('') +
     '<span style="border-left:1px solid var(--border);margin:0 4px"></span>' +
-    [['','Yayın: Tümü'],['awaiting_admin','🔍 Admin Onayı Bekliyor'],['awaiting_integrator','🔗 Zincir Bekliyor'],['ready','✓ Yayında']].map(function(pair) {
+    [['',t('aprod.pub_all','Yayın: Tümü')],['awaiting_admin',t('aprod.pub_admin','🔍 Admin Onayı Bekliyor')],['awaiting_integrator',t('aprod.pub_chain','🔗 Zincir Bekliyor')],['ready',t('aprod.pub_ready','✓ Yayında')]].map(function(pair) {
       return '<button class="ap-psf btn-g btn-sm fs12" data-val="'+pair[0]+'">'+pair[1]+'</button>';
     }).join('') +
     '</div>' +
@@ -26057,12 +26058,12 @@ async function admProducts(m) {
     cats.map(function(cat){ return '<option value="'+cat+'">'+cat+'</option>'; }).join('') +
     '</select>' +
     '<select id="ap-origin" class="inp btn-w-auto">' +
-    '<option value="">Tüm Menşei</option>' +
+    '<option value="">'+t('aprod.all_origin','Tüm Menşei')+'</option>' +
     '<option value="domestic">🇹🇷 Yerli</option>' +
     '<option value="foreign">🌍 Yabancı</option>' +
     '</select>' +
     '<select id="ap-vendor" class="inp btn-w-auto">' +
-    '<option value="">Tüm Vendorlar</option>' +
+    '<option value="">'+t('aprod.all_vendors','Tüm Vendorlar')+'</option>' +
     vendors.map(function(v){ return '<option value="'+v+'">'+v+'</option>'; }).join('') +
     '</select>' +
     '<input id="ap-date-from" type="date" class="inp btn-w-auto" title="Başlangıç tarihi">' +
@@ -26072,7 +26073,7 @@ async function admProducts(m) {
 
     // Tablo
     '<table><thead><tr>' +
-    '<th>Ürün</th><th>Vendor</th><th>Kategori</th><th>Ülke</th><th>Durum</th><th>Yayın</th><th>Tarih</th><th>İşlemler</th>' +
+    '<th>'+t('vprod.col_product','Ürün')+'</th><th>Vendor</th><th>'+t('vprod.col_category','Kategori')+'</th><th>'+t('ausr.country','Ülke')+'</th><th>'+t('vcal.col_status','Durum')+'</th><th>'+t('vprod.col_publish','Yayın')+'</th><th>'+t('vcal.col_date','Tarih')+'</th><th>'+t('aprod.col_actions','İşlemler')+'</th>' +
     '</tr></thead><tbody id="ap-tbody"></tbody></table>';
 
   // Event listener'lar
@@ -29133,7 +29134,11 @@ const I18N_DICT = {
     'common.close':'Kapat',
     'ausr.loading':'Kullanıcılar yükleniyor...','ausr.title':'Kullanıcı Yönetimi','ausr.detail_title':'Kullanıcı Detayı','ausr.fullname':'Ad Soyad','ausr.company':'Şirket','ausr.role':'Rol','ausr.country':'Ülke','ausr.phone':'Telefon','ausr.reg_date':'Kayıt Tarihi','ausr.email_verify_status':'E-posta Doğrulama Durumu',
     'ausr.sum_total':'Toplam: ','ausr.sum_customers':'Müşteri: ','ausr.sum_vendors':'Vendor: ','ausr.sum_premium':'Premium: ','ausr.sum_verified':'Doğrulanmış: ','ausr.search_ph':'🔍 Ad, e-posta, şirket, ülke veya telefon ara...',
-    'ausr.all_roles':'Tüm Roller','ausr.all_types':'Tüm Tipler','ausr.all_membership':'Tüm Üyelik','ausr.col_name_email':'Ad / E-posta','ausr.membership':'Üyelik','ausr.last_seen':'Son Görülme','ausr.verification':'Doğrulama','prof.founded_year':'Kuruluş Yılı','prof.phone_main':'Telefon (Ana)','prof.phone_alt':'Telefon (Yedek)','prof.email_secondary':'İkincil E-posta','prof.kep':'KEP Adresi',
+    'ausr.all_roles':'Tüm Roller','ausr.all_types':'Tüm Tipler','ausr.all_membership':'Tüm Üyelik','ausr.col_name_email':'Ad / E-posta','ausr.membership':'Üyelik','ausr.last_seen':'Son Görülme','ausr.verification':'Doğrulama',
+    'aprod.loading':'Ürünler yükleniyor...','aprod.title':'Ürün Yönetimi','aprod.sum_active':'Aktif: ','aprod.sum_admin':'Admin Onayı: ','aprod.sum_chain':'Zincir Bekleniyor: ','aprod.search_ph':'🔍 Ürün adı, vendor, kategori, ülke veya açıklama...',
+    'aprod.pub_all':'Yayın: Tümü','aprod.pub_admin':'🔍 Admin Onayı Bekliyor','aprod.pub_chain':'🔗 Zincir Bekliyor','aprod.pub_ready':'✓ Yayında','aprod.all_origin':'Tüm Menşei','aprod.all_vendors':'Tüm Vendorlar','aprod.col_actions':'İşlemler',
+    'aprod.hint_none_pending':'Tüm ürünler onaylanmis veya henuz vendorlardan onay talebi gelmedi.','aprod.hint_none_active':'Henüz hiçbir ürün admin tarafından onaylanmadı.','aprod.hint_none_rejected':'Tüm ürünler ya bekliyor ya da aktif.','aprod.hint_all_processed':'Tüm ürünler işlenmiş durumda.','aprod.hint_change_filter':'Filtre veya arama kriterlerini değiştirin.',
+    'aprod.approving':'Onaylanıyor...','aprod.notif_approved':'Ürününüz Onaylandı 🎉','aprod.email_approved':'Ürününüz Onaylandı — PoCHub','aprod.reject_reason':'Ret gerekçesi (opsiyonel):','aprod.toast_rejected':'Ürün reddedildi.','aprod.confirm_archive':'Bu ürünü arşivlemek istiyor musunuz?','prof.founded_year':'Kuruluş Yılı','prof.phone_main':'Telefon (Ana)','prof.phone_alt':'Telefon (Yedek)','prof.email_secondary':'İkincil E-posta','prof.kep':'KEP Adresi',
     'prof.contact_address':'İletişim Adresi (Posta için)','prof.billing_address':'Fatura Adresi (Resmi)','prof.website':'Web Sitesi','prof.signature':'İmza/Görünen Ad (e-postada)','prof.taxno':'Vergi/TC No','prof.tax_office':'Vergi Dairesi','prof.tax_type':'Vergi Türü','prof.mersis':'MERSIS No (varsa)',
     'prof.decider_role':'Karar Verici Rolü','prof.pref_contact':'Tercih Edilen İletişim','prof.detail_desc':'Detaylı Açıklama (Public profile için)','prof.short_desc':'Kısa Açıklama (max 160 karakter)','prof.logo_url':'Logo URL (alternatif)','prof.youtube':'YouTube Tanıtım Videosu (opsiyonel)',
     'prof.certs':'Sertifikalar (virgülle ayırın)','prof.expertise':'Uzmanlık Alanları (virgülle ayırın)','prof.interests':'İlgi Alanları (virgülle ayırın)','prof.current_solutions':'Şu An Kullandığınız Çözümler (opsiyonel)','prof.vendor_type':'Vendor Tipi','prof.role':'Rol','prof.city':'Şehir','prof.country':'Ülke','prof.linkedin':'LinkedIn','prof.twitter':'Twitter / X',
@@ -29399,7 +29404,11 @@ const I18N_DICT = {
     'common.close':'Close',
     'ausr.loading':'Loading users...','ausr.title':'User Management','ausr.detail_title':'User Detail','ausr.fullname':'Full Name','ausr.company':'Company','ausr.role':'Role','ausr.country':'Country','ausr.phone':'Phone','ausr.reg_date':'Registration Date','ausr.email_verify_status':'Email Verification Status',
     'ausr.sum_total':'Total: ','ausr.sum_customers':'Customers: ','ausr.sum_vendors':'Vendors: ','ausr.sum_premium':'Premium: ','ausr.sum_verified':'Verified: ','ausr.search_ph':'🔍 Search name, email, company, country or phone...',
-    'ausr.all_roles':'All Roles','ausr.all_types':'All Types','ausr.all_membership':'All Memberships','ausr.col_name_email':'Name / Email','ausr.membership':'Membership','ausr.last_seen':'Last Seen','ausr.verification':'Verification','prof.founded_year':'Founded Year','prof.phone_main':'Phone (Primary)','prof.phone_alt':'Phone (Backup)','prof.email_secondary':'Secondary Email','prof.kep':'KEP Address',
+    'ausr.all_roles':'All Roles','ausr.all_types':'All Types','ausr.all_membership':'All Memberships','ausr.col_name_email':'Name / Email','ausr.membership':'Membership','ausr.last_seen':'Last Seen','ausr.verification':'Verification',
+    'aprod.loading':'Loading products...','aprod.title':'Product Management','aprod.sum_active':'Active: ','aprod.sum_admin':'Admin Approval: ','aprod.sum_chain':'Awaiting Chain: ','aprod.search_ph':'🔍 Product name, vendor, category, country or description...',
+    'aprod.pub_all':'Publish: All','aprod.pub_admin':'🔍 Awaiting Admin Approval','aprod.pub_chain':'🔗 Awaiting Chain','aprod.pub_ready':'✓ Published','aprod.all_origin':'All Origins','aprod.all_vendors':'All Vendors','aprod.col_actions':'Actions',
+    'aprod.hint_none_pending':'All products approved or no approval request from vendors yet.','aprod.hint_none_active':'No products approved by admin yet.','aprod.hint_none_rejected':'All products are either pending or active.','aprod.hint_all_processed':'All products are processed.','aprod.hint_change_filter':'Change the filter or search criteria.',
+    'aprod.approving':'Approving...','aprod.notif_approved':'Your Product Has Been Approved 🎉','aprod.email_approved':'Your Product Has Been Approved — PoCHub','aprod.reject_reason':'Rejection reason (optional):','aprod.toast_rejected':'Product rejected.','aprod.confirm_archive':'Do you want to archive this product?','prof.founded_year':'Founded Year','prof.phone_main':'Phone (Primary)','prof.phone_alt':'Phone (Backup)','prof.email_secondary':'Secondary Email','prof.kep':'KEP Address',
     'prof.contact_address':'Contact Address (for mail)','prof.billing_address':'Billing Address (Official)','prof.website':'Website','prof.signature':'Signature / Display Name (in email)','prof.taxno':'Tax/ID No','prof.tax_office':'Tax Office','prof.tax_type':'Tax Type','prof.mersis':'MERSIS No (if any)',
     'prof.decider_role':'Decision-Maker Role','prof.pref_contact':'Preferred Contact','prof.detail_desc':'Detailed Description (for public profile)','prof.short_desc':'Short Description (max 160 characters)','prof.logo_url':'Logo URL (alternative)','prof.youtube':'YouTube Intro Video (optional)',
     'prof.certs':'Certifications (comma-separated)','prof.expertise':'Areas of Expertise (comma-separated)','prof.interests':'Areas of Interest (comma-separated)','prof.current_solutions':'Solutions You Currently Use (optional)','prof.vendor_type':'Vendor Type','prof.role':'Role','prof.city':'City','prof.country':'Country','prof.linkedin':'LinkedIn','prof.twitter':'Twitter / X',
