@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.47 | pochub.co -->
+<!-- PoCHub v6.48 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.47';
+const VERSION = 'v6.48';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function formatTS(val, opts) {
@@ -920,6 +920,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.48': ['i18n FAZ 7i (ADMIN Vendor Abonelikler / admVendorSubs) — loading, durum filtre seti (Tumu/Aktif/Grace/Suspend/Bitmis/Aboneliksiz), Tier/Durum/Borc Durumu filtreleri (Tumu/Borclu/Borcsuz), arama etiketi, tablo basliklari (Vendor/Tier/Durum/Bitis/PoC/Borc/LTV/Aksiyon), statusMap rozet etiketleri (Aktif/Grace/Bitti/Iptal/Suspend/Yok), Trial rozeti, Bilinmeyen, hata t()-e sarildi + avs.* (tr/en, status.* reuse). node --check + harness OK. UI — RULES degismedi.'],
   'v6.47': ['i18n FAZ 7h (ADMIN Gelir / admRevenue) — loading, baslik+alt-baslik, 4 stat karti (MRR alt/Bu Ay Gelir/Aktif Abonelik/Churn), borc uyari bandi, MRR degisim, Paket Dagilimi + Bu Ay Hareketler (Yukseltme/Yeni/Yenileme/Dusurme + alt-aciklamalar), En Cok Para Getiren 5 Vendor, bos-durum, Bilinmeyen, hata mesaji t()-e sarildi + arev.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
   'v6.46': ['i18n FAZ 7g (ADMIN Teklifler / admOffers) — baslik, arama, durum filtreleri (Kabul/Red), Var/Yok kanal-payi rozeti, tablo basliklari (Urun/Vendor/Musteri/Tutar/Kanal Payi/Durum/Tarih) t()-e sarildi + aoff.* (tr/en). AYRICA app-wide: common.has/common.has_not (Var/Yok). node --check + harness OK. UI — RULES degismedi.'],
   'v6.45': ['i18n FAZ 7f (ADMIN Etkinlikler / admEvents) — baslik, arama, durum filtreleri (Yayinda/Iptal), donem filtreleri (Yaklasan/Gecmis/Bu Ay/Gecen Ay/Bu Yil), Durum:/Donem: etiketleri, tablo basliklari (Baslik/Vendor/Tarih/Format/Kayitli/Durum/Islem) t()-e sarildi + aevt.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
@@ -27270,7 +27271,7 @@ async function admRevenue(m) {
 // v4.72: ADMIN VENDOR ABONELİKLER TABLOSU
 // ════════════════════════════════════════════════════════════════════
 async function admVendorSubs(m) {
-  m.innerHTML = '<div class="loading"><div class="spinner"></div>Vendor abonelikleri yükleniyor...</div>';
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('avs.loading','Vendor abonelikleri yükleniyor...')+'</div>';
   try {
     // Tüm verileri paralel çek
     const [vendorsSnap, subsSnap, billingsSnap, pkgsSnap, histSnap] = await Promise.all([
@@ -27369,12 +27370,12 @@ async function admVendorSubs(m) {
       filters.style.padding = '14px';
 
       var tiers = ['all','free','starter','professional','business','enterprise'];
-      var statuses = [['all','Tümü'],['active','Aktif'],['grace','Grace'],['suspended','Suspend'],['expired','Bitmiş'],['no_sub','Aboneliksiz']];
+      var statuses = [['all',t('common.all','Tümü')],['active',t('status.active','Aktif')],['grace',t('avs.grace','Grace')],['suspended',t('avs.suspend','Suspend')],['expired',t('avs.expired','Bitmiş')],['no_sub',t('avs.no_sub','Aboneliksiz')]];
 
       filters.innerHTML =
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">'
         + '<div>'
-        +   '<label class="lbl-mini">Tier</label>'
+        +   '<label class="lbl-mini">'+t('avs.tier','Tier')+'</label>'
         +   '<div class="flx-g8-wrap" id="vs-tier-filter" style="margin-top:4px">'
         +     tiers.map(function(t){
                 var active = filterTier === t;
@@ -27383,21 +27384,21 @@ async function admVendorSubs(m) {
         +   '</div>'
         + '</div>'
         + '<div>'
-        +   '<label class="lbl-mini">Durum</label>'
+        +   '<label class="lbl-mini">'+t('vcal.col_status','Durum')+'</label>'
         +   '<select class="inp" id="vs-status-filter" style="width:100%;margin-top:4px">'
         +     statuses.map(function(s){ return '<option value="'+s[0]+'"'+(filterStatus===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('')
         +   '</select>'
         + '</div>'
         + '<div>'
-        +   '<label class="lbl-mini">Borç Durumu</label>'
+        +   '<label class="lbl-mini">'+t('avs.debt_status','Borç Durumu')+'</label>'
         +   '<select class="inp" id="vs-debt-filter" style="width:100%;margin-top:4px">'
-        +     '<option value="all"'+(filterDebt==='all'?' selected':'')+'>Tümü</option>'
-        +     '<option value="yes"'+(filterDebt==='yes'?' selected':'')+'>Borçlu</option>'
-        +     '<option value="no"'+(filterDebt==='no'?' selected':'')+'>Borçsuz</option>'
+        +     '<option value="all"'+(filterDebt==='all'?' selected':'')+'>'+t('common.all','Tümü')+'</option>'
+        +     '<option value="yes"'+(filterDebt==='yes'?' selected':'')+'>'+t('avs.debtor','Borçlu')+'</option>'
+        +     '<option value="no"'+(filterDebt==='no'?' selected':'')+'>'+t('avs.no_debt','Borçsuz')+'</option>'
         +   '</select>'
         + '</div>'
         + '<div>'
-        +   '<label class="lbl-mini">Ara (isim/email)</label>'
+        +   '<label class="lbl-mini">'+t('avs.search_label','Ara (isim/email)')+'</label>'
         +   '<input class="inp" id="vs-search" placeholder="Acme..." value="'+searchQuery.replace(/"/g,'&quot;')+'" style="width:100%;margin-top:4px">'
         + '</div>'
         + '</div>';
@@ -27437,24 +27438,24 @@ async function admVendorSubs(m) {
           + '<tr style="background:rgba(37,99,235,.05);border-bottom:1px solid var(--border)">'
           +   '<th style="padding:10px 8px;text-align:left;width:30px"><input type="checkbox" id="vs-sel-all"></th>'
           +   '<th style="padding:10px 8px;text-align:left">Vendor</th>'
-          +   '<th style="padding:10px 8px;text-align:left">Tier</th>'
-          +   '<th style="padding:10px 8px;text-align:left">Durum</th>'
-          +   '<th style="padding:10px 8px;text-align:left">Bitiş</th>'
+          +   '<th style="padding:10px 8px;text-align:left">'+t('avs.tier','Tier')+'</th>'
+          +   '<th style="padding:10px 8px;text-align:left">'+t('vcal.col_status','Durum')+'</th>'
+          +   '<th style="padding:10px 8px;text-align:left">'+t('avs.col_end','Bitiş')+'</th>'
           +   '<th style="padding:10px 8px;text-align:left">PoC</th>'
-          +   '<th style="padding:10px 8px;text-align:right">Borç</th>'
-          +   '<th style="padding:10px 8px;text-align:right">LTV</th>'
-          +   '<th style="padding:10px 8px;text-align:center">Aksiyon</th>'
+          +   '<th style="padding:10px 8px;text-align:right">'+t('avs.col_debt','Borç')+'</th>'
+          +   '<th style="padding:10px 8px;text-align:right">'+t('avs.col_ltv','LTV')+'</th>'
+          +   '<th style="padding:10px 8px;text-align:center">'+t('avs.col_action','Aksiyon')+'</th>'
           + '</tr>'
           + '</thead>';
         var tbody = document.createElement('tbody');
 
         var statusBadges = {
-          active: { color:'#16a34a', label:'Aktif' },
-          grace_period: { color:'#d97706', label:'Grace' },
-          expired: { color:'#dc2626', label:'Bitti' },
-          cancelled: { color:'#64748b', label:'İptal' },
-          suspended: { color:'#dc2626', label:'Suspend' },
-          no_subscription: { color:'#64748b', label:'Yok' },
+          active: { color:'#16a34a', label:t('status.active','Aktif') },
+          grace_period: { color:'#d97706', label:t('avs.grace','Grace') },
+          expired: { color:'#dc2626', label:t('avs.ended','Bitti') },
+          cancelled: { color:'#64748b', label:t('status.cancelled','İptal') },
+          suspended: { color:'#dc2626', label:t('avs.suspend','Suspend') },
+          no_subscription: { color:'#64748b', label:t('common.has_not','Yok') },
           unknown: { color:'#64748b', label:'?' },
         };
 
@@ -27478,8 +27479,8 @@ async function admVendorSubs(m) {
           tr.style.cssText = 'border-bottom:1px solid rgba(15,23,42,.08);transition:.15s;cursor:default';
           tr.innerHTML =
             '<td style="padding:10px 8px"><input type="checkbox" class="vs-sel" data-id="'+r.vendor.id+'"'+(sel?' checked':'')+'></td>'
-            + '<td style="padding:10px 8px"><div class="fs13-fw6">🏢 '+(r.vendor.company || r.vendor.displayName || 'Bilinmeyen')+'</div><div class="fs11-muted">'+(r.vendor.email||'')+'</div></td>'
-            + '<td style="padding:10px 8px"><span class="tier-badge" style="background:'+tierColor+'20;color:'+tierColor+'">'+tierLabel+'</span>'+(r.sub?.isTrial?'<div class="fs10-muted" style="margin-top:2px">Trial</div>':'')+'</td>'
+            + '<td style="padding:10px 8px"><div class="fs13-fw6">🏢 '+(r.vendor.company || r.vendor.displayName || t('arev.unknown','Bilinmeyen'))+'</div><div class="fs11-muted">'+(r.vendor.email||'')+'</div></td>'
+            + '<td style="padding:10px 8px"><span class="tier-badge" style="background:'+tierColor+'20;color:'+tierColor+'">'+tierLabel+'</span>'+(r.sub?.isTrial?'<div class="fs10-muted" style="margin-top:2px">'+t('avs.trial','Trial')+'</div>':'')+'</td>'
             + '<td style="padding:10px 8px"><span class="tier-badge" style="background:'+sb.color+'15;color:'+sb.color+'">'+sb.label+'</span></td>'
             + '<td style="padding:10px 8px">'+(r.endDate?'<div class="fs12">'+dateText+'</div><div class="fs11-muted">'+daysText+'</div>':'<span class="t-muted">—</span>')+'</td>'
             + '<td style="padding:10px 8px"><span class="fs12">'+quotaText+'</span></td>'
@@ -27554,7 +27555,7 @@ async function admVendorSubs(m) {
     render();
 
   } catch(e) {
-    m.innerHTML = '<div class="alert alert-err">Vendor abonelikler yükleme hatası: '+e.message+'</div>';
+    m.innerHTML = '<div class="alert alert-err">'+t('avs.error','Vendor abonelikler yükleme hatası: ')+e.message+'</div>';
     console.error(e);
   }
 }
@@ -29146,7 +29147,8 @@ const I18N_DICT = {
     'arev.loading':'Gelir verileri hesaplanıyor...','arev.title':'📈 Gelir Dashboard','arev.subtitle':'PoCHub abonelik geliri ve paket performansı analizi','arev.mrr_sub':'Aylık Yinelenen Gelir','arev.this_month':'Bu Ay Gelir','arev.active_subs':'Aktif Abonelik','arev.churn':'Churn Rate (30g)',
     'arev.debt_a':'Vendor cari hesaplarında ','arev.debt_b':' ödenmemiş borç var. ','arev.debt_c':' vendor askıya alındı.','arev.mrr_change':'Aylık ödemelerin toplam değişimi','arev.pkg_dist':'Paket Dağılımı','arev.month_moves':'Bu Ay Hareketler',
     'arev.move_upgrade':'⬆ Yükseltme','arev.move_upgrade_sub':'Üst pakete geçen vendor','arev.move_new':'🆕 Yeni Satın Alma','arev.move_new_sub':'İlk kez paket alan vendor','arev.move_renew':'🔄 Yenileme','arev.move_renew_sub':'Aboneliğini yenileyen','arev.move_downgrade':'⬇ Düşürme','arev.move_downgrade_sub':'Alt pakete geçen vendor',
-    'arev.top5':'En Çok Para Getiren 5 Vendor (LTV)','arev.no_paying':'Henüz ödeme yapan vendor yok.','arev.unknown':'Bilinmeyen','arev.error':'Gelir dashboard hatası: ','prof.founded_year':'Kuruluş Yılı','prof.phone_main':'Telefon (Ana)','prof.phone_alt':'Telefon (Yedek)','prof.email_secondary':'İkincil E-posta','prof.kep':'KEP Adresi',
+    'arev.top5':'En Çok Para Getiren 5 Vendor (LTV)','arev.no_paying':'Henüz ödeme yapan vendor yok.','arev.unknown':'Bilinmeyen','arev.error':'Gelir dashboard hatası: ',
+    'avs.loading':'Vendor abonelikleri yükleniyor...','avs.grace':'Grace','avs.suspend':'Suspend','avs.expired':'Bitmiş','avs.no_sub':'Aboneliksiz','avs.tier':'Tier','avs.debt_status':'Borç Durumu','avs.debtor':'Borçlu','avs.no_debt':'Borçsuz','avs.search_label':'Ara (isim/email)','avs.col_end':'Bitiş','avs.col_debt':'Borç','avs.col_ltv':'LTV','avs.col_action':'Aksiyon','avs.ended':'Bitti','avs.trial':'Trial','avs.error':'Vendor abonelikler yükleme hatası: ','prof.founded_year':'Kuruluş Yılı','prof.phone_main':'Telefon (Ana)','prof.phone_alt':'Telefon (Yedek)','prof.email_secondary':'İkincil E-posta','prof.kep':'KEP Adresi',
     'prof.contact_address':'İletişim Adresi (Posta için)','prof.billing_address':'Fatura Adresi (Resmi)','prof.website':'Web Sitesi','prof.signature':'İmza/Görünen Ad (e-postada)','prof.taxno':'Vergi/TC No','prof.tax_office':'Vergi Dairesi','prof.tax_type':'Vergi Türü','prof.mersis':'MERSIS No (varsa)',
     'prof.decider_role':'Karar Verici Rolü','prof.pref_contact':'Tercih Edilen İletişim','prof.detail_desc':'Detaylı Açıklama (Public profile için)','prof.short_desc':'Kısa Açıklama (max 160 karakter)','prof.logo_url':'Logo URL (alternatif)','prof.youtube':'YouTube Tanıtım Videosu (opsiyonel)',
     'prof.certs':'Sertifikalar (virgülle ayırın)','prof.expertise':'Uzmanlık Alanları (virgülle ayırın)','prof.interests':'İlgi Alanları (virgülle ayırın)','prof.current_solutions':'Şu An Kullandığınız Çözümler (opsiyonel)','prof.vendor_type':'Vendor Tipi','prof.role':'Rol','prof.city':'Şehir','prof.country':'Ülke','prof.linkedin':'LinkedIn','prof.twitter':'Twitter / X',
@@ -29420,7 +29422,8 @@ const I18N_DICT = {
     'arev.loading':'Calculating revenue data...','arev.title':'📈 Revenue Dashboard','arev.subtitle':'PoCHub subscription revenue and package performance analysis','arev.mrr_sub':'Monthly Recurring Revenue','arev.this_month':'This Month Revenue','arev.active_subs':'Active Subscriptions','arev.churn':'Churn Rate (30d)',
     'arev.debt_a':'Vendor accounts have ','arev.debt_b':' unpaid debt. ','arev.debt_c':' vendor(s) suspended.','arev.mrr_change':'Total change in monthly payments','arev.pkg_dist':'Package Distribution','arev.month_moves':'This Month Movements',
     'arev.move_upgrade':'⬆ Upgrade','arev.move_upgrade_sub':'Vendors moving to higher package','arev.move_new':'🆕 New Purchase','arev.move_new_sub':'Vendors buying a package for the first time','arev.move_renew':'🔄 Renewal','arev.move_renew_sub':'Vendors renewing subscription','arev.move_downgrade':'⬇ Downgrade','arev.move_downgrade_sub':'Vendors moving to lower package',
-    'arev.top5':'Top 5 Highest-Revenue Vendors (LTV)','arev.no_paying':'No paying vendors yet.','arev.unknown':'Unknown','arev.error':'Revenue dashboard error: ','prof.founded_year':'Founded Year','prof.phone_main':'Phone (Primary)','prof.phone_alt':'Phone (Backup)','prof.email_secondary':'Secondary Email','prof.kep':'KEP Address',
+    'arev.top5':'Top 5 Highest-Revenue Vendors (LTV)','arev.no_paying':'No paying vendors yet.','arev.unknown':'Unknown','arev.error':'Revenue dashboard error: ',
+    'avs.loading':'Loading vendor subscriptions...','avs.grace':'Grace','avs.suspend':'Suspend','avs.expired':'Expired','avs.no_sub':'No Subscription','avs.tier':'Tier','avs.debt_status':'Debt Status','avs.debtor':'In Debt','avs.no_debt':'No Debt','avs.search_label':'Search (name/email)','avs.col_end':'End','avs.col_debt':'Debt','avs.col_ltv':'LTV','avs.col_action':'Action','avs.ended':'Ended','avs.trial':'Trial','avs.error':'Vendor subscriptions load error: ','prof.founded_year':'Founded Year','prof.phone_main':'Phone (Primary)','prof.phone_alt':'Phone (Backup)','prof.email_secondary':'Secondary Email','prof.kep':'KEP Address',
     'prof.contact_address':'Contact Address (for mail)','prof.billing_address':'Billing Address (Official)','prof.website':'Website','prof.signature':'Signature / Display Name (in email)','prof.taxno':'Tax/ID No','prof.tax_office':'Tax Office','prof.tax_type':'Tax Type','prof.mersis':'MERSIS No (if any)',
     'prof.decider_role':'Decision-Maker Role','prof.pref_contact':'Preferred Contact','prof.detail_desc':'Detailed Description (for public profile)','prof.short_desc':'Short Description (max 160 characters)','prof.logo_url':'Logo URL (alternative)','prof.youtube':'YouTube Intro Video (optional)',
     'prof.certs':'Certifications (comma-separated)','prof.expertise':'Areas of Expertise (comma-separated)','prof.interests':'Areas of Interest (comma-separated)','prof.current_solutions':'Solutions You Currently Use (optional)','prof.vendor_type':'Vendor Type','prof.role':'Role','prof.city':'City','prof.country':'Country','prof.linkedin':'LinkedIn','prof.twitter':'Twitter / X',
