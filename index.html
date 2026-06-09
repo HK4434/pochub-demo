@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.64 | pochub.co -->
+<!-- PoCHub v6.65 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,27 +685,33 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.64';
+const VERSION = 'v6.65';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
-var TRANSLATE_CFG = { apiKey:'' };
-async function loadTranslateCfg(){ try { var s=await getDoc(doc(db,'pochub_config','translation')); if(s.exists()){ var d=s.data()||{}; TRANSLATE_CFG.apiKey=String(d.apiKey||''); } } catch(e){} }
-async function gTranslate(texts, target){
-  target = target || 'en';
-  if(!TRANSLATE_CFG.apiKey) throw new Error('Ceviri API anahtari tanimli degil.');
-  var arr = Array.isArray(texts) ? texts : [texts];
-  var idx=[], send=[];
-  arr.forEach(function(x,i){ if(x && String(x).trim()){ idx.push(i); send.push(String(x)); } });
-  if(!send.length) return arr.map(function(){ return ''; });
-  var res = await fetch('https://translation.googleapis.com/language/translate/v2?key='+encodeURIComponent(TRANSLATE_CFG.apiKey), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ q: send, source:'tr', target: target, format:'text' }) });
-  var data = await res.json();
-  if(!res.ok || !data || !data.data || !data.data.translations) throw new Error((data && data.error && data.error.message) || ('Ceviri hatasi ('+res.status+')'));
-  var out = arr.map(function(){ return ''; });
-  data.data.translations.forEach(function(tr,k){ out[idx[k]] = tr.translatedText; });
+var TRANSLATE_CFG = { email:'' };
+async function loadTranslateCfg(){ try { var s=await getDoc(doc(db,'pochub_config','translation')); if(s.exists()){ var d=s.data()||{}; TRANSLATE_CFG.email=String(d.email||''); } } catch(e){} }
+function _mmChunk(t, max){ t=String(t); if(t.length<=max) return [t]; var parts=[], cur='', toks=t.split(/(\s+)/); toks.forEach(function(w){ if((cur+w).length>max){ if(cur) parts.push(cur); cur=w; } else cur+=w; }); if(cur) parts.push(cur); return parts; }
+async function _mmOne(text, source, target){
+  var url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair='+source+'|'+target+(TRANSLATE_CFG.email?('&de='+encodeURIComponent(TRANSLATE_CFG.email)):'');
+  var res=await fetch(url); var data=await res.json();
+  var out=(data && data.responseData && data.responseData.translatedText) || '';
+  if(/MYMEMORY WARNING|YOU USED ALL AVAILABLE|QUERY LENGTH LIMIT/i.test(out)) throw new Error('MyMemory kota/limit: '+out);
+  if(data && data.responseStatus && String(data.responseStatus)!=='200') throw new Error('Ceviri hatasi: '+(data.responseDetails||data.responseStatus));
   return out;
 }
-function formatTS(val, opts) {
+async function gTranslate(texts, target){
+  target=(target||'en').toLowerCase(); var source='tr';
+  var arr=Array.isArray(texts)?texts:[texts]; var out=[];
+  for(var i=0;i<arr.length;i++){
+    var txt=arr[i];
+    if(!txt || !String(txt).trim()){ out.push(''); continue; }
+    var chunks=_mmChunk(String(txt), 480); var tparts=[];
+    for(var c=0;c<chunks.length;c++){ tparts.push(await _mmOne(chunks[c], source, target)); }
+    out.push(tparts.join(''));
+  }
+  return out;
+}function formatTS(val, opts) {
   if (!val) return '—';
   var d;
   if (val && typeof val.toDate === 'function') { d = val.toDate(); }
@@ -937,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.65': ['OZELLIK: Otomatik EN cevirisi DeepL yerine MyMemory ile (DeepL tarayicidan CORS-bloklu, backend gerektirir — Spark uyumsuz). gTranslate() artik MyMemory (ucretsiz, anahtarsiz, CORS-acik, statik siteden direkt cagrilabilir). tr->en, uzun metinleri ~480 karakterlik parcalara bolup cevirir, kota/limit hatasini yakalar. TRANSLATE_CFG.email opsiyonel (gunluk kota 5K->50K). Biz Kimiz editorundeki ayar alani: API anahtari yerine opsiyonel e-posta; buton (MyMemory). pochub_config/translation a {email} yazar. NOT: kalite Google kadar parlak degil ama admin EN-i gozden gecirip kaydediyor; para kazaninca Google a tek-satir gecis. node --check + harness OK. RULES degismedi.'],
   'v6.64': ['OZELLIK: Otomatik EN cevirisi PoC (Biz Kimiz) — admin-girisi icerigi icin makine cevirisi. (1) gTranslate() helper: Google Cloud Translation v2 REST (client-side, referrer-kisitli anahtar), tr->en, batch, format:text. (2) TRANSLATE_CFG + loadTranslateCfg() (pochub_config/translation dan anahtar okur). (3) Biz Kimiz editorune: 🌐 Otomatik EN Cevirisi (Google) butonu + ⚙ API anahtari alani (admin girer, pochub_config/translation a kaydolur). Buton tum TR alanlarini (hero/who/mission/vision + ilke/fark/istatistik satirlari) toplayip Google a gonderir, -en alanlarini doldurur; admin duzenleyip Kaydet. Render zaten locale-aware (aboutTxt _en bakar). NOT: yasal metinler kapsam disi. node --check + harness OK. KURAL: anahtar admin-yonetimli; pochub_config/translation yazma izni rules-da admin icin acik olmali.'],
   'v6.63': ['i18n FAZ 10 (VENDOR DASHBOARD govdesi / loadVendTab ~3233 satir) — ~61 string t()-e baglandi: stat etiketleri (Aktif Urun/Bos Saat/Entegrator Bek./Etkinlik Kaydi/Teklif Donusum-Gonderdik/Yaklasan PoC/Yanitsiz Davet/Kabul orani/Yanit bekleyen), durum/etiket (Yayinda/Cakisma/Uctan Uca/Entegrator atanmamis/Revizyon istendi/Gecerlilik/Admin onayi), butonlar (Urun/Etkinlik Ekle/PoC Davet/Detay Goster/Tumunu Gor/Aktif Listeye Don/Sure Yakin/Yuksek Tutarli/En Performanslilar), toastlar (yayinlandi/aktife-geri alindi/arsive/cop/URL kopyalandi/red), bolum basliklari (EN COK POC/URUN DURUMLARI), bos-durumlar (Henuz PoC/etkinlik/veri yok/Takvim), dogrulama rozetleri, goreceli zaman (time.*: gun/saat/dakika/dk/ay once, Bugun) + vend.* (tr/en). node --check + harness OK. UI — RULES degismedi.'],
   'v6.62': ['i18n FAZ 9 (SISTEMIK tarih + MUSTERI DASHBOARD govdesi) — (1) TARIH/SAAT: 66 toLocaleDateString + 7 toLocaleTimeString sabit tr-TR idi → LDATE() helper ile locale-aware yapildi (EN modunda artik EN tarih). (2) Baslangic Rehberi chrome (musteri+vendor: baslik, N/M adim tamamlandi, Gizle, Haritayi Ac/Profili Tamamla aksiyonlari). (3) loadCustTab govdesi ~60 string: greeting (sabah/gun/aksam/gece), stat/filtre/durum etiketleri, bolum basliklari, tab/buton/bos-durum/toast, sayac-cumle parcalari + cust.*/greet.* (tr/en). (4) Liderler loading/error. NOT: Liderler/BizKimiz CHROME zaten sariliydi; kalan TR = admin-config ICERIK (misyon/vizyon/FAQ metni) + Firestore taksonomisi (sektor/kategori adlari) = data. node --check + harness OK. UI — RULES degismedi.'],
@@ -5270,8 +5277,8 @@ function _openAboutEditor(){
     + lbl('Misyon') + ta('abe-mission', a.mission, '', 3)
     + lbl('Vizyon') + ta('abe-vision', a.vision, '', 3)
     + '<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#16a34a;margin:16px 0 10px">🌐 İNGİLİZCE (EN) — opsiyonel; boş bırakılırsa o alanda TR gösterilir</div>'
-    + '<div style="display:flex;gap:8px;align-items:center;margin:0 0 8px;flex-wrap:wrap"><button type="button" id="abe-autotr" class="btn-g btn-sm">🌐 Otomatik EN Çevirisi (Google)</button><span id="abe-autotr-status" style="font-size:11px;color:var(--text-muted)"></span></div>'
-    + '<details style="margin:0 0 10px"><summary style="font-size:11px;color:var(--text-muted);cursor:pointer">⚙ Çeviri API ayarı (Google)</summary><div style="display:flex;gap:6px;margin-top:6px"><input class="inp" id="abe-tr-key" type="password" placeholder="Google Translate API anahtarı" value="'+escHtml(TRANSLATE_CFG.apiKey||'')+'" style="flex:1;font-size:11px"><button type="button" id="abe-tr-key-save" class="btn-g btn-sm">Kaydet</button></div><div style="font-size:10.5px;color:var(--text-muted);margin-top:4px">Anahtarı Google Cloud Console üzerinden alın; HTTP referrer kısıtlamasını pochub.co ile sınırlayın.</div></details>'
+    + '<div style="display:flex;gap:8px;align-items:center;margin:0 0 8px;flex-wrap:wrap"><button type="button" id="abe-autotr" class="btn-g btn-sm">🌐 Otomatik EN Çevirisi (MyMemory)</button><span id="abe-autotr-status" style="font-size:11px;color:var(--text-muted)"></span></div>'
+    + '<details style="margin:0 0 10px"><summary style="font-size:11px;color:var(--text-muted);cursor:pointer">⚙ Çeviri ayarı (MyMemory — ücretsiz, anahtar gerekmez)</summary><div style="display:flex;gap:6px;margin-top:6px"><input class="inp" id="abe-tr-key" type="email" placeholder="(opsiyonel) e-posta — günlük kotayı 5K→50K karaktere çıkarır" value="'+escHtml(TRANSLATE_CFG.email||'')+'" style="flex:1;font-size:11px"><button type="button" id="abe-tr-key-save" class="btn-g btn-sm">Kaydet</button></div><div style="font-size:10.5px;color:var(--text-muted);margin-top:4px">MyMemory ücretsiz ve anahtarsız çalışır. E-posta opsiyoneldir; girersen günlük kota 50.000 karaktere çıkar.</div></details>'
     + lbl('Badge (EN)') + inp('abe-badge-en', (a.hero_en&&a.hero_en.badge)||'')
     + lbl('Title (EN)') + ta('abe-title-en', (a.hero_en&&a.hero_en.title)||'', '', 2)
     + lbl('Subtitle (EN)') + ta('abe-subtitle-en', (a.hero_en&&a.hero_en.subtitle)||'', '', 2)
@@ -5307,7 +5314,7 @@ function _openAboutEditor(){
 
   modal.querySelector('#abe-tr-key-save')?.addEventListener('click', async function(){
     var k=modal.querySelector('#abe-tr-key').value.trim();
-    try { await setDoc(doc(db,'pochub_config','translation'), {apiKey:k}, {merge:true}); TRANSLATE_CFG.apiKey=k; showToast('Ceviri anahtari kaydedildi.'); }
+    try { await setDoc(doc(db,'pochub_config','translation'), {email:k}, {merge:true}); TRANSLATE_CFG.email=k; showToast('Ceviri ayari kaydedildi.'); }
     catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); }
   });
   modal.querySelector('#abe-autotr')?.addEventListener('click', async function(){
