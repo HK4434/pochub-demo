@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.68 | pochub.co -->
+<!-- PoCHub v6.69 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.68';
+const VERSION = 'v6.69';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -943,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.69': ['OZELLIK: Otomatik EN cevirisi KATEGORILERE yayildi (categories koleksiyonu) — dort icerik tipi tamam (BizKimiz+FAQ+Paket+Kategori). Kategori name TAKSONOMI ANAHTARI (urun.category eslesmesi) oldugundan anahtar TR kalir; gosterimde name_en kullanilir. (1) catLabel(cat)/catLabelEN(name) + CAT_NAME_EN map (getCategories-te doldurulur). (2) Filtre dropdownlari (fillCatSelect) ve Liderler kategori basliklari locale-aware (deger/anahtar name sabit). (3) admCategories ust bara: 🌐 Tumunu Ingilizceye Cevir (MyMemory) — her kategorinin name + desc-ini cevirip name_en/desc_en olarak categories doc-una merge-ler. node --check + harness OK. RULES degismedi.'],
   'v6.68': ['OZELLIK: Otomatik EN cevirisi PAKETLERE yayildi (pochub_packages). (1) pkgName(p)/pkgFeats(p) getter — EN modunda name_en + features_en kullanir, yoksa TR. openPackageBrowser-da paket adi + ozellik listesi + mevcut-plan etiketi locale-aware. (2) admPackages ust bara: 🌐 Tumunu Ingilizceye Cevir (MyMemory) — her paketin name + tum features-larini cevirir, name_en/features_en olarak pochub_packages doc-una merge-le kaydeder. node --check + harness OK. RULES degismedi.'],
   'v6.67': ['OZELLIK: Otomatik EN cevirisi FAQ-e yayildi (pochub_content/help). (1) renderHelp artik locale-aware: LFAQ(o,k) getter — EN modunda cat.title_en/desc_en + qa.q_en/a_en kullanir, yoksa TR-ye duser (6 goruntuleme noktasi). (2) Icerik Yonetimi (renderHelpAdmin) ust bara: 🌐 Tumunu Ingilizceye Cevir (MyMemory) butonu — tum kategori basliklari/aciklamalari + tum soru q/a-lari toplar, MyMemory ile cevirir, _en alanlarini doldurup pochub_content/help-e kaydeder. Buyuk FAQ-lerde gunluk kota icin admin e-posta girebilir (Biz Kimiz ayar alanindan). node --check + harness OK. RULES degismedi.'],
   'v6.66': ['i18n DUZELTME: Ust menude Liderler ve Biz Kimiz EN modunda Turkce kaliyordu. Sebep: nav.leaderboard ve nav.about anahtarlari I18N_DICT-te HIC yoktu (ne tr ne en) — t() TR fallback-e dusuyordu. Ikisi de tr+en bloklarina eklendi (TR: 🏆 Liderler / Biz Kimiz, EN: 🏆 Leaders / Who We Are). Artik EN navda Leaders / Who We Are gosterir. node --check + harness OK. RULES degismedi.'],
@@ -1916,6 +1917,7 @@ async function getCategories() {
     cats.sort((a,b)=>(a.order||0)-(b.order||0));
     if (!cats.length) cats = ['Firewall','Network','Storage','Yedekleme','Server','Güvenlik','Yazılım','Diğer'].map(function(n,i){return {name:n,order:i,id:n};});
     cats.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','tr'); });
+    cats.forEach(function(c){ if(c && c.name && c.name_en) CAT_NAME_EN[c.name]=c.name_en; });
     _catCache = cats;
     return cats;
   } catch(e) {
@@ -1926,7 +1928,7 @@ function invalidateCatCache() { _catCache = null; }
 async function fillCatSelect(selectEl, selectedVal) {
   if (!selectEl) return;
   var cats = await getCategories();
-  selectEl.innerHTML = cats.map(function(cat){return '<option value="'+cat.name+'"'+(cat.name===selectedVal?' selected':'')+'>'+cat.name+'</option>';}).join('');
+  selectEl.innerHTML = cats.map(function(cat){return '<option value="'+cat.name+'"'+(cat.name===selectedVal?' selected':'')+'>'+catLabel(cat)+'</option>';}).join('');
 }
 
 /* ── ÜLKE LİSTESİ ── */
@@ -5145,6 +5147,9 @@ var ABOUT = JSON.parse(JSON.stringify(ABOUT_DEFAULT));
 var _aboutLoaded = false;
 // v6.02: locale-bilinçli içerik seçimi (EN varsa EN, yoksa TR)
 function heroF(k){ return (window.CUR_LOCALE==='en' && ABOUT.hero_en && ABOUT.hero_en[k]) ? ABOUT.hero_en[k] : (ABOUT.hero[k]||''); }
+var CAT_NAME_EN = {};
+function catLabelEN(name){ return (window.CUR_LOCALE==='en' && name && CAT_NAME_EN[name]) ? CAT_NAME_EN[name] : (name||''); }
+function catLabel(cat){ if(!cat) return ''; return (window.CUR_LOCALE==='en' && cat.name_en) ? cat.name_en : (cat.name||''); }
 function pkgName(p){ return (window.CUR_LOCALE==='en' && p && p.name_en) ? p.name_en : ((p&&p.name)||''); }
 function pkgFeats(p){ return (window.CUR_LOCALE==='en' && p && Array.isArray(p.features_en) && p.features_en.length) ? p.features_en : ((p&&p.features)||[]); }
 function LFAQ(o,k){ return (window.CUR_LOCALE==='en' && o && o[k+'_en']) ? o[k+'_en'] : ((o&&o[k])||''); }
@@ -5238,7 +5243,7 @@ async function renderLeaderboard(){
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:24px">'+cats.map(function(c,i){ return '<button class="lb-chip" data-i="'+i+'" style="font-size:12px;font-weight:600;padding:6px 12px;border:1px solid var(--border);border-radius:20px;color:var(--text-secondary);background:var(--bg-surface);cursor:pointer">'+escHtml(c)+' <span style="color:var(--text-muted)">'+byCat[c].length+'</span></button>'; }).join('')+'</div>';
     cats.forEach(function(c,ci){
       var list=byCat[c].sort(function(a,b){ return b.e.score-a.e.score || (b.p.ratingCount||0)-(a.p.ratingCount||0); }).slice(0,10);
-      html += '<div id="lb-cat-'+ci+'" style="margin-bottom:30px;scroll-margin-top:80px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px"><span style="font-size:16px;font-weight:800;color:var(--text)">'+escHtml(c)+'</span><span style="font-size:11.5px;color:var(--text-muted)">'+byCat[c].length+' '+t('lb.proven_solutions','kanıtlanmış çözüm')+'</span></div>';
+      html += '<div id="lb-cat-'+ci+'" style="margin-bottom:30px;scroll-margin-top:80px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px"><span style="font-size:16px;font-weight:800;color:var(--text)">'+escHtml(catLabelEN(c))+'</span><span style="font-size:11.5px;color:var(--text-muted)">'+byCat[c].length+' '+t('lb.proven_solutions','kanıtlanmış çözüm')+'</span></div>';
       html += list.map(function(x,i){
         var p=x.p, e=x.e, col=evidenceColor(e.score);
         var medal = i===0?'🥇':(i===1?'🥈':(i===2?'🥉':'<span style="display:inline-block;width:22px;text-align:center;color:var(--text-muted);font-weight:700">'+(i+1)+'</span>'));
@@ -34588,7 +34593,7 @@ async function admCategories(m) {
       '<div style="display:flex;gap:8px;align-items:center">' +
       '<input class="inp" id="cat-search" placeholder="'+t('acat.search_ph','Kategori ara...')+'" style="width:220px;font-size:12.5px">' +
       '<button class="btn-g btn-sm fs12" id="sync-cats-btn">🔄 Eksik Kategorileri Ekle</button>' +
-      '<button class="btn-p btn-sm" id="add-cat-btn" style="margin-left:6px">'+t('acnt.add_cat','+ Yeni Kategori')+'</button>' +
+      '<button class="btn-p btn-sm" id="add-cat-btn" style="margin-left:6px">'+t('acnt.add_cat','+ Yeni Kategori')+'</button>' + '<button class="btn-g btn-sm" id="cat-autotr" style="margin-left:6px">🌐 Tümünü İngilizceye Çevir (MyMemory)</button><span id="cat-autotr-status" style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>' +
       '</div></div>' +
       '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
@@ -34603,6 +34608,30 @@ async function admCategories(m) {
     var missingCats = ALL_CATS_V4.filter(function(n){ return !existingCatNames.includes(n); });
 
     m.querySelector('#add-cat-btn').addEventListener('click', function() { openCatModal(null); });
+
+    m.querySelector('#cat-autotr')?.addEventListener('click', async function(){
+      var btn=this, st=m.querySelector('#cat-autotr-status');
+      var jobs=[];
+      cats.forEach(function(c){ if(c.name) jobs.push({c:c,k:'name'}); if(c.desc) jobs.push({c:c,k:'desc'}); });
+      if(!jobs.length){ if(st) st.textContent='Cevrilecek kategori yok.'; return; }
+      if(!confirm(jobs.length+' alan MyMemory ile EN-e cevrilecek ve kaydedilecek. Devam?')) return;
+      btn.disabled=true; if(st) st.textContent='Cevriliyor... ('+jobs.length+' alan)';
+      try {
+        var texts=jobs.map(function(j){ return j.c[j.k]; });
+        var outs=await gTranslate(texts,'en');
+        outs.forEach(function(v,i){ if(v) jobs[i].c[jobs[i].k+'_en']=v; });
+        for(var k=0;k<cats.length;k++){
+          var cc=cats[k]; var upd={};
+          if(cc.name_en) upd.name_en=cc.name_en;
+          if(cc.desc_en) upd.desc_en=cc.desc_en;
+          if(Object.keys(upd).length) await setDoc(doc(db,'categories',cc.id), upd, {merge:true});
+        }
+        if(typeof invalidateCatCache==='function') invalidateCatCache();
+        if(st) st.textContent='\u2713 '+jobs.length+' alan cevrildi ve kaydedildi. (EN modunda gorunur)';
+        showToast('Kategori Ingilizce cevirisi kaydedildi.');
+      } catch(e){ if(st) st.textContent='\u2715 '+((e&&e.message)||'hata'); }
+      btn.disabled=false;
+    });
     m.querySelector('#sync-cats-btn')?.addEventListener('click', async function() {
       if (!missingCats.length) { showToast(t('acat.all_present','Tüm kategoriler mevcut.')); return; }
       var btn = this; btn.disabled = true; btn.textContent = t('acat.adding','Ekleniyor...');
