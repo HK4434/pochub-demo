@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.76 | pochub.co -->
+<!-- PoCHub v6.77 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.76';
+const VERSION = 'v6.77';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -943,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.77': ['i18n FAZ 17 (ADMIN — Revenue + Vendor Subscriptions + Payments kalan TR) — admRevenue: Tahsilat Riski basligi, MRR Trend (Son 6 Ay) basligi, ozet alt-metinler (odeme/toplam/ucretli/aboneden cikis) = arev.*. admVendorSubs: alt-baslik (vendor/aktif aboneli/borclu), tier Tumu (shadowed-t icin on-degisken), N vendor gosteriliyor, secili, CSV Disa Aktar, bos-durum, Vendor Detayi modal basligi = avs.*. admPayments: kart period gun eki + Yontem etiketi + odeme yontemleri (Manuel Havale/Ucretsiz/Kredi Karti/Admin Hediye) = apay.*. Bu sayfalarin chrome-u zaten sariliydi; bunlar satir/kart govde kalintilari. node --check + harness OK. RULES degismedi.'],
   'v6.76': ['i18n FAZ 16 (ADMIN PANEL i18n basladi — Dashboard + Users) — Onceki turlarda admin GOVDESI buyuk olcude TR kalmisti; bu eksigi kapatma turu. ADMIN Dashboard: Admin Paneli sidebar basligi, Genel bakis, 5 kart kicker (MRR/Acil Onay/Reklam/Yeni Kullanici/Demo), kart alt etiketleri (aktif ucretli abonelik, override borc, reklam geliri, randevu alindi), stat etiketleri (Musteri, 7g Yeni PoC), PoC Durum & Vendor Tur basliklari, vendor tipleri (vtype.* = Manufacturer/Distributor/Integrator) = adash.* (tr/en). ADMIN Users: satir rozetleri (Dogrulu/Bekliyor/Admin tarafindan), Dogrula/Kaldir butonlari, Ucretsiz uyelik, kullanici sayaci = ausr.* (tr/en eklendi). NOT: admin paneli cok genis; kalan sayfalar (Revenue, VendorSubs, Packages, Payments, Events, Products, Categories, VendorApprovals, Demo, Overrides, Featured, DataHealth, Profile, Content) sonraki versiyonlarda. node --check + harness OK. RULES degismedi.'],
   'v6.75': ['i18n FAZ 15 (PUBLIC — Anasayfa SSS seridi / loadFAQ) — bu serit HARDCODED 8 Q&A (pochub_content/help-ten ayri). Render-da index-bazli t(\'faqh.qN/aN\', f.q/f.a) ile sarildi; 8 sorunun+cevabin EN cevirileri sozluge eklendi (TR fallback array-den gelir). Ayrica kicker (Bilgi), baslik (Sik Sorulan Sorular), footer (Detayli Yardim Merkezi / Daha fazla sorunuz mu var / Iletisime gecin) = faqh.*. BUNUNLA fotograflardaki 6 public yuzey turu TAMAM. node --check + harness OK. RULES degismedi (NOT: bu serit hardcoded — ileride Firestore-backed yapilabilir).'],
   'v6.74': ['i18n FAZ 14 (PUBLIC — Liderler teaser/Quadrant + Featured urun karti) — lbt.*: vitrin basligi (Kanitlanmis Liderler), Tumu, aciklama, Quadrant aciklamasi, Haritayi Ac. feat.*: Sponsorlu/One Cikan Urun rozeti, Demo/PoC Talep Et CTA + kart kategori etiketi catLabelEN ile locale-aware. (Urun adi/vendor adi = veri, TR kalir.) node --check + harness OK. RULES degismedi.'],
@@ -27122,7 +27123,7 @@ async function admRevenue(m) {
       },
       {
         label: t('arev.this_month','Bu Ay Gelir'),
-        sub: thisMonthPaymentCount + ' ödeme',
+        sub: thisMonthPaymentCount + ' ' + t('arev.sub_payments','ödeme'),
         value: '₺' + Math.round(thisMonthRevenue).toLocaleString('tr-TR'),
         color: '#2563eb',
         bg: 'rgba(37,99,235,.08)',
@@ -27130,7 +27131,7 @@ async function admRevenue(m) {
       },
       {
         label: t('arev.active_subs','Aktif Abonelik'),
-        sub: activeCount + ' toplam (' + paidActive + ' ücretli)',
+        sub: activeCount + ' ' + t('arev.sub_total','toplam') + ' (' + paidActive + ' ' + t('arev.sub_paid','ücretli') + ')',
         value: paidActive + '',
         color: '#a855f7',
         bg: 'rgba(168,85,247,.08)',
@@ -27138,7 +27139,7 @@ async function admRevenue(m) {
       },
       {
         label: t('arev.churn','Churn Rate (30g)'),
-        sub: churnedCount + ' aboneden çıkış',
+        sub: churnedCount + ' ' + t('arev.sub_churned','aboneden çıkış'),
         value: churnRate.toFixed(1) + '%',
         color: churnRate > 5 ? '#dc2626' : '#d97706',
         bg: churnRate > 5 ? 'rgba(220,38,38,.08)' : 'rgba(217,119,6,.08)',
@@ -27162,7 +27163,7 @@ async function admRevenue(m) {
       var alert = document.createElement('div');
       alert.style.cssText = 'background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.25);border-radius:8px;padding:12px;margin-bottom:14px';
       alert.innerHTML =
-        '<div class="fs125-red-fw7" style="margin-bottom:6px;color:#dc2626;font-weight:700">⚠️ Tahsilat Riski</div>'
+        '<div class="fs125-red-fw7" style="margin-bottom:6px;color:#dc2626;font-weight:700">'+t('arev.debt_risk','⚠️ Tahsilat Riski')+'</div>'
         + '<div class="fs12 t-muted">'+t('arev.debt_a','Vendor cari hesaplarında ')+'<strong style="color:#dc2626">₺'+totalUnpaidDebt.toLocaleString('tr-TR')+'</strong>'+t('arev.debt_b',' ödenmemiş borç var. ')+'<strong>'+suspendedCount+'</strong>'+t('arev.debt_c',' vendor askıya alındı.')+'</div>';
       m.appendChild(alert);
     }
@@ -27217,7 +27218,7 @@ async function admRevenue(m) {
     trendCard.innerHTML =
       '<div class="flx-bw-c-mb14">'
       +   '<div>'
-      +     '<div class="fs14-fw7">📊 MRR Trend (Son 6 Ay)</div>'
+      +     '<div class="fs14-fw7">'+t('arev.mrr_trend','📊 MRR Trend (Son 6 Ay)')+'</div>'
       +     '<div class="fs11-mt2-muted">'+t('arev.mrr_change','Aylık ödemelerin toplam değişimi')+'</div>'
       +   '</div>'
       + '</div>'
@@ -27445,7 +27446,7 @@ async function admVendorSubs(m) {
       hdr.className = 'mb14';
       hdr.innerHTML =
         '<h2 class="fs18-fw7">💼 Vendor Abonelikler</h2>'
-        + '<div class="txt-muted-12-mt3">'+rows.length+' vendor — '+rows.filter(function(r){return r.status==='active';}).length+' aktif aboneli, '+rows.filter(function(r){return r.hasDebt;}).length+' borçlu</div>';
+        + '<div class="txt-muted-12-mt3">'+rows.length+' '+t('avs.sub_vendor','vendor')+' — '+rows.filter(function(r){return r.status==='active';}).length+' '+t('avs.sub_active','aktif aboneli')+', '+rows.filter(function(r){return r.hasDebt;}).length+' '+t('avs.sub_debtor','borçlu')+'</div>';
       m.appendChild(hdr);
 
       // ─── Filtreler ───
@@ -27454,6 +27455,7 @@ async function admVendorSubs(m) {
       filters.style.padding = '14px';
 
       var tiers = ['all','free','starter','professional','business','enterprise'];
+      var _vsAll = t('common.all','Tümü');
       var statuses = [['all',t('common.all','Tümü')],['active',t('status.active','Aktif')],['grace',t('avs.grace','Grace')],['suspended',t('avs.suspend','Suspend')],['expired',t('avs.expired','Bitmiş')],['no_sub',t('avs.no_sub','Aboneliksiz')]];
 
       filters.innerHTML =
@@ -27463,7 +27465,7 @@ async function admVendorSubs(m) {
         +   '<div class="flx-g8-wrap" id="vs-tier-filter" style="margin-top:4px">'
         +     tiers.map(function(t){
                 var active = filterTier === t;
-                return '<button class="btn-'+(active?'p':'g')+' btn-sm vs-tier-btn" data-val="'+t+'">'+(t==='all'?'Tümü':TIER_LABELS[t]||t)+'</button>';
+                return '<button class="btn-'+(active?'p':'g')+' btn-sm vs-tier-btn" data-val="'+t+'">'+(t==='all'?_vsAll:TIER_LABELS[t]||t)+'</button>';
               }).join('')
         +   '</div>'
         + '</div>'
@@ -27497,10 +27499,10 @@ async function admVendorSubs(m) {
       actionBar.style.flexWrap = 'wrap';
       actionBar.style.gap = '8px';
       actionBar.innerHTML =
-        '<div class="fs12-muted">'+filtered.length+' / '+rows.length+' vendor gösteriliyor'+(selectedVendorIds.size>0?' · <strong style="color:#2563eb">'+selectedVendorIds.size+' seçili</strong>':'')+'</div>'
+        '<div class="fs12-muted">'+filtered.length+' / '+rows.length+' '+t('avs.showing','vendor gösteriliyor')+(selectedVendorIds.size>0?' · <strong style="color:#2563eb">'+selectedVendorIds.size+' '+t('avs.selected','seçili')+'</strong>':'')+'</div>'
         + '<div class="flx-g8-wrap">'
         +   (selectedVendorIds.size > 0 ? '<button class="btn-p btn-sm" id="vs-bulk-notify">📨 Toplu Bildirim ('+selectedVendorIds.size+')</button>' : '')
-        +   '<button class="btn-g btn-sm" id="vs-csv">⬇ CSV Dışa Aktar</button>'
+        +   '<button class="btn-g btn-sm" id="vs-csv">'+t('avs.csv','⬇ CSV Dışa Aktar')+'</button>'
         + '</div>';
       m.appendChild(actionBar);
 
@@ -27508,7 +27510,7 @@ async function admVendorSubs(m) {
       if (filtered.length === 0) {
         var emp = document.createElement('div');
         emp.className = 'empty';
-        emp.innerHTML = '<div class="empty-icon">🔍</div>Bu filtrelere uyan vendor yok.';
+        emp.innerHTML = '<div class="empty-icon">🔍</div>'+t('avs.empty','Bu filtrelere uyan vendor yok.')+'';
         m.appendChild(emp);
       } else {
         var tableWrap = document.createElement('div');
@@ -27707,7 +27709,7 @@ function openVendorSubDetailModal(r, allHistory, onUpdate) {
   modal.innerHTML =
     '<div class="modal-card" style="max-width:680px">'
     + '<div class="flx-bw-c mb14">'
-    +   '<h3 class="fs16-fw7">👁 Vendor Detayı</h3>'
+    +   '<h3 class="fs16-fw7">'+t('avs.detail_title','👁 Vendor Detayı')+'</h3>'
     +   '<button id="vd-close" class="btn-trans-x">×</button>'
     + '</div>'
     // Vendor bilgi kartı
@@ -29324,18 +29326,41 @@ const I18N_DICT = {
     'aprod.pub_all':'Yayın: Tümü','aprod.pub_admin':'🔍 Admin Onayı Bekliyor','aprod.pub_chain':'🔗 Zincir Bekliyor','aprod.pub_ready':'✓ Yayında','aprod.all_origin':'Tüm Menşei','aprod.all_vendors':'Tüm Vendorlar','aprod.col_actions':'İşlemler',
     'aprod.hint_none_pending':'Tüm ürünler onaylanmis veya henuz vendorlardan onay talebi gelmedi.','aprod.hint_none_active':'Henüz hiçbir ürün admin tarafından onaylanmadı.','aprod.hint_none_rejected':'Tüm ürünler ya bekliyor ya da aktif.','aprod.hint_all_processed':'Tüm ürünler işlenmiş durumda.','aprod.hint_change_filter':'Filtre veya arama kriterlerini değiştirin.',
     'aprod.approving':'Onaylanıyor...','aprod.notif_approved':'Ürününüz Onaylandı 🎉','aprod.email_approved':'Ürününüz Onaylandı — PoCHub','aprod.reject_reason':'Ret gerekçesi (opsiyonel):','aprod.toast_rejected':'Ürün reddedildi.','aprod.confirm_archive':'Bu ürünü arşivlemek istiyor musunuz?','areq.title':'PoC Talepleri','areq.search_ph':'Başlık, müşteri veya vendor...','areq.col_title':'Başlık','areq.col_location':'Lokasyon','aevt.title':'Tüm Etkinlikler','aevt.search_ph':'Başlık veya vendor...','aevt.status_label':'Durum:','aevt.period_label':'Dönem:','aevt.st_published':'Yayında','aevt.p_upcoming':'Yaklaşan','aevt.p_past':'Geçmiş','aevt.p_this_month':'Bu Ay','aevt.p_last_month':'Geçen Ay','aevt.p_this_year':'Bu Yıl','aevt.col_format':'Format','aevt.col_registered':'Kayıtlı','aevt.col_action':'İşlem','common.has':'Var','common.has_not':'Yok','aoff.title':'Teklifler','aoff.search_ph':'Ürün, vendor veya müşteri...','aoff.st_accepted':'Kabul','aoff.st_rejected':'Red','aoff.col_channel_fee':'Kanal Payı',
-    'arev.loading':'Gelir verileri hesaplanıyor...','arev.title':'📈 Gelir Dashboard','arev.subtitle':'PoCHub abonelik geliri ve paket performansı analizi','arev.mrr_sub':'Aylık Yinelenen Gelir','arev.this_month':'Bu Ay Gelir','arev.active_subs':'Aktif Abonelik','arev.churn':'Churn Rate (30g)',
+    'arev.loading':'Gelir verileri hesaplanıyor...',
+    'arev.debt_risk':'⚠️ Tahsilat Riski',
+    'arev.mrr_trend':'📊 MRR Trend (Son 6 Ay)',
+    'arev.sub_payments':'ödeme',
+    'arev.sub_total':'toplam',
+    'arev.sub_paid':'ücretli',
+    'arev.sub_churned':'aboneden çıkış',
+'arev.title':'📈 Gelir Dashboard','arev.subtitle':'PoCHub abonelik geliri ve paket performansı analizi','arev.mrr_sub':'Aylık Yinelenen Gelir','arev.this_month':'Bu Ay Gelir','arev.active_subs':'Aktif Abonelik','arev.churn':'Churn Rate (30g)',
     'arev.debt_a':'Vendor cari hesaplarında ','arev.debt_b':' ödenmemiş borç var. ','arev.debt_c':' vendor askıya alındı.','arev.mrr_change':'Aylık ödemelerin toplam değişimi','arev.pkg_dist':'Paket Dağılımı','arev.month_moves':'Bu Ay Hareketler',
     'arev.move_upgrade':'⬆ Yükseltme','arev.move_upgrade_sub':'Üst pakete geçen vendor','arev.move_new':'🆕 Yeni Satın Alma','arev.move_new_sub':'İlk kez paket alan vendor','arev.move_renew':'🔄 Yenileme','arev.move_renew_sub':'Aboneliğini yenileyen','arev.move_downgrade':'⬇ Düşürme','arev.move_downgrade_sub':'Alt pakete geçen vendor',
     'arev.top5':'En Çok Para Getiren 5 Vendor (LTV)','arev.no_paying':'Henüz ödeme yapan vendor yok.','arev.unknown':'Bilinmeyen','arev.error':'Gelir dashboard hatası: ',
-    'avs.loading':'Vendor abonelikleri yükleniyor...','avs.grace':'Grace','avs.suspend':'Suspend','avs.expired':'Bitmiş','avs.no_sub':'Aboneliksiz','avs.tier':'Tier','avs.debt_status':'Borç Durumu','avs.debtor':'Borçlu','avs.no_debt':'Borçsuz','avs.search_label':'Ara (isim/email)','avs.col_end':'Bitiş','avs.col_debt':'Borç','avs.col_ltv':'LTV','avs.col_action':'Aksiyon','avs.ended':'Bitti','avs.trial':'Trial','avs.error':'Vendor abonelikler yükleme hatası: ',
+    'avs.loading':'Vendor abonelikleri yükleniyor...',
+    'avs.sub_vendor':'vendor',
+    'avs.sub_active':'aktif aboneli',
+    'avs.sub_debtor':'borçlu',
+    'avs.showing':'vendor gösteriliyor',
+    'avs.selected':'seçili',
+    'avs.csv':'⬇ CSV Dışa Aktar',
+    'avs.empty':'Bu filtrelere uyan vendor yok.',
+    'avs.detail_title':'👁 Vendor Detayı',
+'avs.grace':'Grace','avs.suspend':'Suspend','avs.expired':'Bitmiş','avs.no_sub':'Aboneliksiz','avs.tier':'Tier','avs.debt_status':'Borç Durumu','avs.debtor':'Borçlu','avs.no_debt':'Borçsuz','avs.search_label':'Ara (isim/email)','avs.col_end':'Bitiş','avs.col_debt':'Borç','avs.col_ltv':'LTV','avs.col_action':'Aksiyon','avs.ended':'Bitti','avs.trial':'Trial','avs.error':'Vendor abonelikler yükleme hatası: ',
     'avap.loading':'Vendor onayları yükleniyor...','avap.f_pending':'⏳ Bekleyen','avap.f_verified':'✓ Doğrulanmış','avap.f_rejected':'✗ Reddedilen','avap.f_suspicious':'🛡 Şüpheli','avap.empty_pending':'Bekleyen vendor onayı yok','avap.empty_verified':'Henüz doğrulanmış vendor yok','avap.empty_suspicious':'Şüpheli kayıt yok (harika!)','avap.empty_rejected':'Reddedilen vendor yok',
     'avap.susp_reason':'Çoklu IP/fingerprint','avap.susp_badge':'🛡 Şüpheli','avap.no_phone':'Telefon yok','avap.registered':'Kayıt: ','avap.btn_detail':'👁 Detay','avap.btn_approve':'✓ Onayla','avap.btn_reject':'✗ Reddet','avap.btn_revoke':'⤴ Doğrulamayı Kaldır','avap.btn_restore':'↩ Geri Al',
     'avap.reject_prompt':'Reddetme sebebi (vendor görür):','avap.unspecified':'Belirtilmedi','avap.reject_msg_a':'Vendor doğrulaman reddedildi. Sebep: ','avap.reject_msg_b':'. Profilini güncelleyip tekrar başvurabilirsin.','avap.toast_rejected':'Vendor reddedildi','avap.toast_revoked':'Doğrulama kaldırıldı','avap.toast_to_pending':'Vendor "Bekleyen" listesine alındı',
     'adr.loading':'Demo talepleri yükleniyor...','adr.page_open':'Sayfa Açılışı','adr.booked':'Randevu Alındı','adr.conversion':'Conversion','adr.last7_a':'Son 7 gün: ','adr.last7_b':' görüntüleme, ','adr.last7_c':' randevu','adr.empty_none':"Henüz demo talebi yok. LinkedIn outreach'inde <strong>pochub.co/#demo</strong> linkini paylaşmaya başla!",'adr.empty_filter':'Bu filtrede kayıt yok.','adr.col_appt':'Randevu','adr.col_user':'Kullanıcı','adr.col_referrer':'Referrer','adr.col_status':'Status','adr.anonymous':'Anonim','adr.error':'Demo talepleri yüklenirken hata: ',
     'adr.funnel_title':'🎯 Conversion Funnel','adr.tips_title':'💡 Funnel Optimizasyonu:','adr.tip1':'• <strong>Conversion düşükse</strong>: Demo sayfasındaki mesajı güçlendir (Sistem Ayarları → Calendly → Hoş Geldin Mesajı)<br>','adr.tip2':'• <strong>Sayfa açılışı düşükse</strong>: Outreach mesajına direkt <strong>pochub.co/#demo</strong> linki koy<br>','adr.tip3':"• <strong>Notification</strong>: Randevu alındığında admin'lere bildirim gönderiliyor (bildirim çanı)<br>",'adr.tip4':'• <strong>Calendly entegrasyonu</strong>: Webhook olmadan client-side postMessage ile çalışır (Functions deploy gerekmez)',
     'apkg.loading':'Paketler yükleniyor...','apkg.title':'💎 Paket Tanımları','apkg.reseed':"🔄 Default'a Sıfırla",'apkg.add':'+ Yeni Paket','apkg.poc':'PoC:','apkg.product':'Ürün:','apkg.invite':'Davet:','apkg.overflow':'Aşan:','apkg.continuous':'Sürekli','apkg.days_week':' gün/hafta','apkg.edit':'✏️ Düzenle','apkg.toast_deleted':'Paket silindi.','apkg.toast_reseeded':'Default paketler geri yüklendi.',
-    'apay.loading':'Ödeme talepleri yükleniyor...','apay.title':'💳 Ödeme Onayları','apay.subtitle':'Manuel havale ödeme talepleri ve geçmiş','apay.total_revenue':'Toplam Gelir','apay.empty_debt':'Bekleyen borç ödeme talebi yok.','apay.btn_close_debt':'✅ Borçları Kapat','apay.btn_reject':'❌ Reddet','apay.empty_cat':'Bu kategoride kayıt yok.','apay.btn_approve_activate':'✅ Onayla & Aktive Et','apay.reject_label':'Red sebebi:','apay.preparing':'Hazırlanıyor...','apay.package':'Paket','apay.pkg_not_found':'Paket bulunamadı',
+    'apay.loading':'Ödeme talepleri yükleniyor...',
+    'apay.days':'gün',
+    'apay.method':'Yöntem:',
+    'apay.m_transfer':'🏦 Manuel Havale',
+    'apay.m_free':'🆓 Ücretsiz',
+    'apay.m_card':'💳 Kredi Kartı',
+    'apay.m_gift':'🎁 Admin Hediye',
+'apay.title':'💳 Ödeme Onayları','apay.subtitle':'Manuel havale ödeme talepleri ve geçmiş','apay.total_revenue':'Toplam Gelir','apay.empty_debt':'Bekleyen borç ödeme talebi yok.','apay.btn_close_debt':'✅ Borçları Kapat','apay.btn_reject':'❌ Reddet','apay.empty_cat':'Bu kategoride kayıt yok.','apay.btn_approve_activate':'✅ Onayla & Aktive Et','apay.reject_label':'Red sebebi:','apay.preparing':'Hazırlanıyor...','apay.package':'Paket','apay.pkg_not_found':'Paket bulunamadı',
     'apay.confirm_close_a':"Bu vendor'ın ",'apay.confirm_close_b':" borcunu kapatmak istiyor musun?\n\nToplam: ₺",'apay.confirm_close_c':"\nVendor borçları silinecek, hesap askıdaysa açılacak.",'apay.reject_prompt':"Red sebebi (vendor'a gösterilecek):",'apay.reject_default1':'Havale alınmadı.','apay.reject_default2':'Havale ödeme hesaba ulaşmadı.','apay.reject_msg_a':'Sebep: ','apay.reject_msg_b':' — Lütfen havale durumunu kontrol et ve tekrar talep gönder.','apay.toast_req_rejected':'Talep reddedildi.',
     'apay.confirm_approve_a':"Bu ödemeyi onaylamak ve vendor'ın paketini aktive etmek istiyor musun?\n\nVendor: ",'apay.confirm_approve_b':"\nPaket: ",'apay.confirm_approve_c':"\nTutar: ₺",'apay.purchase_rejected_msg':' satın alma talebin reddedildi. Sebep: ','apay.toast_pay_rejected':'Ödeme reddedildi.',
     'apay.act_purchase':'Satın Alma','apay.act_renew':'Yenileme','apay.act_upgrade':'Yükseltme','apay.act_downgrade':'Düşürme','apay.st_paid':'Ödendi','apay.st_failed':'Başarısız','apay.st_refunded':'İade','apay.stat_pending':'Bekleyen','apay.stat_approved':'Onaylanmış','apay.stat_rejected':'Reddedilmiş','apay.tab_pkg_pending':'⏳ Paket Bekleyen','apay.tab_debt':'💳 Borç Ödemeleri','apay.tab_approved':'✅ Onaylanmış','apay.tab_rejected':'❌ Reddedilmiş','apay.tab_all':'📋 Tümü',
@@ -29947,18 +29972,41 @@ const I18N_DICT = {
     'aprod.pub_all':'Publish: All','aprod.pub_admin':'🔍 Awaiting Admin Approval','aprod.pub_chain':'🔗 Awaiting Chain','aprod.pub_ready':'✓ Published','aprod.all_origin':'All Origins','aprod.all_vendors':'All Vendors','aprod.col_actions':'Actions',
     'aprod.hint_none_pending':'All products approved or no approval request from vendors yet.','aprod.hint_none_active':'No products approved by admin yet.','aprod.hint_none_rejected':'All products are either pending or active.','aprod.hint_all_processed':'All products are processed.','aprod.hint_change_filter':'Change the filter or search criteria.',
     'aprod.approving':'Approving...','aprod.notif_approved':'Your Product Has Been Approved 🎉','aprod.email_approved':'Your Product Has Been Approved — PoCHub','aprod.reject_reason':'Rejection reason (optional):','aprod.toast_rejected':'Product rejected.','aprod.confirm_archive':'Do you want to archive this product?','areq.title':'PoC Requests','areq.search_ph':'Title, customer or vendor...','areq.col_title':'Title','areq.col_location':'Location','aevt.title':'All Events','aevt.search_ph':'Title or vendor...','aevt.status_label':'Status:','aevt.period_label':'Period:','aevt.st_published':'Published','aevt.p_upcoming':'Upcoming','aevt.p_past':'Past','aevt.p_this_month':'This Month','aevt.p_last_month':'Last Month','aevt.p_this_year':'This Year','aevt.col_format':'Format','aevt.col_registered':'Registered','aevt.col_action':'Action','common.has':'Yes','common.has_not':'No','aoff.title':'Offers','aoff.search_ph':'Product, vendor or customer...','aoff.st_accepted':'Accepted','aoff.st_rejected':'Rejected','aoff.col_channel_fee':'Channel Fee',
-    'arev.loading':'Calculating revenue data...','arev.title':'📈 Revenue Dashboard','arev.subtitle':'PoCHub subscription revenue and package performance analysis','arev.mrr_sub':'Monthly Recurring Revenue','arev.this_month':'This Month Revenue','arev.active_subs':'Active Subscriptions','arev.churn':'Churn Rate (30d)',
+    'arev.loading':'Calculating revenue data...',
+    'arev.debt_risk':'⚠️ Collection Risk',
+    'arev.mrr_trend':'📊 MRR Trend (Last 6 Months)',
+    'arev.sub_payments':'payments',
+    'arev.sub_total':'total',
+    'arev.sub_paid':'paid',
+    'arev.sub_churned':'churned',
+'arev.title':'📈 Revenue Dashboard','arev.subtitle':'PoCHub subscription revenue and package performance analysis','arev.mrr_sub':'Monthly Recurring Revenue','arev.this_month':'This Month Revenue','arev.active_subs':'Active Subscriptions','arev.churn':'Churn Rate (30d)',
     'arev.debt_a':'Vendor accounts have ','arev.debt_b':' unpaid debt. ','arev.debt_c':' vendor(s) suspended.','arev.mrr_change':'Total change in monthly payments','arev.pkg_dist':'Package Distribution','arev.month_moves':'This Month Movements',
     'arev.move_upgrade':'⬆ Upgrade','arev.move_upgrade_sub':'Vendors moving to higher package','arev.move_new':'🆕 New Purchase','arev.move_new_sub':'Vendors buying a package for the first time','arev.move_renew':'🔄 Renewal','arev.move_renew_sub':'Vendors renewing subscription','arev.move_downgrade':'⬇ Downgrade','arev.move_downgrade_sub':'Vendors moving to lower package',
     'arev.top5':'Top 5 Highest-Revenue Vendors (LTV)','arev.no_paying':'No paying vendors yet.','arev.unknown':'Unknown','arev.error':'Revenue dashboard error: ',
-    'avs.loading':'Loading vendor subscriptions...','avs.grace':'Grace','avs.suspend':'Suspend','avs.expired':'Expired','avs.no_sub':'No Subscription','avs.tier':'Tier','avs.debt_status':'Debt Status','avs.debtor':'In Debt','avs.no_debt':'No Debt','avs.search_label':'Search (name/email)','avs.col_end':'End','avs.col_debt':'Debt','avs.col_ltv':'LTV','avs.col_action':'Action','avs.ended':'Ended','avs.trial':'Trial','avs.error':'Vendor subscriptions load error: ',
+    'avs.loading':'Loading vendor subscriptions...',
+    'avs.sub_vendor':'vendors',
+    'avs.sub_active':'active subscribers',
+    'avs.sub_debtor':'in debt',
+    'avs.showing':'vendors shown',
+    'avs.selected':'selected',
+    'avs.csv':'⬇ Export CSV',
+    'avs.empty':'No vendors match these filters.',
+    'avs.detail_title':'👁 Vendor Detail',
+'avs.grace':'Grace','avs.suspend':'Suspend','avs.expired':'Expired','avs.no_sub':'No Subscription','avs.tier':'Tier','avs.debt_status':'Debt Status','avs.debtor':'In Debt','avs.no_debt':'No Debt','avs.search_label':'Search (name/email)','avs.col_end':'End','avs.col_debt':'Debt','avs.col_ltv':'LTV','avs.col_action':'Action','avs.ended':'Ended','avs.trial':'Trial','avs.error':'Vendor subscriptions load error: ',
     'avap.loading':'Loading vendor approvals...','avap.f_pending':'⏳ Pending','avap.f_verified':'✓ Verified','avap.f_rejected':'✗ Rejected','avap.f_suspicious':'🛡 Suspicious','avap.empty_pending':'No pending vendor approvals','avap.empty_verified':'No verified vendors yet','avap.empty_suspicious':'No suspicious registrations (great!)','avap.empty_rejected':'No rejected vendors',
     'avap.susp_reason':'Multiple IP/fingerprint','avap.susp_badge':'🛡 Suspicious','avap.no_phone':'No phone','avap.registered':'Registered: ','avap.btn_detail':'👁 Detail','avap.btn_approve':'✓ Approve','avap.btn_reject':'✗ Reject','avap.btn_revoke':'⤴ Revoke Verification','avap.btn_restore':'↩ Restore',
     'avap.reject_prompt':'Rejection reason (visible to vendor):','avap.unspecified':'Unspecified','avap.reject_msg_a':'Your vendor verification was rejected. Reason: ','avap.reject_msg_b':'. You can update your profile and reapply.','avap.toast_rejected':'Vendor rejected','avap.toast_revoked':'Verification revoked','avap.toast_to_pending':'Vendor moved to "Pending" list',
     'adr.loading':'Loading demo requests...','adr.page_open':'Page Open','adr.booked':'Appointment Booked','adr.conversion':'Conversion','adr.last7_a':'Last 7 days: ','adr.last7_b':' views, ','adr.last7_c':' appointments','adr.empty_none':'No demo requests yet. Start sharing the <strong>pochub.co/#demo</strong> link in your LinkedIn outreach!','adr.empty_filter':'No records in this filter.','adr.col_appt':'Appointment','adr.col_user':'User','adr.col_referrer':'Referrer','adr.col_status':'Status','adr.anonymous':'Anonymous','adr.error':'Error loading demo requests: ',
     'adr.funnel_title':'🎯 Conversion Funnel','adr.tips_title':'💡 Funnel Optimization:','adr.tip1':'• <strong>If conversion is low</strong>: Strengthen the message on the demo page (System Settings → Calendly → Welcome Message)<br>','adr.tip2':'• <strong>If page opens are low</strong>: Put the <strong>pochub.co/#demo</strong> link directly in your outreach message<br>','adr.tip3':'• <strong>Notification</strong>: Admins are notified when an appointment is booked (notification bell)<br>','adr.tip4':'• <strong>Calendly integration</strong>: Works client-side via postMessage without webhook (no Functions deploy needed)',
     'apkg.loading':'Loading packages...','apkg.title':'💎 Package Definitions','apkg.reseed':'🔄 Reset to Default','apkg.add':'+ New Package','apkg.poc':'PoC:','apkg.product':'Product:','apkg.invite':'Invite:','apkg.overflow':'Overflow:','apkg.continuous':'Continuous','apkg.days_week':' days/week','apkg.edit':'✏️ Edit','apkg.toast_deleted':'Package deleted.','apkg.toast_reseeded':'Default packages restored.',
-    'apay.loading':'Loading payment requests...','apay.title':'💳 Payment Approvals','apay.subtitle':'Manual bank transfer payment requests and history','apay.total_revenue':'Total Revenue','apay.empty_debt':'No pending debt payment requests.','apay.btn_close_debt':'✅ Close Debts','apay.btn_reject':'❌ Reject','apay.empty_cat':'No records in this category.','apay.btn_approve_activate':'✅ Approve & Activate','apay.reject_label':'Rejection reason:','apay.preparing':'Preparing...','apay.package':'Package','apay.pkg_not_found':'Package not found',
+    'apay.loading':'Loading payment requests...',
+    'apay.days':'days',
+    'apay.method':'Method:',
+    'apay.m_transfer':'🏦 Manual Transfer',
+    'apay.m_free':'🆓 Free',
+    'apay.m_card':'💳 Credit Card',
+    'apay.m_gift':'🎁 Admin Gift',
+'apay.title':'💳 Payment Approvals','apay.subtitle':'Manual bank transfer payment requests and history','apay.total_revenue':'Total Revenue','apay.empty_debt':'No pending debt payment requests.','apay.btn_close_debt':'✅ Close Debts','apay.btn_reject':'❌ Reject','apay.empty_cat':'No records in this category.','apay.btn_approve_activate':'✅ Approve & Activate','apay.reject_label':'Rejection reason:','apay.preparing':'Preparing...','apay.package':'Package','apay.pkg_not_found':'Package not found',
     'apay.confirm_close_a':"Close this vendor's ",'apay.confirm_close_b':" debts?\n\nTotal: ₺",'apay.confirm_close_c':"\nVendor debts will be deleted, account reactivated if suspended.",'apay.reject_prompt':'Rejection reason (shown to vendor):','apay.reject_default1':'Transfer not received.','apay.reject_default2':'Transfer payment did not reach the account.','apay.reject_msg_a':'Reason: ','apay.reject_msg_b':' — Please check the transfer status and submit a new request.','apay.toast_req_rejected':'Request rejected.',
     'apay.confirm_approve_a':"Approve this payment and activate the vendor's package?\n\nVendor: ",'apay.confirm_approve_b':"\nPackage: ",'apay.confirm_approve_c':"\nAmount: ₺",'apay.purchase_rejected_msg':' purchase request was rejected. Reason: ','apay.toast_pay_rejected':'Payment rejected.',
     'apay.act_purchase':'Purchase','apay.act_renew':'Renewal','apay.act_upgrade':'Upgrade','apay.act_downgrade':'Downgrade','apay.st_paid':'Paid','apay.st_failed':'Failed','apay.st_refunded':'Refund','apay.stat_pending':'Pending','apay.stat_approved':'Approved','apay.stat_rejected':'Rejected','apay.tab_pkg_pending':'⏳ Package Pending','apay.tab_debt':'💳 Debt Payments','apay.tab_approved':'✅ Approved','apay.tab_rejected':'❌ Rejected','apay.tab_all':'📋 All',
@@ -32683,14 +32731,14 @@ async function admPayments(m) {
           +   '<div>'
           +     '<div class="fs13-fw7">'+(actionLabels[h.action]||h.action)+' · '+(h.packageName||h.toPackageId||'-')+'</div>'
           +     '<div class="txt-muted-12-mt2">'+(h.vendorName||h.vendorId||'—')+' · '+dt+'</div>'
-          +     (h.billingMode ? '<div class="txt-muted-12-mt2">'+(h.billingMode==='yearly'?t('vpkg.yearly','Yıllık'):t('vpkg.monthly','Aylık'))+' · '+(h.durationDays||30)+' gün</div>' : '')
+          +     (h.billingMode ? '<div class="txt-muted-12-mt2">'+(h.billingMode==='yearly'?t('vpkg.yearly','Yıllık'):t('vpkg.monthly','Aylık'))+' · '+(h.durationDays||30)+' '+t('apay.days','gün')+'</div>' : '')
           +   '</div>'
           +   '<div class="t-rgt">'
           +     '<div style="font-size:16px;font-weight:800">'+(h.amount > 0 ? '₺'+h.amount.toLocaleString('tr-TR') : 'Ücretsiz')+'</div>'
           +     '<div style="font-size:11px;font-weight:700;color:'+sc+';margin-top:2px">'+(statusLabels[h.status]||h.status)+'</div>'
           +   '</div>'
           + '</div>'
-          + '<div style="font-size:11.5px;color:var(--text-muted)">Yöntem: '+(h.paymentMethod==='bank_transfer'?'🏦 Manuel Havale':h.paymentMethod==='free'?'🆓 Ücretsiz':h.paymentMethod==='credit_card'?'💳 Kredi Kartı':h.paymentMethod==='admin_gift'?'🎁 Admin Hediye':h.paymentMethod)+'</div>'
+          + '<div style="font-size:11.5px;color:var(--text-muted)">'+t('apay.method','Yöntem:')+' '+(h.paymentMethod==='bank_transfer'?t('apay.m_transfer','🏦 Manuel Havale'):h.paymentMethod==='free'?t('apay.m_free','🆓 Ücretsiz'):h.paymentMethod==='credit_card'?t('apay.m_card','💳 Kredi Kartı'):h.paymentMethod==='admin_gift'?t('apay.m_gift','🎁 Admin Hediye'):h.paymentMethod)+'</div>'
           + (h.status === 'pending' && h.action !== 'trial_started' ? '<div style="margin-top:10px;display:flex;gap:6px"><button class="pay-approve btn-p btn-sm" data-id="'+h.id+'">'+t('apay.btn_approve_activate','✅ Onayla & Aktive Et')+'</button><button class="pay-reject btn-red btn-sm" data-id="'+h.id+'">'+t('apay.btn_reject','❌ Reddet')+'</button></div>' : '')
           + (h.status === 'paid' && h.amount > 0 ? '<div style="margin-top:10px"><button class="pay-pdf btn-g btn-sm" data-id="'+h.id+'">📄 Makbuz PDF</button></div>' : '')
           + (h.rejectionReason ? '<div style="margin-top:8px;font-size:11.5px;color:#dc2626;background:rgba(220,38,38,.06);padding:6px 8px;border-radius:6px"><strong>'+t('apay.reject_label','Red sebebi:')+'</strong> '+h.rejectionReason+'</div>' : '')
