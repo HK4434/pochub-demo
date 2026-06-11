@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.84 | pochub.co -->
+<!-- PoCHub v6.85 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.84';
+const VERSION = 'v6.85';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -943,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.85': ['OZELLIK: Kategoriler her yerde isme gore otomatik siralanir (locale-aware) — yeni sortCatsLocale(arr) helper-i (TR localeCompare tr / EN name_en + en collation, sensitivity:base, numeric). getCategories artik order yerine sortCatsLocale (gereksiz order sort kaldirildi), admCategories admin listesi de locale-sort, urun-bazli 3 kategori dropdown listesi (14329/23460/25919) sortCatsLocale ile, setLocale-de invalidateCatCache() ile dil degisince yeniden siralama. fillCatSelect/katalog facet (CAT_CATEGORY_OPTS) zaten getCategories kullandigi icin otomatik tutarli. node+harness OK. RULES degismedi.'],
   'v6.84': ['i18n FAZ 24 (PoC TALEP AKISI — Image 3 + Katalog Disi form) — Multi-vendor secim modali (step2): Geri butonu, Birden fazla urun/vendor secebilirsiniz notu, Not: sectiginiz diger vendorlar haberdar edilmez, Secilen: N vendor, urun listesi rozetleri (vtypeLabels -> vtype.* render-aninda, Uretici/Distributor/Entegrator), poc-cats loading = poc.*. Geri butonu template-literal (${t}) vs concat (+t+) baglamlari ayri ele alindi (4 concat cust-wiz duzeltildi). Katalog Disi manuel form (openCustomPoCModal): baslik/altbaslik/helper/Urun Adi/Vendor Marka/Kategori sec/Aciklama/Lokasyon/Iptal/Talebi Gonder/validation = pocm.*. Kategori dropdown opsiyonlari TR data (submit degeri) olarak birakildi. 15 anahtar. node+harness OK. KATALOG EKOSISTEMI TAM (Image1+2+3). RULES degismedi.'],
   'v6.83': ['i18n FAZ 23 (URUN DETAY MODALI — Image 2, openProductDetailModal) — TEKNIK OZELLIKLER, Ureticinin urun sayfasini ac, KANIT SKORU paneli (baslik+/100+Gercek PoC verisinden hesaplanir+N degerlendirme+dusuk guven+kriter barlari agirlik %), evidence kriterleri (Genel Memnuniyet/Tavsiye Orani/PoC->Satin Alma render-aninda t()), Seffaf formul, Kanit Karti (PNG), DEGERLENDIRME (AKRAN PUANI), tavsiye ediyor, Genel + N PoC degerlendirmesi, review kriterleri (Kurulum/Destek/Yetenekler/Fiyat display-time t cpd.crit_+id), supportModel (Kendi Bunyesi/Dis Kaynak/Hibrit), KARAR ANALIZI WIN/LOSS + PoC sonrasi karar veren..., Akran kohortu prompt+nodata, Featured (feat.featured reuse), PoC/Demo CTA. cpd.* 33 anahtar. node+harness OK. RULES degismedi.'],
   'v6.82': ['i18n FAZ 22 (KATALOG SAYFASI — Image 1, tamamen TR idi) — Cozum Katalogu basligi+altbaslik+arama+Manuel Talep, Sektore gore kesfet rail, sort secenekleri (kv[1] -> t cat.sort_*), 2 cozum sayaci + sektor tile cozum, filtre sidebar (Filtreler/Temizle/Tumunu temizle/veri yok/tooltip = cflt.*), FACET grup basliklari facetLabel(f,catalog) key-bazli ceviri (KATEGORI/SEKTOR/LISANS/KOKEN/DOGRULAMA/PUAN/SATIS TIPI/LISANS MODELI = cflt.*), facet DEGERLERI yeni catFacetVal() ile (Yerli/Yabanci/Dogrulanmis/Diger/Direkt Satis + kategori catLabelEN + sektor csec.*), Quadrant banner, kart icerigi (kategori catLabelEN, sektor tag catFacetVal, origin tag, Kanit rozeti, vendor Dogrulanmis rozeti, PoC Talebi Olustur CTA), bos-durum mesajlari. 54 anahtar. node+harness OK. RULES degismedi.'],
@@ -1929,10 +1930,9 @@ async function getCategories() {
   try {
     const snap = await getDocs(collection(db,'categories'));
     var cats = snap.docs.map(d=>({...d.data(),id:d.id}));
-    cats.sort((a,b)=>(a.order||0)-(b.order||0));
     if (!cats.length) cats = ['Firewall','Network','Storage','Yedekleme','Server','Güvenlik','Yazılım','Diğer'].map(function(n,i){return {name:n,order:i,id:n};});
-    cats.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','tr'); });
     cats.forEach(function(c){ if(c && c.name && c.name_en) CAT_NAME_EN[c.name]=c.name_en; });
+    cats = sortCatsLocale(cats);
     _catCache = cats;
     return cats;
   } catch(e) {
@@ -5165,6 +5165,22 @@ function heroF(k){ return (window.CUR_LOCALE==='en' && ABOUT.hero_en && ABOUT.he
 var CAT_NAME_EN = {};
 function catLabelEN(name){ return (window.CUR_LOCALE==='en' && name && CAT_NAME_EN[name]) ? CAT_NAME_EN[name] : (name||''); }
 function catLabel(cat){ if(!cat) return ''; return (window.CUR_LOCALE==='en' && cat.name_en) ? cat.name_en : (cat.name||''); }
+function catSortKey(c){
+  if (typeof c === 'string') { return (window.CUR_LOCALE==='en') ? catLabelEN(c) : c; }
+  if (c && typeof c === 'object') {
+    if (window.CUR_LOCALE==='en') return c.name_en || (c.name ? catLabelEN(c.name) : '') || '';
+    return c.name || '';
+  }
+  return '';
+}
+function sortCatsLocale(arr){
+  if (!Array.isArray(arr)) return arr;
+  var loc = (window.CUR_LOCALE==='en') ? 'en' : 'tr';
+  return arr.slice().sort(function(a,b){
+    return String(catSortKey(a)).localeCompare(String(catSortKey(b)), loc, {sensitivity:'base', numeric:true});
+  });
+}
+window.sortCatsLocale = sortCatsLocale;
 function pkgName(p){ return (window.CUR_LOCALE==='en' && p && p.name_en) ? p.name_en : ((p&&p.name)||''); }
 function pkgFeats(p){ return (window.CUR_LOCALE==='en' && p && Array.isArray(p.features_en) && p.features_en.length) ? p.features_en : ((p&&p.features)||[]); }
 function LFAQ(o,k){ return (window.CUR_LOCALE==='en' && o && o[k+'_en']) ? o[k+'_en'] : ((o&&o[k])||''); }
@@ -14311,7 +14327,7 @@ async function loadVendTab() {
       });
     } catch(e) { console.warn('[products] performans verisi yüklenemedi:', e); }
 
-    var allCats = [...new Set(products.map(function(p){ return p.category; }).filter(Boolean))].sort();
+    var allCats = sortCatsLocale([...new Set(products.map(function(p){ return p.category; }).filter(Boolean))]);
     var stColors = {active:'#16a34a', pending:'#d97706', rejected:'#dc2626', archived:'#64748b'};
     var stLabels = {active:'Aktif', pending:'Bekliyor', rejected:'Reddedildi', archived:'Arşiv'};
     var psColors = {ready:'#16a34a', awaiting_admin:'#2563eb', awaiting_integrator:'#d97706'};
@@ -23442,7 +23458,7 @@ async function vendPortfolio(m) {
     } catch(e) { console.warn('[portfolio] performans verisi yüklenemedi:', e); }
 
     // ── Kategoriler ve ülkeler ──────────────────────────────────
-    var allCats = [...new Set(items.map(function(i){ return i.category; }).filter(Boolean))].sort();
+    var allCats = sortCatsLocale([...new Set(items.map(function(i){ return i.category; }).filter(Boolean))]);
     var allCountries = [...new Set(items.map(function(i){ return i.country; }).filter(Boolean))].sort();
     var allVendors = vtype !== 'ureticid'
       ? [...new Set(items.map(function(i){ return i.vendorName; }).filter(Boolean))].sort()
@@ -25901,7 +25917,7 @@ async function admProducts(m) {
   all.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
   // Dinamik filtre seçenekleri
-  var cats    = [...new Set(all.map(function(p){ return p.category; }).filter(Boolean))].sort();
+  var cats    = sortCatsLocale([...new Set(all.map(function(p){ return p.category; }).filter(Boolean))]);
   var vendors = [...new Set(all.map(function(p){ return p.vendorName; }).filter(Boolean))].sort();
   var origins = [...new Set(all.map(function(p){ return p.origin; }).filter(Boolean))].sort();
 
@@ -30783,6 +30799,7 @@ function setLocale(newLocale) {
   if (!I18N_DICT[newLocale]) return false;
   window.CUR_LOCALE = newLocale;
   document.documentElement.lang = newLocale;
+  try { if (typeof invalidateCatCache === 'function') invalidateCatCache(); } catch(e){}
   try { localStorage.setItem('pochub_locale', newLocale); } catch(e){}
   // v5.00: SEO meta og:locale güncelle
   try {
@@ -35203,7 +35220,7 @@ async function admCategories(m) {
   try {
     const snap = await getDocs(collection(db,'categories'));
     var cats = snap.docs.map(d => ({...d.data(), id:d.id}));
-    cats.sort((a,b) => (a.order||0)-(b.order||0));
+    cats = sortCatsLocale(cats);
 
     function renderRows(items) {
       var tbody = m.querySelector('#cat-tbody');
