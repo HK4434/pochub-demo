@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.86 | pochub.co -->
+<!-- PoCHub v6.87 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.86';
+const VERSION = 'v6.87';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -943,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.87': ['i18n FAZ 26 (ADMIN yamali bohca alt-satir temizligi + KATEGORI BUG FIX) — Dashboard hero kart alt-satirlari: bekleyen (adash.pending_suffix), aktif yerlesim (active_placement), basarili odeme (successful_payment), 7 gun N yeni kayit icindeki yeni (new_word). Revenue: aktif paket (arev.active_package), vendor kayitli (vendors_registered), LTV toplam (ltv_total). Data Health alert ...ve N prefix (adh.and_more). KOK BUG: admProducts/loadEvidenceLeaders getCategories() cagirmadigi icin CAT_NAME_EN bos kaliyor ve catLabelEN EN modda TR isimlere dusuyordu (Image3 urun listesi kategori sutunu) — admProducts + loadEvidenceLeaders basina await getCategories() eklendi, ayrica DOMContentLoaded boot-ta global getCategories() ile CAT_NAME_EN tum oturum dolu. 8 anahtar. node+harness OK. RULES degismedi.'],
   'v6.86': ['i18n FAZ 25 (DATA HEALTH BAKIM ARACLARI — v6.80de fotograf disi diye atlanan blok) — 4 bakim karti tam cevrildi: (1) Demo Data Cleanup (aciklama 3 parca + DIKKAT uyarisi + Tara/Sil/Iptal butonlari + Bulunan Demo/Test Veriler basligi + 7 stat etiketi array-literal + bos durum), (2) Homepage Stats Recalculate (4 parca aciklama + Sayaclar guncellendi sonucu), (3) vendorId Backfill (baslik + 4 parca aciklama + Tara + 5 sonuc etiketi + success + Yaziliyor/toast), (4) Product Evidence Aggregates (3 parca aciklama + buton + confirm + Hesaplaniyor/yukleniyor/bulunamadi/N urun hesaplandi/basarisiz/tutarli). 47 anahtar adhx.*. Coklu <strong>/<code>/apostrof iceren fragmentler tek tek sarildi. node+harness OK. RULES degismedi.'],
   'v6.85': ['OZELLIK: Kategoriler her yerde isme gore otomatik siralanir (locale-aware) — yeni sortCatsLocale(arr) helper-i (TR localeCompare tr / EN name_en + en collation, sensitivity:base, numeric). getCategories artik order yerine sortCatsLocale (gereksiz order sort kaldirildi), admCategories admin listesi de locale-sort, urun-bazli 3 kategori dropdown listesi (14329/23460/25919) sortCatsLocale ile, setLocale-de invalidateCatCache() ile dil degisince yeniden siralama. fillCatSelect/katalog facet (CAT_CATEGORY_OPTS) zaten getCategories kullandigi icin otomatik tutarli. node+harness OK. RULES degismedi.'],
   'v6.84': ['i18n FAZ 24 (PoC TALEP AKISI — Image 3 + Katalog Disi form) — Multi-vendor secim modali (step2): Geri butonu, Birden fazla urun/vendor secebilirsiniz notu, Not: sectiginiz diger vendorlar haberdar edilmez, Secilen: N vendor, urun listesi rozetleri (vtypeLabels -> vtype.* render-aninda, Uretici/Distributor/Entegrator), poc-cats loading = poc.*. Geri butonu template-literal (${t}) vs concat (+t+) baglamlari ayri ele alindi (4 concat cust-wiz duzeltildi). Katalog Disi manuel form (openCustomPoCModal): baslik/altbaslik/helper/Urun Adi/Vendor Marka/Kategori sec/Aciklama/Lokasyon/Iptal/Talebi Gonder/validation = pocm.*. Kategori dropdown opsiyonlari TR data (submit degeri) olarak birakildi. 15 anahtar. node+harness OK. KATALOG EKOSISTEMI TAM (Image1+2+3). RULES degismedi.'],
@@ -5453,6 +5454,7 @@ async function loadEvidenceLeaders(){
   var host = el('home-evidence-leaders');
   try {
     await ensureTaxonomy();
+    try { await getCategories(); } catch(e){}
     var snap = await getDocs(query(collection(db,'products'), where('status','==','active')));
     var prods = snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; });
     // v5.85: Canlı Kanıt Akışı — public ürün agregalarından güven istatistikleri
@@ -25164,20 +25166,20 @@ async function loadAdmTab() {
     // v5.50: Acil Onay (Override) kartı
     html += '<div style="background:linear-gradient(135deg,rgba(217,119,6,.08),rgba(217,119,6,.02));border:1px solid rgba(217,119,6,.25);border-radius:12px;padding:16px;cursor:pointer" class="adm-quick-act" data-tab="overrides">'
       + '<div style="font-size:11px;color:#d97706;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">'+t('adash.k_urgent','⚡ Acil Onay Talepleri')+'</div>'
-      + '<div style="font-size:24px;font-weight:800;color:#d97706">'+ovPending+'<span style="font-size:13px;font-weight:600;color:var(--text-muted)"> bekleyen</span></div>'
+      + '<div style="font-size:24px;font-weight:800;color:#d97706">'+ovPending+'<span style="font-size:13px;font-weight:600;color:var(--text-muted)">'+t('adash.pending_suffix','bekleyen')+'</span></div>'
       + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">'+t('adash.override_debt','Onaylı override borç:')+' ₺'+ovDebt.toLocaleString('tr-TR')+'</div>'
       + '</div>';
     // v5.53: Reklam / Öne Çıkan kartı
     html += '<div style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.25);border-radius:12px;padding:16px;cursor:pointer" class="adm-quick-act" data-tab="featured">'
       + '<div style="font-size:11px;color:#7c3aed;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">'+t('adash.k_ads','📢 Reklam / Öne Çıkan')+'</div>'
-      + '<div style="font-size:24px;font-weight:800;color:#7c3aed">'+fpActive+'<span style="font-size:13px;font-weight:600;color:var(--text-muted)"> aktif yerleşim</span></div>'
+      + '<div style="font-size:24px;font-weight:800;color:#7c3aed">'+fpActive+'<span style="font-size:13px;font-weight:600;color:var(--text-muted)">'+t('adash.active_placement','aktif yerleşim')+'</span></div>'
       + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">'+t('adash.month_ad_rev','Bu ay reklam geliri:')+' ₺'+fpMonthRev.toLocaleString('tr-TR')+(fpPending?' · '+fpPending+' onay bekliyor':'')+'</div>'
       + '</div>';
     // Son 30 gün gelir
     html += '<div style="background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(37,99,235,.02));border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:16px">'
       + '<div style="font-size:11px;color:#2563eb;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">'+t('adash.rev_30d','💵 Son 30 Gün Gelir')+'</div>'
       + '<div style="font-size:24px;font-weight:800;color:#2563eb;font-family:monospace">₺'+lastMonthRevenue.toLocaleString('tr-TR')+'</div>'
-      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">'+payments.filter(p=>p.status==='paid' && isAfter(p.paidAt, last30Days)).length+' başarılı ödeme</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">'+payments.filter(p=>p.status==='paid' && isAfter(p.paidAt, last30Days)).length+' '+t('adash.successful_payment','başarılı ödeme')+'</div>'
       + '</div>';
     // Yeni kullanıcı 30g
     var trendIcon = userTrend > 0 ? '↗' : userTrend < 0 ? '↘' : '→';
@@ -25185,7 +25187,7 @@ async function loadAdmTab() {
     html += '<div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.2);border-radius:12px;padding:16px">'
       + '<div style="font-size:11px;color:#7c3aed;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">'+t('adash.k_newusers','👥 Yeni Kullanıcı (30g)')+'</div>'
       + '<div style="font-size:24px;font-weight:800;color:#7c3aed;font-family:monospace">'+newUsers30d+' <span style="font-size:14px;color:'+trendCol+'">'+trendIcon+' %'+Math.abs(userTrend)+'</span></div>'
-      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">'+t('adash.days7','7 gün:')+' '+newUsers7d+' yeni '+t('cnt.records','kayıt')+'</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">'+t('adash.days7','7 gün:')+' '+newUsers7d+' '+t('adash.new_word','yeni')+' '+t('cnt.records','kayıt')+'</div>'
       + '</div>';
     // Demo trafiği
     html += '<div style="background:linear-gradient(135deg,rgba(217,119,6,.06),rgba(217,119,6,.02));border:1px solid rgba(217,119,6,.2);border-radius:12px;padding:16px">'
@@ -25910,6 +25912,7 @@ async function openAdmProdEditModal(prodId, name, cat, desc, country) {
 
 async function admProducts(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('aprod.loading','Ürünler yükleniyor...')+'</div>';
+  try { await getCategories(); } catch(e){}
   const snap = await getDocs(collection(db,'products'));
   var allRaw = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
   // Admin için çöptekileri filtreyle ayır — varsayılan görünümde gizli
@@ -26545,7 +26548,7 @@ async function admDataHealth(m) {
           return '<div style="font-size:12px;color:var(--text-secondary);padding:4px 8px;background:rgba(15,23,42,.02);border-radius:4px">' +
             issue.render(item) + '</div>';
         }).join('') +
-        (issue.items.length > 5 ? '<div class="fs11-muted">...ve ' + (issue.items.length-5) + ' '+t('adh.more_count','tane daha')+'</div>' : '') +
+        (issue.items.length > 5 ? '<div class="fs11-muted">'+t('adh.and_more','...ve ')+(issue.items.length-5) + ' '+t('adh.more_count','tane daha')+'</div>' : '') +
         '</div>';
       m.appendChild(section);
     });
@@ -27154,7 +27157,7 @@ async function admRevenue(m) {
         value: '₺' + Math.round(mrr).toLocaleString('tr-TR'),
         color: '#16a34a',
         bg: 'rgba(22,163,74,.08)',
-        change: paidActive + ' aktif paket',
+        change: paidActive + ' '+t('arev.active_package','aktif paket'),
       },
       {
         label: t('arev.this_month','Bu Ay Gelir'),
@@ -27170,7 +27173,7 @@ async function admRevenue(m) {
         value: paidActive + '',
         color: '#a855f7',
         bg: 'rgba(168,85,247,.08)',
-        change: vendors.length + ' vendor kayıtlı',
+        change: vendors.length + ' '+t('arev.vendors_registered','vendor kayıtlı'),
       },
       {
         label: t('arev.churn','Churn Rate (30g)'),
@@ -27373,7 +27376,7 @@ async function admRevenue(m) {
           + '</div>'
           + '<div class="t-rgt">'
           +   '<div class="fs15-fw7" style="color:'+color+'">₺'+Math.round(v.total).toLocaleString('tr-TR')+'</div>'
-          +   '<div class="fs11-muted">toplam</div>'
+          +   '<div class="fs11-muted">'+t('arev.ltv_total','toplam')+'</div>'
           + '</div>';
         topList.appendChild(item);
       });
@@ -29085,6 +29088,15 @@ const I18N_DICT = {
     'nav.catalog':        'Katalog',
     'nav.leaderboard':    '🏆 Liderler',
     'nav.about':          'Biz Kimiz',
+    'adash.pending_suffix':'bekleyen',
+    'adash.active_placement':'aktif yerleşim',
+    'adash.successful_payment':'başarılı ödeme',
+    'adash.new_word':'yeni',
+    'arev.active_package':'aktif paket',
+    'arev.vendors_registered':'vendor kayıtlı',
+    'arev.ltv_total':'toplam',
+    'adh.and_more':'...ve ',
+
     'adhx.bf_writing':'Yazılıyor...',
     'adhx.bf_toast':'kayıt backfill edildi',
 
@@ -29939,6 +29951,15 @@ const I18N_DICT = {
     'nav.catalog':        'Catalog',
     'nav.leaderboard':    '🏆 Leaders',
     'nav.about':          'Who We Are',
+    'adash.pending_suffix':'pending',
+    'adash.active_placement':'active placement',
+    'adash.successful_payment':'successful payment',
+    'adash.new_word':'new',
+    'arev.active_package':'active package',
+    'arev.vendors_registered':'vendors registered',
+    'arev.ltv_total':'total',
+    'adh.and_more':'...and ',
+
     'adhx.bf_writing':'Writing...',
     'adhx.bf_toast':'records backfilled',
 
@@ -37325,6 +37346,7 @@ window.addEventListener('DOMContentLoaded', () => {
   var yearEl = document.getElementById('ft-year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
   applyFooterI18n();
+  try { getCategories(); } catch(e){}
   initCookieConsent();
   initLegalLinks();
   initAnalytics();
