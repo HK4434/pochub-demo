@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v6.90 | pochub.co -->
+<!-- PoCHub v6.91 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v6.90';
+const VERSION = 'v6.91';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -943,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v6.91': ['BUG FIX (ADMIN SIDEBAR locale): TR->EN gecisinde admin sol menusu TR kaliyordu. Kok sebep: renderAdmin erken-return (if el(adm-main) loadAdmTab return) dil degisince yalnizca icerigi yeniliyor, sidebari (atab.* etiketleri + adash.admin_panel) yeniden KURMUYORDU. Cozum: erken-returne locale guard eklendi (window._admNavLocale === CUR_LOCALE); dil degisince tam rebuild calisir, sondaki loadAdmTab mevcut sekmeyi korur. Tum menu etiketleri zaten dogru sariliydi, yeni anahtar yok. node+harness OK. RULES degismedi.'],
   'v6.90': ['i18n FAZ 29 (ADMIN PROFIL — TUM POPUP/MODAL/CONFIRM/DROPDOWN derin tarama) — (1) inline form: Preferred Contact dropdown E-posta/Telefon opsiyonlari, Kaydediliyor/Isleniyor durumlari (common.saving/processing, app-geneli repall), sifre-sifirlama + veri-export confirm, VKN validasyon toasti, profil-guncellendi/mail-gonderildi/indirildi toastlari. (2) Veri Isleme Gecmisi modali: baslik/aciklama/bos-durum + 12 audit action etiketi (iki ayri action map). (3) Acik Riza Beyanlari modali: baslik/aciklama + 5 consentLabel + Kabul/Reddedildi durum + Tarih/Versiyon/Audit/IP. (4) Hesap Silme modali: baslik + 5 madde liste + 3 onay adimi + placeholderlar + handler toastlari (Sifrenizi girin/onay metni/talep alindi). Kapat butonlari common.close (6x). 56 anahtar (pf.*/common.*). HESABIMI SIL onay-token literal birakildi (handler kontrolu). node+harness OK. RULES degismedi.'],
   'v6.89': ['i18n FAZ 28 (ADMIN PROFIL devami — Bildirim Tercihleri bolumu + rol etiketleri) — Bildirim Tercihleri basligi (prof.notif_prefs), KVKK Madde 11 riza-geri-cekme aciklamasi (notif_kvkk), Admin Info rol etiketleri Admin(Super)/Moderator/Destek (role_admin/moderator/support, render-time ternary), Mevcut tedarikcileriniz vendor ipucu (suppliers_hint, apostrof). 6 anahtar prof.*. Bildirim toggle satirlari zaten EN idi. node+harness OK. RULES degismedi.'],
   'v6.88': ['i18n FAZ 27 (ADMIN PROFIL — KVKK Haklari / Guvenlik / Tehlikeli Bolge blogu, 18675-18740) — Your KVKK Rights aciklamasi, Verilerimi Indir + Indir butonu, Veri Isleme Gecmisi + aciklama, Acik Riza Gecmisi + aciklama, Guvenlik basligi, sifre sifirlama aciklamasi + Sifirlama Maili Gonder butonu, Hesabimi Sil + KVKK Madde 7 aciklama + Hesabi Sil butonu. 13 anahtar prof.*. Guvenlik/Hesabimi Sil paylasilan editor oldugu icin repall (musteri/vendor profilleri de kapsandi). node+harness OK. RULES degismedi.'],
@@ -25004,7 +25005,8 @@ function renderAdmin() {
     el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>Bu bölüme erişim yetkiniz yok.</div></div>`;
     return;
   }
-  if (el('adm-main')) { loadAdmTab(); return; }
+  if (el('adm-main') && window._admNavLocale === window.CUR_LOCALE) { loadAdmTab(); return; }
+  window._admNavLocale = window.CUR_LOCALE;
   const _rp = getRolePerm(CUR_PROFILE?.role);
   const tabs = [
     ['dashboard',t('atab.dashboard','Dashboard')],
