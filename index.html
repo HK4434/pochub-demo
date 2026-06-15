@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.19 | pochub.co -->
+<!-- PoCHub v7.20 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.19';
+const VERSION = 'v7.20';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -943,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.20': ['i18n FAZ 57 (VENDOR PoC-kabul quota mesajlari) — canVendorAcceptPoC mesajlari TAM cevrildi. 6 mesaj: hesap askida (odenmemis borc), paket satin almaniz gerekiyor, abonelik aktif degil, paket bulunamadi, aylik kontenjan doldu (bonus dahil + ekstra odeme/yukseltme tail), kontrol hatasi. Bu mesajlar 3 quota modaline (v7.14) check.message olarak besleniyor; suspend alert (Hesap Askida) zaten sariliydi. ~8 anahtar (qchk.*). Boylece VENDOR PoC-kabul akisi (quota check + modallar + mesajlar) tamamlandi. node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.19': ['i18n FAZ 56 (VENDOR Odeme modallari) — openBillingPaymentModal + openPackageBrowser + openPaymentRequestModal + openPaymentMethodsModal + openPaymentHistory TAM cevrildi. Paket Satin Al basligi, ONERILEN rozeti, urun suffix, Kayitli Kart/havale secimi, havale notu (Talep Olustur), otomatik yenileme metni, Odeme Talebi Olustur butonu, Odeme Yontemlerim (reuse), Kayitli Kart/KART SAHIBI/Karti Sil/kart yok, gecmis (actionLabels: Satin alma/Yenileme/Yukseltme/Dusurme/Iptal/Trial/Hediye; statusLabels: Odendi/Beklemede/Basarisiz/Iade; odeme yontemi: Havale/Kart/Admin Hediye/Ucretsiz), Henuz gecmis yok, Makbuz Indir, makbuz notu (e-Fatura), Haziraniyor, kart silme confirm, bildirim tail, Yukleme hatasi (reuse). ~32 anahtar (pay.*). NOT: PoCHub Teknoloji A.S./IBAN = sirket datasi. node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.18': ['i18n FAZ 55 (VENDOR Faturalandirma + Reklamlar) — vendBilling (zaten cevrilmisti, kalan toplam borc + One cikan urun reklami sarildi) + vendFeatured (Urun fallback) + openFeaturedBoostModal TAM cevrildi. Boost modali: One Cikar (Reklam) basligi + aciklama (Sponsorlu carousel), su an aktif bilgisi, Plan/Sure etiketleri, Haftalik/Aylik plan secenekleri, auto-activate aciklamalari (cari hesap/admin onayi), Satin Al & Yayinla / Talep Gonder butonlari (modal+reset), satin alma description (hafta/ay), bildirim (basligi + govde: haftalik/aylik, satin aldi/talep etti). ~23 anahtar (bill.*/vad.*). node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.17': ['i18n FAZ 54 (VENDOR Portfoyum) — vendPortfolio TAM cevrildi. 3 tab aciklamasi (Urunlerim/Dagittiklarim/Entegrasyonlarim), PERFORMANS LIDERI rozeti, aksiyon karti (distributor/entegrator atanmamis prefix+strong), Portfoy Icgoruleri (En Cok Kategoriler/Mensei Dagilimi), durum suffixleri (Admin Onayi/Entegrator Bekleniyor/Yayinda), sayac suffixleri (distributor/entegrator), Uretici: etiketi (2x), PoC tamamlandi, Entegrator Yonet / Dagitim Yonet butonlari, stLabels (vprod.st_* reuse), time-ago (ago.* reuse), tamamlandi title. ~24 anahtar (port.*). NOT: p.category||Diger = kategori datasi. node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
@@ -17924,7 +17925,7 @@ async function canVendorAcceptPoC(vendorId) {
       return {
         allowed: false,
         reason: 'suspended',
-        message: 'Hesabınız ödenmemiş PoC borçları nedeniyle askıya alındı. Cari hesabınızı kapatın ve yeniden aktif olun.',
+        message: t('qchk.suspended','Hesabınız ödenmemiş PoC borçları nedeniyle askıya alındı. Cari hesabınızı kapatın ve yeniden aktif olun.'),
       };
     }
 
@@ -17934,7 +17935,7 @@ async function canVendorAcceptPoC(vendorId) {
       return {
         allowed: false,
         reason: 'no_subscription',
-        message: 'PoC kabul edebilmek için bir paket satın almanız gerekiyor.',
+        message: t('qchk.no_package','PoC kabul edebilmek için bir paket satın almanız gerekiyor.'),
         options: ['buy_package', 'request_override'],
       };
     }
@@ -17947,7 +17948,7 @@ async function canVendorAcceptPoC(vendorId) {
       return {
         allowed: false,
         reason: 'expired',
-        message: 'Aboneliğiniz aktif değil. Lütfen yenileyin veya yeni paket alın.',
+        message: t('qchk.sub_inactive','Aboneliğiniz aktif değil. Lütfen yenileyin veya yeni paket alın.'),
         options: ['buy_package', 'request_override'],
       };
     }
@@ -17955,7 +17956,7 @@ async function canVendorAcceptPoC(vendorId) {
     // 3. Paket detayı
     const pkgSnap = await getDoc(doc(db,'pochub_packages',sub.currentPackageId));
     if (!pkgSnap.exists()) {
-      return { allowed: false, reason: 'package_not_found', message: 'Paket bilgisi bulunamadı.' };
+      return { allowed: false, reason: 'package_not_found', message: t('qchk.pkg_not_found','Paket bilgisi bulunamadı.') };
     }
     const pkg = {...pkgSnap.data(), id: pkgSnap.id};
 
@@ -18001,12 +18002,12 @@ async function canVendorAcceptPoC(vendorId) {
       baseQuota: baseQuota,
       referralBonus: referralBonus,
       totalQuota: totalQuota,
-      message: 'Aylık PoC kontenjanınız doldu (' + used + '/' + totalQuota + (referralBonus > 0 ? ', bonus dahil' : '') + '). Bu PoC için ekstra ödeme yapmanız veya paketi yükseltmeniz gerekiyor.',
+      message: t('qchk.quota_full_a','Aylık PoC kontenjanınız doldu (') + used + '/' + totalQuota + (referralBonus > 0 ? t('qchk.bonus_included',', bonus dahil') : '') + t('qchk.quota_full_b','). Bu PoC için ekstra ödeme yapmanız veya paketi yükseltmeniz gerekiyor.'),
       options: ['pay_overflow', 'upgrade_package', 'request_override'],
     };
   } catch(e) {
     console.error('canVendorAcceptPoC error:', e);
-    return { allowed: false, reason: 'error', message: 'Kontrol hatası: '+e.message };
+    return { allowed: false, reason: 'error', message: t('qchk.check_error','Kontrol hatası: ')+e.message };
   }
 }
 
@@ -29121,6 +29122,15 @@ const I18N_DICT = {
     'nav.catalog':        'Katalog',
     'nav.leaderboard':    '🏆 Liderler',
     'nav.about':          'Biz Kimiz',
+    'qchk.suspended':'Hesabınız ödenmemiş PoC borçları nedeniyle askıya alındı. Cari hesabınızı kapatın ve yeniden aktif olun.',
+    'qchk.no_package':'PoC kabul edebilmek için bir paket satın almanız gerekiyor.',
+    'qchk.sub_inactive':'Aboneliğiniz aktif değil. Lütfen yenileyin veya yeni paket alın.',
+    'qchk.pkg_not_found':'Paket bilgisi bulunamadı.',
+    'qchk.quota_full_a':'Aylık PoC kontenjanınız doldu (',
+    'qchk.bonus_included':', bonus dahil',
+    'qchk.quota_full_b':'). Bu PoC için ekstra ödeme yapmanız veya paketi yükseltmeniz gerekiyor.',
+    'qchk.check_error':'Kontrol hatası: ',
+
     'pay.debt_for':'borç için ₺',
     'pay.req_sent_notif':'ödeme talebi gönderdi.',
     'pay.recommended':'⭐ ÖNERİLEN',
@@ -30824,6 +30834,15 @@ const I18N_DICT = {
     'nav.catalog':        'Catalog',
     'nav.leaderboard':    '🏆 Leaders',
     'nav.about':          'Who We Are',
+    'qchk.suspended':'Your account is suspended due to unpaid PoC debts. Settle your account to reactivate.',
+    'qchk.no_package':'You need to buy a package to accept PoCs.',
+    'qchk.sub_inactive':'Your subscription is not active. Please renew or buy a new package.',
+    'qchk.pkg_not_found':'Package information not found.',
+    'qchk.quota_full_a':'Your monthly PoC quota is full (',
+    'qchk.bonus_included':', bonus included',
+    'qchk.quota_full_b':'). You need to pay extra for this PoC or upgrade your package.',
+    'qchk.check_error':'Check error: ',
+
     'pay.debt_for':'for debt ₺',
     'pay.req_sent_notif':'sent a payment request.',
     'pay.recommended':'⭐ RECOMMENDED',
