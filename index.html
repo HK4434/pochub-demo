@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.26 | pochub.co -->
+<!-- PoCHub v7.27 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.26';
+const VERSION = 'v7.27';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -943,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.27': ['i18n FAZ 64 (ADMIN Veri Sagligi) — admDataHealth TAM cevrildi. Tanilama basligi (publishStatus diag), gun suffix (reuse), sayac yeniden hesapla butonu + Hesaplaniyor durumu, backfill tarama (Taraniyor/Kayitlar taraniyor/Tara onizleme/Kaydi Doldur/doldurma confirm/kayit guncellendi), Tara butonu prompt, test kaydi silme confirm, suresi dolmus davet expired confirm, orphan urun active confirm, analiz hatasi. ~14 anahtar (adh.*). NOT: SIL guvenlik token-i korundu. node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.26': ['i18n FAZ 63 (ADMIN kullanici+urun yonetimi + kalintilar) — admUsers + admProducts TAM cevrildi, ayrica 9 mostly-done admin fonksiyonunun kalintilari temizlendi. admUsers: rol etiketleri (Uretici/Distributor/Entegrator), premium Evet/Hayir, Dogrulanmamis durumu, Manuel Dogrula, Tum Alanlar/Alanlari Gizle. admProducts: bos durumlar (onay/zincir/yayin/red/bekleyen), onay confirm, onay/red bildirim+email (Gerekce prefix), cop. Kalintilar: admEvents iptal confirm, admRevenue Yillik suffix, admVendorSubs gecti (reuse), admPackages reset confirm, admDemoRequests SAYFA ACILDI, admCategories load error (reuse), admOverrides (Musteri/onay-red bildirimleri), admVendorApprovals (verify confirm + onay/red basliklari). ~37 anahtar (admu/admp/ame/adsub/adpk/admdr/ado/adva). NOT: ALL_CATS_V4 Guvenlik = kategori datasi. node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.25': ['i18n FAZ 62 (URUN-SPEC placeholder + select secenekleri) — pfield taksonomisi TAMAMLANDI. Iki render-time helper eklendi: phT() (placeholder: Orn: prefix -> e.g. + 4 aciklayici TR placeholder PH_EN ile) ve optT() (select opts: 215 TR deger POPT_EN ile cevrilir, KRITIK: value=TR canonical SABIT kalir, sadece display cevrilir -> veri tutarliligi korunur, mevcut urun specleri bozulmaz). 6 render noktasi baglandi (3 ph + 3 opts: urun ekle/duzenle/add-product). Teknik/marka opts (100G, AMD EPYC, AES-256) passthrough. Boylece EN modunda urun spec formu TAM Ingilizce (alan adi v7.24 + placeholder + secenek). Fonksiyonel test PASS (Abonelik->Subscription, value sabit). node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.24': ['i18n FAZ 61 (URUN-SPEC ALAN TAKSONOMISI) — CATEGORY_FIELDS (35 kategori, 472 alan, 267 benzersiz id) ALAN LABELLARI render-time cevrildi. Hazard#3-safe: tanimda DEGIL, render aninda t(pfield.+f.id, f.label) ile 5 noktada baglandi (urun ekleme modali label+validation, urun duzenleme spec, add-product spec, karsilastirma matrisi). 267 benzersiz id icin pfield.* anahtari eklendi (TR=mevcut label fallback, EN=teknik ceviri). Boylece EN modunda urun spec alan adlari (Es Zamanli Oturum, Maks. Firewall Politikasi, Ag Arayuzleri, Donanim Hizlandirici, Lisans Modeli vb.) artik Ingilizce gorunur. NOT: alan placeholderlari (ph: Orn:...) + select secenekleri (opts:[...]) henuz render-time bagli degil (TR kalir) — gelecek pass. ~267 anahtar (pfield.*). node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
@@ -26563,11 +26564,11 @@ async function admDataHealth(m) {
 
     // Sorunlar
     var issues = [
-      {title:'publishStatus:ready ama status:active değil', items:orphanProducts, color:'#dc2626',
+      {title:t('adh.diag_orphan','publishStatus:ready ama status:active değil'), items:orphanProducts, color:'#dc2626',
        render:function(p){ return p.name + ' (' + p.id.substring(0,10) + '...)'; },
        action:'fix-orphan', actionLabel:t('adh.fix_active','Düzelt (active yap)')},
       {title:t('adh.alert_stale_approval','Admin onayında 7+ gün bekleyen ürünler'), items:staleAdminApproval, color:'#d97706',
-       render:function(p){ return p.name + ' — ' + Math.round((now - (p.createdAt?.toDate?.().getTime()||0)) / 86400000) + ' gün'; }},
+       render:function(p){ return p.name + ' — ' + Math.round((now - (p.createdAt?.toDate?.().getTime()||0)) / 86400000) + ' '+t('common.days','gün'); }},
       {title:'Aktif PoC\u2019de 30+ gun teklif yok', items:activePocNoOffer, color:'#d97706',
        render:function(p){ return (p.productName||'?') + ' — ' + (p.customerName||'?'); }},
       {title:t('adh.alert_expired_invites','Süresi dolmuş bekleyen davetler (30+ gün)'), items:expiredInvites, color:'#dc2626',
@@ -26647,7 +26648,7 @@ async function admDataHealth(m) {
         t('adhx.demo_warning','⚠️ <strong>DİKKAT:</strong> Bu işlem geri alınamaz! Önce dataları yedeklemeniz önerilir.') +
       '</div>' +
       '<div id="demo-scan-result" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--text-muted);min-height:40px">' +
-        '<div style="text-align:center;color:var(--text-muted);font-size:12px">'+t('adhx.press_scan','"Tara" butonuna basın')+'</div>' +
+        '<div style="text-align:center;color:var(--text-muted);font-size:12px">'+t('adhx.press_scan',''+t('adh.press_scan','"Tara" butonuna basın')+'')+'</div>' +
       '</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button id="demo-scan-btn" class="btn-g btn-sm" style="padding:8px 14px">'+t('adhx.scan_counts','🔍 Tara (sayıları göster)')+'</button>' +
@@ -26676,7 +26677,7 @@ async function admDataHealth(m) {
     var statsRecalcBtn = m.querySelector('#stats-recalc-btn');
     var statsResultEl = m.querySelector('#stats-recalc-result');
     statsRecalcBtn?.addEventListener('click', async function(){
-      statsRecalcBtn.disabled = true; statsRecalcBtn.textContent = '⏳ Hesaplanıyor...';
+      statsRecalcBtn.disabled = true; statsRecalcBtn.textContent = t('adh.calculating','⏳ Hesaplanıyor...');
       try {
         var rs = await recalcGlobalStats();
         statsResultEl.style.display = 'block';
@@ -26689,7 +26690,7 @@ async function admDataHealth(m) {
         statsResultEl.style.display = 'block';
         statsResultEl.innerHTML = '<div style="color:#dc2626">Hata: '+(e && e.message)+'</div>';
       }
-      statsRecalcBtn.disabled = false; statsRecalcBtn.textContent = '🔄 Sayaçları Yeniden Hesapla';
+      statsRecalcBtn.disabled = false; statsRecalcBtn.textContent = t('adh.recompute','🔄 Sayaçları Yeniden Hesapla');
     });
 
     // ── v5.44: registrations.vendorId backfill (v5.38 öncesi eski kayıtlar) ──
@@ -26725,8 +26726,8 @@ async function admDataHealth(m) {
     }
 
     bfScanBtn?.addEventListener('click', async function(){
-      bfScanBtn.disabled = true; bfScanBtn.textContent = '⏳ Taranıyor...';
-      bfResult.style.display = 'block'; bfResult.innerHTML = 'Kayıtlar taranıyor...';
+      bfScanBtn.disabled = true; bfScanBtn.textContent = t('adh.scanning','⏳ Taranıyor...');
+      bfResult.style.display = 'block'; bfResult.innerHTML = t('adh.records_scanning','Kayıtlar taranıyor...');
       try {
         var snap = await getDocs(collection(db,'registrations'));
         var total = snap.size, missing = 0, fillable = 0, noEvent = 0, noVendor = 0;
@@ -26749,17 +26750,17 @@ async function admDataHealth(m) {
             (noEvent? '<br>➖ '+t('adhx.bf_no_eventid',"eventId'siz (atlanır):")+' '+noEvent : '') +
             (noVendor? '<br>➖ '+t('adhx.bf_no_event',"Event yok / event'te vendorId yok (atlanır):")+' '+noVendor : '') +
           '</div>';
-        if (fillable > 0) { bfApplyBtn.style.display = 'inline-block'; bfApplyBtn.textContent = '✍️ '+fillable+' Kaydı Doldur'; bfApplyBtn.disabled = false; }
+        if (fillable > 0) { bfApplyBtn.style.display = 'inline-block'; bfApplyBtn.textContent = '✍️ '+fillable+' '+t('adh.fill_records','Kaydı Doldur'); bfApplyBtn.disabled = false; }
         else { bfApplyBtn.style.display = 'none'; }
       } catch(e) {
         bfResult.innerHTML = '<div style="color:#dc2626">Tarama hatası: '+(e && e.message)+'</div>';
       }
-      bfScanBtn.disabled = false; bfScanBtn.textContent = '🔍 Tara (önizleme)';
+      bfScanBtn.disabled = false; bfScanBtn.textContent = t('adh.scan_preview','🔍 Tara (önizleme)');
     });
 
     bfApplyBtn?.addEventListener('click', async function(){
       if (!bfPending || !bfPending.length) return;
-      if (!confirm(bfPending.length+' kaydın vendorId alanı doldurulacak. Devam edilsin mi?')) return;
+      if (!confirm(bfPending.length+' '+t('adh.fill_confirm','kaydın vendorId alanı doldurulacak. Devam edilsin mi?'))) return;
       bfApplyBtn.disabled = true;
       var ok = 0, fail = 0;
       for (var p of bfPending) {
@@ -26769,7 +26770,7 @@ async function admDataHealth(m) {
           bfResult.innerHTML = '<div>'+t('adhx.bf_writing','Yazılıyor...')+' '+(ok+fail)+'/'+bfPending.length+' (✓'+ok+(fail?' ✗'+fail:'')+')</div>';
         }
       }
-      bfResult.innerHTML = '<div style="color:'+(fail?'#d97706':'#16a34a')+';font-weight:700">✓ '+ok+' kayıt güncellendi'+(fail?' · '+fail+' '+t('adhx.pe_failed','başarısız'):'')+'</div>' +
+      bfResult.innerHTML = '<div style="color:'+(fail?'#d97706':'#16a34a')+';font-weight:700">✓ '+ok+' '+t('adh.records_updated','kayıt güncellendi')+(fail?' · '+fail+' '+t('adhx.pe_failed','başarısız'):'')+'</div>' +
         '<div style="margin-top:4px;color:var(--text-muted)">'+t('adhx.bf_success',"Vendorlar artık bu eski kayıtların katılımcılarını görebilir. Tekrar \"Tara\" ile doğrulayabilirsin.")+'</div>';
       showToast(ok+' '+t('adhx.bf_toast','kayıt backfill edildi')+(fail?', '+fail+' hata':''), fail?'err':'ok');
       bfApplyBtn.style.display = 'none'; bfPending = [];
@@ -26828,7 +26829,7 @@ async function admDataHealth(m) {
     var scanData = null;
 
     scanBtn?.addEventListener('click', async function(){
-      scanBtn.disabled = true; scanBtn.textContent = '⏳ Taranıyor...';
+      scanBtn.disabled = true; scanBtn.textContent = t('adh.scanning','⏳ Taranıyor...');
       resultEl.innerHTML = '<div style="text-align:center">Veriler analiz ediliyor...</div>';
 
       try {
@@ -26903,7 +26904,7 @@ async function admDataHealth(m) {
       cancelBtn.style.display = 'none';
       scanBtn.style.display = 'inline-flex';
       scanBtn.textContent = '🔍 Tara';
-      resultEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:12px">"Tara" butonuna basın</div>';
+      resultEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:12px">'+t('adh.press_scan','"Tara" butonuna basın')+'</div>';
       scanData = null;
     });
 
@@ -26957,7 +26958,7 @@ async function admDataHealth(m) {
     var cleanBtn = m.querySelector('#health-clean-test');
     if (cleanBtn) {
       cleanBtn.addEventListener('click', async function() {
-        if (!confirm(totalTest + ' test kaydını silmek istiyor musunuz?')) return;
+        if (!confirm(totalTest + ' '+t('adh.delete_test_confirm','test kaydını silmek istiyor musunuz?'))) return;
         cleanBtn.disabled = true; cleanBtn.textContent = 'Siliniyor...';
         var deleted = 0;
         var colsToClean = [
@@ -26983,7 +26984,7 @@ async function admDataHealth(m) {
     var expireBtn = m.querySelector('#health-expire-invites');
     if (expireBtn) {
       expireBtn.addEventListener('click', async function() {
-        if (!confirm(expiredInvites.length + ' süresi dolmuş daveti "expired" yapacaksınız. Onaylıyor musunuz?')) return;
+        if (!confirm(expiredInvites.length + ' '+t('adh.expire_confirm','süresi dolmuş daveti "expired" yapacaksınız. Onaylıyor musunuz?'))) return;
         expireBtn.disabled = true;
         for (var ei = 0; ei < expiredInvites.length; ei++) {
           try {
@@ -26999,7 +27000,7 @@ async function admDataHealth(m) {
     var fixOrphanBtn = m.querySelector('#fix-orphan');
     if (fixOrphanBtn) {
       fixOrphanBtn.addEventListener('click', async function() {
-        if (!confirm(orphanProducts.length + ' ürünü active yapacaksınız?')) return;
+        if (!confirm(orphanProducts.length + ' '+t('adh.activate_confirm','ürünü active yapacaksınız?'))) return;
         for (var oi = 0; oi < orphanProducts.length; oi++) {
           try {
             await updateDoc(doc(db,'products',orphanProducts[oi].id), {status:'active'});
@@ -27011,7 +27012,7 @@ async function admDataHealth(m) {
     }
 
   } catch(e) {
-    m.innerHTML = '<div class="alert alert-err">Analiz hatası: ' + e.message + '</div>';
+    m.innerHTML = '<div class="alert alert-err">'+t('adh.analysis_error','Analiz hatası: ')+e.message + '</div>';
   }
 }
 
@@ -29128,6 +29129,21 @@ const I18N_DICT = {
     'nav.catalog':        'Katalog',
     'nav.leaderboard':    '🏆 Liderler',
     'nav.about':          'Biz Kimiz',
+    'adh.diag_orphan':'publishStatus:ready ama status:active değil',
+    'adh.calculating':'⏳ Hesaplanıyor...',
+    'adh.recompute':'🔄 Sayaçları Yeniden Hesapla',
+    'adh.scanning':'⏳ Taranıyor...',
+    'adh.records_scanning':'Kayıtlar taranıyor...',
+    'adh.fill_records':'Kaydı Doldur',
+    'adh.scan_preview':'🔍 Tara (önizleme)',
+    'adh.fill_confirm':'kaydın vendorId alanı doldurulacak. Devam edilsin mi?',
+    'adh.records_updated':'kayıt güncellendi',
+    'adh.press_scan':'"Tara" butonuna basın',
+    'adh.delete_test_confirm':'test kaydını silmek istiyor musunuz?',
+    'adh.expire_confirm':'süresi dolmuş daveti "expired" yapacaksınız. Onaylıyor musunuz?',
+    'adh.activate_confirm':'ürünü active yapacaksınız?',
+    'adh.analysis_error':'Analiz hatası: ',
+
     'admu.role_manufacturer':'Üretici',
     'admu.role_distributor':'Distribütör',
     'admu.role_integrator':'Entegratör',
@@ -31249,6 +31265,21 @@ const I18N_DICT = {
     'nav.catalog':        'Catalog',
     'nav.leaderboard':    '🏆 Leaders',
     'nav.about':          'Who We Are',
+    'adh.diag_orphan':'publishStatus:ready but status not active',
+    'adh.calculating':'⏳ Calculating...',
+    'adh.recompute':'🔄 Recompute Counters',
+    'adh.scanning':'⏳ Scanning...',
+    'adh.records_scanning':'Scanning records...',
+    'adh.fill_records':'Records to Fill',
+    'adh.scan_preview':'🔍 Scan (preview)',
+    'adh.fill_confirm':"records' vendorId field will be filled. Continue?",
+    'adh.records_updated':'records updated',
+    'adh.press_scan':'Press the "Scan" button',
+    'adh.delete_test_confirm':'test records — do you want to delete them?',
+    'adh.expire_confirm':'expired invites will be set to "expired". Do you confirm?',
+    'adh.activate_confirm':'products will be set to active?',
+    'adh.analysis_error':'Analysis error: ',
+
     'admu.role_manufacturer':'Manufacturer',
     'admu.role_distributor':'Distributor',
     'admu.role_integrator':'Integrator',
