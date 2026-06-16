@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.25 | pochub.co -->
+<!-- PoCHub v7.26 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.25';
+const VERSION = 'v7.26';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -943,6 +943,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.26': ['i18n FAZ 63 (ADMIN kullanici+urun yonetimi + kalintilar) — admUsers + admProducts TAM cevrildi, ayrica 9 mostly-done admin fonksiyonunun kalintilari temizlendi. admUsers: rol etiketleri (Uretici/Distributor/Entegrator), premium Evet/Hayir, Dogrulanmamis durumu, Manuel Dogrula, Tum Alanlar/Alanlari Gizle. admProducts: bos durumlar (onay/zincir/yayin/red/bekleyen), onay confirm, onay/red bildirim+email (Gerekce prefix), cop. Kalintilar: admEvents iptal confirm, admRevenue Yillik suffix, admVendorSubs gecti (reuse), admPackages reset confirm, admDemoRequests SAYFA ACILDI, admCategories load error (reuse), admOverrides (Musteri/onay-red bildirimleri), admVendorApprovals (verify confirm + onay/red basliklari). ~37 anahtar (admu/admp/ame/adsub/adpk/admdr/ado/adva). NOT: ALL_CATS_V4 Guvenlik = kategori datasi. node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.25': ['i18n FAZ 62 (URUN-SPEC placeholder + select secenekleri) — pfield taksonomisi TAMAMLANDI. Iki render-time helper eklendi: phT() (placeholder: Orn: prefix -> e.g. + 4 aciklayici TR placeholder PH_EN ile) ve optT() (select opts: 215 TR deger POPT_EN ile cevrilir, KRITIK: value=TR canonical SABIT kalir, sadece display cevrilir -> veri tutarliligi korunur, mevcut urun specleri bozulmaz). 6 render noktasi baglandi (3 ph + 3 opts: urun ekle/duzenle/add-product). Teknik/marka opts (100G, AMD EPYC, AES-256) passthrough. Boylece EN modunda urun spec formu TAM Ingilizce (alan adi v7.24 + placeholder + secenek). Fonksiyonel test PASS (Abonelik->Subscription, value sabit). node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.24': ['i18n FAZ 61 (URUN-SPEC ALAN TAKSONOMISI) — CATEGORY_FIELDS (35 kategori, 472 alan, 267 benzersiz id) ALAN LABELLARI render-time cevrildi. Hazard#3-safe: tanimda DEGIL, render aninda t(pfield.+f.id, f.label) ile 5 noktada baglandi (urun ekleme modali label+validation, urun duzenleme spec, add-product spec, karsilastirma matrisi). 267 benzersiz id icin pfield.* anahtari eklendi (TR=mevcut label fallback, EN=teknik ceviri). Boylece EN modunda urun spec alan adlari (Es Zamanli Oturum, Maks. Firewall Politikasi, Ag Arayuzleri, Donanim Hizlandirici, Lisans Modeli vb.) artik Ingilizce gorunur. NOT: alan placeholderlari (ph: Orn:...) + select secenekleri (opts:[...]) henuz render-time bagli degil (TR kalir) — gelecek pass. ~267 anahtar (pfield.*). node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
   'v7.23': ['i18n FAZ 60 (ADMIN VERBIS + DPA UI chrome) — renderVERBISInventory + renderDPATemplate UI chrome cevrildi; yasal/data govde BILINCLI olarak TR birakildi. VERBIS chrome: sayfa aciklamasi (Madde 16), kayit yukumlulugu kutusu (header+desc+3 li), Kayit icin link, istatistik kartlari (Aktif Kullanici/Anonimlestiri len/Musteri/Vendor/Acik Riza/Audit Log), JSON Indir + Yazdir/PDF butonlari. DPA chrome: aciklama (Madde 8-9/GDPR 28), Onemli uyarisi, vendor DPA listesi (Firebase SCC link/EmailJS/iyzico), Sablonu Indir butonu. ~23 anahtar (avb.*/adpa.*). KORUNAN TR (yasal belge, KVKK Kurumuna TR sunulur): VERBIS envanter tablosu + kayit sablonu (Sirket Unvani/Vergi no/veri turleri/saklama sureleri/yasal dayanaklar), DPA sozlesme govdesi (8 maddelik Veri Isleme Sozlesmesi). node+harness OK, self-wrap/cift-sarma/chr 0. RULES degismedi.'],
@@ -25493,7 +25494,7 @@ async function admUsers(m) {
   var all = snap.docs.map(function(d){ return {...d.data(),id:d.id}; });
   all.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
-  var vtypes = {ureticid:'Üretici', distributor:'Distribütör', integrator:'Entegratör'};
+  var vtypes = {ureticid:t('admu.role_manufacturer','Üretici'), distributor:t('admu.role_distributor','Distribütör'), integrator:t('admu.role_integrator','Entegratör')};
   var filters = {role:'', vendorType:'', premium:'', country:'', dateFrom:'', dateTo:'', search:''};
 
   // v5.07: Dashboard'dan gelen pre-filter
@@ -25623,18 +25624,18 @@ async function admUsers(m) {
           '<div class="bg-elev-pad10"><div class="lbl-mini">'+t('ausr.country','Ülke')+'</div>'+(u.country||'—')+'</div>' +
           '<div class="bg-elev-pad10"><div class="lbl-mini">'+t('ausr.phone','Telefon')+'</div>'+(u.phone||'—')+'</div>' +
           '<div class="bg-elev-pad10"><div class="lbl-mini">'+t('ausr.reg_date','Kayıt Tarihi')+'</div>'+dateStr2+'</div>' +
-          '<div class="bg-elev-pad10"><div class="lbl-mini">Premium</div>'+(u.premium?'⭐ Evet':'Hayır')+'</div>' +
+          '<div class="bg-elev-pad10"><div class="lbl-mini">Premium</div>'+(u.premium?t('admu.premium_yes','⭐ Evet'):t('admu.premium_no','Hayır'))+'</div>' +
           '<div style="background:'+(u.emailVerified?'rgba(22,163,74,.06)':'rgba(217,119,6,.06)')+';border:1px solid '+(u.emailVerified?'rgba(22,163,74,.20)':'rgba(217,119,6,.20)')+';border-radius:8px;padding:10px;grid-column:1/-1">'+
             '<div class="lbl-mini">'+t('ausr.email_verify_status','E-posta Doğrulama Durumu')+'</div>'+
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px">'+
               '<div>'+
                 (u.emailVerified
                   ? '<b style="color:#16a34a">✓ Doğrulanmış</b>' + (u.emailVerifiedByAdmin ? ' <span style="font-size:11px;color:#d97706;font-weight:700">'+t('ausr.by_admin','(👤 Admin tarafından)')+'</span>' : ' <span style="font-size:11px;color:var(--text-muted)">(otomatik)</span>')
-                  : '<b style="color:#d97706">⏳ Doğrulanmamış</b> <span style="font-size:11px;color:var(--text-muted)">(mail problemi olabilir)</span>')+
+                  : '<b style="color:#d97706">'+t('admu.unverified','⏳ Doğrulanmamış')+'</b> <span style="font-size:11px;color:var(--text-muted)">'+t('admu.mail_issue','(mail problemi olabilir)')+'</span>')+
               '</div>'+
               (u.emailVerified
                 ? '<button id="u-modal-unverify" style="background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.30);color:#d97706;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">'+t('ausr.btn_unverify','⤴ Kaldır')+'</button>'
-                : '<button id="u-modal-verify" style="background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.30);color:#16a34a;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">✓ Manuel Doğrula</button>')+
+                : '<button id="u-modal-verify" style="background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.30);color:#16a34a;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">'+t('admu.manual_verify','✓ Manuel Doğrula')+'</button>')+
             '</div>'+
           '</div>' +
           '<div style="background:var(--bg-elevated);border-radius:8px;padding:10px;grid-column:1/-1"><div class="lbl-mini">UID</div><code class="fs11">'+u.id+'</code></div>' +
@@ -25643,7 +25644,7 @@ async function admUsers(m) {
           '<div id="u-rawwrap"></div>' +
           '<div style="display:flex;gap:8px;margin-top:14px">' +
             (u.role==='vendor' ? '<button id="u-fullprofile" class="btn-g" style="flex:1">📄 Tam Profil</button>' : '') +
-            '<button id="u-rawtoggle" class="btn-g" style="flex:1">🔍 Tüm Alanlar</button>' +
+            '<button id="u-rawtoggle" class="btn-g" style="flex:1">'+t('admu.all_fields','🔍 Tüm Alanlar')+'</button>' +
           '</div>' +
           '<button id="u-modal-close2" class="btn-g" style="width:100%;margin-top:8px">'+t('common.close','Kapat')+'</button>' +
           '</div>';
@@ -25658,7 +25659,7 @@ async function admUsers(m) {
         var rtBtn = modal.querySelector('#u-rawtoggle');
         var rwBox = modal.querySelector('#u-rawwrap');
         if (rtBtn) rtBtn.onclick = function(){
-          if (rwBox.innerHTML) { rwBox.innerHTML=''; rtBtn.textContent='🔍 Tüm Alanlar'; return; }
+          if (rwBox.innerHTML) { rwBox.innerHTML=''; rtBtn.textContent=t('admu.all_fields','🔍 Tüm Alanlar'); return; }
           var rows = Object.keys(u).sort().map(function(k){
             var val = u[k];
             if (val && val.toDate) { try { val = val.toDate().toLocaleString('tr-TR'); } catch(e){} }
@@ -25666,7 +25667,7 @@ async function admUsers(m) {
             return '<div style="display:grid;grid-template-columns:150px 1fr;gap:8px;padding:4px 0;border-bottom:1px solid rgba(15,23,42,.06);font-size:11.5px"><code class="t-muted">'+k+'</code><div style="word-break:break-word">'+(val===undefined||val===null||val===''?'—':String(val))+'</div></div>';
           }).join('');
           rwBox.innerHTML = '<div style="margin-top:12px;max-height:280px;overflow-y:auto;background:var(--bg-elevated);border-radius:8px;padding:10px">'+rows+'</div>';
-          rtBtn.textContent='🔼 Alanları Gizle';
+          rtBtn.textContent=t('admu.hide_fields','🔼 Alanları Gizle');
         };
         // v5.31: Detay modalından manuel doğrulama
         var verifyBtn = modal.querySelector('#u-modal-verify');
@@ -26014,22 +26015,22 @@ async function admProducts(m) {
 
     if (!items.length) {
       // v5.14: Filtre bağlamına özgü empty state
-      var emptyMsg = 'Sonuç bulunamadı.';
+      var emptyMsg = t('admp.no_results','Sonuç bulunamadı.');
       var hint = '';
       if (f.publishStatus === 'awaiting_admin') {
-        emptyMsg = '✅ Onay bekleyen ürün yok';
+        emptyMsg = t('admp.empty_pending_approval','✅ Onay bekleyen ürün yok');
         hint = t('aprod.hint_none_pending','Tüm ürünler onaylanmis veya henuz vendorlardan onay talebi gelmedi.');
       } else if (f.publishStatus === 'awaiting_integrator') {
-        emptyMsg = '🔗 Zincir bekleyen ürün yok';
-        hint = 'Tüm vendor zinciri tamamlandı.';
+        emptyMsg = t('admp.empty_chain','🔗 Zincir bekleyen ürün yok');
+        hint = t('admp.chain_complete','Tüm vendor zinciri tamamlandı.');
       } else if (f.publishStatus === 'ready') {
-        emptyMsg = '📭 Yayında ürün yok';
+        emptyMsg = t('admp.empty_published','📭 Yayında ürün yok');
         hint = t('aprod.hint_none_active','Henüz hiçbir ürün admin tarafından onaylanmadı.');
       } else if (f.status === 'rejected') {
-        emptyMsg = '👍 Reddedilen ürün yok';
+        emptyMsg = t('admp.empty_rejected','👍 Reddedilen ürün yok');
         hint = t('aprod.hint_none_rejected','Tüm ürünler ya bekliyor ya da aktif.');
       } else if (f.status === 'pending') {
-        emptyMsg = '✅ Bekleyen ürün yok';
+        emptyMsg = t('admp.empty_pending','✅ Bekleyen ürün yok');
         hint = t('aprod.hint_all_processed','Tüm ürünler işlenmiş durumda.');
       } else if (f.search || f.category || f.origin || f.vendor || f.dateFrom || f.dateTo) {
         emptyMsg = '🔍 Arama sonucu yok';
@@ -26096,7 +26097,7 @@ async function admProducts(m) {
     // Listener'lar
     tbody.querySelectorAll('.ap-appr').forEach(function(b) {
       b.addEventListener('click', async function() {
-        if (!confirm('"'+b.dataset.pn+'" ürününü onaylamak istiyor musunuz?')) return;
+        if (!confirm('"'+b.dataset.pn+'" '+t('admp.approve_confirm','ürününü onaylamak istiyor musunuz?'))) return;
         b.disabled=true; b.textContent=t('aprod.approving','Onaylanıyor...');
         try {
           await updateDoc(doc(db,'products',b.dataset.id), {status:'active', publishStatus:'ready', approvedAt:serverTimestamp()});
@@ -26105,7 +26106,7 @@ async function admProducts(m) {
             await addDoc(collection(db,'notifications'), {
               userId:b.dataset.vid, type:'product_approved',
               title:t('aprod.notif_approved','Ürününüz Onaylandı 🎉'),
-              message:'"'+b.dataset.pn+'" ürününüz incelendi ve PoCHub kataloğunda yayınlandı!',
+              message:'"'+b.dataset.pn+'" '+t('admp.approved_notif','ürününüz incelendi ve PoCHub kataloğunda yayınlandı!'),
               productId:b.dataset.id, productName:b.dataset.pn,
               fromUserId:CUR_USER.uid,
               senderId: CUR_USER.uid,
@@ -26116,7 +26117,7 @@ async function admProducts(m) {
             });
           }
           if (b.dataset.ve) sendEmail(b.dataset.ve, b.dataset.vn, t('aprod.email_approved','Ürününüz Onaylandı — PoCHub'),
-            b.dataset.pn+' ürününüz onaylandı ve PoCHub katalogunda yayınlandı!', '');
+            b.dataset.pn+' '+t('admp.approved_email','ürününüz onaylandı ve PoCHub katalogunda yayınlandı!'), '');
           showToast('✓ Ürün onaylandı!');
           all = all.map(function(p){ return p.id===b.dataset.id ? {...p,status:'active',publishStatus:'ready'} : p; });
           applyFilter();
@@ -26133,8 +26134,8 @@ async function admProducts(m) {
           if (b.dataset.vid) {
             await addDoc(collection(db,'notifications'), {
               userId:b.dataset.vid, type:'product_rejected',
-              title:'Ürün Başvurusu Hakkında',
-              message:'"'+b.dataset.pn+'" ürününüz şu an için onaylanamadı.'+(reason?' Gerekçe: '+reason:''),
+              title:t('admp.review_title','Ürün Başvurusu Hakkında'),
+              message:'"'+b.dataset.pn+'" '+t('admp.rejected_notif','ürününüz şu an için onaylanamadı.')+(reason?' '+t('admp.reason_prefix','Gerekçe:')+' '+reason:''),
               productId:b.dataset.id, productName:b.dataset.pn,
               fromUserId:CUR_USER.uid,
               senderId: CUR_USER.uid,
@@ -26144,8 +26145,8 @@ async function admProducts(m) {
               read:false, createdAt:serverTimestamp(),
             });
           }
-          if (b.dataset.ve) sendEmail(b.dataset.ve, b.dataset.vn, 'Ürün Başvurusu Hakkında — PoCHub',
-            b.dataset.pn+' ürününüz incelendi ancak onaylanamadı.'+(reason?' Gerekçe: '+reason:''), '');
+          if (b.dataset.ve) sendEmail(b.dataset.ve, b.dataset.vn, t('admp.review_email_subject','Ürün Başvurusu Hakkında — PoCHub'),
+            b.dataset.pn+' '+t('admp.rejected_email','ürününüz incelendi ancak onaylanamadı.')+(reason?' '+t('admp.reason_prefix','Gerekçe:')+' '+reason:''), '');
           showToast(t('aprod.toast_rejected','Ürün reddedildi.'));
           all = all.map(function(p){ return p.id===b.dataset.id ? {...p,status:'rejected'} : p; });
           applyFilter();
@@ -26201,7 +26202,7 @@ async function admProducts(m) {
     '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(22,163,74,.12);color:#16a34a">'+t('aprod.sum_active','Aktif: ')+activeCount+'</span>' +
     '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(217,119,6,.12);color:#d97706">'+t('aprod.sum_admin','Admin Onayı: ')+awaitingAdmin+'</span>' +
     '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(168,85,247,.12);color:#a855f7">'+t('aprod.sum_chain','Zincir Bekleniyor: ')+awaitingInt+'</span>' +
-    (trashedAdminProds.length ? '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(220,38,38,.12);color:#dc2626">🗑 Çöp: '+trashedAdminProds.length+'</span>' : '') +
+    (trashedAdminProds.length ? '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(220,38,38,.12);color:#dc2626">'+t('admp.trash','🗑 Çöp:')+' '+trashedAdminProds.length+'</span>' : '') +
     '</div></div>' +
 
     // Arama
@@ -26406,7 +26407,7 @@ async function admEvents(m) {
 
     m.querySelectorAll('.ev-cancel').forEach(function(b){b.addEventListener('click',async function(e){
       e.stopPropagation();
-      if(!confirm('Bu etkinliği iptal etmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) return;
+      if(!confirm(t('ame.cancel_confirm','Bu etkinliği iptal etmek istediğinizden emin misiniz? Bu işlem geri alınamaz.'))) return;
       await updateDoc(doc(db,'public_events',b.dataset.id),{status:'cancelled'});
       showToast(t('vevt.toast_cancelled','Etkinlik iptal edildi.')); admEvents(m);
     });});
@@ -27410,7 +27411,7 @@ async function admRevenue(m) {
           +   '<div class="fs13-fw7">🏢 '+(v.vendorName || t('arev.unknown','Bilinmeyen'))+'</div>'
           +   '<div class="fs11-muted">'
           +     '<span class="tier-badge" style="background:'+color+'15;color:'+color+'">'+tierLabel+'</span>'
-          +     (v.billingMode === 'yearly' ? ' · Yıllık' : '')
+          +     (v.billingMode === 'yearly' ? ' '+t('adsub.yearly_suffix','· Yıllık') : '')
           +   '</div>'
           + '</div>'
           + '<div class="t-rgt">'
@@ -27636,7 +27637,7 @@ async function admVendorSubs(m) {
           else if (rTotalQuota === -1) quotaText = '∞';
           else quotaText = r.pocUsed + '/' + rTotalQuota + (rBonus > 0 ? ' <span style="color:#16a34a;font-size:10px">+'+rBonus+'🎁</span>' : '');
           var dateText = r.endDate ? r.endDate.toLocaleDateString(LDATE()) : '—';
-          var daysText = r.daysLeft !== null ? (r.daysLeft >= 0 ? '('+r.daysLeft+'g)' : '(geçti)') : '';
+          var daysText = r.daysLeft !== null ? (r.daysLeft >= 0 ? '('+r.daysLeft+'g)' : t('vsub.expired_paren','(geçti)')) : '';
 
           var tr = document.createElement('tr');
           tr.style.cssText = 'border-bottom:1px solid rgba(15,23,42,.08);transition:.15s;cursor:default';
@@ -29127,6 +29128,44 @@ const I18N_DICT = {
     'nav.catalog':        'Katalog',
     'nav.leaderboard':    '🏆 Liderler',
     'nav.about':          'Biz Kimiz',
+    'admu.role_manufacturer':'Üretici',
+    'admu.role_distributor':'Distribütör',
+    'admu.role_integrator':'Entegratör',
+    'admu.premium_yes':'⭐ Evet',
+    'admu.premium_no':'Hayır',
+    'admu.unverified':'⏳ Doğrulanmamış',
+    'admu.mail_issue':'(mail problemi olabilir)',
+    'admu.manual_verify':'✓ Manuel Doğrula',
+    'admu.all_fields':'🔍 Tüm Alanlar',
+    'admu.hide_fields':'🔼 Alanları Gizle',
+    'admp.no_results':'Sonuç bulunamadı.',
+    'admp.empty_pending_approval':'✅ Onay bekleyen ürün yok',
+    'admp.empty_chain':'🔗 Zincir bekleyen ürün yok',
+    'admp.chain_complete':'Tüm vendor zinciri tamamlandı.',
+    'admp.empty_published':'📭 Yayında ürün yok',
+    'admp.empty_rejected':'👍 Reddedilen ürün yok',
+    'admp.empty_pending':'✅ Bekleyen ürün yok',
+    'admp.approve_confirm':'ürününü onaylamak istiyor musunuz?',
+    'admp.approved_notif':'ürününüz incelendi ve PoCHub kataloğunda yayınlandı!',
+    'admp.approved_email':'ürününüz onaylandı ve PoCHub katalogunda yayınlandı!',
+    'admp.review_title':'Ürün Başvurusu Hakkında',
+    'admp.rejected_notif':'ürününüz şu an için onaylanamadı.',
+    'admp.reason_prefix':'Gerekçe:',
+    'admp.review_email_subject':'Ürün Başvurusu Hakkında — PoCHub',
+    'admp.rejected_email':'ürününüz incelendi ancak onaylanamadı.',
+    'admp.trash':'🗑 Çöp:',
+    'ame.cancel_confirm':'Bu etkinliği iptal etmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
+    'adsub.yearly_suffix':'· Yıllık',
+    'adpk.reset_confirm':'TÜM paketler silinip default 5 paket geri yüklenecek. Emin misiniz?',
+    'admdr.page_opened':'👁 SAYFA AÇILDI',
+    'ado.customer_label':'👤 Müşteri:',
+    'ado.approved_title':'✅ Acil Onayın Kabul Edildi',
+    'ado.approved_msg':'PoC kabul edildi. ₺',
+    'ado.rejected_msg':'için acil onay reddedildi. Sebep:',
+    'adva.verify_confirm':'Bu vendor "Doğrulanmış" olarak işaretlenecek. Onaylıyor musun?',
+    'adva.approved_title':'✓ Profilin Doğrulandı',
+    'adva.rejected_title':'⚠ Doğrulama Reddedildi',
+
     'pfield.fw_throughput':'Firewall Throughput (Gbps)',
     'pfield.fw_latency':'Firewall Gecikme (µs)',
     'pfield.concurrent_sessions':'Eş Zamanlı Oturum',
@@ -31210,6 +31249,44 @@ const I18N_DICT = {
     'nav.catalog':        'Catalog',
     'nav.leaderboard':    '🏆 Leaders',
     'nav.about':          'Who We Are',
+    'admu.role_manufacturer':'Manufacturer',
+    'admu.role_distributor':'Distributor',
+    'admu.role_integrator':'Integrator',
+    'admu.premium_yes':'⭐ Yes',
+    'admu.premium_no':'No',
+    'admu.unverified':'⏳ Unverified',
+    'admu.mail_issue':'(possible mail issue)',
+    'admu.manual_verify':'✓ Verify Manually',
+    'admu.all_fields':'🔍 All Fields',
+    'admu.hide_fields':'🔼 Hide Fields',
+    'admp.no_results':'No results found.',
+    'admp.empty_pending_approval':'✅ No products awaiting approval',
+    'admp.empty_chain':'🔗 No products awaiting chain',
+    'admp.chain_complete':'All vendor chains are complete.',
+    'admp.empty_published':'📭 No published products',
+    'admp.empty_rejected':'👍 No rejected products',
+    'admp.empty_pending':'✅ No pending products',
+    'admp.approve_confirm':'— do you want to approve this product?',
+    'admp.approved_notif':'your product was reviewed and published in the PoCHub catalog!',
+    'admp.approved_email':'your product was approved and published in the PoCHub catalog!',
+    'admp.review_title':'About Your Product Application',
+    'admp.rejected_notif':'your product could not be approved at this time.',
+    'admp.reason_prefix':'Reason:',
+    'admp.review_email_subject':'About Your Product Application — PoCHub',
+    'admp.rejected_email':'your product was reviewed but could not be approved.',
+    'admp.trash':'🗑 Trash:',
+    'ame.cancel_confirm':'Are you sure you want to cancel this event? This action cannot be undone.',
+    'adsub.yearly_suffix':'· Yearly',
+    'adpk.reset_confirm':'ALL packages will be deleted and the default 5 packages restored. Are you sure?',
+    'admdr.page_opened':'👁 PAGE OPENED',
+    'ado.customer_label':'👤 Customer:',
+    'ado.approved_title':'✅ Your Urgent Approval Was Accepted',
+    'ado.approved_msg':'PoC accepted. ₺',
+    'ado.rejected_msg':'— urgent approval rejected. Reason:',
+    'adva.verify_confirm':'This vendor will be marked as "Verified". Do you confirm?',
+    'adva.approved_title':'✓ Your Profile Was Verified',
+    'adva.rejected_title':'⚠ Verification Rejected',
+
     'pfield.fw_throughput':'Firewall Throughput (Gbps)',
     'pfield.fw_latency':'Firewall Latency (µs)',
     'pfield.concurrent_sessions':'Concurrent Sessions',
@@ -34433,7 +34510,7 @@ async function admPackages(m) {
       btn.disabled=false;
     });
     el('pkg-reseed')?.addEventListener('click', async function(){
-      if (!confirm('TÜM paketler silinip default 5 paket geri yüklenecek. Emin misiniz?')) return;
+      if (!confirm(t('adpk.reset_confirm','TÜM paketler silinip default 5 paket geri yüklenecek. Emin misiniz?'))) return;
       try {
         const allSnap = await getDocs(collection(db,'pochub_packages'));
         for (const d of allSnap.docs) await deleteDoc(d.ref);
@@ -36653,7 +36730,7 @@ async function admDemoRequests(m) {
         if (r.status === 'booked') {
           statusBdg = '<span style="background:rgba(22,163,74,.15);color:#16a34a;padding:3px 10px;border-radius:10px;font-size:10.5px;font-weight:700">✓ RANDEVU ALINDI</span>';
         } else if (r.status === 'page_viewed') {
-          statusBdg = '<span style="background:rgba(37,99,235,.15);color:#2563eb;padding:3px 10px;border-radius:10px;font-size:10.5px;font-weight:700">👁 SAYFA AÇILDI</span>';
+          statusBdg = '<span style="background:rgba(37,99,235,.15);color:#2563eb;padding:3px 10px;border-radius:10px;font-size:10.5px;font-weight:700">'+t('admdr.page_opened','👁 SAYFA AÇILDI')+'</span>';
         } else {
           statusBdg = '<span style="background:var(--bg-elevated);color:var(--text-muted);padding:3px 10px;border-radius:10px;font-size:10.5px;font-weight:700">'+(r.status||'?').toUpperCase()+'</span>';
         }
@@ -36822,7 +36899,7 @@ async function admVendorApprovals(m) {
     // Aksiyon butonları
     m.querySelectorAll('.va-approve').forEach(function(b){
       b.addEventListener('click', async function(){
-        if (!confirm('Bu vendor "Doğrulanmış" olarak işaretlenecek. Onaylıyor musun?')) return;
+        if (!confirm(t('adva.verify_confirm','Bu vendor "Doğrulanmış" olarak işaretlenecek. Onaylıyor musun?'))) return;
         b.disabled = true;
         try {
           await updateDoc(doc(db,'users',b.dataset.uid), {
@@ -36835,7 +36912,7 @@ async function admVendorApprovals(m) {
             await addDoc(collection(db,'notifications'), {
               userId: b.dataset.uid,
               type: 'vendor_verified',
-              title: '✓ Profilin Doğrulandı',
+              title: t('adva.approved_title','✓ Profilin Doğrulandı'),
               message: 'Tebrikler! PoCHub tarafından doğrulandın. Profilin artık "Doğrulanmış ✓" rozetiyle gösterilecek.',
               read: false,
               createdAt: serverTimestamp(),
@@ -36867,7 +36944,7 @@ async function admVendorApprovals(m) {
             await addDoc(collection(db,'notifications'), {
               userId: b.dataset.uid,
               type: 'vendor_rejected',
-              title: '⚠ Doğrulama Reddedildi',
+              title: t('adva.rejected_title','⚠ Doğrulama Reddedildi'),
               message: t('avap.reject_msg_a','Vendor doğrulaman reddedildi. Sebep: ')+(reason||t('avap.unspecified','Belirtilmedi'))+t('avap.reject_msg_b','. Profilini güncelleyip tekrar başvurabilirsin.'),
               read: false,
               createdAt: serverTimestamp(),
@@ -37570,7 +37647,7 @@ async function admOverrides(m) {
           +   '<div class="flx1">'
           +     '<div class="fs13-fw7">'+(o.pocTitle||'PoC')+'</div>'
           +     '<div class="txt-muted-12-mt2">🏢 '+(o.vendorName||'—')+(o.tier?'<span style="background:rgba(37,99,235,.1);color:#2563eb;font-size:10px;padding:1px 6px;border-radius:6px;margin-left:6px">'+(TIER_LABELS[o.tier]||o.tier)+'</span>':'')+'</div>'
-          +     (o.customerName ? '<div class="txt-muted-12-mt2">👤 Müşteri: '+o.customerName+'</div>' : '')
+          +     (o.customerName ? '<div class="txt-muted-12-mt2">'+t('ado.customer_label','👤 Müşteri:')+' '+o.customerName+'</div>' : '')
           +     '<div class="txt-muted-12-mt2">📅 '+dt+(prevCount>0&&o.status!=='approved'?' · <span style="color:#d97706">⚠️ '+t('aov.prev_warn_a',"Bu vendor'ın daha önce ")+prevCount+t('aov.prev_warn_b'," onaylı override'ı var")+'</span>':'')+'</div>'
           +   '</div>'
           +   '<div class="t-rgt">'
@@ -37660,8 +37737,8 @@ async function admOverrides(m) {
               await addDoc(collection(db,'notifications'), {
                 userId: item.vendorId,
                 type: 'admin_override_approved',
-                title: '✅ Acil Onayın Kabul Edildi',
-                message: '"'+(item.pocTitle||'PoC')+'" PoC kabul edildi. ₺' + Number(item.overrideAmount||0).toLocaleString('tr-TR') + ' cari hesabına işlendi.' + (note ? ' Admin notu: '+note : ''),
+                title: t('ado.approved_title','✅ Acil Onayın Kabul Edildi'),
+                message: '"'+(item.pocTitle||'PoC')+'" '+t('ado.approved_msg','PoC kabul edildi. ₺') + Number(item.overrideAmount||0).toLocaleString('tr-TR') + ' cari hesabına işlendi.' + (note ? ' Admin notu: '+note : ''),
                 relatedId: item.pocId || null,
                 read: false,
                 createdAt: serverTimestamp(),
@@ -37710,7 +37787,7 @@ async function admOverrides(m) {
                   userId: item.vendorId,
                   type: 'admin_override_rejected',
                   title: '❌ Acil Onay Reddedildi',
-                  message: '"'+(item.pocTitle||'PoC')+'" için acil onay reddedildi. Sebep: ' + reason,
+                  message: '"'+(item.pocTitle||'PoC')+'" '+t('ado.rejected_msg','için acil onay reddedildi. Sebep:')+' ' + reason,
                   relatedId: item.pocId || null,
                   read: false,
                   createdAt: serverTimestamp(),
@@ -37932,7 +38009,7 @@ async function admCategories(m) {
 
     renderRows(cats);
   } catch(e) {
-    m.innerHTML = '<div class="empty">Yükleme hatası: ' + e.message + '</div>';
+    m.innerHTML = '<div class="empty">'+t('common.load_error','Yükleme hatası: ')+e.message + '</div>';
   }
 }
 
