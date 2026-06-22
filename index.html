@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.44 | pochub.co -->
+<!-- PoCHub v7.46 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.44';
+const VERSION = 'v7.46';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -944,6 +944,8 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.46': ['ANALITIK: Paydas Deger Ozeti. Analitik sekmesine her stakeholder grubuna ozel ROI karti: Uretici/Vendor (onayli urun, teslim PoC, kabul teklif, yakalanan GMV, ulasilan musteri), Musteri (acilan PoC, degerlendirilen urun, baglanilan vendor, eslesme orani), Kanal (distributor+entegrator ortak, kanal envanteri). Hepsi agregat (KVKK), productionStartAt+isTestRecord filtreli. Sunumda her gruba kendi degerini gosterirsin. node+harness HEPSI 0.'],
+  'v7.45': ['ANALITIK: login-bazli aktivite. (1) Aktivite kancasi: giris yapan kullanicinin user dokumanina lastActiveAt + activeMonths (o ayin YYYY-MM) yazilir (6 saatte bir throttle, non-blocking, owner-write zaten izinli - RULES DEGISMEZ). (2) Yeni metrik: Aktif (30g) kart + kayitliya orani. (3) Cohort retention artik login (activeMonths) + olay (PoC/teklif/urun) aktivitesini BIRLIKTE sayar -> daha dogru engagement. node+harness HEPSI 0.'],
   'v7.44': ['ANALITIK derinlestirme: Analitik sekmesine (1) CANLI aylik trend SVG cizgi grafik (musteri/vendor/PoC, son 12 ay) + aylik gelir bar grafigi, (2) Cohort retention izgarasi (kayit ayi x aktivite, M0..M7, isi-haritasi). Kritik: ikisi de SNAPSHOT BEKLEMEZ; mevcut createdAt verisinden geriye donuk yeniden insa edilir (event-sourced oldugu icin gecmis hemen anlamli). Aktivite = o ay PoC/teklif/urun hareketi. Hepsi productionStartAt + isTestRecord filtreli. node+harness HEPSI 0.'],
   'v7.43': ['ANALITIK 2/2: Metrik dashboard + aylik snapshot + kur audit. (1) Yeni admin sekmesi Analitik: buyume (musteri/uretici/distributor/entegrator), gelir (abonelik+Boost, amountTRY), GMV (kabul edilen teklif), PoC funnel (talep->kabul->tamamlanan + donusum %) + eslesme orani, urun arzi. Hepsi productionStartAt + isTestRecord filtreli (test modunda onizleme + banner). (2) metrics_snapshots: uretimde dashboard acilinca o ay icin idempotent snapshot yazilir; Aylik Trend tablosu snapshotlar biriktikce dolar. (3) Kur (USD/EUR) degisikligi de config_history e yaziliyor. NOT: cohort retention + cok-ayli trend grafikleri snapshotlar birikince anlamlanir. RULES: metrics_snapshots icin kural eklenmeli (firestore.rules v1.3). node+harness HEPSI 0.'],
   'v7.42': ['ANALITIK ALTYAPI 1/2: Uretim gate + Degisiklik gecmisi (toplamaya basla temeli). (1) productionStartAt cizgisi: Admin>Ayarlar>Uretim bolumunde TEST MODU / URETIM AKTIF durumu + Uretime Gec butonu (onay + kim/ne zaman loglanir). Tek tarih cizgisi: silme yok, geri alinabilir, tum analitik bu cizgi + isTestRecord ile filtrelenecek. (2) config_history (degismez): paket fiyat duzenlemeleri (price/yearlyPrice/USD/EUR override) ve Boost fiyat degisiklikleri eski->yeni diff olarak yazilir; her kayit phase (test/production) etiketli. (3) Yeni admin sekmesi: Degisiklik Gecmisi (zaman cizelgesi, phase rozeti). NOT: Kur-rate audit + metrik dashboard + aylik snapshot v7.43 te (dashboard veriyi okur, beklemesi sorun degil; gecmis zaten birikir). RULES: config_history icin kural eklenmeli (admin read + append-only). node+harness HEPSI 0.'],
@@ -3541,6 +3543,20 @@ onAuthStateChanged(auth, async user => {
   if (user) {
     const snap = await getDoc(doc(db, 'users', user.uid));
     CUR_PROFILE = snap.exists() ? snap.data() : null;
+    // v7.45: aktivite kancasi (lastActiveAt + activeMonths) - 6 saatte bir, non-blocking
+    if (CUR_PROFILE) {
+      try {
+        var _ym = new Date().toISOString().slice(0,7);
+        var _am = Array.isArray(CUR_PROFILE.activeMonths) ? CUR_PROFILE.activeMonths.slice() : [];
+        var _la = CUR_PROFILE.lastActiveAt;
+        var _laMs = _la ? (_la.toMillis ? _la.toMillis() : (_la.seconds ? _la.seconds*1000 : 0)) : 0;
+        if (_am.indexOf(_ym) < 0 || (Date.now() - _laMs) > 21600000) {
+          if (_am.indexOf(_ym) < 0) _am.push(_ym);
+          CUR_PROFILE.activeMonths = _am;
+          updateDoc(doc(db,'users',user.uid), { lastActiveAt: serverTimestamp(), activeMonths: _am }).catch(function(){});
+        }
+      } catch(_e){}
+    }
 
     // v5.17: KVKK - Hesap silme talebi otomatik iptal (30 gün içinde geri girerse)
     if (CUR_PROFILE?.deletionRequested && CUR_PROFILE?.status === 'deletion_pending') {
@@ -31991,7 +32007,8 @@ const I18N_DICT = {
     'aprod.title':'Üretim / Production','aprod.live':'ÜRETİM AKTİF','aprod.started':'Başlangıç:','aprod.by':'Başlatan:','aprod.live_note':'Analitik ve geçmiş bu tarihten itibaren üretim verisi sayar. Test hesapları (isTestRecord) yine hariç tutulur.','aprod.test_mode':'TEST MODU','aprod.test_note':'Henüz üretime geçilmedi. Toplanan veriler analitik/geçmiş kaydına DAHİL DEĞİL. Geliştirme bitince ve müşteri almaya başlayınca üretime geç.','aprod.go_live':'Üretime Geç (İzlemeyi Başlat)','aprod.go_note':'Bu tarihten itibaren tüm analitik üretim verisi sayar. Gerçek müşteri öncesi yanlışlıkla bastıysan tekrar sıfırlanabilir.','aprod.confirm':'Üretime geçilsin mi? Bu tarihten itibaren analitik/geçmiş ÜRETİM verisi olarak sayılacak.','aprod.log':'Üretim başlatıldı','aprod.done':'🚀 Üretime geçildi. Analitik kaydı başladı.',
     'ahist.title':'Değişiklik Geçmişi','ahist.subtitle':'Paket / Boost fiyat değişiklikleri ve üretim olayları (değiştirilemez kayıt).','ahist.empty':'Henüz kayıtlı değişiklik yok.','ahist.err':'Geçmiş yüklenemedi: ','ahist.prod':'ÜRETİM','ahist.test':'TEST',
     // v7.43 analitik dashboard
-    'atab.analytics':'📊 Analitik','aanl.title':'Platform Analitik','aanl.err':'Analitik yüklenemedi: ','aanl.test_banner':'TEST MODU','aanl.test_note':'Bu rakamlar önizlemedir, üretim kaydına dahil DEĞİL. Ayarlar > Üretime Geç ile başlat.','aanl.prod_banner':'ÜRETİM','aanl.since':'başlangıç:','aanl.scope_note':'test hesapları hariç, bu tarihten itibaren.','aanl.growth':'Büyüme & Gelir','aanl.customers':'Müşteri','aanl.vendors':'Vendor (toplam)','aanl.revenue':'Gelir (TL)','aanl.rev_mix':'Abonelik ','aanl.gmv_note':'kabul edilen teklif değeri','aanl.by_role':'Rol Kırılımı','aanl.ureticid':'Üretici','aanl.distributor':'Distribütör','aanl.integrator':'Entegratör','aanl.funnel':'PoC Funnel & Likidite','aanl.poc_total':'Toplam PoC Talebi','aanl.poc_accepted':'Kabul Edilen','aanl.poc_completed':'Tamamlanan','aanl.conv':'dönüşüm','aanl.match_rate':'Eşleşme Oranı','aanl.match_note':'vendor yanıtı alan','aanl.products':'Toplam Ürün','aanl.products_active':'Aktif/Onaylı Ürün','aanl.trend':'Aylık Trend (snapshot)','aanl.live_trend':'Aylık Trend (canlı, son 12 ay)','aanl.new_per_month':'Aylık Yeni Kayıt / PoC','aanl.vendors_short':'Vendor','aanl.rev_trend':'Aylık Gelir (TL, abonelik+Boost)','aanl.cohort':'Cohort Retention (kayıt ayı × aktivite)','aanl.cohort_month':'Kayıt Ayı','aanl.cohort_note':'M0=kayıt ayı (%100). Aktivite = o ay PoC/teklif/ürün hareketi. Snapshot beklemez, mevcut veriden hesaplanır.',
+    'atab.analytics':'📊 Analitik','aanl.title':'Platform Analitik','aanl.err':'Analitik yüklenemedi: ','aanl.test_banner':'TEST MODU','aanl.test_note':'Bu rakamlar önizlemedir, üretim kaydına dahil DEĞİL. Ayarlar > Üretime Geç ile başlat.','aanl.prod_banner':'ÜRETİM','aanl.since':'başlangıç:','aanl.scope_note':'test hesapları hariç, bu tarihten itibaren.','aanl.growth':'Büyüme & Gelir','aanl.customers':'Müşteri','aanl.vendors':'Vendor (toplam)','aanl.revenue':'Gelir (TL)','aanl.rev_mix':'Abonelik ','aanl.gmv_note':'kabul edilen teklif değeri','aanl.by_role':'Rol Kırılımı','aanl.ureticid':'Üretici','aanl.distributor':'Distribütör','aanl.integrator':'Entegratör','aanl.funnel':'PoC Funnel & Likidite','aanl.poc_total':'Toplam PoC Talebi','aanl.poc_accepted':'Kabul Edilen','aanl.poc_completed':'Tamamlanan','aanl.conv':'dönüşüm','aanl.match_rate':'Eşleşme Oranı','aanl.match_note':'vendor yanıtı alan','aanl.products':'Toplam Ürün','aanl.products_active':'Aktif/Onaylı Ürün','aanl.trend':'Aylık Trend (snapshot)','aanl.live_trend':'Aylık Trend (canlı, son 12 ay)','aanl.new_per_month':'Aylık Yeni Kayıt / PoC','aanl.vendors_short':'Vendor','aanl.rev_trend':'Aylık Gelir (TL, abonelik+Boost)','aanl.cohort':'Cohort Retention (kayıt ayı × aktivite)','aanl.cohort_month':'Kayıt Ayı','aanl.cohort_note':'M0=kayıt ayı (%100). Aktivite = o ay giriş VEYA PoC/teklif/ürün hareketi. Snapshot beklemez, mevcut veriden hesaplanır.','aanl.active30':'Aktif (30g)','aanl.of_total':'kayıtlının',
+    'aanl.stake':'Paydaş Değer Özeti','aanl.st_vendor':'Üretici / Vendor','aanl.st_v_products':'Onaylı ürün','aanl.st_v_poc':'Teslim edilen PoC','aanl.st_v_offers':'Kabul edilen teklif','aanl.st_v_gmv':'Yakalanan değer (GMV)','aanl.st_v_cust':'Ulaşılan müşteri','aanl.st_customer':'Müşteri','aanl.st_c_poc':'Açılan PoC talebi','aanl.st_c_products':'Değerlendirilen ürün','aanl.st_c_vendors':'Bağlanılan vendor','aanl.st_c_match':'Eşleşme oranı','aanl.st_channel':'Kanal (Distribütör + Entegratör)','aanl.st_ch_dist':'Distribütör ortak','aanl.st_ch_integ':'Entegratör ortak','aanl.st_ch_inv':'Kanal envanteri (aktif ürün)',
   },
   en: {
     // Hero / Home
@@ -34789,7 +34806,8 @@ const I18N_DICT = {
     'aprod.title':'Production','aprod.live':'PRODUCTION ACTIVE','aprod.started':'Started:','aprod.by':'By:','aprod.live_note':'Analytics and history count production data from this date. Test accounts (isTestRecord) are still excluded.','aprod.test_mode':'TEST MODE','aprod.test_note':'Not in production yet. Collected data is NOT included in analytics/history. Go live once development is done and you start onboarding customers.','aprod.go_live':'Go Live (Start Tracking)','aprod.go_note':'From this date all analytics count as production data. If pressed by mistake before real customers, it can be reset.','aprod.confirm':'Go to production? From this date analytics/history will count as PRODUCTION data.','aprod.log':'Production started','aprod.done':'🚀 Now in production. Analytics recording started.',
     'ahist.title':'Change History','ahist.subtitle':'Package / Boost price changes and production events (immutable record).','ahist.empty':'No changes recorded yet.','ahist.err':'Could not load history: ','ahist.prod':'PRODUCTION','ahist.test':'TEST',
     // v7.43 analytics dashboard
-    'atab.analytics':'📊 Analytics','aanl.title':'Platform Analytics','aanl.err':'Could not load analytics: ','aanl.test_banner':'TEST MODE','aanl.test_note':'These figures are a preview, NOT included in production records. Start via Settings > Go Live.','aanl.prod_banner':'PRODUCTION','aanl.since':'since:','aanl.scope_note':'excluding test accounts, from this date.','aanl.growth':'Growth & Revenue','aanl.customers':'Customers','aanl.vendors':'Vendors (total)','aanl.revenue':'Revenue (TL)','aanl.rev_mix':'Subscription ','aanl.gmv_note':'accepted offer value','aanl.by_role':'By Role','aanl.ureticid':'Manufacturer','aanl.distributor':'Distributor','aanl.integrator':'Integrator','aanl.funnel':'PoC Funnel & Liquidity','aanl.poc_total':'Total PoC Requests','aanl.poc_accepted':'Accepted','aanl.poc_completed':'Completed','aanl.conv':'conversion','aanl.match_rate':'Match Rate','aanl.match_note':'got vendor response','aanl.products':'Total Products','aanl.products_active':'Active/Approved Products','aanl.trend':'Monthly Trend (snapshot)','aanl.live_trend':'Monthly Trend (live, last 12 months)','aanl.new_per_month':'New Signups / PoC per Month','aanl.vendors_short':'Vendor','aanl.rev_trend':'Monthly Revenue (TL, subscription+Boost)','aanl.cohort':'Cohort Retention (signup month × activity)','aanl.cohort_month':'Signup Month','aanl.cohort_note':'M0=signup month (100%). Activity = PoC/offer/product action that month. No snapshot wait; computed from existing data.',
+    'atab.analytics':'📊 Analytics','aanl.title':'Platform Analytics','aanl.err':'Could not load analytics: ','aanl.test_banner':'TEST MODE','aanl.test_note':'These figures are a preview, NOT included in production records. Start via Settings > Go Live.','aanl.prod_banner':'PRODUCTION','aanl.since':'since:','aanl.scope_note':'excluding test accounts, from this date.','aanl.growth':'Growth & Revenue','aanl.customers':'Customers','aanl.vendors':'Vendors (total)','aanl.revenue':'Revenue (TL)','aanl.rev_mix':'Subscription ','aanl.gmv_note':'accepted offer value','aanl.by_role':'By Role','aanl.ureticid':'Manufacturer','aanl.distributor':'Distributor','aanl.integrator':'Integrator','aanl.funnel':'PoC Funnel & Liquidity','aanl.poc_total':'Total PoC Requests','aanl.poc_accepted':'Accepted','aanl.poc_completed':'Completed','aanl.conv':'conversion','aanl.match_rate':'Match Rate','aanl.match_note':'got vendor response','aanl.products':'Total Products','aanl.products_active':'Active/Approved Products','aanl.trend':'Monthly Trend (snapshot)','aanl.live_trend':'Monthly Trend (live, last 12 months)','aanl.new_per_month':'New Signups / PoC per Month','aanl.vendors_short':'Vendor','aanl.rev_trend':'Monthly Revenue (TL, subscription+Boost)','aanl.cohort':'Cohort Retention (signup month × activity)','aanl.cohort_month':'Signup Month','aanl.cohort_note':'M0=signup month (100%). Activity = login OR PoC/offer/product action that month. No snapshot wait; computed from existing data.','aanl.active30':'Active (30d)','aanl.of_total':'of registered',
+    'aanl.stake':'Stakeholder Value Summary','aanl.st_vendor':'Manufacturer / Vendor','aanl.st_v_products':'Approved products','aanl.st_v_poc':'PoCs delivered','aanl.st_v_offers':'Offers accepted','aanl.st_v_gmv':'Value captured (GMV)','aanl.st_v_cust':'Customers reached','aanl.st_customer':'Customer','aanl.st_c_poc':'PoC requests opened','aanl.st_c_products':'Products evaluated','aanl.st_c_vendors':'Vendors engaged','aanl.st_c_match':'Match rate','aanl.st_channel':'Channel (Distributor + Integrator)','aanl.st_ch_dist':'Distributor partners','aanl.st_ch_integ':'Integrator partners','aanl.st_ch_inv':'Channel inventory (active products)',
   }
 };
 
@@ -35857,6 +35875,9 @@ async function admAnalytics(m) {
   var nDist=U.filter(function(u){return u.role==='vendor'&&u.vendorType==='distributor';}).length;
   var nInt =U.filter(function(u){return u.role==='vendor'&&u.vendorType==='integrator';}).length;
   var nVend=nUret+nDist+nInt;
+  var _nowMs=Date.now();
+  var active30=U.filter(function(u){ var la=u.lastActiveAt; var t=la?(la.toMillis?la.toMillis():(la.seconds?la.seconds*1000:0)):0; return t && (_nowMs-t)<2592000000; }).length;
+  var totUsers=nCust+nVend;
   var prodActive=Pp.filter(function(p){return p.status==='active';}).length;
 
   var pocTotal=Q.length;
@@ -35893,6 +35914,7 @@ async function admAnalytics(m) {
   h+=card(t('aanl.vendors','Vendor (toplam)'), nVend, '#7c3aed', nUret+' uretici \u00b7 '+nDist+' dist \u00b7 '+nInt+' entegr');
   h+=card(t('aanl.revenue','Gelir (TL)'), tl(revTotal), '#16a34a', t('aanl.rev_mix','Abonelik ')+tl(revSub)+' + Boost '+tl(revBoost));
   h+=card('GMV', tl(gmv), '#0891b2', t('aanl.gmv_note','kabul edilen teklif degeri'));
+  h+=card(t('aanl.active30','Aktif (30g)'), active30, '#0d9488', '%'+(totUsers?Math.round(active30/totUsers*100):0)+' '+t('aanl.of_total','kayitlinin'));
   h+='</div>';
 
   // Rol kirilimi bar
@@ -35971,6 +35993,8 @@ async function admAnalytics(m) {
   Q.forEach(function(p){ addAct(p.customerId,p.createdAt); addAct(p.vendorId,p.createdAt); });
   O.forEach(function(o){ addAct(o.vendorId,o.createdAt); });
   Pp.forEach(function(p){ addAct(p.vendorId,p.createdAt); });
+  // v7.45: login-bazli aktivite (activeMonths) de cohort'a dahil
+  U.forEach(function(u){ var uid=u.__id||u.uid; if(uid && Array.isArray(u.activeMonths)){ u.activeMonths.forEach(function(mm){ (actMap[uid]=actMap[uid]||{})[mm]=1; }); } });
   var addMonths=function(ym,k){ var pp=ym.split('-'); var d=new Date(parseInt(pp[0]),parseInt(pp[1])-1+k,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
   var cohMonths=months.slice(-8);
   var lastM=months[months.length-1];
@@ -35993,6 +36017,39 @@ async function admAnalytics(m) {
     h+='</tr>';
   });
   h+='</table><div style="font-size:10.5px;color:var(--text-muted);margin-top:6px">'+t('aanl.cohort_note','M0=kayıt ayı (%100). Aktivite = o ay PoC/teklif/ürün hareketi. Snapshot beklemez, mevcut veriden hesaplanır.')+'</div></div>';
+
+  // ── v7.46: Paydas deger ozeti (agregat, KVKK-guvenli) ──
+  var uniqN=function(arr){ var o={},n=0; arr.forEach(function(x){ if(x&&!o[x]){o[x]=1;n++;} }); return n; };
+  var vAccOffers=O.filter(function(o){return o.status==='accepted';}).length;
+  var vCustomers=uniqN(Q.filter(function(p){return p.vendorId;}).map(function(p){return p.customerId;}));
+  var cProducts=uniqN(Q.map(function(p){return p.productId;}));
+  var cVendors=uniqN(Q.filter(function(p){return p.vendorId;}).map(function(p){return p.vendorId;}));
+  var stCard=function(icon,title,color,rows){
+    var inner=rows.map(function(r){ return '<div class="flx-bw-c" style="font-size:12px;padding:3px 0"><span style="color:var(--text-muted)">'+r[0]+'</span><strong>'+r[1]+'</strong></div>'; }).join('');
+    return '<div style="background:var(--bg-surface);border:1px solid var(--border);border-top:3px solid '+color+';border-radius:12px;padding:12px 14px;flex:1;min-width:230px">'
+      + '<div style="font-weight:700;font-size:13px;margin-bottom:6px">'+icon+' '+title+'</div>'+inner+'</div>';
+  };
+  h+='<div style="font-size:13px;font-weight:700;margin:6px 0 8px;color:var(--text-muted)">📋 '+t('aanl.stake','Paydas Deger Ozeti')+'</div>';
+  h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">';
+  h+=stCard('🏭', t('aanl.st_vendor','Uretici / Vendor'), '#7c3aed', [
+    [t('aanl.st_v_products','Onayli urun'), prodActive],
+    [t('aanl.st_v_poc','Teslim edilen PoC'), pocComp],
+    [t('aanl.st_v_offers','Kabul edilen teklif'), vAccOffers],
+    [t('aanl.st_v_gmv','Yakalanan deger (GMV)'), tl(gmv)],
+    [t('aanl.st_v_cust','Ulasilan musteri'), vCustomers]
+  ]);
+  h+=stCard('🛒', t('aanl.st_customer','Musteri'), '#2563eb', [
+    [t('aanl.st_c_poc','Acilan PoC talebi'), pocTotal],
+    [t('aanl.st_c_products','Degerlendirilen urun'), cProducts],
+    [t('aanl.st_c_vendors','Baglanilan vendor'), cVendors],
+    [t('aanl.st_c_match','Eslesme orani'), '%'+matchRate]
+  ]);
+  h+=stCard('🔗', t('aanl.st_channel','Kanal (Distributor + Entegrator)'), '#ea580c', [
+    [t('aanl.st_ch_dist','Distributor ortak'), nDist],
+    [t('aanl.st_ch_integ','Entegrator ortak'), nInt],
+    [t('aanl.st_ch_inv','Kanal envanteri (aktif urun)'), prodActive]
+  ]);
+  h+='</div>';
 
   h+='</div>';
   m.innerHTML=h;
