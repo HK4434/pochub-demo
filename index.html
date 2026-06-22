@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.38 | pochub.co -->
+<!-- PoCHub v7.41 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.38';
+const VERSION = 'v7.41';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -768,13 +768,14 @@ async function hasActiveDependencies(collectionName, itemId) {
     if (!fieldName) return { ok: false, reason: '' };
 
     // Aktif PoC kontrolü
+    // v7.39: vendorId ile sorgula (kurallar list icin sahiplik ister), fieldName client-side filtrele
     var pocSnap = await getDocs(query(
       collection(db,'poc_requests'),
-      where(fieldName,'==',itemId)
+      where('vendorId','==',CUR_USER.uid)
     ));
     var activePocs = pocSnap.docs.filter(function(d){
-      var st = d.data().status;
-      return st === 'active' || st === 'pending';
+      var dt = d.data();
+      return dt[fieldName] === itemId && (dt.status === 'active' || dt.status === 'pending');
     });
     if (activePocs.length > 0) {
       return { ok: false, reason: activePocs.length + ' aktif/bekleyen PoC bağlı' };
@@ -784,11 +785,11 @@ async function hasActiveDependencies(collectionName, itemId) {
     if (collectionName === 'products') {
       var offSnap = await getDocs(query(
         collection(db,'offers'),
-        where('productId','==',itemId)
+        where('vendorId','==',CUR_USER.uid)
       ));
       var activeOffers = offSnap.docs.filter(function(d){
-        var st = d.data().status;
-        return st === 'pending' || st === 'revised';
+        var dt = d.data();
+        return dt.productId === itemId && (dt.status === 'pending' || dt.status === 'revised');
       });
       if (activeOffers.length > 0) {
         return { ok: false, reason: activeOffers.length + ' bekleyen teklif bağlı' };
@@ -943,6 +944,9 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.41': ['PARA BIRIMI Asama 2/2 (cevrim devrede). Tum fiyat/tutar noktalari vendor in billingCurrency sine cevriliyor; cevrim TEK merkezde (pkgPrice/boostPrice -> tlToCur; override varsa elle fiyat, yoksa kur). EKLENEN: (1) helperlar pkgPrice/boostPrice/fmtPkg/fmtTL. (2) Paket satin alma modali (oz et + Ode butonu) + abonelik sayfasi mevcut paket fiyati + paket browser kartlari (+yillik aylik-esdeger) artik user para biriminde. (3) Boost modali plan+tutar user para biriminde. (4) subscription_history + featured_purchases artik secilen currency + amountTRY (TL taban, raporlama) yaziyor. (5) Makbuz PDF secilen para biriminde (TL/USD/EUR). (6) Admin paket editorunde pakete ozel Aylik/Yillik USD+EUR override alanlari (bos = kurdan otomatik = sifirla). NOT: Boost su an kur-cevrimi kullanir (boost override altyapisi hazir, admin UI sonraki surumde). Emoji escape leri gercek emojiye temizlendi. node+harness HEPSI 0.'],
+  'v7.40': ['PARA BIRIMI Asama 1/2 (altyapi, odeme akisina dokunmaz). Kur tabanli + elle override modeli onaylandi. EKLENENLER: (1) kur helperlari curSym/userBillingCcy/curRates/tlToCur/fmtCur (Asama 2 buy/boost/makbuz kullanacak). (2) Admin > Ayarlar > Para Birimi / Kur bolumu: USD kuru + EUR kuru (admin-yonetimli; 0=kapali). (3) Kayit (uretici) formunda Faturalandirma Para Birimi secimi -> users.billingCurrency. (4) Account/Profil sayfasinda para birimi secici (sonradan degistirilebilir). NOT: buy/boost/makbuz HALA TL gosterir (degismedi, sifir risk); Asama 2 bunlari kullanici para birimine cevirecek + pakete ozel USD/EUR override alanlari + secilen para biriminin subscription_history/featured_purchases/makbuza yazilmasi. node+harness HEPSI 0.'],
+  'v7.39': ['IZIN+UI duzeltmeleri (3 bug). [A] Etkinlik/urun SILME izin hatasi (Bagintı kontrolu hatasi: Missing or insufficient permissions): hasActiveDependencies poc_requests/offers koleksiyonlarini sadece eventId/productId ile sorguluyordu; kurallar list icin sahiplik (vendorId==uid) istedigi icin Firestore tum sorguyu reddediyordu. Artik vendorId ile sorgulayip fieldName client-side filtreleniyor (composite index de gerekmez). [C] Davetlerim New Invite butonu calismiyordu + liste bos goruluyordu: kart render dongusunde bir invite exception verince render() buton-bind satirindan ONCE patliyordu. Buton artik header sonrasi ERKEN baglaniyor + her kart try/catch ile sarildi (bir bozuk kayit tum listeyi+butonu dusurmez, hata console a yazilir). [D] Manuel havale talimatlari (PoC borc odeme + paket alma modallari) sirket adi/IBAN i HARDCODE ediyordu; artik admin config (companyInfo.name/iban) okunuyor. NOT: Makbuz PDF zaten config ten okuyordu; Admin > Ayarlar > PoCHub Sirket Bilgileri bolumunden duzenlenebilir. node+harness HEPSI 0.'],
   'v7.38': ['i18n HOTFIX 2 (8 yeni ekran goruntusu, v7.37 kalintilari) — (IMG1) Fatura Bilgilerim modali: makbuz banneri + adres placeholder + Vergi/TC Numarasi etiketi (ii.banner/ii.address_ph/ii.taxno). (IMG3) Vendor PoC Talepleri: ozet satiri (toplam/bekleyen/aktif -> cust.sum_* reuse), EN HIZLI YANITLANAN PoC basligi (vreq.fastest_poc), Bu Hafta cipi (vcal.this_week reuse). (IMG4) Teklif Gonder: KDV -> off.vat (modal + teklif detay; PDF makbuz bilincli TR). (IMG5) Urun Ekle: sektor pill-leri locale-aware (sectorLabel helper, prof.sec_* reuse, admin-custom sektor fallback) + Yerli/Yabanci radio (cat.tag_domestic/foreign reuse). (IMG6) Boost modali: /hafta) ve /ay) son ekleri (vad.week_suffix/month_suffix). (IMG7) Kanit Paneli modali: baslik + bos-durum baslik/aciklama + buton tooltip (ve.panel_title/empty_title/empty_desc). (IMG6/7/8) Urunlerim/Tekliflerim cipleri: Aksiyon Gerekenler + Hareketsiz (vpm.f_action/f_idle). 11 yeni anahtar. NOT: sektor taksonomisi admin-yonetimli; built-in 12 sektor prof.sec_* ile cevrilir, admin-ozel sektorler kendi etiketinde kalir (hardcode YOK). node+harness+missing-EN HEPSI 0. RULES degismedi.'],
   'v7.37': ['i18n HOTFIX (8 ekran goruntusu — RAW-KOD render bug + chrome sizintilari) — KRITIK 2 ham-kod leak: (A) vendor sidebar v-add-product/v-add-event butonlari backtick template-literal icinde +t()+ ile sarilmis -> ham kod gorunuyordu, ${t()} ile duzeltildi. (B) dashboard Lead Conversion segment basliklari (vd.sector_dist/company_size) tek-tirnak string icinde escape-li t() -> ham kod; escape kaldirildi + 2 yeni anahtar. Kategori dropdownu (urun-ekle + admin-urun-edit) ham ct.name yerine catLabel(ct) -> EN modunda name_en. Subscription: features/name -> pkgFeats()/pkgName() getterlari (EN icerik Firestore admin-yonetimli, hardcode YOK), /ay (2x), Davet metresi, Fatura Bilgilerim (buton+modal), Bitis:, paket/davet-bonusu chrome (3x). Etkinlik modali (openNewEventModal/openEditEventModal): aciklama+urun-ara placeholder, Saat/Kapasite. Takvim Bu Ay stat. Distributor (opsiyonel). Vendor quick-action Mesajlar (tab.messages reuse). Invite banner Davet Et butonu. ~17 yeni anahtar (vd/vsub/van/vev/vcal/ape/vdash). NOT: kategori EN-etiketleri ve paket EN-feature-lari Firestore datasi -> admin > Tumunu Ingilizceye Cevir gerekir. node+harness OK, self-wrap/leak/cift-sarma/chr/missing-EN HEPSI 0. RULES degismedi.'],
   'v7.36': ['i18n FAZ 73 (KESIN-UI SUPURMESI — toast/confirm/alert/textContent/title hedefli) — definite-UI desen taramasi (showToast/alert/confirm/prompt/.textContent/title:/label:/placeholder) ile ~140 string + ~165 anahtar. tst.* (toastlar: kopya/dogrulama/odeme/kart/silme/vendor-islem/kaydetme hatalari), ntf.* (bildirim basliklari: abonelik grace/bitti/yenilendi/uzatildi, odeme, reklam, demo-randevu, urun-basvuru), btxt.* (buton durumlari: Gonderiliyor/Gonderildi/Hazirlaniyor/Onaylaniyor/Dogrulaniyor/SMS-Kodu-Gonder/Indir/Kaldir/Sil/Kaydet-Yayinla). vendorType rol etiketleri (2 bare ternary) mevcut vtype.* anahtarlariyla saridi. NOT: 9 dict self-wrap (ayni TR metin hem kod hem dict degeri — global replace sizintisi) + 3 Hazard#3 (welcome-wizard step dizisi modul-seviyesi title t() init-TDZ) harness ile yakalandi+geri alindi. BILINCLI TR: pfield.* spec etiketleri (render-time), sektor/facet data, ABOUT_DEFAULT, FAQ baslik seed, legal sayfa basliklari, iyzico. node+harness+missing-EN HEPSI 0. RULES degismedi.'],
@@ -4652,6 +4656,13 @@ function renderAuthForm() {
           </label>
         </div>
 
+        <label class="lbl">${t('auth.currency_label','Faturaland\u0131rma Para Birimi')} <span class="t-red">*</span></label>
+        <select class="inp mb10" id="a-currency">
+          <option value="TRY">${t('auth.ccy_try','\u20ba TRY (T\u00fcrk Liras\u0131)')}</option>
+          <option value="USD">${t('auth.ccy_usd','$ USD')}</option>
+          <option value="EUR">${t('auth.ccy_eur','\u20ac EUR')}</option>
+        </select>
+
         <div id="a-foreign-section" style="display:none">
           <label class="lbl">Menşei Ülke <span class="t-red">*</span></label>
           <input class="inp mb10" id="a-country" placeholder="örn: ABD, Almanya, İsrail...">
@@ -4980,6 +4991,7 @@ async function handleAuth() {
         website, origin, country, categories, specializations, regions, brands, refs,
         distributors, integrators,
         role: AUTH_ROLE, vendorType: AUTH_VTYPE,
+        billingCurrency: (document.getElementById('a-currency')?.value || 'TRY'),
         emailVerified: false,
         subscriptionTier: AUTH_ROLE === 'vendor' ? 'free' : null,
         hasActiveSubscription: AUTH_ROLE === 'vendor' ? true : false,
@@ -17064,6 +17076,8 @@ async function vendInvites(m) {
       + '</div>'
       + '<button class="btn-p btn-sm" id="vend-new-invite-btn">'+t('vinv.new_invite','+ Yeni Davet')+'</button>';
     m.appendChild(hdr);
+    // v7.39: butonu ERKEN bagla (asagidaki liste render'i hata verse bile buton calissin)
+    m.querySelector('#vend-new-invite-btn')?.addEventListener('click', function(){ openSendInviteModal(); });
 
     // İstatistik kartları (sadece active sekmesinde)
     if (filterLifecycle === 'active') {
@@ -17166,6 +17180,7 @@ async function vendInvites(m) {
       listWrap.style.cssText = 'display:flex;flex-direction:column;gap:10px';
 
       filtered.forEach(function(inv){
+       try {
         var lcState = getLifecycleState(inv);
         var stColor = statusColors[inv.status] || '#64748b';
         var stLabel = statusLabels[inv.status] || inv.status;
@@ -17248,13 +17263,13 @@ async function vendInvites(m) {
 
         card.innerHTML = topRow + prodRow + scopeRow + metaRow + actHtml;
         listWrap.appendChild(card);
+       } catch(cardErr) { console.error('invite card render failed', inv && inv.id, cardErr); }
       });
 
       m.appendChild(listWrap);
     }
 
     // ── EVENT LISTENERLAR ────────────────────────────────────────
-    m.querySelector('#vend-new-invite-btn')?.addEventListener('click', function(){ openSendInviteModal(); });
 
     var refresh = function(){ vendInvites(m); };
 
@@ -18582,6 +18597,13 @@ async function renderUserProfile(m, role) {
       +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">'+t('prof.logo_hint','Profil fotoğrafı yüklediyseniz boş bırakın')+'</div>'
       +   '</div>'
       +   '<div>'
+      +     '<label class="lbl">'+t('prof.billing_currency','💱 Faturalandırma Para Birimi')+'</label>'
+      +     '<select id="pf-currency" class="inp">'
+      +       ['TRY','USD','EUR'].map(function(c){ return '<option value="'+c+'"'+((p.billingCurrency||'TRY')===c?' selected':'')+'>'+(c==='TRY'?'\u20ba TRY':c==='USD'?'$ USD':'\u20ac EUR')+'</option>'; }).join('')
+      +     '</select>'
+      +     '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">'+t('prof.billing_currency_hint','Paket ve Boost ödemelerinde kullanılır')+'</div>'
+      +   '</div>'
+      +   '<div>'
       +     '<label class="lbl">'+t('prof.employee_count','Çalışan Sayısı')+'</label>'
       +     '<select id="pf-emp-count" class="inp">'
       +       '<option value=""'+(!p.employeeCount?' selected':'')+'>'+t('prof.select','Seçiniz')+'</option>'
@@ -19077,6 +19099,7 @@ async function renderUserProfile(m, role) {
 
       if (role === 'vendor') {
         updates.logoUrl = el('pf-logo')?.value.trim() || '';
+        updates.billingCurrency = el('pf-currency')?.value || 'TRY';
         updates.shortDescription = el('pf-short-desc')?.value.trim() || '';
         updates.bio = el('pf-bio')?.value.trim() || '';
         // v5.14: Vendor ek alanlar
@@ -21159,8 +21182,8 @@ function openBillingPaymentModal(chargeIds, amount, mode) {
     + '</div>'
     + '<div style="background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
     +   '<div style="font-weight:700;color:#d97706;margin-bottom:6px">'+t('pay.transfer_info','🏦 Havale Bilgileri')+'</div>'
-    +   '<strong>'+t('pay.bank_holder','Hesap Sahibi:')+'</strong> PoCHub Teknoloji A.Ş.<br>'
-    +   '<strong>'+t('pay.bank_iban','IBAN:')+'</strong> TR00 0000 0000 0000 0000 0000 00<br>'
+    +   '<strong>'+t('pay.bank_holder','Hesap Sahibi:')+'</strong> '+escHtml(cfg.companyInfo?.name||'PoCHub Teknoloji A.Ş.')+'<br>'
+    +   '<strong>'+t('pay.bank_iban','IBAN:')+'</strong> '+escHtml(cfg.companyInfo?.iban||'-')+'<br>'
     +   '<strong>'+t('pay.bank_desc','Açıklama:')+'</strong> '+CUR_USER.uid.substring(0,8)+' / borc'
     +   '<div style="margin-top:6px;font-size:11px;color:var(--text-muted)">'+t('pay.transfer_note','Havale yaptıktan sonra "Ödeme Talebimi Gönder" tıkla. Admin onayından sonra borçlar kapanır.')+'</div>'
     + '</div>'
@@ -21901,7 +21924,7 @@ async function vendSubscription(m) {
         + (subscription.status === 'grace_period' ? '<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">⚠️ Grace Period</div>' : '')
         + '</div>'
         + '<div class="t-rgt">'
-        + '<div style="font-size:24px;font-weight:800;color:'+color+'">₺'+(currentPkg.price||0).toLocaleString('tr-TR')+'</div>'
+        + '<div style="font-size:24px;font-weight:800;color:'+color+'">'+fmtPkg(currentPkg,'monthly',cfg)+'</div>'
         + '<div class="fs11-muted">'+t('vsub.per_month','/ay')+'</div>'
         + (endDate ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:4px">'+t('vsub.ends','Bitiş:')+' '+endDate.toLocaleDateString(LDATE())+(daysLeft>=0?' ('+daysLeft+' '+t('common.days','gün')+')':' '+t('vsub.expired_paren','(geçti)'))+'</div>' : '')
         + '</div>'
@@ -22101,8 +22124,8 @@ function openPackageBrowser(allPackages, cfg, currentSub, highlightPkgId) {
         + (isCurrent ? '<div style="position:absolute;top:-10px;right:8px;background:'+color+';color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px">'+t('vpkg.current_badge','MEVCUT')+'</div>' : '')
         + '<div style="font-size:11px;color:'+color+';font-weight:700;text-transform:uppercase;letter-spacing:1px">'+p.tier+'</div>'
         + '<div style="font-size:18px;font-weight:800">'+pkgName(p)+'</div>'
-        + '<div><span style="font-size:24px;font-weight:800;color:'+color+'">'+(displayPrice>0?'₺'+displayPrice.toLocaleString('tr-TR'):t('vpkg.free','Ücretsiz'))+'</span><span class="fs11-muted"> '+(displayPrice>0?perLabel:'')+'</span></div>'
-        + (monthlyEq ? '<div style="font-size:10.5px;color:'+color+';font-weight:600">≈ ₺'+monthlyEq.toLocaleString('tr-TR')+t('vpkg.per_month','/ay')+'</div>' : '')
+        + '<div><span style="font-size:24px;font-weight:800;color:'+color+'">'+(displayPrice>0?fmtPkg(p, billingMode==='yearly'?'yearly':'monthly', cfg):t('vpkg.free','Ücretsiz'))+'</span><span class="fs11-muted"> '+(displayPrice>0?perLabel:'')+'</span></div>'
+        + (monthlyEq ? '<div style="font-size:10.5px;color:'+color+';font-weight:600">≈ '+fmtTL(monthlyEq, cfg)+t('vpkg.per_month','/ay')+'</div>' : '')
         + '<div style="font-size:11px;color:var(--text-muted);padding:8px 0;border-top:1px solid var(--border)">'
         +   '<div><strong>'+(p.pocQuota===-1?t('vsub.unlimited','Sınırsız'):p.pocQuota)+'</strong>'+t('vsub.poc_per_month',' PoC/ay')+'</div>'
         +   '<div><strong>'+(p.productLimit===-1?'∞':p.productLimit)+'</strong> '+t('pay.product_suffix','ürün')+'</div>'
@@ -22163,7 +22186,8 @@ function openPackageBrowser(allPackages, cfg, currentSub, highlightPkgId) {
 // ÖDEME TALEP MODAL (manuel havale)
 // ════════════════════════════════════════════════════════════════════
 async function openPaymentRequestModal(pkg, billingMode, cfg) {
-  var amount = billingMode === 'yearly' && pkg.yearlyPrice ? pkg.yearlyPrice : pkg.price;
+  var _pp = pkgPrice(pkg, billingMode==='yearly'?'yearly':'monthly', userBillingCcy(), cfg);
+  var amount = _pp.amount; var payCcy = _pp.ccy; var amountTRY = _pp.amountTRY;
   var label = billingMode === 'yearly' ? t('vpkg.yearly','Yıllık') : t('vpkg.monthly','Aylık');
   var period = billingMode === 'yearly' ? 365 : (pkg.duration || 30);
 
@@ -22191,7 +22215,7 @@ async function openPaymentRequestModal(pkg, billingMode, cfg) {
       + '<div style="background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:12px 14px;margin-bottom:14px">'
       +   '<div style="font-size:11px;color:#16a34a;font-weight:700;text-transform:uppercase;letter-spacing:1px">'+t('pay.order_summary','Sipariş Özeti')+'</div>'
       +   '<div style="font-size:14px;font-weight:700;margin-top:4px">'+pkgName(pkg)+' · '+label+'</div>'
-      +   '<div class="flx-bw-c" style="margin-top:8px;font-size:13px"><span>'+t('pay.amount','Tutar')+'</span><strong>₺'+amount.toLocaleString('tr-TR')+'</strong></div>'
+      +   '<div class="flx-bw-c" style="margin-top:8px;font-size:13px"><span>'+t('pay.amount','Tutar')+'</span><strong>'+fmtCur(amount,payCcy)+'</strong></div>'
       +   '<div class="flx-bw-c" style="font-size:11.5px;color:var(--text-muted);margin-top:4px"><span>'+t('pay.duration','Süre')+'</span><span>'+period+t('pay.days_suffix',' gün')+'</span></div>'
       + '</div>'
       + '<div class="mb14">'
@@ -22215,7 +22239,7 @@ async function openPaymentRequestModal(pkg, billingMode, cfg) {
       + (selectedMethod === 'manual' ? (
         '<div style="background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
         +   '<div style="font-weight:700;color:#d97706;margin-bottom:6px">'+t('pay.transfer_info','🏦 Havale Bilgileri')+'</div>'
-        +   '<div style="line-height:1.7"><strong>'+t('pay.bank_holder','Hesap Sahibi:')+'</strong> PoCHub Teknoloji A.Ş.<br><strong>'+t('pay.bank_iban','IBAN:')+'</strong> TR00 0000 0000 0000 0000 0000 00<br><strong>'+t('pay.bank_desc','Açıklama:')+'</strong> '+CUR_USER.uid.substring(0,8)+' / '+pkg.tier+'</div>'
+        +   '<div style="line-height:1.7"><strong>'+t('pay.bank_holder','Hesap Sahibi:')+'</strong> '+escHtml(cfg.companyInfo?.name||'PoCHub Teknoloji A.Ş.')+'<br><strong>'+t('pay.bank_iban','IBAN:')+'</strong> '+escHtml(cfg.companyInfo?.iban||'-')+'<br><strong>'+t('pay.bank_desc','Açıklama:')+'</strong> '+CUR_USER.uid.substring(0,8)+' / '+pkg.tier+'</div>'
         +   '<div style="margin-top:6px;font-size:11px;color:var(--text-muted)">'+t('pay.transfer_note','Havale sonrası "Talep Oluştur" tıkla. Admin 24 saat içinde onaylar.')+'</div>'
         + '</div>'
       ) : '')
@@ -22224,7 +22248,7 @@ async function openPaymentRequestModal(pkg, billingMode, cfg) {
         ? '<div style="background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px"><label class="flx-bw-c" style="cursor:pointer;font-size:12.5px"><span><strong>🔄 Otomatik Yenileme</strong><div class="txt-muted-12-mt2">'+period+' '+t('pay.auto_renew','gün sonra otomatik yenilenir, kart üzerinden tahsilat yapılır')+'</div></span><input type="checkbox" id="pr-autorenew" checked style="width:18px;height:18px;cursor:pointer"></label></div>'
         : '')
       + '<div class="flx-g8">'
-      +   '<button class="btn-p flx1" id="pr-submit">'+(selectedMethod==='manual'?t('pay.create_request','📝 Ödeme Talebi Oluştur'):'💳 ₺'+amount.toLocaleString('tr-TR')+' Öde')+'</button>'
+      +   '<button class="btn-p flx1" id="pr-submit">'+(selectedMethod==='manual'?t('pay.create_request','📝 Ödeme Talebi Oluştur'):'💳 '+fmtCur(amount,payCcy)+' '+t('pay.pay_btn','Öde'))+'</button>'
       +   '<button class="btn-g" id="pr-cancel">'+t('common.cancel','Vazgeç')+'</button>'
       + '</div>'
       + '</div>';
@@ -22251,7 +22275,8 @@ async function openPaymentRequestModal(pkg, billingMode, cfg) {
             fromPackageId: null,
             toPackageId: pkg.id,
             amount: amount,
-            currency: 'TRY',
+            currency: payCcy,
+            amountTRY: amountTRY,
             billingMode: billingMode,
             durationDays: period,
             paymentMethod: 'bank_transfer',
@@ -22432,7 +22457,8 @@ async function processIyzicoPayment(pkg, billingMode, amount, period, paymentMet
           fromPackageId: null,
           toPackageId: pkg.id,
           amount: amount,
-          currency: 'TRY',
+          currency: payCcy,
+          amountTRY: amountTRY,
           billingMode: billingMode,
           durationDays: period,
           paymentMethod: 'credit_card',
@@ -28338,6 +28364,7 @@ async function generateReceiptPDF(historyItem, vendorInfo) {
 
     var vatRate = company.vatRate || 20;
     var totalAmount = historyItem.amount || 0;
+    var curLbl = (historyItem.currency && historyItem.currency !== 'TRY') ? historyItem.currency : 'TL';
     var subtotal = Math.round(totalAmount / (1 + vatRate/100) * 100) / 100;
     var vatAmount = Math.round((totalAmount - subtotal) * 100) / 100;
 
@@ -28444,7 +28471,7 @@ async function generateReceiptPDF(historyItem, vendorInfo) {
     pdf.text((historyItem.durationDays || 30) + ' gun', 110, rY);
     var methodLabels = { credit_card:'Kredi Karti', bank_transfer:'Havale', free:'Ucretsiz', admin_gift:'Admin Hediye' };
     pdf.text(_sanitizeForPdf(methodLabels[historyItem.paymentMethod] || historyItem.paymentMethod || '-'), 130, rY);
-    pdf.text((totalAmount > 0 ? subtotal.toFixed(2) + ' TL' : 'Ucretsiz'), 193, rY, { align: 'right' });
+    pdf.text((totalAmount > 0 ? subtotal.toFixed(2) + ' '+curLbl : 'Ucretsiz'), 193, rY, { align: 'right' });
 
     pdf.setDrawColor(230, 230, 230);
     pdf.line(15, rY + 5, 195, rY + 5);
@@ -28457,11 +28484,11 @@ async function generateReceiptPDF(historyItem, vendorInfo) {
 
     if (totalAmount > 0) {
       pdf.text('Ara Toplam:', 145, sY);
-      pdf.text(subtotal.toFixed(2) + ' TL', 193, sY, { align: 'right' });
+      pdf.text(subtotal.toFixed(2) + ' '+curLbl, 193, sY, { align: 'right' });
       sY += 6;
 
       pdf.text('KDV (%' + vatRate + '):', 145, sY);
-      pdf.text(vatAmount.toFixed(2) + ' TL', 193, sY, { align: 'right' });
+      pdf.text(vatAmount.toFixed(2) + ' '+curLbl, 193, sY, { align: 'right' });
       sY += 8;
 
       pdf.setFillColor(34, 208, 120, 0.1);
@@ -28471,7 +28498,7 @@ async function generateReceiptPDF(historyItem, vendorInfo) {
       pdf.setFontSize(11);
       pdf.setTextColor(34, 100, 70);
       pdf.text('TOPLAM:', 145, sY + 3);
-      pdf.text(totalAmount.toFixed(2) + ' TL', 193, sY + 3, { align: 'right' });
+      pdf.text(totalAmount.toFixed(2) + ' '+curLbl, 193, sY + 3, { align: 'right' });
     } else {
       pdf.setFont('helvetica','bold');
       pdf.setFontSize(11);
@@ -28781,6 +28808,42 @@ function renderCustomerBadge(customerData, size) {
 
 // limit fonksiyonu Firebase'den import edilmiş mi kontrol et — eğer yoksa workaround
 // (zaten import edilmiştir, ama emin olalım)
+
+// v7.40: Para birimi yardimcilari (Asama 1 altyapi; Asama 2 buy/boost/makbuz kullanacak)
+function curSym(ccy){ return ccy==='USD'?'$':ccy==='EUR'?'\u20ac':'\u20ba'; }
+function userBillingCcy(){ return (typeof CUR_PROFILE!=='undefined' && CUR_PROFILE && CUR_PROFILE.billingCurrency) || 'TRY'; }
+function curRates(cfg){ var r=(cfg&&cfg.currencyRates)||{}; return { USD: Number(r.usd)||0, EUR: Number(r.eur)||0 }; }
+// TL tutarini hedef para birimine cevirir; override (elle fiyat) varsa onu kullanir; kur yoksa TL'ye duser.
+function tlToCur(tlAmount, ccy, cfg, override){
+  if(!ccy || ccy==='TRY') return { amount: tlAmount, ccy:'TRY' };
+  if(override!=null && override!=='' && !isNaN(override)) return { amount: Number(override), ccy: ccy };
+  var rates=curRates(cfg); var rate = ccy==='USD'?rates.USD:rates.EUR;
+  if(!rate) return { amount: tlAmount, ccy:'TRY' };
+  return { amount: Math.round((tlAmount/rate)*100)/100, ccy: ccy };
+}
+function fmtCur(amount, ccy){
+  var isTl = (!ccy || ccy==='TRY');
+  var n=(Number(amount)||0).toLocaleString(isTl?'tr-TR':'en-US', {minimumFractionDigits:(isTl?0:2), maximumFractionDigits:2});
+  return curSym(isTl?'TRY':ccy)+n;
+}
+// v7.41: paket fiyati hedef para biriminde (override varsa onu, yoksa kurla). amountTRY = TL taban (raporlama).
+function pkgPrice(pkg, period, ccy, cfg){
+  var tl = (period==='yearly' && pkg.yearlyPrice) ? pkg.yearlyPrice : (pkg.price||0);
+  var ov = null;
+  if(ccy==='USD') ov = (period==='yearly') ? pkg.yearlyPriceUSD : pkg.priceUSD;
+  else if(ccy==='EUR') ov = (period==='yearly') ? pkg.yearlyPriceEUR : pkg.priceEUR;
+  var r = tlToCur(tl, ccy, cfg, ov);
+  return { amount: r.amount, ccy: r.ccy, amountTRY: tl };
+}
+function boostPrice(unitTL, plan, ccy, cfg){
+  var ov = null;
+  if(ccy==='USD') ov = (plan==='weekly') ? (cfg&&cfg.weeklyPriceUSD) : (cfg&&cfg.monthlyPriceUSD);
+  else if(ccy==='EUR') ov = (plan==='weekly') ? (cfg&&cfg.weeklyPriceEUR) : (cfg&&cfg.monthlyPriceEUR);
+  var r = tlToCur(unitTL, ccy, cfg, ov);
+  return { amount: r.amount, ccy: r.ccy, amountTRY: unitTL };
+}
+function fmtPkg(pkg, period, cfg){ var p = pkgPrice(pkg, period, userBillingCcy(), cfg); return fmtCur(p.amount, p.ccy); }
+function fmtTL(tl, cfg){ var p = tlToCur(tl, userBillingCcy(), cfg, null); return fmtCur(p.amount, p.ccy); }
 
 const DEFAULT_PACKAGES = [
   {
@@ -31895,6 +31958,12 @@ const I18N_DICT = {
     've.panel_title':'Kanıt Paneli','ve.empty_title':'Henüz değerlendirme yok','ve.empty_desc':'PoC tamamlanıp müşteri değerlendirdikçe burada kriter performansın, kazanma/kaybetme nedenlerin ve sektör bazlı sonuçların belirir.',
     'vpm.f_action':'🚨 Aksiyon Gerekenler','vpm.f_idle':'💤 Hareketsiz','vreq.fastest_poc':'🔥 EN HIZLI YANITLANAN PoC',
     'ii.banner':'💡 Bu bilgiler indirilecek makbuzlarda gösterilecektir. Doğru ve güncel girmen önemli.','ii.address_ph':'Mahalle, Cadde, No, İlçe/İl','ii.taxno':'Vergi/TC Numarası',
+    // v7.40 para birimi (Asama 1)
+    'aset.currency_section':'💱 Para Birimi / Kur','aset.currency_info':'1 USD / 1 EUR kaç TL? Yabancı vendor paket+Boost fiyatları bu kurla otomatik hesaplanır. 0 = o para birimi kapalı. Pakete özel elle fiyat (override) Paketler ekranından girilir.','aset.usd_rate':'USD Kuru (1 USD = ? TL)','aset.eur_rate':'EUR Kuru (1 EUR = ? TL)',
+    'auth.currency_label':'Faturalandırma Para Birimi','auth.ccy_try':'₺ TRY (Türk Lirası)','auth.ccy_usd':'$ USD','auth.ccy_eur':'€ EUR',
+    'prof.billing_currency':'💱 Faturalandırma Para Birimi','prof.billing_currency_hint':'Paket ve Boost ödemelerinde kullanılır',
+    // v7.41 para birimi Asama 2
+    'pay.pay_btn':'Öde','pe.price_usd':'Aylık USD (override)','pe.price_eur':'Aylık EUR (override)','pe.yprice_usd':'Yıllık USD (override)','pe.yprice_eur':'Yıllık EUR (override)','pe.auto_rate':'Boş = kurdan otomatik',
   },
   en: {
     // Hero / Home
@@ -34681,6 +34750,12 @@ const I18N_DICT = {
     've.panel_title':'Evidence Panel','ve.empty_title':'No evaluations yet','ve.empty_desc':'As PoCs are completed and customers leave evaluations, your criteria performance, win/loss reasons and sector-based results will appear here.',
     'vpm.f_action':'🚨 Needs Action','vpm.f_idle':'💤 Inactive','vreq.fastest_poc':'🔥 FASTEST-RESPONDED PoC',
     'ii.banner':'💡 This info will appear on downloadable receipts. Entering it correctly and up to date matters.','ii.address_ph':'Street, No, District/City','ii.taxno':'Tax/National ID Number',
+    // v7.40 currency (Phase 1)
+    'aset.currency_section':'💱 Currency / Exchange Rate','aset.currency_info':'How many TL is 1 USD / 1 EUR? Foreign-vendor package+Boost prices are auto-calculated with this rate. 0 = that currency disabled. Per-package manual price (override) is set on the Packages screen.','aset.usd_rate':'USD Rate (1 USD = ? TL)','aset.eur_rate':'EUR Rate (1 EUR = ? TL)',
+    'auth.currency_label':'Billing Currency','auth.ccy_try':'₺ TRY (Turkish Lira)','auth.ccy_usd':'$ USD','auth.ccy_eur':'€ EUR',
+    'prof.billing_currency':'💱 Billing Currency','prof.billing_currency_hint':'Used for package and Boost payments',
+    // v7.41 currency Phase 2
+    'pay.pay_btn':'Pay','pe.price_usd':'Monthly USD (override)','pe.price_eur':'Monthly EUR (override)','pe.yprice_usd':'Yearly USD (override)','pe.yprice_eur':'Yearly EUR (override)','pe.auto_rate':'Empty = auto from rate',
   }
 };
 
@@ -35863,6 +35938,10 @@ function openPackageEditor(pkgId, allPackages) {
     + '<div class="g2">'
     + '<div><label class="lbl-mini">'+t('afa.monthly_price','Aylık Fiyat (TRY)')+'</label><input class="inp" type="number" id="pe-price" value="'+pkg.price+'"></div>'
     + '<div><label class="lbl-mini">'+t('pe.yprice','Yıllık Fiyat (TRY)')+'</label><input class="inp" type="number" id="pe-yprice" value="'+pkg.yearlyPrice+'"></div>'
+    + '<div><label class="lbl-mini">'+t('pe.price_usd','Aylık USD (override)')+'</label><input class="inp" type="number" step="0.01" id="pe-price-usd" placeholder="'+t('pe.auto_rate','Boş = kurdan otomatik')+'" value="'+(pkg.priceUSD!=null?pkg.priceUSD:'')+'"></div>'
+    + '<div><label class="lbl-mini">'+t('pe.price_eur','Aylık EUR (override)')+'</label><input class="inp" type="number" step="0.01" id="pe-price-eur" placeholder="'+t('pe.auto_rate','Boş = kurdan otomatik')+'" value="'+(pkg.priceEUR!=null?pkg.priceEUR:'')+'"></div>'
+    + '<div><label class="lbl-mini">'+t('pe.yprice_usd','Yıllık USD (override)')+'</label><input class="inp" type="number" step="0.01" id="pe-yprice-usd" placeholder="'+t('pe.auto_rate','Boş = kurdan otomatik')+'" value="'+(pkg.yearlyPriceUSD!=null?pkg.yearlyPriceUSD:'')+'"></div>'
+    + '<div><label class="lbl-mini">'+t('pe.yprice_eur','Yıllık EUR (override)')+'</label><input class="inp" type="number" step="0.01" id="pe-yprice-eur" placeholder="'+t('pe.auto_rate','Boş = kurdan otomatik')+'" value="'+(pkg.yearlyPriceEUR!=null?pkg.yearlyPriceEUR:'')+'"></div>'
     + '</div>'
     + '<div class="g2">'
     + '<div><label class="lbl-mini">'+t('pe.duration','Süre (gün)')+'</label><input class="inp" type="number" id="pe-duration" value="'+pkg.duration+'"></div>'
@@ -35905,6 +35984,10 @@ function openPackageEditor(pkgId, allPackages) {
       duration: parseInt(modal.querySelector('#pe-duration').value) || 30,
       price: parseInt(modal.querySelector('#pe-price').value) || 0,
       yearlyPrice: parseInt(modal.querySelector('#pe-yprice').value) || 0,
+      priceUSD: (function(){var v=parseFloat(modal.querySelector('#pe-price-usd').value); return isNaN(v)?null:v;})(),
+      priceEUR: (function(){var v=parseFloat(modal.querySelector('#pe-price-eur').value); return isNaN(v)?null:v;})(),
+      yearlyPriceUSD: (function(){var v=parseFloat(modal.querySelector('#pe-yprice-usd').value); return isNaN(v)?null:v;})(),
+      yearlyPriceEUR: (function(){var v=parseFloat(modal.querySelector('#pe-yprice-eur').value); return isNaN(v)?null:v;})(),
       currency: 'TRY',
       pocQuota: parseInt(modal.querySelector('#pe-poc').value),
       pocOverflowPrice: parseInt(modal.querySelector('#pe-overflow').value) || 0,
@@ -36660,6 +36743,16 @@ async function admSettings(m) {
     s12.appendChild(field(t('aset.kdv_orani','KDV Oranı (%)'), 'cfg-ci-vat', 'number', cfg.companyInfo?.vatRate ?? 20));
     m.appendChild(s12);
 
+    // v7.40: Para Birimi / Kur (admin-yonetimli)
+    var s12b = section(t('aset.currency_section','💱 Para Birimi / Kur'), '#16a34a');
+    var s12bInfo = document.createElement('div');
+    s12bInfo.style.cssText='background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11.5px;color:var(--text-muted);line-height:1.6';
+    s12bInfo.innerHTML = t('aset.currency_info','1 USD / 1 EUR ka\u00e7 TL? Yabanc\u0131 vendor paket+Boost fiyatlar\u0131 bu kurla otomatik hesaplan\u0131r. 0 = o para birimi kapal\u0131. Pakete \u00f6zel elle fiyat (override) Paketler ekran\u0131ndan girilir.');
+    s12b.appendChild(s12bInfo);
+    s12b.appendChild(field(t('aset.usd_rate','USD Kuru (1 USD = ? TL)'), 'cfg-cur-usd', 'number', cfg.currencyRates?.usd ?? 0));
+    s12b.appendChild(field(t('aset.eur_rate','EUR Kuru (1 EUR = ? TL)'), 'cfg-cur-eur', 'number', cfg.currencyRates?.eur ?? 0));
+    m.appendChild(s12b);
+
     // v4.75: Firebase Functions Sağlık Kontrolü
     var s13 = section(t('aset.firebase_functions_saglik_kontrolu','☁️ Firebase Functions Sağlık Kontrolü'), '#a855f7');
     var fnInfo = document.createElement('div');
@@ -36905,6 +36998,10 @@ async function admSettings(m) {
             phone: el('cfg-ci-phone').value || '',
             website: el('cfg-ci-website').value || '',
             vatRate: parseInt(el('cfg-ci-vat').value) || 20,
+          },
+          currencyRates: {
+            usd: parseFloat(el('cfg-cur-usd').value) || 0,
+            eur: parseFloat(el('cfg-cur-eur').value) || 0,
           },
           updatedAt: serverTimestamp(),
           updatedBy: CUR_USER?.uid || null,
@@ -38401,13 +38498,16 @@ async function openFeaturedBoostModal(pid, pname, product) {
     var maxDur = plan==='weekly' ? maxWeeks : Math.max(1, Math.ceil(maxWeeks/4));
     if (dur > maxDur) { dur = maxDur; durInp.value = maxDur; }
     var unit = plan==='weekly' ? weeklyPrice : monthlyPrice;
-    var amount = unit * dur;
+    var _bp = boostPrice(unit, plan, userBillingCcy(), cfg);
+    var unitC = _bp.amount; var ccy = _bp.ccy;
+    var amount = Math.round(unitC * dur * 100)/100;
+    var amountTRY = unit * dur;
     var days = plan==='weekly' ? dur*7 : dur*30;
     var base = Math.max(Date.now(), curUntil ? curUntil.getTime() : 0);
     var endAt = new Date(base + days*86400000);
-    summary.innerHTML = '<div class="flx-bw-c"><span>'+dur+' '+(plan==='weekly'?t('afa.week','hafta'):t('afa.month','ay'))+' × ₺'+unit.toLocaleString('tr-TR')+'</span><strong>₺'+amount.toLocaleString('tr-TR')+'</strong></div>'
+    summary.innerHTML = '<div class="flx-bw-c"><span>'+dur+' '+(plan==='weekly'?t('afa.week','hafta'):t('afa.month','ay'))+' × '+fmtCur(unitC,ccy)+'</span><strong>'+fmtCur(amount,ccy)+'</strong></div>'
       + '<div class="flx-bw-c" style="margin-top:6px;font-size:11.5px;color:var(--text-muted)"><span>'+t('afa.end_date','Bitiş tarihi')+'</span><span>'+endAt.toLocaleDateString(LDATE())+'</span></div>';
-    return { plan:plan, dur:dur, amount:amount, days:days, endAt:endAt };
+    return { plan:plan, dur:dur, amount:amount, ccy:ccy, amountTRY:amountTRY, days:days, endAt:endAt };
   }
   calc();
   planSel.addEventListener('change', calc);
@@ -38429,6 +38529,8 @@ async function openFeaturedBoostModal(pid, pname, product) {
         periods: c.dur,
         durationDays: c.days,
         amount: c.amount,
+        currency: c.ccy,
+        amountTRY: c.amountTRY,
         startAt: serverTimestamp(),
         endAt: Timestamp.fromDate(c.endAt),
         status: status,
