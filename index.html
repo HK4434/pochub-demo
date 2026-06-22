@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.41 | pochub.co -->
+<!-- PoCHub v7.42 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.41';
+const VERSION = 'v7.42';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -944,6 +944,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.42': ['ANALITIK ALTYAPI 1/2: Uretim gate + Degisiklik gecmisi (toplamaya basla temeli). (1) productionStartAt cizgisi: Admin>Ayarlar>Uretim bolumunde TEST MODU / URETIM AKTIF durumu + Uretime Gec butonu (onay + kim/ne zaman loglanir). Tek tarih cizgisi: silme yok, geri alinabilir, tum analitik bu cizgi + isTestRecord ile filtrelenecek. (2) config_history (degismez): paket fiyat duzenlemeleri (price/yearlyPrice/USD/EUR override) ve Boost fiyat degisiklikleri eski->yeni diff olarak yazilir; her kayit phase (test/production) etiketli. (3) Yeni admin sekmesi: Degisiklik Gecmisi (zaman cizelgesi, phase rozeti). NOT: Kur-rate audit + metrik dashboard + aylik snapshot v7.43 te (dashboard veriyi okur, beklemesi sorun degil; gecmis zaten birikir). RULES: config_history icin kural eklenmeli (admin read + append-only). node+harness HEPSI 0.'],
   'v7.41': ['PARA BIRIMI Asama 2/2 (cevrim devrede). Tum fiyat/tutar noktalari vendor in billingCurrency sine cevriliyor; cevrim TEK merkezde (pkgPrice/boostPrice -> tlToCur; override varsa elle fiyat, yoksa kur). EKLENEN: (1) helperlar pkgPrice/boostPrice/fmtPkg/fmtTL. (2) Paket satin alma modali (oz et + Ode butonu) + abonelik sayfasi mevcut paket fiyati + paket browser kartlari (+yillik aylik-esdeger) artik user para biriminde. (3) Boost modali plan+tutar user para biriminde. (4) subscription_history + featured_purchases artik secilen currency + amountTRY (TL taban, raporlama) yaziyor. (5) Makbuz PDF secilen para biriminde (TL/USD/EUR). (6) Admin paket editorunde pakete ozel Aylik/Yillik USD+EUR override alanlari (bos = kurdan otomatik = sifirla). NOT: Boost su an kur-cevrimi kullanir (boost override altyapisi hazir, admin UI sonraki surumde). Emoji escape leri gercek emojiye temizlendi. node+harness HEPSI 0.'],
   'v7.40': ['PARA BIRIMI Asama 1/2 (altyapi, odeme akisina dokunmaz). Kur tabanli + elle override modeli onaylandi. EKLENENLER: (1) kur helperlari curSym/userBillingCcy/curRates/tlToCur/fmtCur (Asama 2 buy/boost/makbuz kullanacak). (2) Admin > Ayarlar > Para Birimi / Kur bolumu: USD kuru + EUR kuru (admin-yonetimli; 0=kapali). (3) Kayit (uretici) formunda Faturalandirma Para Birimi secimi -> users.billingCurrency. (4) Account/Profil sayfasinda para birimi secici (sonradan degistirilebilir). NOT: buy/boost/makbuz HALA TL gosterir (degismedi, sifir risk); Asama 2 bunlari kullanici para birimine cevirecek + pakete ozel USD/EUR override alanlari + secilen para biriminin subscription_history/featured_purchases/makbuza yazilmasi. node+harness HEPSI 0.'],
   'v7.39': ['IZIN+UI duzeltmeleri (3 bug). [A] Etkinlik/urun SILME izin hatasi (Bagintı kontrolu hatasi: Missing or insufficient permissions): hasActiveDependencies poc_requests/offers koleksiyonlarini sadece eventId/productId ile sorguluyordu; kurallar list icin sahiplik (vendorId==uid) istedigi icin Firestore tum sorguyu reddediyordu. Artik vendorId ile sorgulayip fieldName client-side filtreleniyor (composite index de gerekmez). [C] Davetlerim New Invite butonu calismiyordu + liste bos goruluyordu: kart render dongusunde bir invite exception verince render() buton-bind satirindan ONCE patliyordu. Buton artik header sonrasi ERKEN baglaniyor + her kart try/catch ile sarildi (bir bozuk kayit tum listeyi+butonu dusurmez, hata console a yazilir). [D] Manuel havale talimatlari (PoC borc odeme + paket alma modallari) sirket adi/IBAN i HARDCODE ediyordu; artik admin config (companyInfo.name/iban) okunuyor. NOT: Makbuz PDF zaten config ten okuyordu; Admin > Ayarlar > PoCHub Sirket Bilgileri bolumunden duzenlenebilir. node+harness HEPSI 0.'],
@@ -25090,7 +25091,7 @@ function renderAdmin() {
     ['requests',t('atab.requests','PoC Talepleri')],
     ['events',t('atab.events','Etkinlikler')],
     ...(_rp.canViewAll?[['offers',t('atab.offers','Teklifler')]]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['revenue',t('atab.revenue','📈 Gelir')],['vendorsubs',t('atab.vendorsubs','💼 Vendor Abonelikler')],['vendorapprovals',t('atab.vendorapprovals','✓ Vendor Onayları')],['demo-requests',t('atab.demo_requests','📅 Demo Talepleri')],['packages',t('atab.packages','💎 Paketler')],['payments',t('atab.payments','💳 Ödeme Onayları')],['overrides',t('atab.overrides','⚡ Acil Onay Talepleri')],['featured',t('atab.featured','📢 Reklam / Öne Çıkan')],['content',t('atab.content','📝 İçerik Yönetimi')],['kvkk-mgmt',t('atab.kvkk_mgmt','🛡 KVKK & Yasal Sayfalar')],['settings',t('atab.settings','🔧 Sistem Ayarları')]]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['revenue',t('atab.revenue','📈 Gelir')],['vendorsubs',t('atab.vendorsubs','💼 Vendor Abonelikler')],['vendorapprovals',t('atab.vendorapprovals','✓ Vendor Onayları')],['demo-requests',t('atab.demo_requests','📅 Demo Talepleri')],['packages',t('atab.packages','💎 Paketler')],['history',t('atab.history','📜 Değişiklik Geçmişi')],['payments',t('atab.payments','💳 Ödeme Onayları')],['overrides',t('atab.overrides','⚡ Acil Onay Talepleri')],['featured',t('atab.featured','📢 Reklam / Öne Çıkan')],['content',t('atab.content','📝 İçerik Yönetimi')],['kvkk-mgmt',t('atab.kvkk_mgmt','🛡 KVKK & Yasal Sayfalar')],['settings',t('atab.settings','🔧 Sistem Ayarları')]]:[]),
     ...(_rp.canViewAll?[['health',t('atab.health','🩺 Veri Sağlığı')]]:[]),
     ['profile',t('atab.profile','👤 Profilim')],
   ];
@@ -25130,6 +25131,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'content') { await admContent(m); return; }
     if (CUR_ADM_TAB === 'kvkk-mgmt') { await admKVKKMgmt(m); return; }
     if (CUR_ADM_TAB === 'packages')   { await admPackages(m);   return; }
+    if (CUR_ADM_TAB === 'history')    { await admHistory(m);    return; }
     if (CUR_ADM_TAB === 'payments')   { await admPayments(m);   return; }
     if (CUR_ADM_TAB === 'overrides')  { await admOverrides(m);  return; }
     if (CUR_ADM_TAB === 'featured')   { await admFeaturedAds(m); return; }
@@ -28844,6 +28846,23 @@ function boostPrice(unitTL, plan, ccy, cfg){
 }
 function fmtPkg(pkg, period, cfg){ var p = pkgPrice(pkg, period, userBillingCcy(), cfg); return fmtCur(p.amount, p.ccy); }
 function fmtTL(tl, cfg){ var p = tlToCur(tl, userBillingCcy(), cfg, null); return fmtCur(p.amount, p.ccy); }
+// v7.42: Uretim gate + degisiklik audit
+function isProduction(cfg){ return !!(cfg && cfg.productionStartAt); }
+async function logConfigChange(entityType, entityId, entityName, changes, note){
+  try {
+    if(!changes || !changes.length) return;
+    var cs = await getDoc(doc(db,'pochub_config','system'));
+    var prod = cs.exists() && cs.data().productionStartAt;
+    await addDoc(collection(db,'config_history'), {
+      entityType: entityType, entityId: entityId||null, entityName: entityName||'',
+      changes: changes, note: note||'',
+      actorUid: (typeof CUR_USER!=='undefined'&&CUR_USER)?CUR_USER.uid:null,
+      actorName: (typeof CUR_PROFILE!=='undefined'&&CUR_PROFILE)?(CUR_PROFILE.displayName||CUR_PROFILE.company||CUR_USER.email):'admin',
+      phase: prod ? 'production' : 'test',
+      at: serverTimestamp(),
+    });
+  } catch(e){ console.error('logConfigChange failed', e); }
+}
 
 const DEFAULT_PACKAGES = [
   {
@@ -31964,6 +31983,10 @@ const I18N_DICT = {
     'prof.billing_currency':'💱 Faturalandırma Para Birimi','prof.billing_currency_hint':'Paket ve Boost ödemelerinde kullanılır',
     // v7.41 para birimi Asama 2
     'pay.pay_btn':'Öde','pe.price_usd':'Aylık USD (override)','pe.price_eur':'Aylık EUR (override)','pe.yprice_usd':'Yıllık USD (override)','pe.yprice_eur':'Yıllık EUR (override)','pe.auto_rate':'Boş = kurdan otomatik',
+    // v7.42 uretim gate + degisiklik gecmisi
+    'atab.history':'📜 Değişiklik Geçmişi',
+    'aprod.title':'Üretim / Production','aprod.live':'ÜRETİM AKTİF','aprod.started':'Başlangıç:','aprod.by':'Başlatan:','aprod.live_note':'Analitik ve geçmiş bu tarihten itibaren üretim verisi sayar. Test hesapları (isTestRecord) yine hariç tutulur.','aprod.test_mode':'TEST MODU','aprod.test_note':'Henüz üretime geçilmedi. Toplanan veriler analitik/geçmiş kaydına DAHİL DEĞİL. Geliştirme bitince ve müşteri almaya başlayınca üretime geç.','aprod.go_live':'Üretime Geç (İzlemeyi Başlat)','aprod.go_note':'Bu tarihten itibaren tüm analitik üretim verisi sayar. Gerçek müşteri öncesi yanlışlıkla bastıysan tekrar sıfırlanabilir.','aprod.confirm':'Üretime geçilsin mi? Bu tarihten itibaren analitik/geçmiş ÜRETİM verisi olarak sayılacak.','aprod.log':'Üretim başlatıldı','aprod.done':'🚀 Üretime geçildi. Analitik kaydı başladı.',
+    'ahist.title':'Değişiklik Geçmişi','ahist.subtitle':'Paket / Boost fiyat değişiklikleri ve üretim olayları (değiştirilemez kayıt).','ahist.empty':'Henüz kayıtlı değişiklik yok.','ahist.err':'Geçmiş yüklenemedi: ','ahist.prod':'ÜRETİM','ahist.test':'TEST',
   },
   en: {
     // Hero / Home
@@ -34756,6 +34779,10 @@ const I18N_DICT = {
     'prof.billing_currency':'💱 Billing Currency','prof.billing_currency_hint':'Used for package and Boost payments',
     // v7.41 currency Phase 2
     'pay.pay_btn':'Pay','pe.price_usd':'Monthly USD (override)','pe.price_eur':'Monthly EUR (override)','pe.yprice_usd':'Yearly USD (override)','pe.yprice_eur':'Yearly EUR (override)','pe.auto_rate':'Empty = auto from rate',
+    // v7.42 production gate + change history
+    'atab.history':'📜 Change History',
+    'aprod.title':'Production','aprod.live':'PRODUCTION ACTIVE','aprod.started':'Started:','aprod.by':'By:','aprod.live_note':'Analytics and history count production data from this date. Test accounts (isTestRecord) are still excluded.','aprod.test_mode':'TEST MODE','aprod.test_note':'Not in production yet. Collected data is NOT included in analytics/history. Go live once development is done and you start onboarding customers.','aprod.go_live':'Go Live (Start Tracking)','aprod.go_note':'From this date all analytics count as production data. If pressed by mistake before real customers, it can be reset.','aprod.confirm':'Go to production? From this date analytics/history will count as PRODUCTION data.','aprod.log':'Production started','aprod.done':'🚀 Now in production. Analytics recording started.',
+    'ahist.title':'Change History','ahist.subtitle':'Package / Boost price changes and production events (immutable record).','ahist.empty':'No changes recorded yet.','ahist.err':'Could not load history: ','ahist.prod':'PRODUCTION','ahist.test':'TEST',
   }
 };
 
@@ -35779,6 +35806,43 @@ function openVendorDetailModal(v) {
 }
 
 // Admin: Paket Tanımları Sayfası
+async function admHistory(m) {
+  m.innerHTML = renderSkeleton('list', 1);
+  var rows = [];
+  try {
+    var snap = await getDocs(query(collection(db,'config_history'), orderBy('at','desc'), limit(150)));
+    snap.forEach(function(d){ rows.push(d.data()); });
+  } catch(e) {
+    m.innerHTML = '<div style="padding:20px;color:var(--text-muted)">'+t('ahist.err','Ge\u00e7mi\u015f y\u00fcklenemedi: ')+escHtml(e.message)+'</div>';
+    return;
+  }
+  var icon = function(tp){ return tp==='package'?'💎':tp==='boost'?'📢':tp==='currency'?'💱':tp==='production'?'🚀':'\u2699'; };
+  var html = '<div style="max-width:900px">';
+  html += '<h2 style="font-size:20px;font-weight:800;margin:0 0 4px">📜 '+t('ahist.title','De\u011fi\u015fiklik Ge\u00e7mi\u015fi')+'</h2>';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">'+t('ahist.subtitle','Paket / Boost fiyat de\u011fi\u015fiklikleri ve \u00fcretim olaylar\u0131 (de\u011fi\u015ftirilemez kay\u0131t).')+'</div>';
+  if (!rows.length) {
+    html += '<div style="padding:30px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px">'+t('ahist.empty','Hen\u00fcz kay\u0131tl\u0131 de\u011fi\u015fiklik yok.')+'</div>';
+  } else {
+    rows.forEach(function(r){
+      var d = (r.at && r.at.toDate) ? r.at.toDate() : null;
+      var when = d ? d.toLocaleString('tr-TR') : '\u2014';
+      var phaseBadge = r.phase==='production'
+        ? '<span style="background:rgba(22,163,74,.12);color:#16a34a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">\u2705 '+t('ahist.prod','\u00dcRET\u0130M')+'</span>'
+        : '<span style="background:rgba(217,119,6,.12);color:#d97706;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🧪 '+t('ahist.test','TEST')+'</span>';
+      var changesHtml = (r.changes||[]).map(function(c){
+        return '<div style="font-size:12px;margin-top:3px"><span style="color:var(--text-muted)">'+escHtml(String(c.field))+':</span> <span style="text-decoration:line-through;color:#dc2626">'+escHtml(c.old==null?'\u2014':String(c.old))+'</span> \u2192 <strong style="color:#16a34a">'+escHtml(c.new==null?'\u2014':String(c.new))+'</strong></div>';
+      }).join('');
+      html += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;background:var(--bg-surface)">'
+        + '<div class="flx-bw-c"><div style="font-weight:700;font-size:13px">'+icon(r.entityType)+' '+escHtml(r.entityName||r.entityType||'')+'</div>'+phaseBadge+'</div>'
+        + changesHtml
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">'+escHtml(r.actorName||'\u2014')+' \u00b7 '+when+'</div>'
+        + '</div>';
+    });
+  }
+  html += '</div>';
+  m.innerHTML = html;
+}
+
 async function admPackages(m) {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('apkg.loading','Paketler yükleniyor...')+'</div>';
   try {
@@ -36009,6 +36073,17 @@ function openPackageEditor(pkgId, allPackages) {
     if (isNew) data.createdAt = serverTimestamp();
     try {
       await setDoc(doc(db,'pochub_packages',newId), data, {merge:!isNew});
+      // v7.42: degisiklik gecmisi (fiyat alanlari)
+      if (isNew) {
+        logConfigChange('package', newId, data.name, [{field:'created', old:null, new:data.name}], '');
+      } else {
+        var _chg = [];
+        ['price','yearlyPrice','priceUSD','priceEUR','yearlyPriceUSD','yearlyPriceEUR'].forEach(function(f){
+          var o = pkg[f], nv = data[f];
+          if (String(o==null?'':o) !== String(nv==null?'':nv)) _chg.push({field:f, old:(o==null?null:o), new:(nv==null?null:nv)});
+        });
+        if (_chg.length) logConfigChange('package', newId, data.name, _chg, '');
+      }
       showToast(isNew?t('pe.created','Paket oluşturuldu'):t('pe.updated','Paket güncellendi'));
       modal.remove();
       loadAdmTab();
@@ -36752,6 +36827,43 @@ async function admSettings(m) {
     s12b.appendChild(field(t('aset.usd_rate','USD Kuru (1 USD = ? TL)'), 'cfg-cur-usd', 'number', cfg.currencyRates?.usd ?? 0));
     s12b.appendChild(field(t('aset.eur_rate','EUR Kuru (1 EUR = ? TL)'), 'cfg-cur-eur', 'number', cfg.currencyRates?.eur ?? 0));
     m.appendChild(s12b);
+
+    // v7.42: Uretim / Production gate
+    var sProd = document.createElement('div');
+    sProd.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px';
+    var _ps = cfg.productionStartAt;
+    if (_ps) {
+      var _pd = _ps.toDate ? _ps.toDate() : new Date(_ps);
+      sProd.innerHTML = '<div style="font-size:14px;font-weight:800;color:#16a34a;margin-bottom:8px">🚀 '+t('aprod.title','\u00dcretim / Production')+'</div>'
+        + '<div style="background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.25);border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.7">'
+        +   '<strong style="color:#16a34a">\u2705 '+t('aprod.live','\u00dcRET\u0130M AKT\u0130F')+'</strong><br>'
+        +   t('aprod.started','Ba\u015flang\u0131\u00e7:')+' '+_pd.toLocaleString('tr-TR')
+        +   (cfg.productionStartedByName?'<br>'+t('aprod.by','Ba\u015flatan:')+' '+escHtml(cfg.productionStartedByName):'')
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:8px">'+t('aprod.live_note','Analitik ve ge\u00e7mi\u015f bu tarihten itibaren \u00fcretim verisi sayar. Test hesaplar\u0131 (isTestRecord) yine hari\u00e7 tutulur.')+'</div>';
+    } else {
+      sProd.innerHTML = '<div style="font-size:14px;font-weight:800;color:#d97706;margin-bottom:8px">🚀 '+t('aprod.title','\u00dcretim / Production')+'</div>'
+        + '<div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.7">'
+        +   '<strong style="color:#d97706">🧪 '+t('aprod.test_mode','TEST MODU')+'</strong><br>'
+        +   t('aprod.test_note','Hen\u00fcz \u00fcretime ge\u00e7ilmedi. Toplanan veriler analitik/ge\u00e7mi\u015f kayd\u0131na DAH\u0130L DE\u011e\u0130L. Geli\u015ftirme bitince ve m\u00fc\u015fteri almaya ba\u015flay\u0131nca \u00fcretime ge\u00e7.')
+        + '</div>'
+        + '<button class="btn-p" id="prod-go-btn" style="margin-top:10px">🚀 '+t('aprod.go_live','\u00dcretime Ge\u00e7 (\u0130zlemeyi Ba\u015flat)')+'</button>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">'+t('aprod.go_note','Bu tarihten itibaren t\u00fcm analitik \u00fcretim verisi sayar. Ger\u00e7ek m\u00fc\u015fteri \u00f6ncesi yanl\u0131\u015fl\u0131kla bast\u0131ysan tekrar s\u0131f\u0131rlanabilir.')+'</div>';
+    }
+    m.appendChild(sProd);
+    m.querySelector('#prod-go-btn')?.addEventListener('click', async function(){
+      if (!confirm(t('aprod.confirm','\u00dcretime ge\u00e7ilsin mi? Bu tarihten itibaren analitik/ge\u00e7mi\u015f \u00dcRET\u0130M verisi olarak say\u0131lacak.'))) return;
+      try {
+        await setDoc(doc(db,'pochub_config','system'), {
+          productionStartAt: serverTimestamp(),
+          productionStartedBy: CUR_USER?.uid || null,
+          productionStartedByName: CUR_PROFILE?.displayName || CUR_PROFILE?.company || CUR_USER?.email || null,
+        }, { merge: true });
+        await logConfigChange('production','system',t('aprod.title','\u00dcretim / Production'),[{field:'productionStartAt',old:null,new:'now'}], t('aprod.log','\u00dcretim ba\u015flat\u0131ld\u0131'));
+        showToast(t('aprod.done','🚀 \u00dcretime ge\u00e7ildi. Analitik kayd\u0131 ba\u015flad\u0131.'));
+        loadAdmTab();
+      } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); }
+    });
 
     // v4.75: Firebase Functions Sağlık Kontrolü
     var s13 = section(t('aset.firebase_functions_saglik_kontrolu','☁️ Firebase Functions Sağlık Kontrolü'), '#a855f7');
@@ -38936,6 +39048,12 @@ async function renderFeaturedSettings(m) {
       };
       try {
         await setDoc(doc(db,'pochub_config','system'), { featuredAds: data }, { merge: true });
+        // v7.42: degisiklik gecmisi (boost fiyatlari)
+        var _bchg = [];
+        ['weeklyPrice','monthlyPrice'].forEach(function(f){
+          if (String(v[f]==null?'':v[f]) !== String(data[f]==null?'':data[f])) _bchg.push({field:f, old:(v[f]==null?null:v[f]), new:(data[f]==null?null:data[f])});
+        });
+        if (_bchg.length) logConfigChange('boost','featuredAds','Boost / \u00d6ne \u00c7\u0131kan', _bchg, '');
         showToast(t('afa.toast_saved','Reklam ayarları kaydedildi.'));
         renderFeaturedSettings(m);
       } catch(e) {
