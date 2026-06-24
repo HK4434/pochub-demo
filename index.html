@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.55 | pochub.co -->
+<!-- PoCHub v7.56 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.55';
+const VERSION = 'v7.56';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -944,6 +944,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.56': ['BUG FIX + i18n. (1) ODEME ONAY BUG: Approve & Activate -> Cannot read properties of undefined (reading indexOf). Kok sebep: eski subscription_history kayitlarinda toPackageId yok (sadece packageId) -> doc(db,pochub_packages,undefined) Firestore icinde .indexOf cagirip cokuyordu. Fix: _pkgId = toPackageId || packageId + net guard. (2) Vendor abonelik detay modali i18n: Bitis, PoC Kullanim, Cari Hesap/Temiz/borc, Manuel Mudahale, Borclari Sil, Manuel Suspend, Ucretsiz, Bilinmeyen + prompt/confirm dialoglari (uzat, paket hediye, borc sil). (3) Analitik PDF/CSV + Change History CSV locale-aware (EN modunda Ingilizce). node+harness HEPSI 0.'],
   'v7.55': ['i18n SIZINTI SWEEP (admin paneli, EN modunda TR kalan yerler). Hardcoded TR -> t() (40+ anahtar tr+en): (1) Paket editoru (PoC kontenjani, asan PoC fiyati, override hakki/zammi/yardim, featured gun, surekli featured, ozellikler, onerilen vendor tipleri, gorunur mu, evet/hayir secenekleri, iptal). (2) Kullanici detay modali (kazancimiz, LTV, acik bakiye, abonelik/one cikan/diger, aktivite-paket, aldigi PoC, son aktivite, son 6 ay gelir, borclari sifirla). (3) Vendor detay modali (baslik, dogrulanmis, telefon/adres/vergi no/isim, kategoriler/uzmanliklar/bolgeler/markalar/referanslar, yerli/yabanci). (4) Kategori +Alan Ekle. (5) Etkinlik katilimci modali (baslik + bos durum, 2 yer). (6) Data Health: tiklama sonrasi butona hardcoded TR yazilmasi -> t(). node+harness HEPSI 0.'],
   'v7.54': ['DEGISIKLIK GECMISI yeniden tasarlandi (admHistory). Eski: duz 150-satir liste. Yeni: (1) Ozet basligi (toplam kayit + tip kirilimi 💎/📢/💱/🚀 + kisi sayisi). (2) Filtre cubugu: tip cipleri (Paket/Boost/Kur/Uretim) + asama cipleri (Uretim/Test) + canli metin arama (urun/kisi/alan). (3) Gune gore gruplama (Bugun/Dun/tarih) + locale-dogru zaman (LDATE). (4) Alan adi cevirisi (weeklyPrice -> Haftalik fiyat vb.). (5) Tip rozeti + not gosterimi. (6) CSV export (denetim/uyum). limit 150->300. ~21 yeni anahtar (tr+en). node+harness HEPSI 0.'],
   'v7.53': ['i18n SIZINTI FIX (EN modunda TR kalan yerler) + PDF FIX. (1) KOK SEBEP: vendor + customer sol menusu locale degisince yeniden kurulmuyordu (admin v6.91 ile ayni erken-return bug) -> locale guard eklendi (_vendNavLocale/_custNavLocale), dil degisince sidebar tam rebuild. (2) Etkinlik modali PoC Dili etiketi t()-e sarildi. (3) Teklif Detay modali hardcoded TR -> t(): Urun/Musteri/Satici/Gecerlilik/gun/Net Tutar/TOPLAM(KDV Dahil)/NOTLAR/Gonderilme/Yanit (12 yeni anahtar tr+en). (4) Analitik PDF: jsPDF lazy-load oldugu icin handler await loadJsPDF() cagirmiyordu -> PDF kutuphanesi yuklenemedi hatasi; await loadJsPDF() eklendi. node+harness HEPSI 0.'],
@@ -27851,7 +27852,7 @@ function openVendorSubDetailModal(r, allHistory, onUpdate) {
         var dt = h.createdAt?.toDate ? h.createdAt.toDate().toLocaleDateString(LDATE()) : '—';
         return '<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid rgba(15,23,42,.08);font-size:11.5px">'
           + '<div><div class="fs12 fw6">'+(actionLabels[h.action]||h.action)+' · '+(h.packageName||'-')+'</div><div class="fs10-muted">'+dt+'</div></div>'
-          + '<div class="t-rgt"><div class="fs12 fw7">'+(h.amount>0?'₺'+h.amount.toLocaleString('tr-TR'):'Ücretsiz')+'</div><div class="fs10" style="color:'+sc+';font-weight:700">'+h.status+'</div></div>'
+          + '<div class="t-rgt"><div class="fs12 fw7">'+(h.amount>0?'₺'+h.amount.toLocaleString('tr-TR'):t('ev.free','Ücretsiz'))+'</div><div class="fs10" style="color:'+sc+';font-weight:700">'+h.status+'</div></div>'
           + '</div>';
       }).join('');
 
@@ -27866,7 +27867,7 @@ function openVendorSubDetailModal(r, allHistory, onUpdate) {
     +   '<div class="flx-bw-c-mb14" style="margin-bottom:8px">'
     +     '<div>'
     +       '<div class="eyebrow-text" style="color:'+tierColor+'">'+tierLabel+(r.sub?.isTrial?' · Trial':'')+'</div>'
-    +       '<div class="fs15-fw7">🏢 '+(v.company || v.displayName || 'Bilinmeyen')+'</div>'
+    +       '<div class="fs15-fw7">🏢 '+(v.company || v.displayName || t('vsd.unknown','Bilinmeyen'))+'</div>'
     +       '<div class="fs11-muted">'+(v.email||'')+' · '+(v.vendorType==='ureticid'?t('vtype.ureticid','Üretici'):v.vendorType==='distributor'?t('vtype.distributor','Distribütör'):v.vendorType==='integrator'?t('vtype.integrator','Entegratör'):v.vendorType||'—')+'</div>'
     +     '</div>'
     +     '<div class="t-rgt">'
@@ -27878,19 +27879,19 @@ function openVendorSubDetailModal(r, allHistory, onUpdate) {
     // Stat'lar
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px">'
     +   '<div class="card" style="padding:10px"><div class="fs11-muted">'+t('vsd.status','Durum')+'</div><div class="fs13-fw7" style="color:'+tierColor+';margin-top:2px">'+statusLabel+'</div></div>'
-    +   '<div class="card" style="padding:10px"><div class="fs11-muted">Bitiş</div><div class="fs13-fw7" style="margin-top:2px">'+(r.endDate?r.endDate.toLocaleDateString(LDATE()):'—')+'</div>'+(r.daysLeft!==null?'<div class="fs10-muted">'+r.daysLeft+' gün</div>':'')+'</div>'
-    +   '<div class="card" style="padding:10px"><div class="fs11-muted">PoC Kullanım</div><div class="fs13-fw7" style="margin-top:2px">'+(r.pkg?(r.pocQuota===-1?r.pocUsed+' (∞)':r.pocUsed+' / '+r.pocQuota):'—')+'</div></div>'
-    +   '<div class="card" style="padding:10px"><div class="fs11-muted">Cari Hesap</div><div class="fs13-fw7" style="margin-top:2px;color:'+(r.unpaidBalance>0?'#dc2626':'#16a34a')+'">'+(r.unpaidBalance>0?'₺'+r.unpaidBalance.toLocaleString('tr-TR'):'Temiz')+'</div>'+(r.unpaidPocCount>0?'<div class="fs10-muted">'+r.unpaidPocCount+' borç</div>':'')+'</div>'
+    +   '<div class="card" style="padding:10px"><div class="fs11-muted">'+t('vsd.end','Bitiş')+'</div><div class="fs13-fw7" style="margin-top:2px">'+(r.endDate?r.endDate.toLocaleDateString(LDATE()):'—')+'</div>'+(r.daysLeft!==null?'<div class="fs10-muted">'+r.daysLeft+' '+t('vsd.days','gün')+'</div>':'')+'</div>'
+    +   '<div class="card" style="padding:10px"><div class="fs11-muted">'+t('vsd.poc_usage','PoC Kullanım')+'</div><div class="fs13-fw7" style="margin-top:2px">'+(r.pkg?(r.pocQuota===-1?r.pocUsed+' (∞)':r.pocUsed+' / '+r.pocQuota):'—')+'</div></div>'
+    +   '<div class="card" style="padding:10px"><div class="fs11-muted">'+t('vsd.balance','Cari Hesap')+'</div><div class="fs13-fw7" style="margin-top:2px;color:'+(r.unpaidBalance>0?'#dc2626':'#16a34a')+'">'+(r.unpaidBalance>0?'₺'+r.unpaidBalance.toLocaleString('tr-TR'):t('vsd.clean','Temiz'))+'</div>'+(r.unpaidPocCount>0?'<div class="fs10-muted">'+r.unpaidPocCount+' '+t('vsd.debt_word','borç')+'</div>':'')+'</div>'
     + '</div>'
     // Manuel müdahale
-    + '<div class="fs13-fw7 mb10">⚙️ Manuel Müdahale</div>'
+    + '<div class="fs13-fw7 mb10">⚙️ '+t('vsd.manual','Manuel Müdahale')+'</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:14px">'
     +   '<button class="btn-g btn-sm" id="vd-extend">'+t('vsd.extend','📅 Süre Uzat')+'</button>'
     +   '<button class="btn-g btn-sm" id="vd-gift">'+t('vsd.gift','🎁 Hediye Paket')+'</button>'
-    +   (r.unpaidBalance > 0 ? '<button class="btn-g btn-sm" id="vd-clear-debt">💸 Borçları Sil</button>' : '')
+    +   (r.unpaidBalance > 0 ? '<button class="btn-g btn-sm" id="vd-clear-debt">💸 '+t('vsd.clear_debt','Borçları Sil')+'</button>' : '')
     +   (r.isSuspended
       ? '<button class="btn-p btn-sm" id="vd-unsuspend">✅ Suspend Kaldır</button>'
-      : (r.sub ? '<button class="btn-red btn-sm" id="vd-suspend">⛔ Manuel Suspend</button>' : ''))
+      : (r.sub ? '<button class="btn-red btn-sm" id="vd-suspend">⛔ '+t('vsd.suspend','Manuel Suspend')+'</button>' : ''))
     + '</div>'
     // Geçmiş
     + '<div class="fs13-fw7 mb10">'+t('vsd.last10','📜 Son 10 İşlem')+'</div>'
@@ -27903,7 +27904,7 @@ function openVendorSubDetailModal(r, allHistory, onUpdate) {
   // Süre uzat
   modal.querySelector('#vd-extend')?.addEventListener('click', async function(){
     if (!r.sub) { showToast('Bu vendor\'ın aboneliği yok','warn'); return; }
-    var days = prompt('Kaç gün uzatılacak?', '30');
+    var days = prompt(t('vsd.extend_q','Kaç gün uzatılacak?'), '30');
     if (!days) return;
     var d = parseInt(days);
     if (isNaN(d) || d < 1 || d > 365) { showToast(t('tst.invalid_days','Geçersiz süre (1-365)'),'err'); return; }
@@ -27934,11 +27935,11 @@ function openVendorSubDetailModal(r, allHistory, onUpdate) {
     var pkgsSnap = await getDocs(collection(db,'pochub_packages'));
     var availPkgs = pkgsSnap.docs.map(function(d){ return {...d.data(), id:d.id}; }).filter(function(p){ return p.tier !== 'free'; });
     var pkgList = availPkgs.map(function(p,i){ return (i+1)+'. '+p.name; }).join('\n');
-    var idx = prompt('Hangi paketi hediye edeceksin?\n\n'+pkgList+'\n\nNumara gir:', '1');
+    var idx = prompt(t('vsd.gift_q','Hangi paketi hediye edeceksin?')+'\n\n'+pkgList+'\n\n'+t('vsd.enter_num','Numara gir:'), '1');
     if (!idx) return;
     var pkg = availPkgs[parseInt(idx)-1];
     if (!pkg) { showToast(t('tst.invalid_choice','Geçersiz seçim'),'err'); return; }
-    var days = prompt('Kaç gün geçerli? (varsayılan: '+pkg.duration+')', pkg.duration||30);
+    var days = prompt(t('vsd.gift_days','Kaç gün geçerli?')+' ('+t('vsd.default','varsayılan')+': '+pkg.duration+')', pkg.duration||30);
     if (!days) return;
     var d = parseInt(days);
     if (!confirm(pkg.name+' '+t('vsd.gift_confirm_a','paketi')+' '+d+' '+t('vsd.gift_confirm_b','gün için hediye edilecek. Onayla?'))) return;
@@ -27998,7 +27999,7 @@ function openVendorSubDetailModal(r, allHistory, onUpdate) {
 
   // Borçları sil
   modal.querySelector('#vd-clear-debt')?.addEventListener('click', async function(){
-    if (!confirm('Bu vendor\'ın TÜM borçları silinecek (₺'+r.unpaidBalance.toLocaleString('tr-TR')+'). Emin misin?\n\nBu işlem geri alınamaz.')) return;
+    if (!confirm(t('vsd.cleardebt_q','Bu vendorun TUM borclari silinecek')+' (₺'+r.unpaidBalance.toLocaleString('tr-TR')+'). '+t('vsd.cleardebt_warn','Emin misin? Bu islem geri alinamaz.'))) return;
     try {
       // Bekleyen poc_charges'leri paid yap
       const chSnap = await getDocs(query(collection(db,'poc_charges'), where('vendorId','==',v.id), where('status','in',['pending_invoice','invoiced'])));
@@ -29652,7 +29653,7 @@ const I18N_DICT = {
     'vpub.od_st_accepted':'Kabul Edildi',
     'vpub.od_st_revision':'Revizyon Istendi',
     'vpub.od_revise':'Revize Et ve Gonder',
-    'vpub.od_total':'Toplam Tutar','vpub.od_product':'Ürün','vpub.od_customer':'Müşteri','vpub.od_seller':'Satıcı','vpub.od_validity':'Geçerlilik','vpub.od_days':'gün','vpub.od_net':'Net Tutar (KDV Hariç)','vpub.od_total_vat':'TOPLAM (KDV Dahil)','vpub.od_notes':'NOTLAR','vpub.od_sent':'Gönderilme','vpub.od_response':'Yanıt','afa.opt_no':'Hayır','pe.pocquota':'PoC Kontenjanı (-1 = sınırsız)','pe.overflow_price':'Aşan PoC Fiyatı (TRY)','pe.override_limit':'Override Hakkı/Ay (-1 = ∞)','pe.markup_lbl':'Override Fiyat Zammı (% — boş = global zam)','pe.use_global':'Global zammı kullan','pe.markup_help':'Override tutarı = Aşan PoC Fiyatı × (1 + zam%). Boş bırakırsan global ayar geçerli olur.','pe.featured_days':'Featured Gün/Hafta (0-7)','pe.continuous':'Sürekli Featured','pe.features_lbl':'Özellikler (her satıra bir özellik)','pe.one_per_line':'her satıra bir özellik','pe.recommend':'Önerilen Vendor Tipleri (virgülle: ureticid,distributor,integrator)','pe.visible':'Görünür Mü?','pe.visible_yes':'Evet (satışta)','pe.visible_no':'Hayır (gizli)','uxd.earnings':'Kazancımız (PoCHub geliri)','uxd.ltv':'Yaşam Boyu (LTV)','uxd.openbal':'Açık Bakiye','uxd.subscription':'Abonelik','uxd.featured':'Öne Çıkan','uxd.other':'Diğer','uxd.activity_pkg':'Aktivite · Paket','uxd.poc_received':'Aldığı PoC','uxd.active_feat':'aktif öne çıkan yerleşim','uxd.last_activity':'Son aktivite','uxd.rev6':'Son 6 Ay Gelir','uxd.clear_debt':'Borçları Sıfırla','vvd.title':'Vendor Detayı','vvd.verified':'✓ Doğrulanmış','vvd.foreign':'Yabancı','vvd.phone':'Telefon','vvd.address':'Adres','vvd.taxno':'Vergi No','vvd.name':'İsim','vvd.categories':'KATEGORİLER','vvd.specializations':'UZMANLIKLAR','vvd.regions':'BÖLGELER','vvd.brands':'MARKALAR','vvd.refs':'REFERANSLAR','acat.add_field':'+ Alan Ekle','eam.title':'Katılımcı Listesi','eam.empty':'Bu etkinliğe henüz kayıt yok.','eam.event':'Etkinlik','vev.poc_lang':'PoC Dili','vev.required_paren':'(Zorunlu)',
+    'vpub.od_total':'Toplam Tutar','vpub.od_product':'Ürün','vpub.od_customer':'Müşteri','vpub.od_seller':'Satıcı','vpub.od_validity':'Geçerlilik','vpub.od_days':'gün','vpub.od_net':'Net Tutar (KDV Hariç)','vpub.od_total_vat':'TOPLAM (KDV Dahil)','vpub.od_notes':'NOTLAR','vpub.od_sent':'Gönderilme','vpub.od_response':'Yanıt','vsd.end':'Bitiş','vsd.days':'gün','vsd.poc_usage':'PoC Kullanım','vsd.balance':'Cari Hesap','vsd.clean':'Temiz','vsd.debt_word':'borç','vsd.manual':'Manuel Müdahale','vsd.clear_debt':'Borçları Sil','vsd.suspend':'Manuel Suspend','vsd.unknown':'Bilinmeyen','vsd.extend_q':'Kaç gün uzatılacak?','vsd.gift_q':'Hangi paketi hediye edeceksin?','vsd.enter_num':'Numara gir:','vsd.cleardebt_q':'Bu vendorun TÜM borçları silinecek','vsd.cleardebt_warn':'Emin misin? Bu işlem geri alınamaz.','vsd.gift_days':'Kaç gün geçerli?','vsd.default':'varsayılan','apay.no_pkg':'Bu kayıtta paket bilgisi eksik (eski kayıt).','afa.opt_no':'Hayır','pe.pocquota':'PoC Kontenjanı (-1 = sınırsız)','pe.overflow_price':'Aşan PoC Fiyatı (TRY)','pe.override_limit':'Override Hakkı/Ay (-1 = ∞)','pe.markup_lbl':'Override Fiyat Zammı (% — boş = global zam)','pe.use_global':'Global zammı kullan','pe.markup_help':'Override tutarı = Aşan PoC Fiyatı × (1 + zam%). Boş bırakırsan global ayar geçerli olur.','pe.featured_days':'Featured Gün/Hafta (0-7)','pe.continuous':'Sürekli Featured','pe.features_lbl':'Özellikler (her satıra bir özellik)','pe.one_per_line':'her satıra bir özellik','pe.recommend':'Önerilen Vendor Tipleri (virgülle: ureticid,distributor,integrator)','pe.visible':'Görünür Mü?','pe.visible_yes':'Evet (satışta)','pe.visible_no':'Hayır (gizli)','uxd.earnings':'Kazancımız (PoCHub geliri)','uxd.ltv':'Yaşam Boyu (LTV)','uxd.openbal':'Açık Bakiye','uxd.subscription':'Abonelik','uxd.featured':'Öne Çıkan','uxd.other':'Diğer','uxd.activity_pkg':'Aktivite · Paket','uxd.poc_received':'Aldığı PoC','uxd.active_feat':'aktif öne çıkan yerleşim','uxd.last_activity':'Son aktivite','uxd.rev6':'Son 6 Ay Gelir','uxd.clear_debt':'Borçları Sıfırla','vvd.title':'Vendor Detayı','vvd.verified':'✓ Doğrulanmış','vvd.foreign':'Yabancı','vvd.phone':'Telefon','vvd.address':'Adres','vvd.taxno':'Vergi No','vvd.name':'İsim','vvd.categories':'KATEGORİLER','vvd.specializations':'UZMANLIKLAR','vvd.regions':'BÖLGELER','vvd.brands':'MARKALAR','vvd.refs':'REFERANSLAR','acat.add_field':'+ Alan Ekle','eam.title':'Katılımcı Listesi','eam.empty':'Bu etkinliğe henüz kayıt yok.','eam.event':'Etkinlik','vev.poc_lang':'PoC Dili','vev.required_paren':'(Zorunlu)',
     'vpub.od_detail':'Teklif Detayi',
     'vpub.od_type':'Teklif Tipi',
 
@@ -32435,7 +32436,7 @@ const I18N_DICT = {
     'vpub.od_st_accepted':'Accepted',
     'vpub.od_st_revision':'Revision Requested',
     'vpub.od_revise':'Revise and Send',
-    'vpub.od_total':'Total Amount','vpub.od_product':'Product','vpub.od_customer':'Customer','vpub.od_seller':'Seller','vpub.od_validity':'Validity','vpub.od_days':'days','vpub.od_net':'Net Amount (excl. VAT)','vpub.od_total_vat':'TOTAL (incl. VAT)','vpub.od_notes':'NOTES','vpub.od_sent':'Sent','vpub.od_response':'Response','afa.opt_no':'No','pe.pocquota':'PoC Quota (-1 = unlimited)','pe.overflow_price':'Overflow PoC Price (TRY)','pe.override_limit':'Override Quota/Month (-1 = ∞)','pe.markup_lbl':'Override Markup (% — empty = global markup)','pe.use_global':'Use global markup','pe.markup_help':'Override = Overflow PoC Price × (1 + markup%). Leave empty to use the global setting.','pe.featured_days':'Featured Days/Week (0-7)','pe.continuous':'Continuous Featured','pe.features_lbl':'Features (one per line)','pe.one_per_line':'one per line','pe.recommend':'Recommended Vendor Types (comma: ureticid,distributor,integrator)','pe.visible':'Visible?','pe.visible_yes':'Yes (on sale)','pe.visible_no':'No (hidden)','uxd.earnings':'Our Earnings (PoCHub revenue)','uxd.ltv':'Lifetime (LTV)','uxd.openbal':'Open Balance','uxd.subscription':'Subscription','uxd.featured':'Featured','uxd.other':'Other','uxd.activity_pkg':'Activity · Package','uxd.poc_received':'PoC Received','uxd.active_feat':'active featured placement(s)','uxd.last_activity':'Last activity','uxd.rev6':'Last 6 Months Revenue','uxd.clear_debt':'Clear Debts','vvd.title':'Vendor Detail','vvd.verified':'✓ Verified','vvd.foreign':'Foreign','vvd.phone':'Phone','vvd.address':'Address','vvd.taxno':'Tax No','vvd.name':'Name','vvd.categories':'CATEGORIES','vvd.specializations':'EXPERTISE','vvd.regions':'REGIONS','vvd.brands':'BRANDS','vvd.refs':'REFERENCES','acat.add_field':'+ Add Field','eam.title':'Participant List','eam.empty':'No registrations for this event yet.','eam.event':'Event','vev.poc_lang':'PoC Language','vev.required_paren':'(Required)',
+    'vpub.od_total':'Total Amount','vpub.od_product':'Product','vpub.od_customer':'Customer','vpub.od_seller':'Seller','vpub.od_validity':'Validity','vpub.od_days':'days','vpub.od_net':'Net Amount (excl. VAT)','vpub.od_total_vat':'TOTAL (incl. VAT)','vpub.od_notes':'NOTES','vpub.od_sent':'Sent','vpub.od_response':'Response','vsd.end':'End','vsd.days':'days','vsd.poc_usage':'PoC Usage','vsd.balance':'Balance','vsd.clean':'Clean','vsd.debt_word':'debt','vsd.manual':'Manual Intervention','vsd.clear_debt':'Clear Debts','vsd.suspend':'Manual Suspend','vsd.unknown':'Unknown','vsd.extend_q':'Extend by how many days?','vsd.gift_q':'Which package to gift?','vsd.enter_num':'Enter number:','vsd.cleardebt_q':'ALL debts of this vendor will be cleared','vsd.cleardebt_warn':'Are you sure? This cannot be undone.','vsd.gift_days':'Valid for how many days?','vsd.default':'default','apay.no_pkg':'This record has no package info (legacy record).','afa.opt_no':'No','pe.pocquota':'PoC Quota (-1 = unlimited)','pe.overflow_price':'Overflow PoC Price (TRY)','pe.override_limit':'Override Quota/Month (-1 = ∞)','pe.markup_lbl':'Override Markup (% — empty = global markup)','pe.use_global':'Use global markup','pe.markup_help':'Override = Overflow PoC Price × (1 + markup%). Leave empty to use the global setting.','pe.featured_days':'Featured Days/Week (0-7)','pe.continuous':'Continuous Featured','pe.features_lbl':'Features (one per line)','pe.one_per_line':'one per line','pe.recommend':'Recommended Vendor Types (comma: ureticid,distributor,integrator)','pe.visible':'Visible?','pe.visible_yes':'Yes (on sale)','pe.visible_no':'No (hidden)','uxd.earnings':'Our Earnings (PoCHub revenue)','uxd.ltv':'Lifetime (LTV)','uxd.openbal':'Open Balance','uxd.subscription':'Subscription','uxd.featured':'Featured','uxd.other':'Other','uxd.activity_pkg':'Activity · Package','uxd.poc_received':'PoC Received','uxd.active_feat':'active featured placement(s)','uxd.last_activity':'Last activity','uxd.rev6':'Last 6 Months Revenue','uxd.clear_debt':'Clear Debts','vvd.title':'Vendor Detail','vvd.verified':'✓ Verified','vvd.foreign':'Foreign','vvd.phone':'Phone','vvd.address':'Address','vvd.taxno':'Tax No','vvd.name':'Name','vvd.categories':'CATEGORIES','vvd.specializations':'EXPERTISE','vvd.regions':'REGIONS','vvd.brands':'BRANDS','vvd.refs':'REFERENCES','acat.add_field':'+ Add Field','eam.title':'Participant List','eam.empty':'No registrations for this event yet.','eam.event':'Event','vev.poc_lang':'PoC Language','vev.required_paren':'(Required)',
     'vpub.od_detail':'Offer Detail',
     'vpub.od_type':'Offer Type',
 
@@ -36102,6 +36103,8 @@ async function admAnalytics(m) {
   var _dl=function(content, mime, fname){ var blob=new Blob([content],{type:mime}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},1500); };
   var _today=new Date().toISOString().slice(0,10);
   var _mode=pStart?'URETIM':'TEST';
+  var _L=function(tr,en){ return (window.CUR_LOCALE==='en')?en:tr; };
+  var _modeL=_L(_mode, _mode==='URETIM'?'PRODUCTION':'TEST');
   // v7.50: PDF icin trend grafigi (explicit renk, CSS var yok) -> PNG
   var _svgToPng=function(svgStr,w,hh){ return new Promise(function(res,rej){ var img=new Image(); var url=URL.createObjectURL(new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'})); img.onload=function(){ var sc=2; var c=document.createElement('canvas'); c.width=w*sc; c.height=hh*sc; var ctx=c.getContext('2d'); ctx.scale(sc,sc); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,w,hh); ctx.drawImage(img,0,0,w,hh); URL.revokeObjectURL(url); try{ res(c.toDataURL('image/png')); }catch(e){ rej(e); } }; img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error('svg render failed')); }; img.src=url; }); };
   var _pdfTrendSvg=function(){
@@ -36120,16 +36123,17 @@ async function admAnalytics(m) {
   };
   m.querySelector('#anl-csv')?.addEventListener('click', function(){
     var L=[];
-    L.push('PoCHub Analitik;'+_today+';Mod: '+_mode);
+    L.push('PoCHub '+_L('Analitik','Analytics')+';'+_today+';'+_L('Mod','Mode')+': '+_modeL);
     L.push('');
-    L.push('OZET METRIK;Deger');
-    [['Musteri',nCust],['Uretici',nUret],['Distributor',nDist],['Entegrator',nInt],['Aktif 30g',active30],['Toplam Urun',Pp.length],['Aktif Urun',prodActive],['Toplam PoC',pocTotal],['Kabul',pocAcc],['Tamamlanan',pocComp],['Eslesme %',matchRate],['GMV TL',gmv],['Gelir TL',revTotal]].forEach(function(r){ L.push(_csvEsc(r[0])+';'+_csvEsc(r[1])); });
+    L.push(_L('OZET METRIK','SUMMARY METRIC')+';'+_L('Deger','Value'));
+    [[_L('Musteri','Customers'),nCust],[_L('Uretici','Manufacturers'),nUret],[_L('Distributor','Distributors'),nDist],[_L('Entegrator','Integrators'),nInt],[_L('Aktif 30g','Active 30d'),active30],[_L('Toplam Urun','Total Products'),Pp.length],[_L('Aktif Urun','Active Products'),prodActive],[_L('Toplam PoC','Total PoC'),pocTotal],[_L('Kabul','Accepted'),pocAcc],[_L('Tamamlanan','Completed'),pocComp],[_L('Eslesme %','Match %'),matchRate],['GMV TL',gmv],[_L('Gelir TL','Revenue TL'),revTotal]].forEach(function(r){ L.push(_csvEsc(r[0])+';'+_csvEsc(r[1])); });
     L.push('');
-    L.push('AYLIK TREND;Yeni Musteri;Yeni Vendor;PoC;Gelir TL');
+    L.push(_L('AYLIK TREND','MONTHLY TREND')+';'+_L('Yeni Musteri','New Customers')+';'+_L('Yeni Vendor','New Vendors')+';PoC;'+_L('Gelir TL','Revenue TL'));
     months.forEach(function(mm,i){ L.push(_csvEsc(mm)+';'+sCust[i]+';'+sVend[i]+';'+sPoc[i]+';'+sRevT[i]); });
     L.push('');
-    L.push('PAYDAS DEGER;Metrik;Deger');
-    [['Uretici','Onayli urun',prodActive],['Uretici','Teslim PoC',pocComp],['Uretici','Kabul teklif',vAccOffers],['Uretici','GMV',gmv],['Uretici','Ulasilan musteri',vCustomers],['Musteri','Acilan PoC',pocTotal],['Musteri','Degerlendirilen urun',cProducts],['Musteri','Baglanilan vendor',cVendors],['Musteri','Eslesme %',matchRate],['Kanal','Distributor ortak',nDist],['Kanal','Entegrator ortak',nInt]].forEach(function(r){ L.push(_csvEsc(r[0])+';'+_csvEsc(r[1])+';'+_csvEsc(r[2])); });
+    L.push(_L('PAYDAS DEGER','STAKEHOLDER VALUE')+';'+_L('Metrik','Metric')+';'+_L('Deger','Value'));
+    var _U=_L('Uretici','Manufacturer'),_M=_L('Musteri','Customer'),_K=_L('Kanal','Channel');
+    [[_U,_L('Onayli urun','Approved products'),prodActive],[_U,_L('Teslim PoC','PoC delivered'),pocComp],[_U,_L('Kabul teklif','Offers accepted'),vAccOffers],[_U,'GMV',gmv],[_U,_L('Ulasilan musteri','Customers reached'),vCustomers],[_M,_L('Acilan PoC','PoC opened'),pocTotal],[_M,_L('Degerlendirilen urun','Products evaluated'),cProducts],[_M,_L('Baglanilan vendor','Vendors engaged'),cVendors],[_M,_L('Eslesme %','Match %'),matchRate],[_K,_L('Distributor ortak','Distributor partners'),nDist],[_K,_L('Entegrator ortak','Integrator partners'),nInt]].forEach(function(r){ L.push(_csvEsc(r[0])+';'+_csvEsc(r[1])+';'+_csvEsc(r[2])); });
     _dl(String.fromCharCode(0xFEFF)+L.join(String.fromCharCode(13)+String.fromCharCode(10)), 'text/csv;charset=utf-8', 'PoCHub-Analitik-'+_today+'.csv');
     showToast(t('aanl.csv_done','📥 CSV indirildi.'));
   });
@@ -36138,25 +36142,25 @@ async function admAnalytics(m) {
     if(!window.jspdf||!window.jspdf.jsPDF){ showToast(t('tst.pdf_lib_err','PDF kutuphanesi yuklenemedi.'),'err'); return; }
     var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
     var y=18;
-    pdf.setFontSize(18); pdf.setTextColor(22,163,74); pdf.text('PoCHub Platform Analitik', 14, y); y+=7;
-    pdf.setFontSize(10); pdf.setTextColor(120,120,120); pdf.text(_today+'   -   Mod: '+_mode, 14, y); y+=4;
+    pdf.setFontSize(18); pdf.setTextColor(22,163,74); pdf.text('PoCHub Platform '+_L('Analitik','Analytics'), 14, y); y+=7;
+    pdf.setFontSize(10); pdf.setTextColor(120,120,120); pdf.text(_today+'   -   '+_L('Mod','Mode')+': '+_modeL, 14, y); y+=4;
     pdf.setDrawColor(220,220,220); pdf.line(14, y, 196, y); y+=8;
     var row=function(label,val){ pdf.setFontSize(10); pdf.setTextColor(90,90,90); pdf.text(String(label), 16, y); pdf.setTextColor(20,20,20); pdf.text(String(val), 95, y); y+=6; };
     var head=function(txt){ y+=2; pdf.setFontSize(12); pdf.setTextColor(22,163,74); pdf.text(String(txt), 14, y); y+=6.5; };
-    head('Buyume & Gelir');
-    row('Musteri', nCust); row('Vendor (toplam)', nVend+'  ('+nUret+' uretici, '+nDist+' dist, '+nInt+' entegrator)'); row('Aktif (son 30 gun)', active30); row('Gelir (TL)', (revTotal||0).toLocaleString('tr-TR')); row('GMV (TL)', (gmv||0).toLocaleString('tr-TR'));
-    head('PoC Funnel & Likidite');
-    row('Toplam PoC talebi', pocTotal); row('Kabul edilen', pocAcc+'   (%'+convAcc+')'); row('Tamamlanan', pocComp+'   (%'+convComp+')'); row('Eslesme orani', '%'+matchRate);
-    head('Arz');
-    row('Toplam urun', Pp.length); row('Aktif / onayli urun', prodActive);
-    head('Paydas Deger');
-    row('Uretici - ulasilan musteri', vCustomers); row('Musteri - baglanilan vendor', cVendors); row('Kanal - ortak (dist+entegr)', (nDist+nInt));
+    head(_L('Buyume & Gelir','Growth & Revenue'));
+    row(_L('Musteri','Customers'), nCust); row(_L('Vendor (toplam)','Vendors (total)'), nVend+'  ('+nUret+' '+_L('uretici','mfr')+', '+nDist+' dist, '+nInt+' '+_L('entegrator','integ')+')'); row(_L('Aktif (son 30 gun)','Active (last 30d)'), active30); row(_L('Gelir (TL)','Revenue (TL)'), (revTotal||0).toLocaleString('tr-TR')); row('GMV (TL)', (gmv||0).toLocaleString('tr-TR'));
+    head(_L('PoC Funnel & Likidite','PoC Funnel & Liquidity'));
+    row(_L('Toplam PoC talebi','Total PoC requests'), pocTotal); row(_L('Kabul edilen','Accepted'), pocAcc+'   (%'+convAcc+')'); row(_L('Tamamlanan','Completed'), pocComp+'   (%'+convComp+')'); row(_L('Eslesme orani','Match rate'), '%'+matchRate);
+    head(_L('Arz','Supply'));
+    row(_L('Toplam urun','Total products'), Pp.length); row(_L('Aktif / onayli urun','Active / approved products'), prodActive);
+    head(_L('Paydas Deger','Stakeholder Value'));
+    row(_L('Uretici - ulasilan musteri','Manufacturer - customers reached'), vCustomers); row(_L('Musteri - baglanilan vendor','Customer - vendors engaged'), cVendors); row(_L('Kanal - ortak (dist+entegr)','Channel - partners (dist+integ)'), (nDist+nInt));
     try {
-      y+=3; pdf.setFontSize(12); pdf.setTextColor(22,163,74); pdf.text('Aylik Trend (son 12 ay)', 14, y); y+=2;
+      y+=3; pdf.setFontSize(12); pdf.setTextColor(22,163,74); pdf.text(_L('Aylik Trend (son 12 ay)','Monthly Trend (last 12 months)'), 14, y); y+=2;
       var _png = await _svgToPng(_pdfTrendSvg(), 560, 200);
       pdf.addImage(_png, 'PNG', 14, y, 182, 65); y+=70;
     } catch(_ce){ console.error('PDF chart embed failed', _ce); }
-    y+=4; pdf.setFontSize(8); pdf.setTextColor(150,150,150); pdf.text('Agregat veriler - KVKK uyumlu - '+(pStart?'uretim verisi':'TEST MODU (onizleme)'), 14, y);
+    y+=4; pdf.setFontSize(8); pdf.setTextColor(150,150,150); pdf.text(_L('Agregat veriler - KVKK uyumlu - ','Aggregate data - KVKK compliant - ')+(pStart?_L('uretim verisi','production data'):_L('TEST MODU (onizleme)','TEST MODE (preview)')), 14, y);
     pdf.save('PoCHub-Analitik-'+_today+'.pdf');
   });
 
@@ -36269,7 +36273,8 @@ async function admHistory(m) {
   var csvBtn=document.getElementById('ahist-csv');
   if(csvBtn) csvBtn.addEventListener('click',function(){
     var esc=function(v){ v=String(v==null?'':v); return '"'+v.replace(/"/g,'""')+'"'; };
-    var L=['Tarih;Asama;Tip;Varlik;Alan;Eski;Yeni;Kisi'];
+    var _L=function(tr,en){ return (window.CUR_LOCALE==='en')?en:tr; };
+    var L=[[_L('Tarih','Date'),_L('Asama','Phase'),_L('Tip','Type'),_L('Varlik','Entity'),_L('Alan','Field'),_L('Eski','Old'),_L('Yeni','New'),_L('Kisi','Actor')].join(';')];
     rows.forEach(function(r){ var d=(r.at&&r.at.toDate)?r.at.toDate():null; var when=d?d.toISOString():''; (r.changes&&r.changes.length?r.changes:[{field:'',old:'',new:''}]).forEach(function(c){ L.push([esc(when),esc(r.phase||'test'),esc(typeLabel(r.entityType)),esc(r.entityName||''),esc(fieldLabel(c.field)),esc(c.old),esc(c.new),esc(r.actorName||'')].join(';')); }); });
     var blob=new Blob([String.fromCharCode(0xFEFF)+L.join(String.fromCharCode(13)+String.fromCharCode(10))],{type:'text/csv;charset=utf-8'});
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='PoCHub-Degisiklik-Gecmisi-'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},1500);
@@ -37808,7 +37813,9 @@ async function admPayments(m) {
 
           try {
             // 1. Paket bilgisini çek
-            const pkgSnap = await getDoc(doc(db,'pochub_packages',item.toPackageId));
+            var _pkgId = item.toPackageId || item.packageId;
+            if (!_pkgId) throw new Error(t('apay.no_pkg','Bu kayitta paket bilgisi eksik (eski kayit) — vendor_subscriptions manuel guncellenmeli.'));
+            const pkgSnap = await getDoc(doc(db,'pochub_packages',_pkgId));
             if (!pkgSnap.exists()) throw new Error(t('apay.pkg_not_found','Paket bulunamadı'));
             const pkg = pkgSnap.data();
 
@@ -37821,7 +37828,7 @@ async function admPayments(m) {
 
             await setDoc(subRef, {
               vendorId: item.vendorId,
-              currentPackageId: item.toPackageId,
+              currentPackageId: _pkgId,
               currentTier: pkg.tier,
               status: 'active',
               startDate: serverTimestamp(),
