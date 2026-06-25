@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.63 | pochub.co -->
+<!-- PoCHub v7.64 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -689,7 +689,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.63';
+const VERSION = 'v7.64';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -948,6 +948,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.64': ['BUG FIX (Odeme Onaylari): Bos kategoride liste m.innerHTML += ile basildigi icin m nin TUM icerigi yeniden parse ediliyor ve TAB BUTONLARININ click listener lari yok oluyordu. Sonuc: Pending=0 olunca ilk render listenerlari oldururyor, Approved/Rejected/All tab lari tiklaninca hicbir sey olmuyor (ekran bos pending de takili). Onay verilen kayitlar veri olarak duruyordu (sayaclar 41/4 dogru), sadece liste gosterilemiyordu. Fix: bos mesaji innerHTML += yerine appendChild ile DOM node olarak eklendi -> listenerlar korunuyor. Eskiden pending dolu oldugu icin bu yol hic tetiklenmiyordu. node+harness HEPSI 0.'],
   'v7.63': ['i18n: Ayarlar ekranindaki 5 hardcoded TR aciklama metni t() ye alindi (EN cevirileri eklendi): Taxonomy (dinamik {s}/{d} sektor/dagitim sayisi), Filter Management, Evidence Score Weights, Decision Reasons (Win/Loss), Visit Analytics. Basliklar/butonlar zaten cevriliydi; sadece aciklamalar TR kalmisti. node+harness HEPSI 0.'],
   'v7.62': ['UI: TUM ayar ekrani (admSettings) yeniden tasarlandi. section() artik responsive grid (.cfg-grid, auto-fit minmax 240px); field() stacked .cfg-cell dondurur (ustte etiket, altta tam-genislik SOL-yasli input — eski dar/saga-yasli 140px duzen gitti). Tek CSS kurali (.cfg-grid>:not(.cfg-cell){grid-column:1/-1}) sayesinde field disi her sey (info cubuklari, currency paneli, sirket formu) otomatik tam-genislik kalir. section()/field() admSettings e ozel (yerel) oldugu icin blast-radius sadece ayarlar; cagri noktalari ve input id leri degismedi -> Kaydet ve diger handler lar aynen calisir. node+harness HEPSI 0.'],
   'v7.61': ['UI: Sirket Bilgileri (Makbuz PDF) bolumu yeniden tasarlandi. Eski label-sol/input-sag (sага yasli, dar) duzen yerine; grupli (Kimlik / Vergi & Banka / Iletisim & Fatura), sol-yasli tam-genislik inputlu, placeholderli, responsive grid. IBAN monospace, uygun inputmode/type (email/tel/number). Ayni input id leri korundu -> Kaydet handler i degismedi. Global field() helper a dokunulmadi. node+harness HEPSI 0.'],
@@ -37899,7 +37900,10 @@ async function admPayments(m) {
         : allHistory;
 
       if (items.length === 0) {
-        m.innerHTML += '<div class="empty"><div class="empty-icon">💳</div>'+t('apay.empty_cat','Bu kategoride kayıt yok.')+'</div>';
+        var empC = document.createElement('div');
+        empC.className = 'empty';
+        empC.innerHTML = '<div class="empty-icon">💳</div>'+t('apay.empty_cat','Bu kategoride kayıt yok.');
+        m.appendChild(empC);
         return;
       }
 
