@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.57 | pochub.co -->
+<!-- PoCHub v7.58 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.57';
+const VERSION = 'v7.58';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -944,6 +944,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.58': ['KUR: TCMB Efektif Satis (BanknoteSelling) cekme. Ayarlar > Para Birimi/Kur bolumune TCMB today.xml den USD/EUR BanknoteSelling + bulten tarihini gosteren panel + TCMB Kurunu Uygula butonu. Spark/Functions yok -> tarayicidan CORS proxy zinciri (allorigins/corsproxy/codetabs) ile cekilir, DOMParser ile parse edilir. ADMIN ONAYLI: deger input lara DOLDURULUR, Kaydet ile uygulanir (sessiz overwrite yok, fiyatlandirma guvenligi). Fetch basarisizsa (CORS/hafta sonu) zarif uyari + manuel. node+harness HEPSI 0.'],
   'v7.57': ['URETIM GATE GERI ALMA: Ayarlar > Uretim bolumune, uretim aktifken gorunen TEST Moduna Don butonu eklendi. productionStartAt null yapilir (veri SILINMEZ; isProduction falsy olur, analitik/gecmis tekrar onizleme sayar). Islem config_history e audit olarak yazilir. Yanlislikla Uretime Gec basildiginda tek tikla geri alinir. node+harness HEPSI 0.'],
   'v7.56': ['BUG FIX + i18n. (1) ODEME ONAY BUG: Approve & Activate -> Cannot read properties of undefined (reading indexOf). Kok sebep: eski subscription_history kayitlarinda toPackageId yok (sadece packageId) -> doc(db,pochub_packages,undefined) Firestore icinde .indexOf cagirip cokuyordu. Fix: _pkgId = toPackageId || packageId + net guard. (2) Vendor abonelik detay modali i18n: Bitis, PoC Kullanim, Cari Hesap/Temiz/borc, Manuel Mudahale, Borclari Sil, Manuel Suspend, Ucretsiz, Bilinmeyen + prompt/confirm dialoglari (uzat, paket hediye, borc sil). (3) Analitik PDF/CSV + Change History CSV locale-aware (EN modunda Ingilizce). node+harness HEPSI 0.'],
   'v7.55': ['i18n SIZINTI SWEEP (admin paneli, EN modunda TR kalan yerler). Hardcoded TR -> t() (40+ anahtar tr+en): (1) Paket editoru (PoC kontenjani, asan PoC fiyati, override hakki/zammi/yardim, featured gun, surekli featured, ozellikler, onerilen vendor tipleri, gorunur mu, evet/hayir secenekleri, iptal). (2) Kullanici detay modali (kazancimiz, LTV, acik bakiye, abonelik/one cikan/diger, aktivite-paket, aldigi PoC, son aktivite, son 6 ay gelir, borclari sifirla). (3) Vendor detay modali (baslik, dogrulanmis, telefon/adres/vergi no/isim, kategoriler/uzmanliklar/bolgeler/markalar/referanslar, yerli/yabanci). (4) Kategori +Alan Ekle. (5) Etkinlik katilimci modali (baslik + bos durum, 2 yer). (6) Data Health: tiklama sonrasi butona hardcoded TR yazilmasi -> t(). node+harness HEPSI 0.'],
@@ -28847,6 +28848,40 @@ function renderCustomerBadge(customerData, size) {
 function curSym(ccy){ return ccy==='USD'?'$':ccy==='EUR'?'\u20ac':'\u20ba'; }
 function userBillingCcy(){ return (typeof CUR_PROFILE!=='undefined' && CUR_PROFILE && CUR_PROFILE.billingCurrency) || 'TRY'; }
 function curRates(cfg){ var r=(cfg&&cfg.currencyRates)||{}; return { USD: Number(r.usd)||0, EUR: Number(r.eur)||0 }; }
+// v7.58: TCMB today.xml Efektif Satis (BanknoteSelling) — Spark/browser-only -> CORS proxy zinciri
+async function fetchTCMBRates(){
+  var target = 'https://www.tcmb.gov.tr/kurlar/today.xml';
+  var proxies = [
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(target),
+    'https://corsproxy.io/?url=' + encodeURIComponent(target),
+    'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(target)
+  ];
+  for (var i=0;i<proxies.length;i++){
+    try {
+      var res = await fetch(proxies[i], { cache:'no-store' });
+      if(!res || !res.ok) continue;
+      var txt = await res.text();
+      if(!txt || txt.indexOf('Currency')<0) continue;
+      var xml = new DOMParser().parseFromString(txt, 'text/xml');
+      var rateOf = function(code){
+        var nodes = xml.getElementsByTagName('Currency');
+        for(var j=0;j<nodes.length;j++){
+          if(nodes[j].getAttribute('Kod')===code || nodes[j].getAttribute('CurrencyCode')===code){
+            var bs = nodes[j].getElementsByTagName('BanknoteSelling')[0];
+            var v = bs ? parseFloat(String(bs.textContent||'').trim().replace(',','.')) : 0;
+            return isNaN(v)?0:v;
+          }
+        }
+        return 0;
+      };
+      var usd = rateOf('USD'), eur = rateOf('EUR');
+      var td = xml.getElementsByTagName('Tarih_Date')[0];
+      var dstr = td ? (td.getAttribute('Tarih')||'') : '';
+      if(usd>0 && eur>0) return { usd:usd, eur:eur, date:dstr };
+    } catch(e){ /* sonraki proxy */ }
+  }
+  return null;
+}
 // TL tutarini hedef para birimine cevirir; override (elle fiyat) varsa onu kullanir; kur yoksa TL'ye duser.
 function tlToCur(tlAmount, ccy, cfg, override){
   if(!ccy || ccy==='TRY') return { amount: tlAmount, ccy:'TRY' };
@@ -32010,7 +32045,7 @@ const I18N_DICT = {
     'vpm.f_action':'🚨 Aksiyon Gerekenler','vpm.f_idle':'💤 Hareketsiz','vreq.fastest_poc':'🔥 EN HIZLI YANITLANAN PoC',
     'ii.banner':'💡 Bu bilgiler indirilecek makbuzlarda gösterilecektir. Doğru ve güncel girmen önemli.','ii.address_ph':'Mahalle, Cadde, No, İlçe/İl','ii.taxno':'Vergi/TC Numarası',
     // v7.40 para birimi (Asama 1)
-    'aset.currency_section':'💱 Para Birimi / Kur','aset.currency_info':'1 USD / 1 EUR kaç TL? Yabancı vendor paket+Boost fiyatları bu kurla otomatik hesaplanır. 0 = o para birimi kapalı. Pakete özel elle fiyat (override) Paketler ekranından girilir.','aset.usd_rate':'USD Kuru (1 USD = ? TL)','aset.eur_rate':'EUR Kuru (1 EUR = ? TL)',
+    'aset.currency_section':'💱 Para Birimi / Kur','aset.currency_info':'1 USD / 1 EUR kaç TL? Yabancı vendor paket+Boost fiyatları bu kurla otomatik hesaplanır. 0 = o para birimi kapalı. Pakete özel elle fiyat (override) Paketler ekranından girilir.','aset.usd_rate':'USD Kuru (1 USD = ? TL)','aset.eur_rate':'EUR Kuru (1 EUR = ? TL)','atcmb.loading':'TCMB Efektif Satış çekiliyor…','atcmb.fail':'TCMB kuru çekilemedi (CORS/hafta sonu/proxy). Manuel girebilirsin.','atcmb.bnote':'Efektif Satış','atcmb.apply':'TCMB Kurunu Uygula','atcmb.applied':'📥 TCMB değerleri dolduruldu. Kaydet butonuna bas.',
     'auth.currency_label':'Faturalandırma Para Birimi','auth.ccy_try':'₺ TRY (Türk Lirası)','auth.ccy_usd':'$ USD','auth.ccy_eur':'€ EUR',
     'prof.billing_currency':'💱 Faturalandırma Para Birimi','prof.billing_currency_hint':'Paket ve Boost ödemelerinde kullanılır',
     // v7.41 para birimi Asama 2
@@ -34809,7 +34844,7 @@ const I18N_DICT = {
     'vpm.f_action':'🚨 Needs Action','vpm.f_idle':'💤 Inactive','vreq.fastest_poc':'🔥 FASTEST-RESPONDED PoC',
     'ii.banner':'💡 This info will appear on downloadable receipts. Entering it correctly and up to date matters.','ii.address_ph':'Street, No, District/City','ii.taxno':'Tax/National ID Number',
     // v7.40 currency (Phase 1)
-    'aset.currency_section':'💱 Currency / Exchange Rate','aset.currency_info':'How many TL is 1 USD / 1 EUR? Foreign-vendor package+Boost prices are auto-calculated with this rate. 0 = that currency disabled. Per-package manual price (override) is set on the Packages screen.','aset.usd_rate':'USD Rate (1 USD = ? TL)','aset.eur_rate':'EUR Rate (1 EUR = ? TL)',
+    'aset.currency_section':'💱 Currency / Exchange Rate','aset.currency_info':'How many TL is 1 USD / 1 EUR? Foreign-vendor package+Boost prices are auto-calculated with this rate. 0 = that currency disabled. Per-package manual price (override) is set on the Packages screen.','aset.usd_rate':'USD Rate (1 USD = ? TL)','aset.eur_rate':'EUR Rate (1 EUR = ? TL)','atcmb.loading':'Fetching TCMB banknote selling…','atcmb.fail':'Could not fetch TCMB rate (CORS/weekend/proxy). You can enter manually.','atcmb.bnote':'Banknote Selling','atcmb.apply':'Apply TCMB Rate','atcmb.applied':'📥 TCMB values filled in. Click Save.',
     'auth.currency_label':'Billing Currency','auth.ccy_try':'₺ TRY (Turkish Lira)','auth.ccy_usd':'$ USD','auth.ccy_eur':'€ EUR',
     'prof.billing_currency':'💱 Billing Currency','prof.billing_currency_hint':'Used for package and Boost payments',
     // v7.41 currency Phase 2
@@ -37268,7 +37303,28 @@ async function admSettings(m) {
     s12b.appendChild(s12bInfo);
     s12b.appendChild(field(t('aset.usd_rate','USD Kuru (1 USD = ? TL)'), 'cfg-cur-usd', 'number', cfg.currencyRates?.usd ?? 0));
     s12b.appendChild(field(t('aset.eur_rate','EUR Kuru (1 EUR = ? TL)'), 'cfg-cur-eur', 'number', cfg.currencyRates?.eur ?? 0));
+    var tcmbBox = document.createElement('div');
+    tcmbBox.id = 'tcmb-box';
+    tcmbBox.style.cssText = 'background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:10px 12px;margin:8px 0 4px;font-size:12px;color:var(--text-muted);line-height:1.7';
+    tcmbBox.innerHTML = '⏳ ' + t('atcmb.loading','TCMB Efektif Satış çekiliyor…');
+    s12b.appendChild(tcmbBox);
     m.appendChild(s12b);
+    (async function(){
+      var _r = await fetchTCMBRates();
+      var box = el('tcmb-box'); if(!box) return;
+      if(!_r){ box.innerHTML = '⚠️ ' + t('atcmb.fail','TCMB kuru çekilemedi (CORS/hafta sonu/proxy). Manuel girebilirsin.'); return; }
+      box.innerHTML = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+        + '<span><strong style="color:#2563eb">🏦 TCMB</strong> ' + t('atcmb.bnote','Efektif Satış') + ' <span style="color:var(--text-muted)">(' + escHtml(_r.date) + ')</span></span>'
+        + '<span>USD <strong>' + _r.usd.toFixed(4) + '</strong></span>'
+        + '<span>EUR <strong>' + _r.eur.toFixed(4) + '</strong></span>'
+        + '<button class="btn-p btn-sm" id="tcmb-apply" style="margin-left:auto">📥 ' + t('atcmb.apply','TCMB Kurunu Uygula') + '</button>'
+        + '</div>';
+      el('tcmb-apply')?.addEventListener('click', function(){
+        if(el('cfg-cur-usd')) el('cfg-cur-usd').value = _r.usd.toFixed(4);
+        if(el('cfg-cur-eur')) el('cfg-cur-eur').value = _r.eur.toFixed(4);
+        showToast(t('atcmb.applied','📥 TCMB değerleri dolduruldu. Kaydet butonuna bas.'));
+      });
+    })();
 
     // v7.42: Uretim / Production gate
     var sProd = document.createElement('div');
