@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.60 | pochub.co -->
+<!-- PoCHub v7.61 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -685,7 +685,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.60';
+const VERSION = 'v7.61';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -944,6 +944,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.61': ['UI: Sirket Bilgileri (Makbuz PDF) bolumu yeniden tasarlandi. Eski label-sol/input-sag (sага yasli, dar) duzen yerine; grupli (Kimlik / Vergi & Banka / Iletisim & Fatura), sol-yasli tam-genislik inputlu, placeholderli, responsive grid. IBAN monospace, uygun inputmode/type (email/tel/number). Ayni input id leri korundu -> Kaydet handler i degismedi. Global field() helper a dokunulmadi. node+harness HEPSI 0.'],
   'v7.60': ['KUR/TCMB en saglam yol: fetchTCMBRates artik ONCE ayni-origin ./tcmb-rates.json dosyasini okur (GitHub Action gunluk yazar) -> sifir CORS, proxy gerekmez. Dosya yoksa (404) eski proxy zincirine duser, regresyon yok. Repo ya .github/workflows/tcmb-rates.yml eklenince TCMB sunucu tarafinda cekilip repo ya commitlenir; uygulama kendi origininden okur. node+harness HEPSI 0.'],
   'v7.59': ['KUR/TCMB saglamlastirma: public proxyler tek basina guvenilmez oldugu icin (corsproxy API-key istiyor, allorigins 429/timeout) Ayarlar > Para Birimi/Kur a TCMB Proxy URL alani eklendi (config tcmbProxyUrl). Kendi Cloudflare Worker URL ini yapistirinca kod degismeden ILK o denenir; {url} placeholder destegi. Ayrica zincire per-istek 9sn timeout (AbortController) + allorigins /get JSON ({contents}) varyanti eklendi. fetchTCMBRates(cfg). node+harness HEPSI 0.'],
   'v7.58': ['KUR: TCMB Efektif Satis (BanknoteSelling) cekme. Ayarlar > Para Birimi/Kur bolumune TCMB today.xml den USD/EUR BanknoteSelling + bulten tarihini gosteren panel + TCMB Kurunu Uygula butonu. Spark/Functions yok -> tarayicidan CORS proxy zinciri (allorigins/corsproxy/codetabs) ile cekilir, DOMParser ile parse edilir. ADMIN ONAYLI: deger input lara DOLDURULUR, Kaydet ile uygulanir (sessiz overwrite yok, fiyatlandirma guvenligi). Fetch basarisizsa (CORS/hafta sonu) zarif uyari + manuel. node+harness HEPSI 0.'],
@@ -31840,6 +31841,7 @@ const I18N_DICT = {
     'aset.sirket_unvani':'Şirket Unvanı',
     'aset.adres':'Adres',
     'aset.vergi_dairesi':'Vergi Dairesi',
+    'aci.subtitle':'Bu bilgiler makbuz ve fatura PDF dosyalarında görünür.','aci.grp_identity':'Kimlik','aci.grp_taxbank':'Vergi & Banka','aci.grp_contact':'İletişim & Fatura',
     'aset.vkn':'VKN',
     'aset.iban':'IBAN',
     'aset.e_posta':'E-posta',
@@ -34639,6 +34641,7 @@ const I18N_DICT = {
     'aset.sirket_unvani':'Company Title',
     'aset.adres':'Address',
     'aset.vergi_dairesi':'Tax Office',
+    'aci.subtitle':'These details appear on receipt and invoice PDFs.','aci.grp_identity':'Identity','aci.grp_taxbank':'Tax & Bank','aci.grp_contact':'Contact & Invoice',
     'aset.vkn':'Tax ID',
     'aset.iban':'IBAN',
     'aset.e_posta':'Email',
@@ -37303,15 +37306,37 @@ async function admSettings(m) {
 
     // v4.74: Şirket Bilgileri (PDF makbuz için)
     var s12 = section(t('aset.pochub_sirket_bilgileri_makbuz_pdf','🏢 PoCHub Şirket Bilgileri (Makbuz PDF için)'), '#2563eb');
-    s12.appendChild(field(t('aset.sirket_unvani','Şirket Unvanı'), 'cfg-ci-name', 'text', cfg.companyInfo?.name || 'PoCHub Teknoloji A.Ş.'));
-    s12.appendChild(field(t('aset.adres','Adres'), 'cfg-ci-address', 'text', cfg.companyInfo?.address || 'İstanbul, Türkiye'));
-    s12.appendChild(field(t('aset.vergi_dairesi','Vergi Dairesi'), 'cfg-ci-tax-office', 'text', cfg.companyInfo?.taxOffice || ''));
-    s12.appendChild(field(t('aset.vkn','VKN'), 'cfg-ci-tax-no', 'text', cfg.companyInfo?.taxNumber || ''));
-    s12.appendChild(field(t('aset.iban','IBAN'), 'cfg-ci-iban', 'text', cfg.companyInfo?.iban || ''));
-    s12.appendChild(field(t('aset.e_posta','E-posta'), 'cfg-ci-email', 'text', cfg.companyInfo?.email || 'info@pochub.co'));
-    s12.appendChild(field(t('aset.telefon','Telefon'), 'cfg-ci-phone', 'text', cfg.companyInfo?.phone || ''));
-    s12.appendChild(field(t('aset.web_sitesi','Web Sitesi'), 'cfg-ci-website', 'text', cfg.companyInfo?.website || 'pochub.co'));
-    s12.appendChild(field(t('aset.kdv_orani','KDV Oranı (%)'), 'cfg-ci-vat', 'number', cfg.companyInfo?.vatRate ?? 20));
+    // v7.61: sirket bilgileri formu — grupli, sol-yasli, tam-genislik, responsive grid
+    var _ci = cfg.companyInfo || {};
+    var ciWrap = document.createElement('div');
+    var _ciEsc = function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
+    var _ciF = function(label, id, val, ph, o){
+      o = o || {};
+      return '<div style="'+(o.full?'grid-column:1/-1;':'')+'min-width:0">'
+        + '<label for="'+id+'" style="display:block;font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px">'+label+'</label>'
+        + '<input class="inp" type="'+(o.type||'text')+'" id="'+id+'" value="'+_ciEsc(val)+'" placeholder="'+_ciEsc(ph||'')+'"'
+        + (o.attr||'')
+        + ' style="width:100%;text-align:left;'+(o.mono?'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.5px;':'')+'">'
+        + '</div>';
+    };
+    var _ciGrp = function(txt){ return '<div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:4px"><span style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#2563eb;white-space:nowrap">'+txt+'</span><span style="flex:1;height:1px;background:var(--border)"></span></div>'; };
+    ciWrap.innerHTML =
+      '<div style="font-size:12px;color:var(--text-muted);margin:-2px 0 14px;line-height:1.5">'+t('aci.subtitle','Bu bilgiler makbuz ve fatura PDF dosyalarında görünür.')+'</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 18px;align-items:end">'
+      + _ciGrp(t('aci.grp_identity','Kimlik'))
+      + _ciF('🏢 '+t('aset.sirket_unvani','Şirket Unvanı'), 'cfg-ci-name', _ci.name||'PoCHub Teknoloji A.Ş.', 'PoCHub Teknoloji A.Ş.', {full:true})
+      + _ciF('📍 '+t('aset.adres','Adres'), 'cfg-ci-address', _ci.address||'İstanbul, Türkiye', 'Cadde, No, İlçe / İl', {full:true})
+      + _ciGrp(t('aci.grp_taxbank','Vergi & Banka'))
+      + _ciF('🏛️ '+t('aset.vergi_dairesi','Vergi Dairesi'), 'cfg-ci-tax-office', _ci.taxOffice||'', 'Beşiktaş V.D.')
+      + _ciF('🔢 '+t('aset.vkn','VKN'), 'cfg-ci-tax-no', _ci.taxNumber||'', '1234567890', {attr:' inputmode=\"numeric\"'})
+      + _ciF('🏦 '+t('aset.iban','IBAN'), 'cfg-ci-iban', _ci.iban||'', 'TR00 0000 0000 0000 0000 0000 00', {full:true, mono:true})
+      + _ciGrp(t('aci.grp_contact','İletişim & Fatura'))
+      + _ciF('✉️ '+t('aset.e_posta','E-posta'), 'cfg-ci-email', _ci.email||'info@pochub.co', 'info@pochub.co', {type:'email'})
+      + _ciF('📞 '+t('aset.telefon','Telefon'), 'cfg-ci-phone', _ci.phone||'', '+90 5xx xxx xx xx', {type:'tel'})
+      + _ciF('🌐 '+t('aset.web_sitesi','Web Sitesi'), 'cfg-ci-website', _ci.website||'pochub.co', 'pochub.co')
+      + _ciF('🧾 '+t('aset.kdv_orani','KDV Oranı (%)'), 'cfg-ci-vat', (_ci.vatRate==null?20:_ci.vatRate), '20', {type:'number'})
+      + '</div>';
+    s12.appendChild(ciWrap);
     m.appendChild(s12);
 
     // v7.40: Para Birimi / Kur (admin-yonetimli)
