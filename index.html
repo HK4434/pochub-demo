@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.68 | pochub.co -->
+<!-- PoCHub v7.69 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -689,7 +689,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.68';
+const VERSION = 'v7.69';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -948,6 +948,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.69': ['TAKSONOMI: Sektorler tab i tam Taksonomi yonetimine cevrildi — Sektorler + Dagitim Turleri + Lisans Modelleri 3 bolum liste-CRUD (her satir TR + EN + kod (+ eslesme)). 🌐 Bos EN etiketlerini cevir butonu (MyMemory/gTranslate) — TR den EN i otomatik doldurur, elle yazma derdi biter. EN etiketleri artik taxonomy de label_en olarak saklanir; applyTaxonomy locale-aware facet etiketi kurar + window._TAX_RAW saklar; setLocale te yeniden uygulanir; sectorLabel once taxonomy EN ine bakar. Ayarlardaki eski Taksonomi modal butonu bu taba yonlendiriyor. node+harness HEPSI 0.'],
   'v7.68': ['ADMIN: yeni Sektorler tab i (Kategoriler in yaninda). Liste halinde sektor ekle/sil/degistir (etiket + kod), kaydetme pochub_config/system.taxonomy ye yazar ve deployments/licenses i KORUR (silmez), applyTaxonomy ile SECTORS yerinde tazelenir. Uretici urun eklerken zaten bu listeyi coklu-pill secebiliyordu (v5.59) — degisiklik gerekmedi; admin yeni sektor ekleyince formda aninda cikar. Sektor yonetimi artik gomulu taxonomy modali yerine gorunur bir tab. node+harness HEPSI 0.'],
   'v7.67': ['DASHBOARD dilim 3: (1) AYLIK TREND — son 6 ay icin Yeni Kullanici / Gelir / Yeni PoC mini bar-chart (users.createdAt, subscription_history paid amount, poc createdAt timestamplerinden; yeni rules gerekmez). (2) SON AKTIVITE akisi — yeni kullanici/PoC/abonelik/demo olaylari birlestirilip zamana gore siralanir, son 8 gosterilir, goreli zaman (az once / dakika once...). Tamamen yuklu veriden sentezlenir, audit log/config_history GEREKMEZ. node+harness HEPSI 0.'],
   'v7.66': ['DASHBOARD dilim 2 (finansal/abonelik): (1) GERCEK MRR — currentPrice bos oldugu icin MRR ₺0 cikiyordu; artik pochub_packages tier->monthlyPrice haritasindan aktif (trial haric) aboneliklerin gercek aylik fiyati toplaniyor (highlight MRR karti da duzeldi). (2) ABONELIK SAGLIGI paneli: MRR, aktif abonelik, suresi dolacak (30g + 7g), riskli hesap (gecikmis/grace/askida), churn (30g + %), ve aktif tier dagilimi (fiyat/ay ile). pochub_packages yuklemeye eklendi. node+harness HEPSI 0.'],
@@ -7861,7 +7862,7 @@ var TAXONOMY_DEFAULTS = {
   ]
 };
 var SECTORS = TAXONOMY_DEFAULTS.sectors.map(function(s){ return [s.value, s.label]; });
-var SECTOR_LABEL = {}; function _rebuildSectorLabel(){ SECTOR_LABEL={}; SECTORS.forEach(function(s){ SECTOR_LABEL[s[0]]=s[1]; }); } _rebuildSectorLabel();
+var SECTOR_LABEL = {}; var SECTOR_LABEL_EN = {}; function _rebuildSectorLabel(){ SECTOR_LABEL={}; SECTORS.forEach(function(s){ SECTOR_LABEL[s[0]]=s[1]; }); } _rebuildSectorLabel();
 var TAX_DEPLOYMENTS = TAXONOMY_DEFAULTS.deployments.map(function(d){ return {value:d.value,label:d.label,match:(d.match||[]).slice()}; });
 var TAX_LICENSES = TAXONOMY_DEFAULTS.licenses.map(function(d){ return {value:d.value,label:d.label,match:(d.match||[]).slice()}; });
 var CAT_FILTERS = { category:[], sector:[], deployment:[], license:[], origin:[], verified:[], rating:[] }; // çok-gruplu facet seçimleri
@@ -7907,16 +7908,20 @@ var CAT_FACET_LABEL = {}; function _rebuildFacetLabel(){ CAT_FACET_LABEL={}; CAT
 
 // Config'den gelen taksonomiyi uygula (yerinde mutasyon — referanslar korunur)
 function applyTaxonomy(tax){
+  window._TAX_RAW = tax;
+  var _en = (window.CUR_LOCALE==='en');
   if (tax && Array.isArray(tax.sectors) && tax.sectors.length){
-    SECTORS.length=0; tax.sectors.forEach(function(s){ if(s&&s.value) SECTORS.push([s.value, s.label||s.value]); }); _rebuildSectorLabel();
+    SECTORS.length=0; SECTOR_LABEL_EN={};
+    tax.sectors.forEach(function(s){ if(s&&s.value){ SECTORS.push([s.value, s.label||s.value]); if(s.label_en) SECTOR_LABEL_EN[s.value]=s.label_en; } });
+    _rebuildSectorLabel();
   }
   if (tax && Array.isArray(tax.deployments) && tax.deployments.length){
-    TAX_DEPLOYMENTS = tax.deployments.map(function(d){ return {value:d.value,label:d.label||d.value,match:(d.match||[]).map(function(x){return (x||'').toString().toLowerCase();})}; });
-    var dep = CAT_FACETS.filter(function(f){return f.key==='deployment';})[0]; if(dep) dep.options = TAX_DEPLOYMENTS.map(function(d){return [d.value,d.label];});
+    TAX_DEPLOYMENTS = tax.deployments.map(function(d){ return {value:d.value,label:d.label||d.value,label_en:d.label_en||'',match:(d.match||[]).map(function(x){return (x||'').toString().toLowerCase();})}; });
+    var dep = CAT_FACETS.filter(function(f){return f.key==='deployment';})[0]; if(dep) dep.options = TAX_DEPLOYMENTS.map(function(d){return [d.value,(_en&&d.label_en)?d.label_en:d.label];});
   }
   if (tax && Array.isArray(tax.licenses) && tax.licenses.length){
-    TAX_LICENSES = tax.licenses.map(function(d){ return {value:d.value,label:d.label||d.value,match:(d.match||[]).map(function(x){return (x||'').toString().toLowerCase();})}; });
-    var lic = CAT_FACETS.filter(function(f){return f.key==='license';})[0]; if(lic) lic.options = TAX_LICENSES.map(function(d){return [d.value,d.label];});
+    TAX_LICENSES = tax.licenses.map(function(d){ return {value:d.value,label:d.label||d.value,label_en:d.label_en||'',match:(d.match||[]).map(function(x){return (x||'').toString().toLowerCase();})}; });
+    var lic = CAT_FACETS.filter(function(f){return f.key==='license';})[0]; if(lic) lic.options = TAX_LICENSES.map(function(d){return [d.value,(_en&&d.label_en)?d.label_en:d.label];});
   }
   _rebuildFacetLabel();
 }
@@ -7928,7 +7933,7 @@ async function ensureTaxonomy(force){
 }
 
 // v5.59 (Faz A3): ürün formu — çoklu sektör pill yardımcıları
-function sectorLabel(val, fallback){ var m=PROFILE_SECTOR_LABEL_L(); return (window.CUR_LOCALE==='en' && m[val]) ? m[val] : (fallback||SECTOR_LABEL[val]||val); }
+function sectorLabel(val, fallback){ if(window.CUR_LOCALE==='en'){ if(SECTOR_LABEL_EN[val]) return SECTOR_LABEL_EN[val]; var m=PROFILE_SECTOR_LABEL_L(); if(m[val]) return m[val]; } return (fallback||SECTOR_LABEL[val]||val); }
 function sectorPillsHtml(selected){
   selected = selected || [];
   return SECTORS.map(function(s){
@@ -25132,7 +25137,7 @@ function renderAdmin() {
   const tabs = [
     ['dashboard',t('atab.dashboard','Dashboard')],
     ...(_rp.canViewAll?[['users',t('atab.users','Kullanıcılar')]]:[]),
-    ...(CUR_PROFILE?.role==='admin'?[['roles',t('atab.roles','Rol Yönetimi')],['categories',t('atab.categories','Kategoriler')],['sectors',t('atab.sectors','🏷 Sektörler')]]:[]),
+    ...(CUR_PROFILE?.role==='admin'?[['roles',t('atab.roles','Rol Yönetimi')],['categories',t('atab.categories','Kategoriler')],['sectors',t('atab.sectors','🏷 Taksonomi')]]:[]),
     ...(_rp.canApproveProducts?[['products',t('atab.products','Ürün Onayları')]]:[]),
     ['requests',t('atab.requests','PoC Talepleri')],
     ['events',t('atab.events','Etkinlikler')],
@@ -31839,7 +31844,7 @@ const I18N_DICT = {
     'ref.active':'✓ AKTİF','ref.suspicious':'⚠ ŞÜPHELİ','ref.toast_link':'🔗 Davet linki kopyalandı','ref.toast_msg':'💬 Mesaj kopyalandı','ref.copy_fail':'Kopyalama başarısız',
     'prof.fullname':'Ad Soyad / Tam Ad','prof.position':'Pozisyon / Unvan','prof.department':'Departman','prof.company':'Şirket / Kurum','prof.company_size':'Şirket Büyüklüğü','prof.employee_count':'Çalışan Sayısı',
     'prof.sector':'Sektör','prof.sec_finance':'🏦 Finans / Bankacılık','prof.sec_healthcare':'🏥 Sağlık','prof.sec_education':'🎓 Eğitim','prof.sec_manufacturing':'🏭 Üretim / Sanayi','prof.sec_retail':'🛒 Perakende','prof.sec_telecom':'📡 Telekom','prof.sec_government':'🏛 Kamu','prof.sec_energy':'⚡ Enerji','prof.sec_logistics':'🚚 Lojistik','prof.sec_media':'📺 Medya','prof.sec_tech':'💻 Teknoloji','prof.sec_other':'🌐 Diğer',
-    'atab.dashboard':'Dashboard','atab.users':'Kullanıcılar','atab.roles':'Rol Yönetimi','atab.categories':'Kategoriler','atab.sectors':'🏷 Sektörler','atab.products':'Ürün Onayları','atab.requests':'PoC Talepleri','atab.events':'Etkinlikler','atab.offers':'Teklifler','atab.revenue':'📈 Gelir','atab.vendorsubs':'💼 Vendor Abonelikler','atab.vendorapprovals':'✓ Vendor Onayları','atab.demo_requests':'📅 Demo Talepleri','atab.packages':'💎 Paketler','atab.payments':'💳 Ödeme Onayları','atab.overrides':'⚡ Acil Onay Talepleri','atab.featured':'📢 Reklam / Öne Çıkan','atab.content':'📝 İçerik Yönetimi','atab.kvkk_mgmt':'🛡 KVKK & Yasal Sayfalar','atab.settings':'🔧 Sistem Ayarları','atab.health':'🩺 Veri Sağlığı','atab.profile':'👤 Profilim','adash.title':'📊 Platform Dashboard','adash.rev_30d':'💵 Son 30 Gün Gelir','adash.total_users':'Toplam Kullanıcı','adash.total_products':'Toplam Ürün','adash.active_products':'Aktif Ürün','adash.pending_admin':'Admin Onayı Bekleyen','adash.chain_waiting':'Zincir Bekleyen Ürün','adash.pending_poc':'Bekleyen PoC','adash.active_poc':'Aktif PoC','adash.active_events':'Aktif Etkinlik','adash.accepted_offers':'Kabul Edilen Teklif','adash.action_center':'Aksiyon Merkezi','adash.ac_queues':'kuyruk ilgi bekliyor','adash.ac_clear':'Tüm onay kuyrukları temiz — bekleyen iş yok.','adash.ac_vendor':'Vendor Onayı','adash.ac_payment':'Ödeme Onayı','adash.ac_product':'Ürün Onayı','adash.ac_poc':'Bekleyen PoC','adash.ac_demo':'Demo Talebi','adash.ac_urgent':'Acil Onay','adash.ac_ads':'Reklam Onayı','adash.fin_title':'Finansal Özet','adash.fin_sub_total':'Toplam Abonelik Geliri','adash.fin_30d':'Son 30 Gün (abonelik+reklam)','adash.fin_ads30':'Reklam Geliri (30g)','adash.fin_pending':'Bekleyen Tahsilat','adash.fin_req_word':'talep','adash.fin_active_subs':'Aktif Abonelik','adash.fin_override':'Override Tahsilatı','adash.poc_funnel':'PoC Dönüşüm Hunisi','adash.fn_req':'Talep','adash.fn_acc':'Kabul','adash.fn_comp':'Tamamlanan','adash.sub_health':'Abonelik Sağlığı','adash.sh_paying':'ödeyen','adash.sh_active':'Aktif Abonelik','adash.sh_expiring':'Süresi Dolacak (30g)','adash.sh_in7':'7g içinde','adash.sh_atrisk':'Riskli Hesap','adash.sh_atrisk_sub':'gecikmiş / grace / askıda','adash.sh_churn':'Churn (30g)','adash.sh_tier_dist':'Tier Dağılımı (aktif)','adash.sh_mo':'ay','adash.trend_title':'Aylık Trend (son 6 ay)','adash.tr_users':'Yeni Kullanıcı','adash.tr_rev':'Gelir','adash.tr_poc':'Yeni PoC','adash.recent_activity':'Son Aktivite','adash.act_joined':'katıldı','adash.act_poc':'Yeni PoC talebi','adash.act_purchase':'abonelik aldı','adash.act_gift':'paket hediye','adash.act_trial':'deneme başlattı','adash.act_sub':'abonelik hareketi','adash.act_demo':'Demo talebi','adash.act_now':'az önce','adash.act_empty':'Henüz aktivite yok.','asec.title':'Sektörler','asec.desc':'Üreticiler ürün eklerken bu listeden sektör seçer. Etikette emoji kullanabilirsin. Kod, kayıtlı ürünlerle eşleşmeyi korur — mevcut bir kodu değiştirme.','asec.col_label':'Etiket','asec.col_code':'Kod','asec.add':'Sektör Ekle','asec.reset':'Varsayılana Dön','asec.reset_confirm':'Sektörler kod varsayılanlarına dönsün mü? (Kaydedince geçerli olur)','asec.label_ph':'Etiket (örn. 🏥 Sağlık)','asec.code_ph':'kod','asec.saved':'Sektörler kaydedildi.',
+    'atab.dashboard':'Dashboard','atab.users':'Kullanıcılar','atab.roles':'Rol Yönetimi','atab.categories':'Kategoriler','atab.sectors':'🏷 Taksonomi','atab.products':'Ürün Onayları','atab.requests':'PoC Talepleri','atab.events':'Etkinlikler','atab.offers':'Teklifler','atab.revenue':'📈 Gelir','atab.vendorsubs':'💼 Vendor Abonelikler','atab.vendorapprovals':'✓ Vendor Onayları','atab.demo_requests':'📅 Demo Talepleri','atab.packages':'💎 Paketler','atab.payments':'💳 Ödeme Onayları','atab.overrides':'⚡ Acil Onay Talepleri','atab.featured':'📢 Reklam / Öne Çıkan','atab.content':'📝 İçerik Yönetimi','atab.kvkk_mgmt':'🛡 KVKK & Yasal Sayfalar','atab.settings':'🔧 Sistem Ayarları','atab.health':'🩺 Veri Sağlığı','atab.profile':'👤 Profilim','adash.title':'📊 Platform Dashboard','adash.rev_30d':'💵 Son 30 Gün Gelir','adash.total_users':'Toplam Kullanıcı','adash.total_products':'Toplam Ürün','adash.active_products':'Aktif Ürün','adash.pending_admin':'Admin Onayı Bekleyen','adash.chain_waiting':'Zincir Bekleyen Ürün','adash.pending_poc':'Bekleyen PoC','adash.active_poc':'Aktif PoC','adash.active_events':'Aktif Etkinlik','adash.accepted_offers':'Kabul Edilen Teklif','adash.action_center':'Aksiyon Merkezi','adash.ac_queues':'kuyruk ilgi bekliyor','adash.ac_clear':'Tüm onay kuyrukları temiz — bekleyen iş yok.','adash.ac_vendor':'Vendor Onayı','adash.ac_payment':'Ödeme Onayı','adash.ac_product':'Ürün Onayı','adash.ac_poc':'Bekleyen PoC','adash.ac_demo':'Demo Talebi','adash.ac_urgent':'Acil Onay','adash.ac_ads':'Reklam Onayı','adash.fin_title':'Finansal Özet','adash.fin_sub_total':'Toplam Abonelik Geliri','adash.fin_30d':'Son 30 Gün (abonelik+reklam)','adash.fin_ads30':'Reklam Geliri (30g)','adash.fin_pending':'Bekleyen Tahsilat','adash.fin_req_word':'talep','adash.fin_active_subs':'Aktif Abonelik','adash.fin_override':'Override Tahsilatı','adash.poc_funnel':'PoC Dönüşüm Hunisi','adash.fn_req':'Talep','adash.fn_acc':'Kabul','adash.fn_comp':'Tamamlanan','adash.sub_health':'Abonelik Sağlığı','adash.sh_paying':'ödeyen','adash.sh_active':'Aktif Abonelik','adash.sh_expiring':'Süresi Dolacak (30g)','adash.sh_in7':'7g içinde','adash.sh_atrisk':'Riskli Hesap','adash.sh_atrisk_sub':'gecikmiş / grace / askıda','adash.sh_churn':'Churn (30g)','adash.sh_tier_dist':'Tier Dağılımı (aktif)','adash.sh_mo':'ay','adash.trend_title':'Aylık Trend (son 6 ay)','adash.tr_users':'Yeni Kullanıcı','adash.tr_rev':'Gelir','adash.tr_poc':'Yeni PoC','adash.recent_activity':'Son Aktivite','adash.act_joined':'katıldı','adash.act_poc':'Yeni PoC talebi','adash.act_purchase':'abonelik aldı','adash.act_gift':'paket hediye','adash.act_trial':'deneme başlattı','adash.act_sub':'abonelik hareketi','adash.act_demo':'Demo talebi','adash.act_now':'az önce','adash.act_empty':'Henüz aktivite yok.','asec.title':'Taksonomi','asec.desc':'Üreticiler ürün eklerken bu listelerden seçer. Etikette emoji kullanabilirsin. Kod, kayıtlı ürünlerle eşleşmeyi korur — mevcut bir kodu değiştirme. EN sütununu elle doldurabilir ya da otomatik çevirebilirsin.','asec.autotr':'Boş EN etiketlerini çevir','asec.tr_none':'Çevrilecek boş EN etiket yok.','asec.tr_running':'Çevriliyor...','asec.tr_done':'etiket çevrildi — gözden geçir ve Kaydet.','asec.sec_h':'📌 Sektörler','asec.dep_h':'🚀 Dağıtım Türleri','asec.lic_h':'💳 Lisans Modelleri','asec.add_sec':'Sektör Ekle','asec.add_dep':'Dağıtım Ekle','asec.add_lic':'Lisans Ekle','asec.reset':'Varsayılana Dön','asec.reset_confirm':'Tüm taksonomi kod varsayılanlarına dönsün mü? (Kaydedince geçerli olur)','asec.label_ph':'Etiket TR (örn. 🏥 Sağlık)','asec.en_ph':'Etiket EN','asec.code_ph':'kod','asec.match_ph':'eşleşme: saas, cloud...','asec.saved':'Taksonomi kaydedildi.',
     'common.close':'Kapat',
     'ausr.loading':'Kullanıcılar yükleniyor...',
     'ausr.st_verified':'✓ Doğrulı',
@@ -34639,7 +34644,7 @@ const I18N_DICT = {
     'ref.active':'✓ ACTIVE','ref.suspicious':'⚠ SUSPICIOUS','ref.toast_link':'🔗 Invite link copied','ref.toast_msg':'💬 Message copied','ref.copy_fail':'Copy failed',
     'prof.fullname':'Full Name','prof.position':'Position / Title','prof.department':'Department','prof.company':'Company / Organization','prof.company_size':'Company Size','prof.employee_count':'Employee Count',
     'prof.sector':'Sector','prof.sec_finance':'🏦 Finance / Banking','prof.sec_healthcare':'🏥 Healthcare','prof.sec_education':'🎓 Education','prof.sec_manufacturing':'🏭 Manufacturing / Industry','prof.sec_retail':'🛒 Retail','prof.sec_telecom':'📡 Telecom','prof.sec_government':'🏛 Government','prof.sec_energy':'⚡ Energy','prof.sec_logistics':'🚚 Logistics','prof.sec_media':'📺 Media','prof.sec_tech':'💻 Technology','prof.sec_other':'🌐 Other',
-    'atab.dashboard':'Dashboard','atab.users':'Users','atab.roles':'Role Management','atab.categories':'Categories','atab.sectors':'🏷 Sectors','atab.products':'Product Approvals','atab.requests':'PoC Requests','atab.events':'Events','atab.offers':'Offers','atab.revenue':'📈 Revenue','atab.vendorsubs':'💼 Vendor Subscriptions','atab.vendorapprovals':'✓ Vendor Approvals','atab.demo_requests':'📅 Demo Requests','atab.packages':'💎 Packages','atab.payments':'💳 Payment Approvals','atab.overrides':'⚡ Urgent Approval Requests','atab.featured':'📢 Ads / Featured','atab.content':'📝 Content Management','atab.kvkk_mgmt':'🛡 KVKK & Legal Pages','atab.settings':'🔧 System Settings','atab.health':'🩺 Data Health','atab.profile':'👤 My Profile','adash.title':'📊 Platform Dashboard','adash.rev_30d':'💵 Last 30 Days Revenue','adash.total_users':'Total Users','adash.total_products':'Total Products','adash.active_products':'Active Products','adash.pending_admin':'Awaiting Admin Approval','adash.chain_waiting':'Products Awaiting Chain','adash.pending_poc':'Pending PoC','adash.active_poc':'Active PoC','adash.active_events':'Active Events','adash.accepted_offers':'Accepted Offers','adash.action_center':'Action Center','adash.ac_queues':'queues need attention','adash.ac_clear':'All approval queues are clear — nothing pending.','adash.ac_vendor':'Vendor Approval','adash.ac_payment':'Payment Approval','adash.ac_product':'Product Approval','adash.ac_poc':'Pending PoC','adash.ac_demo':'Demo Request','adash.ac_urgent':'Urgent Approval','adash.ac_ads':'Ad Approval','adash.fin_title':'Financial Summary','adash.fin_sub_total':'Total Subscription Revenue','adash.fin_30d':'Last 30 Days (subs+ads)','adash.fin_ads30':'Ad Revenue (30d)','adash.fin_pending':'Pending Collection','adash.fin_req_word':'requests','adash.fin_active_subs':'Active Subscriptions','adash.fin_override':'Override Collection','adash.poc_funnel':'PoC Conversion Funnel','adash.fn_req':'Requested','adash.fn_acc':'Accepted','adash.fn_comp':'Completed','adash.sub_health':'Subscription Health','adash.sh_paying':'paying','adash.sh_active':'Active Subscriptions','adash.sh_expiring':'Expiring (30d)','adash.sh_in7':'within 7d','adash.sh_atrisk':'At-Risk Accounts','adash.sh_atrisk_sub':'overdue / grace / suspended','adash.sh_churn':'Churn (30d)','adash.sh_tier_dist':'Tier Distribution (active)','adash.sh_mo':'mo','adash.trend_title':'Monthly Trend (last 6 months)','adash.tr_users':'New Users','adash.tr_rev':'Revenue','adash.tr_poc':'New PoC','adash.recent_activity':'Recent Activity','adash.act_joined':'joined','adash.act_poc':'New PoC request','adash.act_purchase':'purchased a subscription','adash.act_gift':'package gifted','adash.act_trial':'started a trial','adash.act_sub':'subscription activity','adash.act_demo':'Demo request','adash.act_now':'just now','adash.act_empty':'No activity yet.','asec.title':'Sectors','asec.desc':'Manufacturers pick sectors from this list when adding a product. You can use emoji in the label. The code preserves matching with existing products — do not change an existing code.','asec.col_label':'Label','asec.col_code':'Code','asec.add':'Add Sector','asec.reset':'Reset to Defaults','asec.reset_confirm':'Reset sectors to code defaults? (Applies after saving)','asec.label_ph':'Label (e.g. 🏥 Healthcare)','asec.code_ph':'code','asec.saved':'Sectors saved.',
+    'atab.dashboard':'Dashboard','atab.users':'Users','atab.roles':'Role Management','atab.categories':'Categories','atab.sectors':'🏷 Taxonomy','atab.products':'Product Approvals','atab.requests':'PoC Requests','atab.events':'Events','atab.offers':'Offers','atab.revenue':'📈 Revenue','atab.vendorsubs':'💼 Vendor Subscriptions','atab.vendorapprovals':'✓ Vendor Approvals','atab.demo_requests':'📅 Demo Requests','atab.packages':'💎 Packages','atab.payments':'💳 Payment Approvals','atab.overrides':'⚡ Urgent Approval Requests','atab.featured':'📢 Ads / Featured','atab.content':'📝 Content Management','atab.kvkk_mgmt':'🛡 KVKK & Legal Pages','atab.settings':'🔧 System Settings','atab.health':'🩺 Data Health','atab.profile':'👤 My Profile','adash.title':'📊 Platform Dashboard','adash.rev_30d':'💵 Last 30 Days Revenue','adash.total_users':'Total Users','adash.total_products':'Total Products','adash.active_products':'Active Products','adash.pending_admin':'Awaiting Admin Approval','adash.chain_waiting':'Products Awaiting Chain','adash.pending_poc':'Pending PoC','adash.active_poc':'Active PoC','adash.active_events':'Active Events','adash.accepted_offers':'Accepted Offers','adash.action_center':'Action Center','adash.ac_queues':'queues need attention','adash.ac_clear':'All approval queues are clear — nothing pending.','adash.ac_vendor':'Vendor Approval','adash.ac_payment':'Payment Approval','adash.ac_product':'Product Approval','adash.ac_poc':'Pending PoC','adash.ac_demo':'Demo Request','adash.ac_urgent':'Urgent Approval','adash.ac_ads':'Ad Approval','adash.fin_title':'Financial Summary','adash.fin_sub_total':'Total Subscription Revenue','adash.fin_30d':'Last 30 Days (subs+ads)','adash.fin_ads30':'Ad Revenue (30d)','adash.fin_pending':'Pending Collection','adash.fin_req_word':'requests','adash.fin_active_subs':'Active Subscriptions','adash.fin_override':'Override Collection','adash.poc_funnel':'PoC Conversion Funnel','adash.fn_req':'Requested','adash.fn_acc':'Accepted','adash.fn_comp':'Completed','adash.sub_health':'Subscription Health','adash.sh_paying':'paying','adash.sh_active':'Active Subscriptions','adash.sh_expiring':'Expiring (30d)','adash.sh_in7':'within 7d','adash.sh_atrisk':'At-Risk Accounts','adash.sh_atrisk_sub':'overdue / grace / suspended','adash.sh_churn':'Churn (30d)','adash.sh_tier_dist':'Tier Distribution (active)','adash.sh_mo':'mo','adash.trend_title':'Monthly Trend (last 6 months)','adash.tr_users':'New Users','adash.tr_rev':'Revenue','adash.tr_poc':'New PoC','adash.recent_activity':'Recent Activity','adash.act_joined':'joined','adash.act_poc':'New PoC request','adash.act_purchase':'purchased a subscription','adash.act_gift':'package gifted','adash.act_trial':'started a trial','adash.act_sub':'subscription activity','adash.act_demo':'Demo request','adash.act_now':'just now','adash.act_empty':'No activity yet.','asec.title':'Taxonomy','asec.desc':'Manufacturers pick from these lists when adding a product. You can use emoji in the label. The code preserves matching with existing products — do not change an existing code. Fill the EN column manually or auto-translate it.','asec.autotr':'Translate empty EN labels','asec.tr_none':'No empty EN labels to translate.','asec.tr_running':'Translating...','asec.tr_done':'labels translated — review and Save.','asec.sec_h':'📌 Sectors','asec.dep_h':'🚀 Deployment Types','asec.lic_h':'💳 License Models','asec.add_sec':'Add Sector','asec.add_dep':'Add Deployment','asec.add_lic':'Add License','asec.reset':'Reset to Defaults','asec.reset_confirm':'Reset all taxonomy to code defaults? (Applies after saving)','asec.label_ph':'Label TR (e.g. 🏥 Healthcare)','asec.en_ph':'Label EN','asec.code_ph':'code','asec.match_ph':'match: saas, cloud...','asec.saved':'Taxonomy saved.',
     'common.close':'Close',
     'ausr.loading':'Loading users...',
     'ausr.st_verified':'✓ Verified',
@@ -35169,6 +35174,7 @@ function setLocale(newLocale) {
   try {
     setMetaTag('og:locale', newLocale === 'en' ? 'en_US' : 'tr_TR', 'property');
   } catch(e){}
+  try { if(window._TAX_RAW && typeof applyTaxonomy==='function') applyTaxonomy(window._TAX_RAW); } catch(e){}
   // Mevcut ekranı yeniden render et
   if (typeof renderScreen === 'function' && typeof CUR_SCREEN !== 'undefined') {
     renderScreen(CUR_SCREEN);
@@ -37073,48 +37079,79 @@ async function admSectors(m) {
   await ensureTaxonomy();
   function esc(x){ return (x||'').toString().replace(/"/g,'&quot;'); }
   function slug(x){ return (x||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30) || ('x'+(Date.now()%100000)); }
-  var html = '<div style="margin-bottom:16px"><h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0 0 4px">🏷 '+t('asec.title','Sektörler')+'</h2>'
-    + '<div style="font-size:13px;color:var(--text-muted);line-height:1.5">'+t('asec.desc','Üreticiler ürün eklerken bu listeden sektör seçer. Etikette emoji kullanabilirsin. Kod, kayıtlı ürünlerle eşleşmeyi korur — mevcut bir kodu değiştirme.')+'</div></div>';
-  html += '<div class="card">';
-  html += '<div style="display:flex;gap:8px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);margin-bottom:8px"><span style="flex:1">'+t('asec.col_label','Etiket')+'</span><span style="width:140px">'+t('asec.col_code','Kod')+'</span><span style="width:34px"></span></div>';
-  html += '<div id="asec-list"></div>';
-  html += '<button id="asec-add" class="btn-g btn-sm" style="margin-top:8px">+ '+t('asec.add','Sektör Ekle')+'</button>';
-  html += '<div style="display:flex;gap:8px;margin-top:18px;border-top:1px solid var(--border);padding-top:14px"><button class="btn-p" id="asec-save" style="flex:1">'+t('common.save','💾 Kaydet')+'</button><button class="btn-g" id="asec-reset">↺ '+t('asec.reset','Varsayılana Dön')+'</button></div>';
-  html += '</div>';
-  m.innerHTML = html;
-  var list = el('asec-list');
-  function addRow(r){
-    var row = document.createElement('div'); row.className='asec-row';
-    row.style.cssText='display:flex;gap:8px;margin-bottom:8px;align-items:center';
-    row.innerHTML='<input class="inp asec-label" placeholder="'+t('asec.label_ph','Etiket (örn. 🏥 Sağlık)')+'" value="'+esc(r.label)+'" style="flex:1">'
-      + '<input class="inp asec-value" placeholder="'+t('asec.code_ph','kod')+'" value="'+esc(r.value)+'" style="width:140px;font-family:ui-monospace,Menlo,Consolas,monospace">'
-      + '<button class="btn-g btn-sm asec-del" title="'+t('common.delete','Sil')+'">🗑</button>';
-    row.querySelector('.asec-del').addEventListener('click', function(){ row.remove(); });
-    list.appendChild(row);
+  function enFor(val){ if(SECTOR_LABEL_EN[val]) return SECTOR_LABEL_EN[val]; return (I18N_DICT.en && I18N_DICT.en['prof.sec_'+val]) || ''; }
+  var html = '<div style="margin-bottom:16px"><h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0 0 4px">🏷 '+t('asec.title','Taksonomi')+'</h2>'
+    + '<div style="font-size:13px;color:var(--text-muted);line-height:1.5">'+t('asec.desc','Üreticiler ürün eklerken bu listelerden seçer. Etikette emoji kullanabilirsin. Kod, kayıtlı ürünlerle eşleşmeyi korur — mevcut bir kodu değiştirme. EN sütununu elle doldurabilir ya da otomatik çevirebilirsin.')+'</div></div>';
+  html += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px"><button class="btn-g btn-sm" id="asec-autotr">🌐 '+t('asec.autotr','Boş EN etiketlerini çevir')+'</button><span id="asec-autotr-st" style="font-size:11px;color:var(--text-muted)"></span></div>';
+  function sectionCard(title, listId, addId, addLbl){
+    return '<div class="card" style="margin-bottom:12px"><div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text-primary)">'+title+'</div><div id="'+listId+'"></div><button class="btn-g btn-sm" id="'+addId+'" style="margin-top:8px">+ '+addLbl+'</button></div>';
   }
-  SECTORS.forEach(function(sx){ addRow({value:sx[0], label:sx[1]}); });
-  el('asec-add').addEventListener('click', function(){ addRow({value:'',label:''}); });
+  html += sectionCard(t('asec.sec_h','📌 Sektörler'),'asec-sec','asec-sec-add',t('asec.add_sec','Sektör Ekle'));
+  html += sectionCard(t('asec.dep_h','🚀 Dağıtım Türleri'),'asec-dep','asec-dep-add',t('asec.add_dep','Dağıtım Ekle'));
+  html += sectionCard(t('asec.lic_h','💳 Lisans Modelleri'),'asec-lic','asec-lic-add',t('asec.add_lic','Lisans Ekle'));
+  html += '<div style="display:flex;gap:8px;margin-top:6px"><button class="btn-p" id="asec-save" style="flex:1">'+t('common.save','💾 Kaydet')+'</button><button class="btn-g" id="asec-reset">↺ '+t('asec.reset','Varsayılana Dön')+'</button></div>';
+  m.innerHTML = html;
+  var secEl=el('asec-sec'), depEl=el('asec-dep'), licEl=el('asec-lic');
+  function mkRow(host, kind, r){
+    r = r || {};
+    var row=document.createElement('div'); row.className='tx-row tx-'+kind;
+    row.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap';
+    var h='<input class="inp tx-label" placeholder="'+t('asec.label_ph','Etiket TR (örn. 🏥 Sağlık)')+'" value="'+esc(r.label)+'" style="flex:1;min-width:150px">'
+      + '<input class="inp tx-en" placeholder="'+t('asec.en_ph','Etiket EN')+'" value="'+esc(r.label_en)+'" style="flex:1;min-width:130px">'
+      + '<input class="inp tx-code" placeholder="'+t('asec.code_ph','kod')+'" value="'+esc(r.value)+'" style="width:110px;font-family:ui-monospace,Menlo,Consolas,monospace">';
+    if(kind!=='sec') h+='<input class="inp tx-match" placeholder="'+t('asec.match_ph','eşleşme: saas, cloud...')+'" value="'+esc(r.match)+'" style="flex:1;min-width:130px">';
+    h+='<button class="btn-g btn-sm tx-del" title="'+t('common.delete','Sil')+'">🗑</button>';
+    row.innerHTML=h;
+    row.querySelector('.tx-del').addEventListener('click', function(){ row.remove(); });
+    host.appendChild(row);
+  }
+  SECTORS.forEach(function(sx){ mkRow(secEl,'sec',{value:sx[0],label:sx[1],label_en:enFor(sx[0])}); });
+  TAX_DEPLOYMENTS.forEach(function(d){ mkRow(depEl,'dep',{value:d.value,label:d.label,label_en:d.label_en||'',match:(d.match||[]).join(', ')}); });
+  TAX_LICENSES.forEach(function(d){ mkRow(licEl,'lic',{value:d.value,label:d.label,label_en:d.label_en||'',match:(d.match||[]).join(', ')}); });
+  el('asec-sec-add').addEventListener('click', function(){ mkRow(secEl,'sec',{}); });
+  el('asec-dep-add').addEventListener('click', function(){ mkRow(depEl,'dep',{}); });
+  el('asec-lic-add').addEventListener('click', function(){ mkRow(licEl,'lic',{}); });
+  el('asec-autotr').addEventListener('click', async function(){
+    var btn=this, st=el('asec-autotr-st'); btn.disabled=true;
+    var rows=[].slice.call(m.querySelectorAll('.tx-row')).filter(function(row){ var l=(row.querySelector('.tx-label').value||'').trim(); var e=(row.querySelector('.tx-en').value||'').trim(); return l && !e; });
+    if(!rows.length){ st.textContent=t('asec.tr_none','Çevrilecek boş EN etiket yok.'); btn.disabled=false; return; }
+    st.textContent=t('asec.tr_running','Çevriliyor...');
+    try {
+      var srcs=rows.map(function(row){ return (row.querySelector('.tx-label').value||'').trim(); });
+      var res=await gTranslate(srcs,'en');
+      rows.forEach(function(row,i){ if(res[i]) row.querySelector('.tx-en').value=res[i]; });
+      st.textContent='✓ '+rows.length+' '+t('asec.tr_done','etiket çevrildi — gözden geçir ve Kaydet.');
+    } catch(e){ st.textContent='⚠ '+e.message; }
+    btn.disabled=false;
+  });
   el('asec-reset').addEventListener('click', function(){
-    if(!confirm(t('asec.reset_confirm','Sektörler kod varsayılanlarına dönsün mü? (Kaydedince geçerli olur)'))) return;
-    list.innerHTML='';
-    TAXONOMY_DEFAULTS.sectors.forEach(function(sx){ addRow({value:sx.value,label:sx.label}); });
+    if(!confirm(t('asec.reset_confirm','Tüm taksonomi kod varsayılanlarına dönsün mü? (Kaydedince geçerli olur)'))) return;
+    secEl.innerHTML=''; depEl.innerHTML=''; licEl.innerHTML='';
+    TAXONOMY_DEFAULTS.sectors.forEach(function(sx){ mkRow(secEl,'sec',{value:sx.value,label:sx.label,label_en:enFor(sx.value)}); });
+    TAXONOMY_DEFAULTS.deployments.forEach(function(d){ mkRow(depEl,'dep',{value:d.value,label:d.label,label_en:d.label_en||'',match:(d.match||[]).join(', ')}); });
+    TAXONOMY_DEFAULTS.licenses.forEach(function(d){ mkRow(licEl,'lic',{value:d.value,label:d.label,label_en:d.label_en||'',match:(d.match||[]).join(', ')}); });
   });
   el('asec-save').addEventListener('click', async function(){
     var btn=this; btn.disabled=true; btn.textContent=t('common.saving','⏳ Kaydediliyor...');
-    var sectors=[], used={};
-    [].slice.call(list.querySelectorAll('.asec-row')).forEach(function(row){
-      var label=(row.querySelector('.asec-label').value||'').trim(); if(!label) return;
-      var value=((row.querySelector('.asec-value').value||'').trim())||slug(label);
-      while(used[value]) value=value+'_2'; used[value]=1;
-      sectors.push({value:value, label:label});
-    });
+    function collect(host, withMatch){
+      var arr=[], used={};
+      [].slice.call(host.querySelectorAll('.tx-row')).forEach(function(row){
+        var label=(row.querySelector('.tx-label').value||'').trim(); if(!label) return;
+        var value=((row.querySelector('.tx-code').value||'').trim())||slug(label);
+        while(used[value]) value=value+'_2'; used[value]=1;
+        var o={value:value, label:label};
+        var en=(row.querySelector('.tx-en').value||'').trim(); if(en) o.label_en=en;
+        if(withMatch){ o.match=(row.querySelector('.tx-match').value||'').split(',').map(function(x){return x.trim().toLowerCase();}).filter(Boolean); }
+        arr.push(o);
+      });
+      return arr;
+    }
+    var sectors=collect(secEl,false), deployments=collect(depEl,true), licenses=collect(licEl,true);
     if(!sectors.length){ showToast(t('tst.min_one_sector','En az bir sektör gerekli.'),'err'); btn.disabled=false; btn.textContent=t('common.save','💾 Kaydet'); return; }
-    var deployments = TAX_DEPLOYMENTS.map(function(d){ return {value:d.value, label:d.label, match:(d.match||[])}; });
-    var licenses    = TAX_LICENSES.map(function(d){ return {value:d.value, label:d.label, match:(d.match||[])}; });
     try {
       await setDoc(doc(db,'pochub_config','system'), { taxonomy: {sectors:sectors, deployments:deployments, licenses:licenses} }, {merge:true});
       applyTaxonomy({sectors:sectors, deployments:deployments, licenses:licenses}); _taxLoaded=true;
-      showToast(t('asec.saved','Sektörler kaydedildi.'));
+      showToast(t('asec.saved','Taksonomi kaydedildi.'));
       admSectors(m);
     } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); btn.disabled=false; btn.textContent=t('common.save','💾 Kaydet'); }
   });
@@ -37405,7 +37442,7 @@ async function admSettings(m) {
     taxInfo.innerHTML = t('aset.tax_desc','Katalog filtreleri ve ürün formundaki sektör ({s}) ve dağıtım ({d}) listelerini düzenle. Boş bırakılırsa kod varsayılanları kullanılır.').replace('{s}', SECTORS.length).replace('{d}', TAX_DEPLOYMENTS.length);
     sTax.appendChild(taxInfo);
     var taxBtn = document.createElement('button'); taxBtn.className='btn-g'; taxBtn.textContent=t('aset.edit_taxonomy','🏷 Taksonomiyi Düzenle');
-    taxBtn.addEventListener('click', function(){ openTaxonomyEditorModal(); });
+    taxBtn.addEventListener('click', function(){ CUR_ADM_TAB='sectors'; loadAdmTab(); el('scr-admin')?.querySelectorAll('.si').forEach(function(b){ b.classList.toggle('on',b.dataset.t==='sectors'); }); });
     sTax.appendChild(taxBtn);
     m.appendChild(sTax);
 
