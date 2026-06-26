@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.65 | pochub.co -->
+<!-- PoCHub v7.66 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -689,7 +689,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.65';
+const VERSION = 'v7.66';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -948,6 +948,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.66': ['DASHBOARD dilim 2 (finansal/abonelik): (1) GERCEK MRR — currentPrice bos oldugu icin MRR ₺0 cikiyordu; artik pochub_packages tier->monthlyPrice haritasindan aktif (trial haric) aboneliklerin gercek aylik fiyati toplaniyor (highlight MRR karti da duzeldi). (2) ABONELIK SAGLIGI paneli: MRR, aktif abonelik, suresi dolacak (30g + 7g), riskli hesap (gecikmis/grace/askida), churn (30g + %), ve aktif tier dagilimi (fiyat/ay ile). pochub_packages yuklemeye eklendi. node+harness HEPSI 0.'],
   'v7.65': ['DASHBOARD zenginlestirme (dilim 1): (1) AKSIYON MERKEZI — eski 4 kucuk header chip yerine tam, tiklanabilir is kuyrugu paneli (Vendor/Odeme/Urun onayi, Bekleyen PoC, Demo, Acil, Reklam); >0 olanlar gosterilir, hepsi 0 ise temiz durumu. Her tile ilgili taba (+filtre) gider. (2) FINANSAL OZET — subscription_history den gercek tahsilat: Toplam abonelik geliri, son 30 gun (abonelik+reklam), reklam 30g, bekleyen tahsilat, aktif abonelik, override tahsilati. payment_history bos oldugu icin dashboard ₺0 gosteriyordu; artik Odeme Onaylari ile uzlasiyor. (3) PoC DONUSUM HUNISI — Talep->Kabul->Tamamlanan + donusum %. subscription_history yuklemeye eklendi. node+harness HEPSI 0.'],
   'v7.64': ['BUG FIX (Odeme Onaylari): Bos kategoride liste m.innerHTML += ile basildigi icin m nin TUM icerigi yeniden parse ediliyor ve TAB BUTONLARININ click listener lari yok oluyordu. Sonuc: Pending=0 olunca ilk render listenerlari oldururyor, Approved/Rejected/All tab lari tiklaninca hicbir sey olmuyor (ekran bos pending de takili). Onay verilen kayitlar veri olarak duruyordu (sayaclar 41/4 dogru), sadece liste gosterilemiyordu. Fix: bos mesaji innerHTML += yerine appendChild ile DOM node olarak eklendi -> listenerlar korunuyor. Eskiden pending dolu oldugu icin bu yol hic tetiklenmiyordu. node+harness HEPSI 0.'],
   'v7.63': ['i18n: Ayarlar ekranindaki 5 hardcoded TR aciklama metni t() ye alindi (EN cevirileri eklendi): Taxonomy (dinamik {s}/{d} sektor/dagitim sayisi), Filter Management, Evidence Score Weights, Decision Reasons (Win/Loss), Visit Analytics. Basliklar/butonlar zaten cevriliydi; sadece aciklamalar TR kalmisti. node+harness HEPSI 0.'],
@@ -25184,7 +25185,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'profile')    { await renderUserProfile(m, 'admin');  return; }
 
     // DASHBOARD - v5.06: Zenginleştirildi
-    const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap, subSnap, paymentsSnap, demoSnap, ovSnap, fpSnap, subHistSnap] = await Promise.all([
+    const [usersSnap, prodsSnap, pocSnap, evSnap, offSnap, subSnap, paymentsSnap, demoSnap, ovSnap, fpSnap, subHistSnap, pkgsSnap] = await Promise.all([
       getDocs(collection(db,'users')),
       getDocs(collection(db,'products')),
       getDocs(collection(db,'poc_requests')),
@@ -25196,6 +25197,7 @@ async function loadAdmTab() {
       getDocs(collection(db,'admin_overrides')).catch(()=>({docs:[]})),
       getDocs(collection(db,'featured_purchases')).catch(()=>({docs:[]})),
       getDocs(collection(db,'subscription_history')).catch(()=>({docs:[]})),
+      getDocs(collection(db,'pochub_packages')).catch(()=>({docs:[]})),
     ]);
     const users  = usersSnap.docs.map(d=>d.data());
     const prods  = prodsSnap.docs.map(d=>d.data());
@@ -25206,6 +25208,8 @@ async function loadAdmTab() {
     const payments = paymentsSnap.docs.map(d=>d.data());
     const demos = demoSnap.docs.map(d=>d.data());
     const ovs = ovSnap.docs.map(d=>d.data());
+    const pkgs = pkgsSnap.docs.map(d=>d.data());
+    var pkgPriceByTier = {}; pkgs.forEach(function(p){ if(p.tier) pkgPriceByTier[p.tier] = p.monthlyPrice || p.price || 0; });
 
     // ─── Zaman hesapları ───
     var nowMs = Date.now();
@@ -25237,8 +25241,8 @@ async function loadAdmTab() {
     var mrr = 0;
     var paidSubs = 0;
     subs.forEach(function(s){
-      if (s.status === 'active' || s.status === 'grace_period') {
-        var price = s.currentPrice || 0;
+      if ((s.status === 'active' || s.status === 'grace_period') && !s.isTrial) {
+        var price = s.currentPrice || pkgPriceByTier[s.currentTier] || 0;
         if (price > 0) {
           mrr += price;
           paidSubs++;
@@ -25284,6 +25288,16 @@ async function loadAdmTab() {
     var fnComp = pocs.filter(function(p){return p.status==='completed';}).length;
     var fnConv1 = fnReq>0?Math.round(fnAcc/fnReq*100):0;
     var fnConv2 = fnAcc>0?Math.round(fnComp/fnAcc*100):0;
+    // v7.66: abonelik sagligi
+    function subEndMs(x){ var e=x.endDate; return e?.toMillis?e.toMillis():(e?.seconds?e.seconds*1000:0); }
+    var activeSubs2 = subs.filter(function(x){ return x.status==='active'||x.status==='grace_period'; });
+    var expiring7  = activeSubs2.filter(function(x){ var e=subEndMs(x); return e>0 && e>=nowMs && e<=nowMs+7*dayMs; }).length;
+    var expiring30 = activeSubs2.filter(function(x){ var e=subEndMs(x); return e>0 && e>=nowMs && e<=nowMs+30*dayMs; }).length;
+    var atRisk = subs.filter(function(x){ return (x.consecutiveUnpaidMonths||0)>0 || x.status==='grace_period' || x.status==='suspended'; }).length;
+    var churn30 = subs.filter(function(x){ if(['cancelled','expired'].indexOf(x.status)<0) return false; var u=x.updatedAt; var um=u?.toMillis?u.toMillis():(u?.seconds?u.seconds*1000:0); return um>=last30Days; }).length;
+    var churnBase = activeSubsCount + churn30; var churnRate = churnBase>0?Math.round(churn30/churnBase*100):0;
+    var tierCounts = {}; activeSubs2.forEach(function(x){ var tt=x.currentTier||'free'; tierCounts[tt]=(tierCounts[tt]||0)+1; });
+    var tierEntries = Object.keys(tierCounts).map(function(k){ return {k:k,n:tierCounts[k],price:pkgPriceByTier[k]||0}; }).sort(function(a,b){ return b.n-a.n; });
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:10px">';
     html += '<div>';
@@ -25410,6 +25424,37 @@ async function loadAdmTab() {
         + '</div>';
     });
     html += '</div></div>';
+
+    // ═══ v7.66: ABONELİK SAĞLIĞI ═══
+    html += '<div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-primary)">📊 '+t('adash.sub_health','Abonelik Sağlığı')+'</div>';
+    var shCards = [
+      {l:'MRR',v:'₺'+mrr.toLocaleString('tr-TR'),c:'#16a34a',sub:paidSubs+' '+t('adash.sh_paying','ödeyen')},
+      {l:t('adash.sh_active','Aktif Abonelik'),v:activeSubsCount,c:'#2563eb'},
+      {l:t('adash.sh_expiring','Süresi Dolacak (30g)'),v:expiring30,c:'#d97706',sub:expiring7+' '+t('adash.sh_in7','7g içinde')},
+      {l:t('adash.sh_atrisk','Riskli Hesap'),v:atRisk,c:'#dc2626',sub:t('adash.sh_atrisk_sub','gecikmiş / grace / askıda')},
+      {l:t('adash.sh_churn','Churn (30g)'),v:churn30,c:'#dc2626',sub:'%'+churnRate}
+    ];
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:'+(tierEntries.length?'14':'0')+'px">';
+    shCards.forEach(function(sc){
+      html += '<div style="background:var(--bg-elevated,rgba(15,23,42,.02));border:1px solid var(--border);border-radius:8px;padding:11px 12px">'
+        + '<div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:4px">'+sc.l+'</div>'
+        + '<div style="font-size:19px;font-weight:800;color:'+sc.c+';font-family:monospace;line-height:1.1">'+sc.v+'</div>'
+        + (sc.sub?'<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px">'+sc.sub+'</div>':'')
+        + '</div>';
+    });
+    html += '</div>';
+    if (tierEntries.length) {
+      html += '<div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">'+t('adash.sh_tier_dist','Tier Dağılımı (aktif)')+'</div>';
+      tierEntries.forEach(function(te){
+        var pct = activeSubsCount>0?Math.round(te.n/activeSubsCount*100):0;
+        var nm = te.k.charAt(0).toUpperCase()+te.k.slice(1);
+        html += '<div style="padding:5px 0;font-size:12.5px">'
+          + '<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--text-secondary);font-weight:600">'+nm+(te.price>0?' <span style="font-size:10px;color:var(--text-muted)">₺'+te.price.toLocaleString('tr-TR')+'/'+t('adash.sh_mo','ay')+'</span>':'')+'</span><span style="font-family:monospace;font-weight:700;color:var(--text-primary)">'+te.n+' <span style="color:var(--text-muted);font-size:11px">(%'+pct+')</span></span></div>'
+          + '<div style="background:rgba(15,23,42,.05);height:5px;border-radius:3px;overflow:hidden"><div style="background:#0891b2;height:100%;width:'+pct+'%"></div></div>'
+          + '</div>';
+      });
+    }
+    html += '</div>';
 
     // ═══ v7.65: PoC DÖNÜŞÜM HUNİSİ ═══
     html += '<div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text-primary)">🎯 '+t('adash.poc_funnel','PoC Dönüşüm Hunisi')+'</div>';
@@ -31752,7 +31797,7 @@ const I18N_DICT = {
     'ref.active':'✓ AKTİF','ref.suspicious':'⚠ ŞÜPHELİ','ref.toast_link':'🔗 Davet linki kopyalandı','ref.toast_msg':'💬 Mesaj kopyalandı','ref.copy_fail':'Kopyalama başarısız',
     'prof.fullname':'Ad Soyad / Tam Ad','prof.position':'Pozisyon / Unvan','prof.department':'Departman','prof.company':'Şirket / Kurum','prof.company_size':'Şirket Büyüklüğü','prof.employee_count':'Çalışan Sayısı',
     'prof.sector':'Sektör','prof.sec_finance':'🏦 Finans / Bankacılık','prof.sec_healthcare':'🏥 Sağlık','prof.sec_education':'🎓 Eğitim','prof.sec_manufacturing':'🏭 Üretim / Sanayi','prof.sec_retail':'🛒 Perakende','prof.sec_telecom':'📡 Telekom','prof.sec_government':'🏛 Kamu','prof.sec_energy':'⚡ Enerji','prof.sec_logistics':'🚚 Lojistik','prof.sec_media':'📺 Medya','prof.sec_tech':'💻 Teknoloji','prof.sec_other':'🌐 Diğer',
-    'atab.dashboard':'Dashboard','atab.users':'Kullanıcılar','atab.roles':'Rol Yönetimi','atab.categories':'Kategoriler','atab.products':'Ürün Onayları','atab.requests':'PoC Talepleri','atab.events':'Etkinlikler','atab.offers':'Teklifler','atab.revenue':'📈 Gelir','atab.vendorsubs':'💼 Vendor Abonelikler','atab.vendorapprovals':'✓ Vendor Onayları','atab.demo_requests':'📅 Demo Talepleri','atab.packages':'💎 Paketler','atab.payments':'💳 Ödeme Onayları','atab.overrides':'⚡ Acil Onay Talepleri','atab.featured':'📢 Reklam / Öne Çıkan','atab.content':'📝 İçerik Yönetimi','atab.kvkk_mgmt':'🛡 KVKK & Yasal Sayfalar','atab.settings':'🔧 Sistem Ayarları','atab.health':'🩺 Veri Sağlığı','atab.profile':'👤 Profilim','adash.title':'📊 Platform Dashboard','adash.rev_30d':'💵 Son 30 Gün Gelir','adash.total_users':'Toplam Kullanıcı','adash.total_products':'Toplam Ürün','adash.active_products':'Aktif Ürün','adash.pending_admin':'Admin Onayı Bekleyen','adash.chain_waiting':'Zincir Bekleyen Ürün','adash.pending_poc':'Bekleyen PoC','adash.active_poc':'Aktif PoC','adash.active_events':'Aktif Etkinlik','adash.accepted_offers':'Kabul Edilen Teklif','adash.action_center':'Aksiyon Merkezi','adash.ac_queues':'kuyruk ilgi bekliyor','adash.ac_clear':'Tüm onay kuyrukları temiz — bekleyen iş yok.','adash.ac_vendor':'Vendor Onayı','adash.ac_payment':'Ödeme Onayı','adash.ac_product':'Ürün Onayı','adash.ac_poc':'Bekleyen PoC','adash.ac_demo':'Demo Talebi','adash.ac_urgent':'Acil Onay','adash.ac_ads':'Reklam Onayı','adash.fin_title':'Finansal Özet','adash.fin_sub_total':'Toplam Abonelik Geliri','adash.fin_30d':'Son 30 Gün (abonelik+reklam)','adash.fin_ads30':'Reklam Geliri (30g)','adash.fin_pending':'Bekleyen Tahsilat','adash.fin_req_word':'talep','adash.fin_active_subs':'Aktif Abonelik','adash.fin_override':'Override Tahsilatı','adash.poc_funnel':'PoC Dönüşüm Hunisi','adash.fn_req':'Talep','adash.fn_acc':'Kabul','adash.fn_comp':'Tamamlanan',
+    'atab.dashboard':'Dashboard','atab.users':'Kullanıcılar','atab.roles':'Rol Yönetimi','atab.categories':'Kategoriler','atab.products':'Ürün Onayları','atab.requests':'PoC Talepleri','atab.events':'Etkinlikler','atab.offers':'Teklifler','atab.revenue':'📈 Gelir','atab.vendorsubs':'💼 Vendor Abonelikler','atab.vendorapprovals':'✓ Vendor Onayları','atab.demo_requests':'📅 Demo Talepleri','atab.packages':'💎 Paketler','atab.payments':'💳 Ödeme Onayları','atab.overrides':'⚡ Acil Onay Talepleri','atab.featured':'📢 Reklam / Öne Çıkan','atab.content':'📝 İçerik Yönetimi','atab.kvkk_mgmt':'🛡 KVKK & Yasal Sayfalar','atab.settings':'🔧 Sistem Ayarları','atab.health':'🩺 Veri Sağlığı','atab.profile':'👤 Profilim','adash.title':'📊 Platform Dashboard','adash.rev_30d':'💵 Son 30 Gün Gelir','adash.total_users':'Toplam Kullanıcı','adash.total_products':'Toplam Ürün','adash.active_products':'Aktif Ürün','adash.pending_admin':'Admin Onayı Bekleyen','adash.chain_waiting':'Zincir Bekleyen Ürün','adash.pending_poc':'Bekleyen PoC','adash.active_poc':'Aktif PoC','adash.active_events':'Aktif Etkinlik','adash.accepted_offers':'Kabul Edilen Teklif','adash.action_center':'Aksiyon Merkezi','adash.ac_queues':'kuyruk ilgi bekliyor','adash.ac_clear':'Tüm onay kuyrukları temiz — bekleyen iş yok.','adash.ac_vendor':'Vendor Onayı','adash.ac_payment':'Ödeme Onayı','adash.ac_product':'Ürün Onayı','adash.ac_poc':'Bekleyen PoC','adash.ac_demo':'Demo Talebi','adash.ac_urgent':'Acil Onay','adash.ac_ads':'Reklam Onayı','adash.fin_title':'Finansal Özet','adash.fin_sub_total':'Toplam Abonelik Geliri','adash.fin_30d':'Son 30 Gün (abonelik+reklam)','adash.fin_ads30':'Reklam Geliri (30g)','adash.fin_pending':'Bekleyen Tahsilat','adash.fin_req_word':'talep','adash.fin_active_subs':'Aktif Abonelik','adash.fin_override':'Override Tahsilatı','adash.poc_funnel':'PoC Dönüşüm Hunisi','adash.fn_req':'Talep','adash.fn_acc':'Kabul','adash.fn_comp':'Tamamlanan','adash.sub_health':'Abonelik Sağlığı','adash.sh_paying':'ödeyen','adash.sh_active':'Aktif Abonelik','adash.sh_expiring':'Süresi Dolacak (30g)','adash.sh_in7':'7g içinde','adash.sh_atrisk':'Riskli Hesap','adash.sh_atrisk_sub':'gecikmiş / grace / askıda','adash.sh_churn':'Churn (30g)','adash.sh_tier_dist':'Tier Dağılımı (aktif)','adash.sh_mo':'ay',
     'common.close':'Kapat',
     'ausr.loading':'Kullanıcılar yükleniyor...',
     'ausr.st_verified':'✓ Doğrulı',
@@ -34552,7 +34597,7 @@ const I18N_DICT = {
     'ref.active':'✓ ACTIVE','ref.suspicious':'⚠ SUSPICIOUS','ref.toast_link':'🔗 Invite link copied','ref.toast_msg':'💬 Message copied','ref.copy_fail':'Copy failed',
     'prof.fullname':'Full Name','prof.position':'Position / Title','prof.department':'Department','prof.company':'Company / Organization','prof.company_size':'Company Size','prof.employee_count':'Employee Count',
     'prof.sector':'Sector','prof.sec_finance':'🏦 Finance / Banking','prof.sec_healthcare':'🏥 Healthcare','prof.sec_education':'🎓 Education','prof.sec_manufacturing':'🏭 Manufacturing / Industry','prof.sec_retail':'🛒 Retail','prof.sec_telecom':'📡 Telecom','prof.sec_government':'🏛 Government','prof.sec_energy':'⚡ Energy','prof.sec_logistics':'🚚 Logistics','prof.sec_media':'📺 Media','prof.sec_tech':'💻 Technology','prof.sec_other':'🌐 Other',
-    'atab.dashboard':'Dashboard','atab.users':'Users','atab.roles':'Role Management','atab.categories':'Categories','atab.products':'Product Approvals','atab.requests':'PoC Requests','atab.events':'Events','atab.offers':'Offers','atab.revenue':'📈 Revenue','atab.vendorsubs':'💼 Vendor Subscriptions','atab.vendorapprovals':'✓ Vendor Approvals','atab.demo_requests':'📅 Demo Requests','atab.packages':'💎 Packages','atab.payments':'💳 Payment Approvals','atab.overrides':'⚡ Urgent Approval Requests','atab.featured':'📢 Ads / Featured','atab.content':'📝 Content Management','atab.kvkk_mgmt':'🛡 KVKK & Legal Pages','atab.settings':'🔧 System Settings','atab.health':'🩺 Data Health','atab.profile':'👤 My Profile','adash.title':'📊 Platform Dashboard','adash.rev_30d':'💵 Last 30 Days Revenue','adash.total_users':'Total Users','adash.total_products':'Total Products','adash.active_products':'Active Products','adash.pending_admin':'Awaiting Admin Approval','adash.chain_waiting':'Products Awaiting Chain','adash.pending_poc':'Pending PoC','adash.active_poc':'Active PoC','adash.active_events':'Active Events','adash.accepted_offers':'Accepted Offers','adash.action_center':'Action Center','adash.ac_queues':'queues need attention','adash.ac_clear':'All approval queues are clear — nothing pending.','adash.ac_vendor':'Vendor Approval','adash.ac_payment':'Payment Approval','adash.ac_product':'Product Approval','adash.ac_poc':'Pending PoC','adash.ac_demo':'Demo Request','adash.ac_urgent':'Urgent Approval','adash.ac_ads':'Ad Approval','adash.fin_title':'Financial Summary','adash.fin_sub_total':'Total Subscription Revenue','adash.fin_30d':'Last 30 Days (subs+ads)','adash.fin_ads30':'Ad Revenue (30d)','adash.fin_pending':'Pending Collection','adash.fin_req_word':'requests','adash.fin_active_subs':'Active Subscriptions','adash.fin_override':'Override Collection','adash.poc_funnel':'PoC Conversion Funnel','adash.fn_req':'Requested','adash.fn_acc':'Accepted','adash.fn_comp':'Completed',
+    'atab.dashboard':'Dashboard','atab.users':'Users','atab.roles':'Role Management','atab.categories':'Categories','atab.products':'Product Approvals','atab.requests':'PoC Requests','atab.events':'Events','atab.offers':'Offers','atab.revenue':'📈 Revenue','atab.vendorsubs':'💼 Vendor Subscriptions','atab.vendorapprovals':'✓ Vendor Approvals','atab.demo_requests':'📅 Demo Requests','atab.packages':'💎 Packages','atab.payments':'💳 Payment Approvals','atab.overrides':'⚡ Urgent Approval Requests','atab.featured':'📢 Ads / Featured','atab.content':'📝 Content Management','atab.kvkk_mgmt':'🛡 KVKK & Legal Pages','atab.settings':'🔧 System Settings','atab.health':'🩺 Data Health','atab.profile':'👤 My Profile','adash.title':'📊 Platform Dashboard','adash.rev_30d':'💵 Last 30 Days Revenue','adash.total_users':'Total Users','adash.total_products':'Total Products','adash.active_products':'Active Products','adash.pending_admin':'Awaiting Admin Approval','adash.chain_waiting':'Products Awaiting Chain','adash.pending_poc':'Pending PoC','adash.active_poc':'Active PoC','adash.active_events':'Active Events','adash.accepted_offers':'Accepted Offers','adash.action_center':'Action Center','adash.ac_queues':'queues need attention','adash.ac_clear':'All approval queues are clear — nothing pending.','adash.ac_vendor':'Vendor Approval','adash.ac_payment':'Payment Approval','adash.ac_product':'Product Approval','adash.ac_poc':'Pending PoC','adash.ac_demo':'Demo Request','adash.ac_urgent':'Urgent Approval','adash.ac_ads':'Ad Approval','adash.fin_title':'Financial Summary','adash.fin_sub_total':'Total Subscription Revenue','adash.fin_30d':'Last 30 Days (subs+ads)','adash.fin_ads30':'Ad Revenue (30d)','adash.fin_pending':'Pending Collection','adash.fin_req_word':'requests','adash.fin_active_subs':'Active Subscriptions','adash.fin_override':'Override Collection','adash.poc_funnel':'PoC Conversion Funnel','adash.fn_req':'Requested','adash.fn_acc':'Accepted','adash.fn_comp':'Completed','adash.sub_health':'Subscription Health','adash.sh_paying':'paying','adash.sh_active':'Active Subscriptions','adash.sh_expiring':'Expiring (30d)','adash.sh_in7':'within 7d','adash.sh_atrisk':'At-Risk Accounts','adash.sh_atrisk_sub':'overdue / grace / suspended','adash.sh_churn':'Churn (30d)','adash.sh_tier_dist':'Tier Distribution (active)','adash.sh_mo':'mo',
     'common.close':'Close',
     'ausr.loading':'Loading users...',
     'ausr.st_verified':'✓ Verified',
