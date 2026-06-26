@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.74 | pochub.co -->
+<!-- PoCHub v7.75 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -148,6 +148,8 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 20px
 @media(max-width:760px){.home-paths{grid-template-columns:1fr}.home-aud-grid{grid-template-columns:1fr 1fr}}
 .ev-leader-card,.ftd-product-card{transition:transform .16s ease,box-shadow .16s ease}
 .ev-leader-card:hover,.ftd-product-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(15,23,42,.09)}
+.lb-row{transition:transform .14s ease,box-shadow .14s ease}
+.lb-row:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(15,23,42,.08)}
 .cfg-cell .inp:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
 .inp:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px var(--color-primary-dim)}
 .btn-p{background:var(--color-primary);color:#fff;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
@@ -700,7 +702,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.74';
+const VERSION = 'v7.75';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -959,6 +961,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.75': ['ANASAYFA PARLATMA (devam): Top Vendor + Top Customer leaderboardlari yeni dile gecti. Eski duz emoji-rank satirlar gitti -> gradient RANK MADALYONU (altin/gumus/bronz 1-2-3, neutral digerleri) + LOGO/initials tile (vendor gercek logo renderAvatar; musteri firma-keyed gradient bas-harf) + temiz isim/rozet + buyuk sayi + hover lift. _lbRankMedal helper. i18n ref.invites (TR+EN). node+harness HEPSI 0. Sonraki: Nasil Calisir + FAQ.'],
   'v7.74': ['ANASAYFA PARLATMA (devam): (1) One Cikan Urunler kartlari yeni dile gecti — vendor-keyed gradient ust-cubuk + logo tile (gercek vendor logosu / gradient bas-harf) + net hiyerarsi. (2) Kanitlanmis Liderler kartlari ayni dil — gradient ust-cubuk + logo tile + skor. (3) Yeni KANIT > GORUS sosyal-kanit seridi (koyu manifest bandi: Karar beyana degil davranisa dayanir + 3 kanit noktasi). (4) Hangisi sensin? routing sertlestirildi: musteri/entegrator->katalog, uretici/distributor misafir->vendor kayit / vendor->panel / diger->katalog, try-catch. Hover lift. i18n sp.* (TR+EN). node+harness HEPSI 0.'],
   'v7.73': ['ANASAYFA TASARIM + BUG: (1) BUG FIX — Yaklasan Etkinlikler bolumunde template-literal icinde yanlis string-concat sozdizimi ham metin siziyordu (\"+t(common.loading)+\") -> ${...} ile duzeltildi. (2) Yeni CIFT-YOL donusum bandi: Etkinlikler + Katalog buyuk gradient doorway kartlari, canli sayilarla (yaklasan etkinlik / dogrulanmis cozum) — ziyaretciyi iki ana sayfaya iten merkez. (3) Yeni KITLE bandi: Musteri/Uretici/Distributor/Entegrator — her birine deger onerisi + yonlendirme (musteri/entegrator->katalog, uretici/distributor->vendor kayit). (4) Bos Kategoriler karti artik veri yoksa gizleniyor (cirkin bos kutu gitti). (5) Hero yumusak gradient zemin + hover lift. i18n hp.*/aud.* (TR+EN). node+harness HEPSI 0.'],
   'v7.72': ['KATALOG TASARIM (B-agirlikli, pazaryeri): urun kartlari (grid + liste) bastan tasarlandi. Vendor-keyed gradient brand band (ayni vendor = ayni renk, etkinlik kapaklariyla ayni 8 ton) + flag/checkbox + kategori band uzerinde; logo TILE one cikti (gercek vendor logosu getVendorAvatarFromCache, yoksa gradient+bas-harf). Net hiyerarsi: logo + isim (2-satir clamp) + vendor/dogrulanmis + puan + Kanit Skoru + aciklama (2-satir clamp) + etiketler + tam-genislik CTA. Liste satirinda 42px logo tile. Bos kategori artik — basmaz. Sektore gore kesfet kartlari gradient-swatch+emoji+sayi+tik (Etkinlikler ile ayni dil). Hover lift. node+harness HEPSI 0.'],
@@ -7087,6 +7090,11 @@ function openEventAttendeesMailModal(eventTitle, regs) {
 // Anasayfada müşteri leaderboard'ı altında gösterilir
 // Madalya teması rozetler (🥉🥈🥇)
 // ════════════════════════════════════════════════════════════════════
+function _lbRankMedal(rank){
+  var g={1:['#fbbf24','#d97706'],2:['#cbd5e1','#94a3b8'],3:['#e0a878','#b45309']}[rank];
+  if(g) return '<div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,'+g[0]+','+g[1]+');color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.12)">'+rank+'</div>';
+  return '<div style="width:34px;height:34px;border-radius:50%;background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">'+rank+'</div>';
+}
 async function loadTopVendors() {
   var wrap = el('home-top-vendors');
   if (!wrap) return;
@@ -7106,21 +7114,21 @@ async function loadTopVendors() {
     var html = topVendors.map(function(v, i){
       var badge = getVendorReferralBadgeInfo(v.vendorReferralBadge || getVendorReferralBadgeLevel(v.vendorReferralCount));
       var rank = i + 1;
-      var rankColor = rank === 1 ? '#d97706' : rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : 'var(--text-muted)';
-      var rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank;
       var slug = v.slug || generateSlug(v.company || v.displayName || 'vendor');
       var typeIcon = v.vendorType === 'ureticid' ? '🏭'
                   : v.vendorType === 'distributor' ? '🚚'
                   : v.vendorType === 'integrator' ? '🔧' : '💼';
-      return '<a href="#v/'+slug+'" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:12px;text-decoration:none;transition:all .15s;cursor:pointer" onmouseover="this.style.borderColor=\'rgba(217,119,6,.4)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'translateY(0)\'">'
-        + '<div style="font-size:22px;font-weight:800;color:'+rankColor+';min-width:36px;text-align:center">'+rankEmoji+'</div>'
-        + '<div style="flex:1;min-width:120px">'
-        +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary)">'+typeIcon+' '+(v.company || 'Vendor')+'</div>'
-        +   (badge ? '<div style="font-size:11px;color:'+badge.color+';font-weight:600;margin-top:2px">'+badge.icon+' '+badge.label+'</div>' : '')
+      var avatar = renderAvatar({photoBase64:v.photoBase64,logoUrl:v.logoUrl,company:v.company,displayName:v.displayName,uid:v.uid},40,{square:true});
+      return '<a href="#v/'+slug+'" class="lb-row" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 14px;display:flex;align-items:center;gap:12px;text-decoration:none;cursor:pointer">'
+        + _lbRankMedal(rank)
+        + '<div style="width:40px;height:40px;border-radius:10px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.10)">'+avatar+'</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13.5px;font-weight:800;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+typeIcon+' '+escHtml(v.company || 'Vendor')+'</div>'
+        +   (badge ? '<div style="font-size:11px;color:'+badge.color+';font-weight:700;margin-top:2px">'+badge.icon+' '+badge.label+'</div>' : '')
         + '</div>'
-        + '<div style="text-align:right">'
-        +   '<div style="font-size:22px;font-weight:800;color:#d97706">'+v.vendorReferralCount+'</div>'
-        +   '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600">davet</div>'
+        + '<div style="text-align:right;flex-shrink:0">'
+        +   '<div style="font-size:20px;font-weight:900;color:#d97706;line-height:1">'+v.vendorReferralCount+'</div>'
+        +   '<div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-top:2px">'+t('ref.invites','davet')+'</div>'
         + '</div>'
         + '</a>';
     }).join('');
@@ -7168,17 +7176,17 @@ async function loadTopCustomers() {
     var html = topCustomers.map(function(c, i){
       var badge = getCustomerReferralBadgeInfo(c.customerReferralBadge || getCustomerReferralBadgeLevel(c.customerReferralCount));
       var rank = i + 1;
-      var rankColor = rank === 1 ? '#d97706' : rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : 'var(--text-muted)';
-      var rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank;
-      return '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:12px">'
-        + '<div style="font-size:22px;font-weight:800;color:'+rankColor+';min-width:36px;text-align:center">'+rankEmoji+'</div>'
-        + '<div style="flex:1;min-width:120px">'
-        +   '<div style="font-size:13.5px;font-weight:700;color:var(--text-primary)">'+(c.company || 'Kurum')+'</div>'
-        +   (badge ? '<div style="font-size:11px;color:'+badge.color+';font-weight:600;margin-top:2px">'+badge.icon+' '+badge.label+'</div>' : '')
+      var g = EV_GRADS[_evHash(String(c.company||c.uid||''))%EV_GRADS.length];
+      return '<div class="lb-row" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 14px;display:flex;align-items:center;gap:12px">'
+        + _lbRankMedal(rank)
+        + '<div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,'+g[0]+','+g[1]+');color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">'+escHtml(evInitials(c.company))+'</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13.5px;font-weight:800;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(c.company || 'Kurum')+'</div>'
+        +   (badge ? '<div style="font-size:11px;color:'+badge.color+';font-weight:700;margin-top:2px">'+badge.icon+' '+badge.label+'</div>' : '')
         + '</div>'
-        + '<div style="text-align:right">'
-        +   '<div style="font-size:22px;font-weight:800;color:#a855f7">'+c.customerReferralCount+'</div>'
-        +   '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600">davet</div>'
+        + '<div style="text-align:right;flex-shrink:0">'
+        +   '<div style="font-size:20px;font-weight:900;color:#a855f7;line-height:1">'+c.customerReferralCount+'</div>'
+        +   '<div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-top:2px">'+t('ref.invites','davet')+'</div>'
         + '</div>'
         + '</div>';
     }).join('');
@@ -31734,7 +31742,7 @@ const I18N_DICT = {
 
     'promo.title':"Kendi PoC'unuzu Başlatın",
     'promo.desc':"Birden fazla vendor'ı sıralı kuyrukla değerlendirin.",
-    'promo.cta':'Kataloğa Git →','hp.ev_kicker':'CANLI','hp.ev_title':'PoC Etkinlikleri','hp.ev_desc':'Üreticilerden canlı demolar ve webinarlar. Ücretsiz katıl, ürünleri gerçek zamanlı gör, sorularını sor.','hp.ev_count':'yaklaşan etkinlik','hp.ev_cta':'Etkinliklere Gözat →','hp.cat_kicker':'KANITLA SEÇ','hp.cat_title':'Çözüm Kataloğu','hp.cat_desc':'Doğrulanmış çözümleri Kanıt Skoru ile karşılaştır. Analist görüşü değil; gerçek PoC sonuçları. Tek tıkla PoC iste.','hp.cat_count':'doğrulanmış çözüm','hp.cat_cta':'Kataloğu Keşfet →','aud.kicker':'PoCHub HERKES İÇİN','aud.title':'Hangisi sensin?','aud.cust_t':'Müşteri','aud.cust_d':'İhtiyacını kanıtla karşılaştır, doğru çözümü PoC ile seç.','aud.cust_c':'PoC İste →','aud.vend_t':'Üretici','aud.vend_d':'Ürününü listele, gerçek PoC kanıtıyla rakiplerinin önüne geç.','aud.vend_c':'Vendor Ol →','aud.dist_t':'Distribütör','aud.dist_d':'Portföyünü dijital vitrine taşı, nitelikli talepleri yakala.','aud.dist_c':'Ağa Katıl →','aud.integ_t':'Entegratör','aud.integ_d':'Projelerine kanıtlanmış çözümler bul, hızlı teklif topla.','aud.integ_c':'Çözüm Bul →','sp.kicker':'KANIT > GÖRÜŞ','sp.title':'Karar, beyana değil davranışa dayanır.','sp.desc':'Her değerlendirme gerçek bir PoC ile kanıtlanır. Analist görüşü değil; ölçülmüş, şeffaf sonuç. Ücretli sıralama yoktur.','sp.p1':'Gerçek PoC sonuçları','sp.p2':'Şeffaf Kanıt Skoru','sp.p3':'Ücretli sıralama yok',
+    'promo.cta':'Kataloğa Git →','hp.ev_kicker':'CANLI','hp.ev_title':'PoC Etkinlikleri','hp.ev_desc':'Üreticilerden canlı demolar ve webinarlar. Ücretsiz katıl, ürünleri gerçek zamanlı gör, sorularını sor.','hp.ev_count':'yaklaşan etkinlik','hp.ev_cta':'Etkinliklere Gözat →','hp.cat_kicker':'KANITLA SEÇ','hp.cat_title':'Çözüm Kataloğu','hp.cat_desc':'Doğrulanmış çözümleri Kanıt Skoru ile karşılaştır. Analist görüşü değil; gerçek PoC sonuçları. Tek tıkla PoC iste.','hp.cat_count':'doğrulanmış çözüm','hp.cat_cta':'Kataloğu Keşfet →','aud.kicker':'PoCHub HERKES İÇİN','aud.title':'Hangisi sensin?','aud.cust_t':'Müşteri','aud.cust_d':'İhtiyacını kanıtla karşılaştır, doğru çözümü PoC ile seç.','aud.cust_c':'PoC İste →','aud.vend_t':'Üretici','aud.vend_d':'Ürününü listele, gerçek PoC kanıtıyla rakiplerinin önüne geç.','aud.vend_c':'Vendor Ol →','aud.dist_t':'Distribütör','aud.dist_d':'Portföyünü dijital vitrine taşı, nitelikli talepleri yakala.','aud.dist_c':'Ağa Katıl →','aud.integ_t':'Entegratör','aud.integ_d':'Projelerine kanıtlanmış çözümler bul, hızlı teklif topla.','aud.integ_c':'Çözüm Bul →','sp.kicker':'KANIT > GÖRÜŞ','sp.title':'Karar, beyana değil davranışa dayanır.','sp.desc':'Her değerlendirme gerçek bir PoC ile kanıtlanır. Analist görüşü değil; ölçülmüş, şeffaf sonuç. Ücretli sıralama yoktur.','sp.p1':'Gerçek PoC sonuçları','sp.p2':'Şeffaf Kanıt Skoru','sp.p3':'Ücretli sıralama yok','ref.invites':'davet',
     'vbar.kicker':'🤝 Güvenilir İş Ortaklarımız',
     'vbar.title':"Aramızdaki Vendor'lar",
 
@@ -34518,7 +34526,7 @@ const I18N_DICT = {
 
     'promo.title':'Start Your Own PoC',
     'promo.desc':'Evaluate multiple vendors in a ranked queue.',
-    'promo.cta':'Go to Catalog →','hp.ev_kicker':'LIVE','hp.ev_title':'PoC Events','hp.ev_desc':'Live demos and webinars from vendors. Join free, see products in real time, ask your questions.','hp.ev_count':'upcoming events','hp.ev_cta':'Browse Events →','hp.cat_kicker':'DECIDE BY PROOF','hp.cat_title':'Solution Catalog','hp.cat_desc':'Compare verified solutions by Evidence Score. Not analyst opinion; real PoC results. Request a PoC in one click.','hp.cat_count':'verified solutions','hp.cat_cta':'Explore Catalog →','aud.kicker':'PoCHub IS FOR EVERYONE','aud.title':'Which one are you?','aud.cust_t':'Buyer','aud.cust_d':'Compare on proof and pick the right solution with a PoC.','aud.cust_c':'Request a PoC →','aud.vend_t':'Vendor','aud.vend_d':'List your product and stand out with real PoC evidence.','aud.vend_c':'Become a Vendor →','aud.dist_t':'Distributor','aud.dist_d':'Bring your portfolio to a digital storefront, capture qualified demand.','aud.dist_c':'Join the Network →','aud.integ_t':'Integrator','aud.integ_d':'Find proven solutions for your projects, collect quick quotes.','aud.integ_c':'Find Solutions →','sp.kicker':'PROOF > OPINION','sp.title':'Decisions rest on behavior, not claims.','sp.desc':'Every assessment is backed by a real PoC. Not analyst opinion; measured, transparent results. No paid rankings.','sp.p1':'Real PoC results','sp.p2':'Transparent Evidence Score','sp.p3':'No paid rankings',
+    'promo.cta':'Go to Catalog →','hp.ev_kicker':'LIVE','hp.ev_title':'PoC Events','hp.ev_desc':'Live demos and webinars from vendors. Join free, see products in real time, ask your questions.','hp.ev_count':'upcoming events','hp.ev_cta':'Browse Events →','hp.cat_kicker':'DECIDE BY PROOF','hp.cat_title':'Solution Catalog','hp.cat_desc':'Compare verified solutions by Evidence Score. Not analyst opinion; real PoC results. Request a PoC in one click.','hp.cat_count':'verified solutions','hp.cat_cta':'Explore Catalog →','aud.kicker':'PoCHub IS FOR EVERYONE','aud.title':'Which one are you?','aud.cust_t':'Buyer','aud.cust_d':'Compare on proof and pick the right solution with a PoC.','aud.cust_c':'Request a PoC →','aud.vend_t':'Vendor','aud.vend_d':'List your product and stand out with real PoC evidence.','aud.vend_c':'Become a Vendor →','aud.dist_t':'Distributor','aud.dist_d':'Bring your portfolio to a digital storefront, capture qualified demand.','aud.dist_c':'Join the Network →','aud.integ_t':'Integrator','aud.integ_d':'Find proven solutions for your projects, collect quick quotes.','aud.integ_c':'Find Solutions →','sp.kicker':'PROOF > OPINION','sp.title':'Decisions rest on behavior, not claims.','sp.desc':'Every assessment is backed by a real PoC. Not analyst opinion; measured, transparent results. No paid rankings.','sp.p1':'Real PoC results','sp.p2':'Transparent Evidence Score','sp.p3':'No paid rankings','ref.invites':'invites',
     'vbar.kicker':'🤝 Our Trusted Partners',
     'vbar.title':'Our Vendors',
 
