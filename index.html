@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.70 | pochub.co -->
+<!-- PoCHub v7.71 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -691,7 +691,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.70';
+const VERSION = 'v7.71';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -950,6 +950,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.71': ['ETKINLIKLER (devam): (1) Kategoriye gore kesfet kartlari yeniden tasarlandi — gradient swatch (kategoriye gore deterministik, kapaklarla ayni 8 ton) + bas-harf + kategori adi + etkinlik sayisi + secili tik. Eski duz kucuk kutular gitti. (2) Liste gorunumu artik TARIHE GORE GRUPLU (date_asc/date_desc sortunda): Bugun / Yarin / Bu hafta / Bu ay / Daha sonra / Gecmis / Tarihi belirsiz basliklari + sayilar. newest/fill sortunda duz liste. node+harness HEPSI 0.'],
   'v7.70': ['ETKINLIKLER TASARIM (B-agirlikli, pazaryeri hissi): liste + grid kartlari bastan tasarlandi. Her etkinlige veriden URETILEN deterministik gradient KAPAK (kategori+vendor+baslik hash i -> 8 premium kurumsal gradient) + uzerinde TAKVIM KAROSU (ay/gun/saat; tarih yoksa cirkin — yerine 🗓️ Yakinda) + vendor BAS-HARF rozeti (host kimligi, kapakla ayni gradient). Grid kartta 16:9 kapak + kose takvim karosu (kirmizi ay) + format pill. Bos-veri zarafeti: kategori/urun/lokasyon yoksa cirkin — basilmaz, gizlenir; tarih yoksa Tarih yakinda. Net hiyerarsi (badge -> baslik 2-satir clamp -> host -> tarih/lokasyon -> aciklama 2-satir clamp -> kapasite bari + Kayit CTA). Hover lift. i18n: ev.spots_left/last_spots/date_tba/soon (TR+EN). node+harness HEPSI 0.'],
   'v7.69': ['TAKSONOMI: Sektorler tab i tam Taksonomi yonetimine cevrildi — Sektorler + Dagitim Turleri + Lisans Modelleri 3 bolum liste-CRUD (her satir TR + EN + kod (+ eslesme)). 🌐 Bos EN etiketlerini cevir butonu (MyMemory/gTranslate) — TR den EN i otomatik doldurur, elle yazma derdi biter. EN etiketleri artik taxonomy de label_en olarak saklanir; applyTaxonomy locale-aware facet etiketi kurar + window._TAX_RAW saklar; setLocale te yeniden uygulanir; sectorLabel once taxonomy EN ine bakar. Ayarlardaki eski Taksonomi modal butonu bu taba yonlendiriyor. node+harness HEPSI 0.'],
   'v7.68': ['ADMIN: yeni Sektorler tab i (Kategoriler in yaninda). Liste halinde sektor ekle/sil/degistir (etiket + kod), kaydetme pochub_config/system.taxonomy ye yazar ve deployments/licenses i KORUR (silmez), applyTaxonomy ile SECTORS yerinde tazelenir. Uretici urun eklerken zaten bu listeyi coklu-pill secebiliyordu (v5.59) — degisiklik gerekmedi; admin yeni sektor ekleyince formda aninda cikar. Sektor yonetimi artik gomulu taxonomy modali yerine gorunur bir tab. node+harness HEPSI 0.'],
@@ -7525,7 +7526,13 @@ function updateEventFacets(base){
     var cnt={}; fb.forEach(function(e){ catF.get(e).forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
     var tiles = catF.options.filter(function(o){ return cnt[o[0]]; }).sort(function(a,b){return (cnt[b[0]]||0)-(cnt[a[0]]||0);}).map(function(o){
       var on = EV_FILTERS.category.indexOf(o[0])>=0;
-      return '<button class="ev-rail-tile" data-cat="'+String(o[0]).replace(/"/g,'&quot;')+'" style="flex-shrink:0;display:flex;flex-direction:column;gap:2px;min-width:104px;padding:10px 12px;border-radius:12px;cursor:pointer;border:1.5px solid '+(on?'#2563eb':'var(--border)')+';background:'+(on?'rgba(37,99,235,.08)':'var(--bg-surface)')+';text-align:left"><span style="font-size:13px;font-weight:700;color:var(--text)">'+o[1]+'</span><span style="font-size:11px;color:var(--text-muted)">'+(cnt[o[0]]||0)+' etkinlik</span></button>';
+      var g = EV_GRADS[_evHash(String(o[0]))%EV_GRADS.length];
+      var ini = (o[1]||'').trim().replace(/^[^0-9A-Za-zÇĞİÖŞÜçğıöşü]+/,'').charAt(0).toUpperCase() || '★';
+      return '<button class="ev-rail-tile" data-cat="'+String(o[0]).replace(/"/g,'&quot;')+'" style="flex-shrink:0;display:flex;align-items:center;gap:10px;min-width:160px;padding:10px 12px;border-radius:12px;cursor:pointer;border:1.5px solid '+(on?'#2563eb':'var(--border)')+';background:'+(on?'rgba(37,99,235,.06)':'var(--bg-surface)')+';text-align:left">'
+        + '<span style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,'+g[0]+','+g[1]+');display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:800;flex-shrink:0">'+ini+'</span>'
+        + '<span style="min-width:0;flex:1"><span style="display:block;font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+o[1]+'</span><span style="display:block;font-size:11px;color:var(--text-muted)">'+(cnt[o[0]]||0)+' '+t('ev.events_word','etkinlik')+'</span></span>'
+        + (on?'<span style="color:#2563eb;font-size:14px;font-weight:800;flex-shrink:0">✓</span>':'')
+        + '</button>';
     }).join('');
     rail.innerHTML = tiles ? '<div style="font-size:12.5px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">🧭 Kategoriye göre keşfet</div><div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">'+tiles+'</div>' : '';
     rail.querySelectorAll('.ev-rail-tile').forEach(function(b){ b.addEventListener('click', function(){ toggleEvFacet('category', b.dataset.cat); }); });
@@ -7574,6 +7581,31 @@ function _evSpots(e){ var spots=(e.capacity||0)-(e.registeredCount||0); var pct=
 function _evFee(e){ return { bg:(e.fee>0?'rgba(37,99,235,.10)':'rgba(22,163,74,.10)'), col:(e.fee>0?'#2563eb':'#16a34a'), label:(e.fee>0?('₺'+e.fee):t('ev.free','Ücretsiz')) }; }
 function _evRegBtn(e,short){ return '<button class="btn-p btn-sm ev-reg-btn" data-id="'+e.id+'" data-title="'+escHtml(e.title||'')+'" data-vendor-email="'+(e.vendorEmail||'')+'" data-vendor-name="'+escHtml(e.vendorName||'')+'" style="white-space:nowrap">'+(short?(CUR_USER?t('ev.register','Kayıt Ol'):t('ev.register','Kayıt Ol')):(CUR_USER?t('ev.register','Kayıt Ol'):t('ev.login_register','Giriş Yap & Kayıt Ol')))+' →</button>'; }
 
+function evBucket(e){
+  if(!e.eventDate||!e.eventDate.toDate) return {k:'tbd',o:9999};
+  var d=e.eventDate.toDate(), now=new Date();
+  var t0=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  var ed=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
+  var diff=Math.round((ed-t0)/86400000);
+  if(diff<0) return {k:'past',o:-1};
+  if(diff===0) return {k:'today',o:0};
+  if(diff===1) return {k:'tomorrow',o:1};
+  if(diff<=7) return {k:'week',o:2};
+  if(d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()) return {k:'month',o:3};
+  if(diff<=31) return {k:'month',o:3};
+  return {k:'later',o:4};
+}
+function evGroupedListHtml(docs){
+  var groups={}, order=[];
+  docs.forEach(function(e){ var b=evBucket(e); if(!groups[b.k]){ groups[b.k]={o:b.o,items:[]}; order.push(b.k); } groups[b.k].items.push(e); });
+  order.sort(function(a,b){ if(a==='tbd') return 1; if(b==='tbd') return -1; return (EV_SORT==='date_desc')?(groups[b].o-groups[a].o):(groups[a].o-groups[b].o); });
+  var lbl={past:t('ev.bk_past','Geçmiş'),today:t('ev.bk_today','Bugün'),tomorrow:t('ev.bk_tomorrow','Yarın'),week:t('ev.bk_week','Bu hafta'),month:t('ev.bk_month','Bu ay'),later:t('ev.bk_later','Daha sonra'),tbd:t('ev.bk_tbd','Tarihi belirsiz')};
+  return order.map(function(k,idx){
+    var gr=groups[k];
+    var head='<div style="display:flex;align-items:center;gap:10px;margin:'+(idx===0?'2':'22')+'px 0 11px"><span style="font-size:12.5px;font-weight:800;color:#0f172a;letter-spacing:.2px">'+lbl[k]+'</span><span style="font-size:11.5px;font-weight:700;color:#94a3b8">'+gr.items.length+'</span><span style="flex:1;height:1px;background:#e2e8f0"></span></div>';
+    return head + gr.items.map(evCardList).join('');
+  }).join('');
+}
 function evCardList(e){
   var g=evGrad(e), dp=evDateParts(e), sp=_evSpots(e), fee=_evFee(e);
   var cover='<div style="position:relative;background:linear-gradient(135deg,'+g[0]+' 0%,'+g[1]+' 100%);display:flex;align-items:center;justify-content:center;min-height:152px;overflow:hidden">'
@@ -7800,9 +7832,13 @@ async function loadEventsList() {
       return;
     }
 
-    listEl.innerHTML = EV_VIEW==='grid'
-      ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">'+docs.map(evCardGrid).join('')+'</div>'
-      : docs.map(evCardList).join('');
+    if (EV_VIEW==='grid') {
+      listEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">'+docs.map(evCardGrid).join('')+'</div>';
+    } else if (EV_SORT==='date_asc' || EV_SORT==='date_desc') {
+      listEl.innerHTML = evGroupedListHtml(docs);
+    } else {
+      listEl.innerHTML = docs.map(evCardList).join('');
+    }
 
     listEl.querySelectorAll('.ev-reg-btn').forEach(b => b.addEventListener('click', function(ev){
       ev.stopPropagation();
@@ -31651,7 +31687,7 @@ const I18N_DICT = {
     'ev.events':'Etkinlikler',
     'ev.no_events':'Etkinlik Yok',
     'ev.events_of':'Etkinlikleri',
-    'ev.spots_left':'{n} yer kaldı','ev.last_spots':'Son {n} yer!','ev.date_tba':'Tarih yakında','ev.soon':'Yakında','ev.free':'Ücretsiz',
+    'ev.spots_left':'{n} yer kaldı','ev.last_spots':'Son {n} yer!','ev.date_tba':'Tarih yakında','ev.soon':'Yakında','ev.events_word':'etkinlik','ev.bk_past':'Geçmiş','ev.bk_today':'Bugün','ev.bk_tomorrow':'Yarın','ev.bk_week':'Bu hafta','ev.bk_month':'Bu ay','ev.bk_later':'Daha sonra','ev.bk_tbd':'Tarihi belirsiz','ev.free':'Ücretsiz',
     'ev.full':'Dolu',
     'ev.seats':'yer',
     'ev.detail':'Detay →',
@@ -34451,7 +34487,7 @@ const I18N_DICT = {
     'ev.events':'Events',
     'ev.no_events':'No Events',
     'ev.events_of':'Events',
-    'ev.spots_left':'{n} spots left','ev.last_spots':'Only {n} left!','ev.date_tba':'Date TBA','ev.soon':'Soon','ev.free':'Free',
+    'ev.spots_left':'{n} spots left','ev.last_spots':'Only {n} left!','ev.date_tba':'Date TBA','ev.soon':'Soon','ev.events_word':'events','ev.bk_past':'Past','ev.bk_today':'Today','ev.bk_tomorrow':'Tomorrow','ev.bk_week':'This week','ev.bk_month':'This month','ev.bk_later':'Later','ev.bk_tbd':'Date TBA','ev.free':'Free',
     'ev.full':'Full',
     'ev.seats':'seats',
     'ev.detail':'Detail →',
