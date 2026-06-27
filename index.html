@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.76 | pochub.co -->
+<!-- PoCHub v7.78 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -151,7 +151,9 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 20px
 .lb-row{transition:transform .14s ease,box-shadow .14s ease}
 .lb-row:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(15,23,42,.08)}
 .hiw-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;position:relative}
-.hiw-steps::before{content:"";position:absolute;top:42px;left:16%;right:16%;height:2px;background:linear-gradient(90deg,#e2e8f0,#cbd5e1,#e2e8f0);z-index:0}
+.hiw-steps::before{content:"";position:absolute;top:42px;left:16%;right:16%;height:2px;background:linear-gradient(90deg,#e2e8f0,#cbd5e1,#e2e8f0);z-index:0;transition:background .2s}
+.hiw-steps.hiw-blue::before{background:linear-gradient(90deg,#dbeafe,#93c5fd,#dbeafe)}
+.hiw-steps.hiw-green::before{background:linear-gradient(90deg,#dcfce7,#86efac,#dcfce7)}
 .hiw-step{position:relative;z-index:1;transition:transform .16s ease,box-shadow .16s ease}
 .hiw-step:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(15,23,42,.10)}
 @media(max-width:680px){.hiw-steps{grid-template-columns:1fr}.hiw-steps::before{display:none}}
@@ -710,7 +712,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.76';
+const VERSION = 'v7.78';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -969,6 +971,8 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.78': ['ANASAYFA: (1) TEKRAR giderildi — alttaki 4-kutu istatistik satiri (Aktif Etkinlik/Kullanici/PoC/Urun) kaldirildi; ayni sayilar (25 etkinlik, 82 cozum) zaten ust cift-yol kartlarinda. Cift-yol kartlari (donusum) korundu. (2) BUG FIX — Yaklasan Etkinlikler sonsuz Loading + sag takvim bos: getDocs(public_events) artik 9sn timeout-race ile asla takilmiyor; renderHomeEventList ve renderCalendar ayri try/catch e alindi -> biri hata verse digeri calisir, spinner her durumda temizlenir (veri/bos/hata). node+harness HEPSI 0.'],
+  'v7.77': ['ANASAYFA (Nasil Calisir polish): Nasil Calisir akis cizgisi artik AKTIF SEKMENIN rengini aliyor — Musteri sekmesinde mavi, Vendor sekmesinde yesil (eski notr gri yerine), yumusak gecisli. (Nasil Calisir gradient madalyon + akis cizgisi ve FAQ temiz akordeon zaten v7.76 da vardi.) node+harness HEPSI 0.'],
   'v7.76': ['ANASAYFA PARLATMA (final): (1) Nasil Calisir 3-adim STEPPER e cevrildi — gradient numarali madalyon (1-2-3, mavi musteri / yesil vendor) + adimlar arasi akis cizgisi (gradient connector, mobilde gizli) + temiz beyaz kartlar + hover. ADIM rozeti / duz kutu gitti. (2) FAQ akordeonu temizlendi — beyaz kartlar, + ikonu acilinca 45deg donup x oluyor, hover border + acik durumda mavi cerceve/golge. Tab + accordion mantigi korundu. node+harness HEPSI 0.'],
   'v7.75': ['ANASAYFA PARLATMA (devam): Top Vendor + Top Customer leaderboardlari yeni dile gecti. Eski duz emoji-rank satirlar gitti -> gradient RANK MADALYONU (altin/gumus/bronz 1-2-3, neutral digerleri) + LOGO/initials tile (vendor gercek logo renderAvatar; musteri firma-keyed gradient bas-harf) + temiz isim/rozet + buyuk sayi + hover lift. _lbRankMedal helper. i18n ref.invites (TR+EN). node+harness HEPSI 0. Sonraki: Nasil Calisir + FAQ.'],
   'v7.74': ['ANASAYFA PARLATMA (devam): (1) One Cikan Urunler kartlari yeni dile gecti — vendor-keyed gradient ust-cubuk + logo tile (gercek vendor logosu / gradient bas-harf) + net hiyerarsi. (2) Kanitlanmis Liderler kartlari ayni dil — gradient ust-cubuk + logo tile + skor. (3) Yeni KANIT > GORUS sosyal-kanit seridi (koyu manifest bandi: Karar beyana degil davranisa dayanir + 3 kanit noktasi). (4) Hangisi sensin? routing sertlestirildi: musteri/entegrator->katalog, uretici/distributor misafir->vendor kayit / vendor->panel / diger->katalog, try-catch. Hover lift. i18n sp.* (TR+EN). node+harness HEPSI 0.'],
@@ -5729,9 +5733,7 @@ async function renderHome() {
     <!-- v5.81: Kanıtlanmış Liderler + Quadrant vitrin -->
     <div id="home-evidence-leaders" style="margin-bottom:24px"></div>
 
-    <div class="g4" style="margin-bottom:20px" id="home-stats">
-      ${[t('home.stat_events','Aktif Etkinlik'),t('home.stat_users','Toplam Kullanıcı'),t('home.stat_pocs','PoC Talebi'),t('home.stat_products','Aktif Ürün')].map((lbl,i)=>'<div class="stat-card" data-i="'+i+'"><div class="stat-num skel skel-line w50" style="height:28px"></div><div class="stat-lbl" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:6px">'+lbl+'</div></div>').join('')}
-    </div>
+    <!-- v7.78: 4-kutu istatistik satiri kaldirildi — sayilar zaten ust cift-yol kartlarinda (tekrari onlemek icin) -->
 
     <!-- v4.87: VENDOR LOGO BAR -->
     <div id="home-vendor-bar" style="margin-bottom:24px"></div>
@@ -5862,7 +5864,10 @@ async function renderHome() {
   // Tüm etkinlikleri çek — hem takvim hem liste için
   let allEvents = [];
   try {
-    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published')));
+    const snap = await Promise.race([
+      getDocs(query(collection(db,'public_events'), where('status','==','published'))),
+      new Promise(function(_r,rej){ setTimeout(function(){ rej(new Error('events-timeout')); }, 9000); })
+    ]);
     var _now = new Date();
     allEvents = snap.docs.map(d => ({...d.data(), id:d.id}))
       .filter(e => getLifecycleState(e) === 'active')
@@ -6024,8 +6029,9 @@ async function renderHome() {
 
   // İlk yükleme — yaklaşan etkinlikler
   console.log('PoCHub: allEvents yüklendi, sayı:', allEvents.length);
-  renderHomeEventList(allEvents.slice(0,6), t('home.upcoming_events','Yaklaşan Etkinlikler'));
-  renderCalendar(calYear, calMonth);
+  try { renderHomeEventList(allEvents.slice(0,6), t('home.upcoming_events','Yaklaşan Etkinlikler')); }
+  catch(_eList){ console.error('home event list render:', _eList); var _le=el('home-events-list'); if(_le) _le.innerHTML='<div class="empty"><div class="empty-icon">📅</div>'+t('ev.no_events','Etkinlik Yok')+'</div>'; }
+  try { renderCalendar(calYear, calMonth); } catch(_eCal){ console.error('calendar render:', _eCal); var _cg=el('cal-grid'); if(_cg) _cg.innerHTML=''; }
 
   // Ay değişince listeyi güncelle — temiz listener
   const MONTHS_TR = MONTHS_L();
@@ -7302,7 +7308,7 @@ function loadHowItWorks() {
 
   var renderSteps = function(steps, accentColor){
     var a2 = accentColor==='#16a34a' ? '#15803d' : '#1e40af';
-    return '<div class="hiw-steps">'
+    return '<div class="hiw-steps '+(accentColor==='#16a34a'?'hiw-green':'hiw-blue')+'">'
       + steps.map(function(s, i){
           return '<div class="hiw-step" style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px 18px;text-align:center;display:flex;flex-direction:column;align-items:center">'
             + '<div style="width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,'+accentColor+','+a2+');color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:900;box-shadow:0 4px 12px '+accentColor+'45">'+(i+1)+'</div>'
