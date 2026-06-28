@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.88 | pochub.co -->
+<!-- PoCHub v7.89 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.88';
+const VERSION = 'v7.89';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.89': ['URETICI KATILIMCI ERISIMI: Etkinlik sahibi uretici artik kendi etkinliginin katilimci listesini gorebiliyor. Etkinliklerim listesine \u0022👥 N Katilimci\u0022 butonu eklendi (locale-aware etiket, sozluksuz) -> mevcut openEventAttendeesModal (katilimci listesi + 📄 PDF indir + 📧 listeyi e-postayla gonder, EmailJS) acilir. IZIN-GUVENLI SORGU: admin eventId ile, URETICI vendorId==uid ile ceker (tek esitlik filtresi -> composite index GEREKMEZ) ve eventId JS-te suzulur; firestore.rules zaten isOwner(vendorId) okumaya izin veriyor (degismedi). NOT: mail modali listeyi yazilan alicilara gonderir (uretici kendine/ekibine); katilimcilara DOGRUDAN toplu mail ayri bir gelistirme. KVKK: katilimci kayit akisinda riza mevcut. node+harness 0.'],
   'v7.88': ['(1) OZEL FACET label_en (locale-aware): Filtre Yonetimi modalinde her facet satirina EN etiket input-u eklendi (TR-nin altinda). Kaydedilince config.filters.{catalog,events}[].label_en olarak saklanir; applyFilterLayout CAT/EV_LABEL_OVR_EN map-lerini doldurur; facetLabel EN modda once EN etiketi (ovrEn[key] || f.label_en) dener, yoksa TR/cflt davranisi. Boylece SATIS TIPI/LISANS MODELI gibi ozel facetler EN modda admin-girilen EN adi gosterir. buildCustomFacets/customOut DEGISMEDI (EN override map uzerinden). (2) catFacetVal ikon-onek FIX: 📦 Diger gibi ikon-onekli degerler VT map-ine takilmiyordu; artik ikon ayrilip govde cevriliyor (📦 Diger -> 📦 Other), Direkt Satis vb. zaten calisiyordu. SOZLUGE YENI ANAHTAR EKLENMEDI (mevcut cflt.* + override map). node+harness 0.'],
   'v7.87': ['EVENTS SAYFASI i18n (EN modda tamamen TR idi — Image1): renderEvents hardcoded TR metinleri iki dilli yapildi. Yontem: SOZLUKSUZ, yerel _evL(en,tr) helper-i (CUR_LOCALE kosulu, her render-da taze, evFacets fonksiyon oldugu icin facetlerde de calisir). Cevrilenler: baslik (Public PoC Events), alt-baslik kuyrugu (fee-explore/filter/register), + Create Event, donem sekmeleri (Upcoming/This Month/Last Month/This Year/All), arama placeholder, Filtreler/Temizle (Filters/Clear), N events sayaci, siralama (Soonest/Latest/Newest/Filling — split() colon cakismasi icin yeniden yapilandirildi), event facet etiketleri+degerleri (Category/Format/Language/Fee + On-site/Free/Paid). YENI DICT ANAHTARI YOK. NOT: katalog SATIS TIPI/LISANS MODELI = OZEL FACET (admin-config TR) = veri; Diger = catFacetVal ikon-onek eslesmesi (ayri ele alinacak). node+harness 0.'],
   'v7.86': ['KATEGORI EN KAPSAMI TAMAMLANDI (catLabelEN bosluklari kapatildi): EN modda kategori adi ham TR kalan 6 gosterim yuzeyi catLabelEN-e baglandi — (1) Urun DETAY MODALI baslik kategorisi, (2) Etkinlik-urun secici opsiyonu, (3+4) Etkinlik kategori rozetleri (grid+liste, 6004/7858), (5+6) Etkinlik kart kategori rozetleri (7745/7779). Paylasim karti canvas kategorisi de eklendi. Etkinlik kategorileri ZATEN ayni categories koleksiyonundan geldigi icin (getCategories->setEvCategoryOptions) catLabelEN dogru EN dondurur. Mantik/anahtar yuzeyleri (getCatFields, data-cat, Firestore query, gruplama anahtari, evGrad hash) bilerek HAM birakildi. Onkosul: Admin>Kategoriler>Tumunu Ingilizceye Cevir ile name_en dolu olmali. SOZLUGE DOKUNULMADI. node+harness 0.'],
@@ -6772,12 +6773,13 @@ async function openEventAttendeesModal(eventId, eventTitle) {
 
   try {
     // registrations koleksiyonundan bu etkinliğin kayıtlarını çek
-    var regSnap = await getDocs(query(
-      collection(db,'registrations'),
-      where('eventId','==',eventId)
-    ));
+    var _isAdm = (CUR_PROFILE && CUR_PROFILE.role==='admin');
+    var regSnap = await getDocs(_isAdm
+      ? query(collection(db,'registrations'), where('eventId','==',eventId))
+      : query(collection(db,'registrations'), where('vendorId','==',CUR_USER.uid)));
 
     var regs = regSnap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    if (!_isAdm) regs = regs.filter(function(r){ return r.eventId === eventId; });
     regs.sort(function(a,b){ return (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0); });
 
     var body = modal.querySelector('#ea-body');
@@ -15661,6 +15663,7 @@ async function loadVendTab() {
               html += '<button class="btn-red btn-sm vev-cancel" data-id="' + e.id + '" data-title="' + (e.title||'').replace(/"/g,'') + '" data-count="' + (e.registeredCount||0) + '" style="font-size:11.5px;margin-right:4px">'+t('vev.cancel','✕ İptal')+'</button>';
             }
             // v4.46: Klonla butonu — mevcut etkinliği yeni etkinlik olarak çoğalt
+            html += '<button class="btn-g btn-sm vev-attendees" data-id="' + e.id + '" data-title="' + (e.title||'').replace(/"/g,'') + '" style="font-size:11.5px;margin-right:4px">👥 ' + (e.registeredCount||0) + ' ' + (window.CUR_LOCALE==='en'?'Attendees':'Katılımcı') + '</button>';
             html += '<button class="vev-clone lc-btn lc-btn-edit" data-id="' + e.id + '" title="'+t('vev.t_clone_long','Klonla — bu etkinliği şablon olarak kullan ve yeni oluştur')+'">📋</button>';
             html += '<button class="ev-arch lc-btn lc-btn-arch" data-id="'+e.id+'" data-title="'+(e.title||'').replace(/"/g,"&quot;")+'" title="'+t('vev.t_archive','Arşive al')+'">📦</button>';
             html += '<button class="ev-trash lc-btn lc-btn-tr" data-id="'+e.id+'" data-title="'+(e.title||'').replace(/"/g,"&quot;")+'" data-count="'+(e.registeredCount||0)+'" title="'+t('vev.t_trash','Çöpe at')+'">🗑</button>';
@@ -15692,6 +15695,9 @@ async function loadVendTab() {
           var ev = events.find(function(x){ return x.id===b.dataset.id; });
           if (ev) openEditEventModal(ev.id, ev);
         });
+      });
+      m.querySelectorAll('.vev-attendees').forEach(function(b) {
+        b.addEventListener('click', function() { openEventAttendeesModal(b.dataset.id, b.dataset.title); });
       });
       m.querySelectorAll('.vev-cancel').forEach(function(b) {
         b.addEventListener('click', async function() {
