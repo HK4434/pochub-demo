@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.87 | pochub.co -->
+<!-- PoCHub v7.88 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.87';
+const VERSION = 'v7.88';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.88': ['(1) OZEL FACET label_en (locale-aware): Filtre Yonetimi modalinde her facet satirina EN etiket input-u eklendi (TR-nin altinda). Kaydedilince config.filters.{catalog,events}[].label_en olarak saklanir; applyFilterLayout CAT/EV_LABEL_OVR_EN map-lerini doldurur; facetLabel EN modda once EN etiketi (ovrEn[key] || f.label_en) dener, yoksa TR/cflt davranisi. Boylece SATIS TIPI/LISANS MODELI gibi ozel facetler EN modda admin-girilen EN adi gosterir. buildCustomFacets/customOut DEGISMEDI (EN override map uzerinden). (2) catFacetVal ikon-onek FIX: 📦 Diger gibi ikon-onekli degerler VT map-ine takilmiyordu; artik ikon ayrilip govde cevriliyor (📦 Diger -> 📦 Other), Direkt Satis vb. zaten calisiyordu. SOZLUGE YENI ANAHTAR EKLENMEDI (mevcut cflt.* + override map). node+harness 0.'],
   'v7.87': ['EVENTS SAYFASI i18n (EN modda tamamen TR idi — Image1): renderEvents hardcoded TR metinleri iki dilli yapildi. Yontem: SOZLUKSUZ, yerel _evL(en,tr) helper-i (CUR_LOCALE kosulu, her render-da taze, evFacets fonksiyon oldugu icin facetlerde de calisir). Cevrilenler: baslik (Public PoC Events), alt-baslik kuyrugu (fee-explore/filter/register), + Create Event, donem sekmeleri (Upcoming/This Month/Last Month/This Year/All), arama placeholder, Filtreler/Temizle (Filters/Clear), N events sayaci, siralama (Soonest/Latest/Newest/Filling — split() colon cakismasi icin yeniden yapilandirildi), event facet etiketleri+degerleri (Category/Format/Language/Fee + On-site/Free/Paid). YENI DICT ANAHTARI YOK. NOT: katalog SATIS TIPI/LISANS MODELI = OZEL FACET (admin-config TR) = veri; Diger = catFacetVal ikon-onek eslesmesi (ayri ele alinacak). node+harness 0.'],
   'v7.86': ['KATEGORI EN KAPSAMI TAMAMLANDI (catLabelEN bosluklari kapatildi): EN modda kategori adi ham TR kalan 6 gosterim yuzeyi catLabelEN-e baglandi — (1) Urun DETAY MODALI baslik kategorisi, (2) Etkinlik-urun secici opsiyonu, (3+4) Etkinlik kategori rozetleri (grid+liste, 6004/7858), (5+6) Etkinlik kart kategori rozetleri (7745/7779). Paylasim karti canvas kategorisi de eklendi. Etkinlik kategorileri ZATEN ayni categories koleksiyonundan geldigi icin (getCategories->setEvCategoryOptions) catLabelEN dogru EN dondurur. Mantik/anahtar yuzeyleri (getCatFields, data-cat, Firestore query, gruplama anahtari, evGrad hash) bilerek HAM birakildi. Onkosul: Admin>Kategoriler>Tumunu Ingilizceye Cevir ile name_en dolu olmali. SOZLUGE DOKUNULMADI. node+harness 0.'],
   'v7.85': ['#2 KAPI MESAJI EN (GUVENLI/SOZLUKSUZ): Musteri erisim-kapisi mesaji (scr-customer) artik iki dilli — SOZLUGE HIC DOKUNULMADAN, satir-ici kosulla: CUR_LOCALE===en ? (EN) : (TR). Yeni dict anahtari YOK (v7.81in bos-ekran sebebi olan global dict eklemesinden kacinildi). EN: Please sign in with a customer account... / TR: Bu bolume erismek icin musteri hesabiyla giris yapin. Buton zaten nav.login_register ile cevriliydi. NOT: Kategori EN cevirisi (Veritabani vb.) ADMIN tarafinda tek tik: Admin > Kategoriler > Tumunu Ingilizceye Cevir. node+harness HEPSI 0.'],
@@ -8173,6 +8174,7 @@ function allFacets(){ var b = CAT_CUSTOM.length ? CAT_FACETS.concat(CAT_CUSTOM) 
 var CAT_FACET_ORDER = null, CAT_FACET_OFF = {};
 var EV_FACET_ORDER  = null, EV_FACET_OFF  = {};
 var CAT_LABEL_OVR = {}, EV_LABEL_OVR = {};   // admin etiket override
+var CAT_LABEL_OVR_EN = {}, EV_LABEL_OVR_EN = {};   // v7.88: EN etiket override (locale-aware facet label)
 var CAT_CUSTOM = [], EV_CUSTOM = [];          // admin-tanımlı özel facet'ler
 function orderFacetList(master, orderArr, offMap){
   var byKey={}; master.forEach(function(f){ byKey[f.key]=f; });
@@ -8181,7 +8183,7 @@ function orderFacetList(master, orderArr, offMap){
   master.forEach(function(f){ if(out.indexOf(f)<0) out.push(f); }); // yeni/eksik gruplar sona
   return out.filter(function(f){ return !offMap[f.key]; });
 }
-function facetLabel(f, scope){ var ovr=(scope==='events'?EV_LABEL_OVR:CAT_LABEL_OVR); var base=(ovr && ovr[f.key]) || f.label;
+function facetLabel(f, scope){ var ovr=(scope==='events'?EV_LABEL_OVR:CAT_LABEL_OVR); var ovrEn=(scope==='events'?EV_LABEL_OVR_EN:CAT_LABEL_OVR_EN); if(window.CUR_LOCALE==='en'){ var _enL=(ovrEn&&ovrEn[f.key])||f.label_en; if(_enL) return _enL; } var base=(ovr && ovr[f.key]) || f.label;
   if (scope==='catalog') { var FK={category:'cflt.category',sector:'cflt.sector',deployment:'cflt.deployment',license:'cflt.license',origin:'cflt.origin',verified:'cflt.verification',rating:'cflt.rating',sales_type:'cflt.sales_type',license_model:'cflt.license_model',performance:'cflt.performance',form_factor:'cflt.form_factor',deployment_model:'cflt.deployment_model'}; if (FK[f.key]) return t(FK[f.key], base); }
   return base; }
 function catFacetVal(fkey, val, label){
@@ -8189,6 +8191,8 @@ function catFacetVal(fkey, val, label){
     if (fkey==='category') return catLabelEN(val);
     var VT={'🇹🇷 Yerli':'cflt.v_domestic','🌍 Yabancı':'cflt.v_foreign','✓ Doğrulanmış':'cflt.v_verified','Diğer':'cflt.v_other','Direkt Satış':'cflt.v_direct','Bayi / Kanal':'cflt.v_channel','Evet':'common.yes','Hayır':'common.no'};
     if (VT[label]) return t(VT[label], label);
+    var _mm = String(label).match(/^(\s*[^\p{L}\p{N}]+\s*)(.+)$/u);
+    if (_mm && VT[_mm[2].trim()]) return _mm[1] + t(VT[_mm[2].trim()], _mm[2].trim());
     if (fkey==='sector') return t('csec.'+String(val), label);
   } catch(e){}
   return label;
@@ -8216,17 +8220,17 @@ function computeCustomOptions(customArr, list){
 }
 function applyFilterLayout(filters){
   CAT_FACET_ORDER=null; CAT_FACET_OFF={}; EV_FACET_ORDER=null; EV_FACET_OFF={};
-  CAT_LABEL_OVR={}; EV_LABEL_OVR={}; CAT_CUSTOM=[]; EV_CUSTOM=[];
+  CAT_LABEL_OVR={}; EV_LABEL_OVR={}; CAT_LABEL_OVR_EN={}; EV_LABEL_OVR_EN={}; CAT_CUSTOM=[]; EV_CUSTOM=[];
   if(!filters) return;
   if(Array.isArray(filters.catalogCustom)) CAT_CUSTOM = buildCustomFacets(filters.catalogCustom, CAT_FILTERS);
   if(Array.isArray(filters.eventsCustom))  EV_CUSTOM  = buildCustomFacets(filters.eventsCustom, EV_FILTERS);
   if(Array.isArray(filters.catalog)){
     CAT_FACET_ORDER=filters.catalog.map(function(g){return g.key;});
-    filters.catalog.forEach(function(g){ if(!g) return; if(g.on===false) CAT_FACET_OFF[g.key]=true; if(g.label) CAT_LABEL_OVR[g.key]=g.label; });
+    filters.catalog.forEach(function(g){ if(!g) return; if(g.on===false) CAT_FACET_OFF[g.key]=true; if(g.label) CAT_LABEL_OVR[g.key]=g.label; if(g.label_en) CAT_LABEL_OVR_EN[g.key]=g.label_en; });
   }
   if(Array.isArray(filters.events)){
     EV_FACET_ORDER=filters.events.map(function(g){return g.key;});
-    filters.events.forEach(function(g){ if(!g) return; if(g.on===false) EV_FACET_OFF[g.key]=true; if(g.label) EV_LABEL_OVR[g.key]=g.label; });
+    filters.events.forEach(function(g){ if(!g) return; if(g.on===false) EV_FACET_OFF[g.key]=true; if(g.label) EV_LABEL_OVR[g.key]=g.label; if(g.label_en) EV_LABEL_OVR_EN[g.key]=g.label_en; });
   }
 }
 // Özel facet aday alanları (admin "ekle" için)
@@ -37199,16 +37203,16 @@ function openFilterManagerModal(){
   var catCands = catalogCustomCandidates();
   var evCands  = eventsCustomCandidates();
 
-  function layout(master, customArr, orderArr, offMap, ovr){
+  function layout(master, customArr, orderArr, offMap, ovr, ovrEn){
     var rows=[], seen={};
     var all = master.concat(customArr.map(function(f){ return {key:f.key, label:(f.def&&f.def.label)||f.label, custom:true}; }));
     var byKey={}; all.forEach(function(m){ byKey[m.key]=m; });
-    (orderArr||[]).forEach(function(k){ if(byKey[k] && !seen[k]){ seen[k]=1; var m=byKey[k]; rows.push({key:k,label:(ovr&&ovr[k])||m.label,on:!offMap[k],custom:!!m.custom}); } });
-    all.forEach(function(m){ if(!seen[m.key]){ seen[m.key]=1; rows.push({key:m.key,label:(ovr&&ovr[m.key])||m.label,on:!offMap[m.key],custom:!!m.custom}); } });
+    (orderArr||[]).forEach(function(k){ if(byKey[k] && !seen[k]){ seen[k]=1; var m=byKey[k]; rows.push({key:k,label:(ovr&&ovr[k])||m.label,label_en:(ovrEn&&ovrEn[k])||'',on:!offMap[k],custom:!!m.custom}); } });
+    all.forEach(function(m){ if(!seen[m.key]){ seen[m.key]=1; rows.push({key:m.key,label:(ovr&&ovr[m.key])||m.label,label_en:(ovrEn&&ovrEn[m.key])||'',on:!offMap[m.key],custom:!!m.custom}); } });
     return rows;
   }
-  var catRows = layout(catMaster, CAT_CUSTOM, CAT_FACET_ORDER, CAT_FACET_OFF, CAT_LABEL_OVR);
-  var evRows  = layout(evMaster,  EV_CUSTOM,  EV_FACET_ORDER,  EV_FACET_OFF,  EV_LABEL_OVR);
+  var catRows = layout(catMaster, CAT_CUSTOM, CAT_FACET_ORDER, CAT_FACET_OFF, CAT_LABEL_OVR, CAT_LABEL_OVR_EN);
+  var evRows  = layout(evMaster,  EV_CUSTOM,  EV_FACET_ORDER,  EV_FACET_OFF,  EV_LABEL_OVR, EV_LABEL_OVR_EN);
 
   function candOptions(cands){ return cands.map(function(c,i){ return '<option value="'+i+'">'+(c.label||c.field)+(c.cf?' (teknik)':'')+'</option>'; }).join(''); }
 
@@ -37216,7 +37220,7 @@ function openFilterManagerModal(){
   modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:760px;width:100%;max-height:90vh;overflow-y:auto;padding:22px;position:relative">'
     + '<button id="fil-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>'
     + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">🎛 Filtre Yönetimi</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sıra için ↑/↓ · görünürlük için anahtar · etiketi yazarak değiştir · özel filtre ekle/sil. Seçenekler veriden otomatik gelir. (Liste içerikleri sektör/dağıtım/lisans için Taksonomi bölümünde.)</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sıra için ↑/↓ · görünürlük için anahtar · TR + EN etiket gir (EN boşsa TR/otomatik çeviri kullanılır) · özel filtre ekle/sil. Seçenekler veriden otomatik gelir. (Liste içerikleri sektör/dağıtım/lisans için Taksonomi bölümünde.)</div>'
     + '<div style="display:flex;gap:18px;flex-wrap:wrap">'
     +   '<div style="flex:1;min-width:300px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📦 Katalog filtreleri</div><div id="fil-cat"></div>'
     +     '<div style="display:flex;gap:6px;margin-top:8px"><select class="inp" id="fil-cat-cand" style="flex:1;font-size:12px;padding:5px 8px">'+candOptions(catCands)+'</select><button class="btn-g btn-sm" id="fil-cat-add">+ Ekle</button></div></div>'
@@ -37230,7 +37234,10 @@ function openFilterManagerModal(){
   function rowHtml(r){
     return '<div class="fil-row" data-key="'+r.key+'" data-custom="'+(r.custom?'1':'0')+'" style="display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--bg-elevated)">'
       + '<div style="display:flex;flex-direction:column;gap:1px"><button class="fil-up" title="Yukarı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▲</button><button class="fil-down" title="Aşağı" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;line-height:1;padding:0">▼</button></div>'
-      + '<input class="inp fil-label" value="'+(r.label||'').replace(/"/g,'&quot;')+'" style="flex:1;font-size:12.5px;padding:4px 8px">'
+      + '<div style="flex:1;display:flex;flex-direction:column;gap:3px;min-width:120px">'
+        + '<input class="inp fil-label" value="'+(r.label||'').replace(/"/g,'&quot;')+'" placeholder="TR etiket" style="font-size:12.5px;padding:4px 8px">'
+        + '<input class="inp fil-label-en" value="'+(r.label_en||'').replace(/"/g,'&quot;')+'" placeholder="EN etiket (opsiyonel)" style="font-size:12px;padding:4px 8px;color:var(--text-secondary)">'
+        + '</div>'
       + (r.custom?'<span title="Özel filtre" style="font-size:10px;color:#2563eb;font-weight:700">★</span>':'')
       + '<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);cursor:pointer"><input type="checkbox" class="fil-on"'+(r.on?' checked':'')+'>Görünür</label>'
       + (r.custom?'<button class="fil-del" title="Sil" style="background:none;border:none;cursor:pointer;font-size:13px">🗑</button>':'')
@@ -37258,7 +37265,7 @@ function openFilterManagerModal(){
 
   function collect(hostId){
     return [].slice.call(modal.querySelectorAll(hostId+' .fil-row')).map(function(row){
-      return { key:row.dataset.key, on:row.querySelector('.fil-on').checked, label:(row.querySelector('.fil-label').value||'').trim(), custom:row.dataset.custom==='1' };
+      return { key:row.dataset.key, on:row.querySelector('.fil-on').checked, label:(row.querySelector('.fil-label').value||'').trim(), label_en:(((row.querySelector('.fil-label-en')||{}).value)||'').trim(), custom:row.dataset.custom==='1' };
     });
   }
   modal.querySelector('#fil-close').addEventListener('click', function(){ modal.remove(); });
@@ -37272,7 +37279,7 @@ function openFilterManagerModal(){
     var btn=this; btn.disabled=true; btn.textContent=t('common.saving','⏳ Kaydediliyor...');
     var catC=collect('#fil-cat'), evC=collect('#fil-ev');
     function defaultLabel(key, scope){ var m=(scope==='ev'?evMaster:catMaster).filter(function(x){return x.key===key;})[0]; return m?m.label:''; }
-    function layoutOut(rows, scope){ return rows.map(function(r){ var o={key:r.key, on:r.on}; if(r.label && r.label!==defaultLabel(r.key,scope)) o.label=r.label; return o; }); }
+    function layoutOut(rows, scope){ return rows.map(function(r){ var o={key:r.key, on:r.on}; if(r.label && r.label!==defaultLabel(r.key,scope)) o.label=r.label; if(r.label_en) o.label_en=r.label_en; return o; }); }
     function customOut(rows){ return rows.filter(function(r){return r.custom && customDefs[r.key];}).map(function(r){ var d=Object.assign({}, customDefs[r.key]); d.label=r.label||d.label; return d; }); }
     var filters = { catalog: layoutOut(catC,'cat'), events: layoutOut(evC,'ev'), catalogCustom: customOut(catC), eventsCustom: customOut(evC) };
     try {
