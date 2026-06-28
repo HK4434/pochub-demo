@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.83 | pochub.co -->
+<!-- PoCHub v7.84 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -704,6 +704,40 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
   </div>
 </footer>
 
+<!-- v7.84: BOOT KALKANI — modulden bagimsiz nobetci. Modul yuklenemese / bir hata olsa bile sayfa ASLA bos kalmaz: hatayi yakalar, ekranda gosterir, Yenile sunar; app sonradan acilirsa fallback kalkar. -->
+<script>
+(function(){
+  var E = [];
+  function push(m){ try{ E.push(String(m)); }catch(_){} }
+  window.addEventListener('error', function(ev){
+    try{ push((ev.message||'error') + (ev.filename ? ' @ '+String(ev.filename).split('/').pop()+':'+ev.lineno : '')); }catch(_){}
+  });
+  window.addEventListener('unhandledrejection', function(ev){
+    try{ var r=ev.reason; push('Promise: ' + ((r&&(r.message||r.code))||r)); }catch(_){}
+  });
+  window.__bootErrors = E;
+  function appRendered(){ var n=document.getElementById('ntabs'); return !!(n && n.children && n.children.length>0); }
+  setTimeout(function(){
+    try{
+      if (appRendered()) return;
+      if (document.getElementById('boot-fallback')) return;
+      function esc(x){ return String(x).replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';}); }
+      var errHtml = E.length ? '<pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:12px;color:#991b1b;overflow:auto;max-height:180px;white-space:pre-wrap;margin:14px 0">'+E.map(esc).join('\n')+'</pre>' : '';
+      var box = document.createElement('div');
+      box.id = 'boot-fallback';
+      box.style.cssText = 'max-width:560px;margin:72px auto;padding:28px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;text-align:center;color:#0f172a';
+      box.innerHTML = '<div style="font-size:42px;margin-bottom:8px">⚠️</div>'+
+        '<div style="font-size:18px;font-weight:800;margin-bottom:6px">Sayfa yüklenemedi</div>'+
+        '<div style="font-size:14px;color:#475569">Geçici bir hata oluştu. Lütfen sayfayı yenileyin.</div>'+
+        errHtml+
+        '<div><button onclick="location.reload()" style="margin-top:10px;background:#2563eb;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;cursor:pointer">Yenile</button></div>';
+      (document.body||document.documentElement).appendChild(box);
+      var iv = setInterval(function(){ if (appRendered()){ var f=document.getElementById('boot-fallback'); if(f) f.remove(); clearInterval(iv); } }, 1000);
+    }catch(_){}
+  }, 10000);
+})();
+</script>
+
 <!-- FIREBASE + EMAILJS -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
@@ -712,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.83';
+const VERSION = 'v7.84';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -971,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.84': ['BOOT KALKANI (bos-ekran kokten onlem): Modulden BAGIMSIZ bir nobetci script eklendi (modul script tag-inden once). window.onerror + unhandledrejection ile boot hatalarini yakalar; 10sn icinde ust menu (ntabs) render olmazsa bos ekran yerine -Sayfa yuklenemedi + yakalanan hata + Yenile- fallback-i gosterir; app sonradan acilirsa fallback otomatik kalkar. Boylece tek bir hatali sozluk/yukleme hatasi bir daha TUM sayfayi asla bos birakamaz ve hata gorunur olur. node+harness HEPSI 0.'],
   'v7.83': ['GERI DONUS + GUVENLI FIX: v7.81/v7.82 bos ekran (v7.80 calisiyor). CALISAN v7.80 tabanindan yeniden kuruldu; v7.81in GLOBAL dict eklemeleri (gate.customer_login) TAMAMEN cikarildi (suclu aday). Musteri erisim-kapisi buton sizintisi yalnizca MEVCUT nav.login_register anahtariyla ${...} olarak duzeltildi. Boot-hardening dahil edilmedi (tek degisken). node+harness 0.'],
   'v7.80': ['CEVIRI FIX (Featured kart rozeti): loadFeaturedCarousels icinde p.featuredBadge SABIT TR (\'One Cikan Urun\') atanip badge olarak kullaniliyordu -> EN modunda bile TR kaliyordu (Image1 ÖNE ÇIKAN ÜRÜN). Artik t(\'feat.featured\') ile locale-aware (EN: Featured Product). NOT: Kategori (Veritabani) TR kalmasi VERI eksigi — o kategorinin name_en alani Firestoreda bos; Admin > Kategoriler > Tumunu Ingilizceye Cevir ile dolar. Audience band (Hangisi sensin) kodda dogru (anahtarlar + setLocale re-render) — guncel build deploy edilince EN olur. node+harness HEPSI 0.'],
   'v7.79': ['ANASAYFA (tekrar duzeltme - dogru anlasildi): Hero zaten Explore PoC Events + Product Catalog butonlarini iceriyordu; hemen altina eklenen cift-yol kartlari (Live PoC Events / Solution Catalog) ayni isi tekrarliyordu -> cift-yol kartlari KALDIRILDI. Alttaki 4-kutu istatistik satiri GERI GETIRILDI (kullanici onceki hali tercih etti). Hangisi sensin? + Kanit>Gorus seridi + v7.78 bug fixleri (events timeout / takvim) korundu.'],
