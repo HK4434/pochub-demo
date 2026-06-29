@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.89 | pochub.co -->
+<!-- PoCHub v7.90 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.89';
+const VERSION = 'v7.90';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.90': ['KATILIMCILARA DOGRUDAN MESAJ + ARSIV KATILIMCI BUTONU: (1) Katilimci modaline 📨 Katilimcilara Mesaj butonu + yeni openEventAttendeesBroadcastModal: uretici konu+mesaj yazar, tum AKTIF katilimcilara EmailJS ile (sendEmail dongusu, 250ms ara, ilerleme N/N, onay) gonderilir; HTML sablonlu, gonderen adi alttа. Mevcut Mail Gonder -> Listeyi Gonder olarak netlestirildi (liste vs mesaj ayrimi). Spark uyumlu (Cloud Function YOK, client EmailJS). (2) ARSIV etkinlik satirina da 👥 Katilimci butonu eklendi (vev-attendees handler v7.89-dan ortak). Locale-aware etiketler, SOZLUKSUZ. node+harness 0.'],
   'v7.89': ['URETICI KATILIMCI ERISIMI: Etkinlik sahibi uretici artik kendi etkinliginin katilimci listesini gorebiliyor. Etkinliklerim listesine \u0022👥 N Katilimci\u0022 butonu eklendi (locale-aware etiket, sozluksuz) -> mevcut openEventAttendeesModal (katilimci listesi + 📄 PDF indir + 📧 listeyi e-postayla gonder, EmailJS) acilir. IZIN-GUVENLI SORGU: admin eventId ile, URETICI vendorId==uid ile ceker (tek esitlik filtresi -> composite index GEREKMEZ) ve eventId JS-te suzulur; firestore.rules zaten isOwner(vendorId) okumaya izin veriyor (degismedi). NOT: mail modali listeyi yazilan alicilara gonderir (uretici kendine/ekibine); katilimcilara DOGRUDAN toplu mail ayri bir gelistirme. KVKK: katilimci kayit akisinda riza mevcut. node+harness 0.'],
   'v7.88': ['(1) OZEL FACET label_en (locale-aware): Filtre Yonetimi modalinde her facet satirina EN etiket input-u eklendi (TR-nin altinda). Kaydedilince config.filters.{catalog,events}[].label_en olarak saklanir; applyFilterLayout CAT/EV_LABEL_OVR_EN map-lerini doldurur; facetLabel EN modda once EN etiketi (ovrEn[key] || f.label_en) dener, yoksa TR/cflt davranisi. Boylece SATIS TIPI/LISANS MODELI gibi ozel facetler EN modda admin-girilen EN adi gosterir. buildCustomFacets/customOut DEGISMEDI (EN override map uzerinden). (2) catFacetVal ikon-onek FIX: 📦 Diger gibi ikon-onekli degerler VT map-ine takilmiyordu; artik ikon ayrilip govde cevriliyor (📦 Diger -> 📦 Other), Direkt Satis vb. zaten calisiyordu. SOZLUGE YENI ANAHTAR EKLENMEDI (mevcut cflt.* + override map). node+harness 0.'],
   'v7.87': ['EVENTS SAYFASI i18n (EN modda tamamen TR idi — Image1): renderEvents hardcoded TR metinleri iki dilli yapildi. Yontem: SOZLUKSUZ, yerel _evL(en,tr) helper-i (CUR_LOCALE kosulu, her render-da taze, evFacets fonksiyon oldugu icin facetlerde de calisir). Cevrilenler: baslik (Public PoC Events), alt-baslik kuyrugu (fee-explore/filter/register), + Create Event, donem sekmeleri (Upcoming/This Month/Last Month/This Year/All), arama placeholder, Filtreler/Temizle (Filters/Clear), N events sayaci, siralama (Soonest/Latest/Newest/Filling — split() colon cakismasi icin yeniden yapilandirildi), event facet etiketleri+degerleri (Category/Format/Language/Fee + On-site/Free/Paid). YENI DICT ANAHTARI YOK. NOT: katalog SATIS TIPI/LISANS MODELI = OZEL FACET (admin-config TR) = veri; Diger = catFacetVal ikon-onek eslesmesi (ayri ele alinacak). node+harness 0.'],
@@ -6757,7 +6758,8 @@ async function openEventAttendeesModal(eventId, eventTitle) {
     '<div class="txt-muted-12-mt3">' + (eventTitle||'Etkinlik') + '</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;align-items:center">' +
-    '<button id="ea-mail" class="btn-g btn-sm" style="font-size:12px;margin-right:4px">'+t('eam.mail','📧 Mail Gönder')+'</button>' +
+    '<button id="ea-mail" class="btn-g btn-sm" style="font-size:12px;margin-right:4px">'+(window.CUR_LOCALE==='en'?'📋 Send List':'📋 Listeyi Gönder')+'</button>' +
+    '<button id="ea-broadcast" class="btn-g btn-sm" style="font-size:12px;margin-right:4px">'+(window.CUR_LOCALE==='en'?'📨 Message Attendees':'📨 Katılımcılara Mesaj')+'</button>' +
     '<button id="ea-pdf" class="btn-g btn-sm fs12">'+t('eam.pdf','📄 PDF İndir')+'</button>' +
     '<button id="ea-close" class="btn-x">×</button>' +
     '</div>' +
@@ -6837,6 +6839,9 @@ async function openEventAttendeesModal(eventId, eventTitle) {
     // Mail gönder
     modal.querySelector('#ea-mail').addEventListener('click', function() {
       openEventAttendeesMailModal(eventTitle, regs);
+    });
+    modal.querySelector('#ea-broadcast').addEventListener('click', function() {
+      openEventAttendeesBroadcastModal(eventTitle, regs);
     });
 
     // PDF export
@@ -7119,6 +7124,69 @@ function openEventAttendeesMailModal(eventTitle, regs) {
 // Anasayfada müşteri leaderboard'ı altında gösterilir
 // Madalya teması rozetler (🥉🥈🥇)
 // ════════════════════════════════════════════════════════════════════
+function openEventAttendeesBroadcastModal(eventTitle, regs){
+  var EN = (window.CUR_LOCALE==='en');
+  var actives = (regs||[]).filter(function(r){ return r.status!=='cancelled' && (r.userEmail||'').indexOf('@')>0; });
+  var modal=document.createElement('div'); modal.className='modal-bg on';
+  modal.innerHTML =
+    '<div class="modal" style="max-width:560px;width:95vw;padding:0;border-radius:14px;display:flex;flex-direction:column;max-height:88vh">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--border);flex-shrink:0">'+
+      '<div><div class="fs16-fw7">'+(EN?'Message Attendees':'Katılımcılara Mesaj')+'</div>'+
+      '<div class="txt-muted-12-mt3">'+escHtml(eventTitle||(EN?'Event':'Etkinlik'))+'</div></div>'+
+      '<button id="bc-close" class="btn-x">×</button>'+
+    '</div>'+
+    '<div style="padding:20px 24px;overflow-y:auto;flex:1">'+
+      '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px">'+(EN?'This message is emailed to all active attendees':'Bu mesaj tüm aktif katılımcılara e-posta olarak gönderilir')+' ('+actives.length+').</div>'+
+      '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">'+(EN?'Subject':'Konu')+'</label>'+
+      '<input class="inp" id="bc-subject" value="'+(String(eventTitle||'').replace(/"/g,'&quot;'))+'" style="margin-bottom:12px">'+
+      '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">'+(EN?'Message':'Mesaj')+'</label>'+
+      '<textarea class="inp" id="bc-message" rows="6" placeholder="'+(EN?'Reminder, agenda, location/time update...':'Hatırlatma, gündem, konum/saat güncellemesi...')+'" style="resize:vertical;margin-bottom:10px"></textarea>'+
+      '<div id="bc-err" style="font-size:12px;color:#dc2626;margin-bottom:6px"></div>'+
+      '<div id="bc-prog" style="font-size:12px;color:var(--text-muted);margin-bottom:4px"></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;padding:16px 24px;border-top:1px solid var(--border);flex-shrink:0">'+
+      '<button class="btn-g" id="bc-cancel" style="flex:1;padding:10px">'+(EN?'Cancel':'Vazgeç')+'</button>'+
+      '<button class="btn-p" id="bc-send" style="flex:2;padding:10px">'+(EN?('Send to '+actives.length):(actives.length+' katılımcıya gönder'))+'</button>'+
+    '</div>'+
+    '</div>';
+  document.body.appendChild(modal);
+  function close(){ modal.remove(); }
+  modal.querySelector('#bc-close').addEventListener('click', close);
+  modal.querySelector('#bc-cancel').addEventListener('click', close);
+  modal.addEventListener('click', function(e){ if(e.target===modal) close(); });
+  if(!actives.length){ modal.querySelector('#bc-err').textContent=(EN?'No active attendees with an email address.':'E-posta adresi olan aktif katılımcı yok.'); modal.querySelector('#bc-send').disabled=true; }
+  modal.querySelector('#bc-send').addEventListener('click', async function(){
+    var subject=(modal.querySelector('#bc-subject').value||'').trim();
+    var message=(modal.querySelector('#bc-message').value||'').trim();
+    var err=modal.querySelector('#bc-err'); err.textContent='';
+    if(!message){ err.textContent=(EN?'Please write a message.':'Lütfen bir mesaj yazın.'); return; }
+    if(!subject) subject=(eventTitle||(EN?'Event':'Etkinlik'));
+    if(!confirm((EN?('Send this message to '+actives.length+' attendees?'):('Bu mesaj '+actives.length+' katılımcıya gönderilsin mi?')))) return;
+    var btn=this; btn.disabled=true; var prog=modal.querySelector('#bc-prog');
+    var sent=0, failed=[];
+    var senderName=(CUR_PROFILE && (CUR_PROFILE.company||CUR_PROFILE.displayName)) || 'PoCHub';
+    var htmlBody=
+      '<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#111827">'+
+      '<div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:24px 28px;border-radius:10px 10px 0 0">'+
+      '<div style="font-size:12px;color:#dbeafe;letter-spacing:.5px">PoCHub.co · '+escHtml(eventTitle||'')+'</div>'+
+      '<div style="font-size:19px;font-weight:700;color:#fff;margin-top:4px">'+escHtml(subject)+'</div></div>'+
+      '<div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;padding:22px 28px;font-size:14px;line-height:1.65;color:#374151;white-space:pre-wrap">'+escHtml(message)+
+      '<div style="margin-top:20px;padding-top:14px;border-top:1px solid #eee;font-size:12.5px;color:#6b7280">'+escHtml(senderName)+'</div></div></div>';
+    for(var i=0;i<actives.length;i++){
+      var r=actives[i];
+      prog.textContent=(EN?'Sending... ':'Gönderiliyor... ')+'('+(i+1)+'/'+actives.length+')';
+      try{
+        await sendEmail(r.userEmail, r.userName||r.userEmail, subject, message+'\n\n— '+senderName+'\n'+(eventTitle||''), htmlBody);
+        sent++;
+      }catch(e2){ failed.push(r.userEmail); }
+      if(i<actives.length-1) await new Promise(function(res){ setTimeout(res,250); });
+    }
+    close();
+    if(failed.length) showToast(sent+(EN?' sent, ':' gönderildi, ')+failed.length+(EN?' failed.':' başarısız.'),'err');
+    else showToast('📨 '+(EN?('Message sent to '+sent+' attendees.'):('Mesaj '+sent+' katılımcıya gönderildi.')));
+  });
+}
+
 function _lbRankMedal(rank){
   var g={1:['#fbbf24','#d97706'],2:['#cbd5e1','#94a3b8'],3:['#e0a878','#b45309']}[rank];
   if(g) return '<div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,'+g[0]+','+g[1]+');color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.12)">'+rank+'</div>';
@@ -15671,6 +15739,7 @@ async function loadVendTab() {
           } else if (lcState === 'archived') {
             td.innerHTML =
               '<button class="ev-unarch lc-btn lc-btn-act" data-id="'+e.id+'" title="'+t('vev.t_activate','Aktife al')+'">'+t('vev.activate','↩ Aktif')+'</button>'
+              + '<button class="btn-g btn-sm vev-attendees" data-id="' + e.id + '" data-title="' + (e.title||'').replace(/"/g,'') + '" style="font-size:11.5px;margin-right:4px">👥 ' + (e.registeredCount||0) + ' ' + (window.CUR_LOCALE==='en'?'Attendees':'Katılımcı') + '</button>'
               + '<button class="vev-clone lc-btn lc-btn-edit" data-id="' + e.id + '" title="'+t('vev.t_clone','Klonla')+'">📋</button>'
               + '<button class="ev-trash lc-btn lc-btn-tr" data-id="'+e.id+'" data-title="'+(e.title||'').replace(/"/g,"&quot;")+'" data-count="'+(e.registeredCount||0)+'" title="'+t('vev.t_trash','Çöpe at')+'">🗑</button>';
           } else if (lcState === 'trash') {
