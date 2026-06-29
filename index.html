@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.91 | pochub.co -->
+<!-- PoCHub v7.92 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.91';
+const VERSION = 'v7.92';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.92': ['ONE CIKAN URUN KARTI DONATILDI (#3 — mankenin podyumu): Anasayfa featured urun karti artik zengin/premium. Render aninda her featured urunun (<=6) TAM dokumani cekilir (window._ftProdFull) ve kart su anda gosterir: KANIT SKORU (computeEvidenceScore, /100 + evidenceColor renk paneli), ★ puan + (degerlendirme sayisi), ✓ Dogrulanmis rozeti (getVendorBadgeRow), EN AZ 3 kilit teknik ozellik (getCatFields ∩ catFields, pfield.* etiket), sektor cipleri (sectorLabel, locale), mensei (🇹🇷 Yerli / 🌍 ulke), PoC degerlendirme sayisi, 2-satir aciklama, Sponsorlu rozeti, ve guclu CTA. Tiklama artik go(catalog) yerine openProductDetailModal(productId) acar. FIYAT IKINCIL (kucuk/soluk). Tier rozeti (Pro/Business/Enterprise) KALDIRILDI — v5.84 ilkesi: abonelik duzeyi alicidan gizli. Grid 200->260px genisletildi. Tum etiketler INLINE locale (yeni dict YOK). Veri: ekstra <=6 okuma; evidence/rating denormalize alanlardan (yeni okuma yok). node+harness 0.'],
   'v7.91': ['ADMIN URUN DUZENLEME = TAM PARITE: Admin Urun Onaylari-nda Duzenle artik uretici ile AYNI zengin editoru (openEditProd) aciyor — tum alanlar: ad/kategori/mensei/aciklama/uretici-URL/sektorler/destek-modeli + KATEGORI-BAZLI TEKNIK OZELLIKLER (getCatFields). Eski 4-alanli zayif modal (openAdmProdEditModal) artik kullanilmiyor (dead, silinmedi). MIMARI: openEditProd-a ADDITIVE adminMode parametresi (vendor cagrilari 9 arg gectigi icin onlarin yolu HIC degismez = sifir vendor riski). Kaydetme updateDoc oldugu icin sahiplik/vendorId/onay-durumu KORUNUR (admin baska vendor urununu duzenlese bile sahibi ezmez). Onay/red mantigi standalone _admApproveProduct/_admRejectProduct fonksiyonlarina cikarildi; adminMode-da urun onay bekliyorsa footer-a ✓ Onayla / ✗ Reddet bari DOM ile enjekte edilir (bildirim+toast aynen). Save sonrasi adminMode-da admProducts tazelenir. node+harness 0.'],
   'v7.90': ['KATILIMCILARA DOGRUDAN MESAJ + ARSIV KATILIMCI BUTONU: (1) Katilimci modaline 📨 Katilimcilara Mesaj butonu + yeni openEventAttendeesBroadcastModal: uretici konu+mesaj yazar, tum AKTIF katilimcilara EmailJS ile (sendEmail dongusu, 250ms ara, ilerleme N/N, onay) gonderilir; HTML sablonlu, gonderen adi alttа. Mevcut Mail Gonder -> Listeyi Gonder olarak netlestirildi (liste vs mesaj ayrimi). Spark uyumlu (Cloud Function YOK, client EmailJS). (2) ARSIV etkinlik satirina da 👥 Katilimci butonu eklendi (vev-attendees handler v7.89-dan ortak). Locale-aware etiketler, SOZLUKSUZ. node+harness 0.'],
   'v7.89': ['URETICI KATILIMCI ERISIMI: Etkinlik sahibi uretici artik kendi etkinliginin katilimci listesini gorebiliyor. Etkinliklerim listesine \u0022👥 N Katilimci\u0022 butonu eklendi (locale-aware etiket, sozluksuz) -> mevcut openEventAttendeesModal (katilimci listesi + 📄 PDF indir + 📧 listeyi e-postayla gonder, EmailJS) acilir. IZIN-GUVENLI SORGU: admin eventId ile, URETICI vendorId==uid ile ceker (tek esitlik filtresi -> composite index GEREKMEZ) ve eventId JS-te suzulur; firestore.rules zaten isOwner(vendorId) okumaya izin veriyor (degismedi). NOT: mail modali listeyi yazilan alicilara gonderir (uretici kendine/ekibine); katilimcilara DOGRUDAN toplu mail ayri bir gelistirme. KVKK: katilimci kayit akisinda riza mevcut. node+harness 0.'],
@@ -23509,20 +23510,70 @@ async function loadFeaturedCarousels() {
       html += '<div class="flx-c-g8"><span style="font-size:18px">⚡</span><div class="fs14-fw7">Öne Çıkan Ürünler</div></div>';
       html += '<button class="btn-g btn-sm" id="ftd-all-products">Tüm Ürünler →</button>';
       html += '</div>';
-      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">';
+      // v7.92: featured urunlerin TAM dokumanlarini cek (zengin podyum karti) — <=6 okuma
+      window._ftProdFull = {};
+      try {
+        var _ftIds = data.featuredProducts.slice(0,6).map(function(x){return x.productId;}).filter(Boolean);
+        var _ftDocs = await Promise.all(_ftIds.map(function(id){ return getDoc(doc(db,'products',id)).then(function(ds){return ds.exists()?{id:id,d:ds.data()}:null;}).catch(function(){return null;}); }));
+        _ftDocs.forEach(function(r){ if(r) window._ftProdFull[r.id]=r.d; });
+      } catch(e){}
       data.featuredProducts.slice(0, 6).forEach(function(p){
+        var full = (window._ftProdFull && window._ftProdFull[p.productId]) || {};
         var g=EV_GRADS[_evHash(String(p.vendorId||p.vendorName||p.productName||''))%EV_GRADS.length];
-        var tierBadge = '';
-        if (p.tier === 'professional') tierBadge = '<span class="vbadge vbadge-pro">⚡ Pro</span>';
-        else if (p.tier === 'business') tierBadge = '<span class="vbadge vbadge-biz">💎 Business</span>';
-        else if (p.tier === 'enterprise') tierBadge = '<span class="vbadge vbadge-ent">👑 Enterprise</span>';
-        var logoF='<div style="width:38px;height:38px;border-radius:9px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.10)">'+(p.vendorId?getVendorAvatarFromCache(p.vendorId,38,{square:true}):'<span style="display:flex;width:38px;height:38px;background:linear-gradient(135deg,'+g[0]+','+g[1]+');color:#fff;align-items:center;justify-content:center;font-weight:800;font-size:13px">'+escHtml(evInitials(p.vendorName))+'</span>')+'</div>';
-        html += '<div class="ftd-product-card" data-product="'+p.productId+'" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:0;overflow:hidden;cursor:pointer">';
+        var EN = (window.CUR_LOCALE==='en');
+        var logoF='<div style="width:42px;height:42px;border-radius:10px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.10)">'+(p.vendorId?getVendorAvatarFromCache(p.vendorId,42,{square:true}):'<span style="display:flex;width:42px;height:42px;background:linear-gradient(135deg,'+g[0]+','+g[1]+');color:#fff;align-items:center;justify-content:center;font-weight:800;font-size:14px">'+escHtml(evInitials(p.vendorName))+'</span>')+'</div>';
+
+        // Kanit Skoru
+        var ev = (typeof computeEvidenceScore==='function') ? computeEvidenceScore(full) : null;
+        var evHtml='';
+        if (ev) { var ec=evidenceColor(ev.score);
+          evHtml='<div style="display:flex;align-items:center;gap:7px;background:'+ec+'14;border:1px solid '+ec+'33;border-radius:10px;padding:6px 9px">'
+            +'<div style="font-size:18px;font-weight:900;color:'+ec+';line-height:1">'+ev.score+'<span style="font-size:10px;font-weight:700">/100</span></div>'
+            +'<div style="font-size:9px;font-weight:800;color:'+ec+';letter-spacing:.3px;line-height:1.15">'+(EN?'EVIDENCE<br>SCORE':'KANIT<br>SKORU')+'</div></div>';
+        }
+        // Puan + PoC sayisi
+        var ratHtml = (full.avgRating && full.ratingCount) ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#f59e0b">★ '+Number(full.avgRating).toFixed(1)+'<span style="color:#94a3b8;font-weight:600">('+full.ratingCount+')</span></span>' : '';
+        var pocHtml = (ev && ev.n) ? '<span style="font-size:9.5px;color:#64748b;font-weight:600">📊 '+ev.n+' '+(EN?'PoC reviews':'PoC değerlendirmesi')+'</span>' : '';
+        // Verified
+        var verHtml = (typeof getVendorBadgeRow==='function') ? getVendorBadgeRow(p.vendorId) : '';
+        // >=3 kilit teknik ozellik
+        var specs=[];
+        try { var cf=full.catFields||{}; var defs=(typeof getCatFields==='function')?(getCatFields(full.category||p.category)||[]):[];
+          defs.forEach(function(f){ if(specs.length>=4) return; var v=cf[f.id]; if(v!==undefined&&v!==null&&String(v).trim()!=='') specs.push({l:t('pfield.'+f.id,f.label),v:String(v)}); });
+        } catch(e){}
+        var specHtml='';
+        if (specs.length) { specHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;margin-top:10px;padding-top:10px;border-top:1px dashed rgba(15,23,42,.09)">'
+            +specs.map(function(sp){ return '<div style="min-width:0"><div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(sp.l)+'</div><div style="font-size:11.5px;font-weight:700;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escHtml(sp.v)+'">'+escHtml(sp.v)+'</div></div>'; }).join('')+'</div>';
+        }
+        // Sektorler
+        var secHtml='';
+        if (Array.isArray(full.sectors)&&full.sectors.length) { secHtml='<div style="display:flex;flex-wrap:wrap;gap:4px">'
+            +full.sectors.slice(0,2).map(function(sc){ return '<span style="font-size:9.5px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid rgba(15,23,42,.06);padding:2px 8px;border-radius:20px">'+escHtml((typeof sectorLabel==='function'?sectorLabel(sc):sc))+'</span>'; }).join('')
+            +(full.sectors.length>2?'<span style="font-size:9.5px;color:#94a3b8;padding:2px 3px">+'+(full.sectors.length-2)+'</span>':'')+'</div>';
+        }
+        // Mensei
+        var origHtml='';
+        if (full.origin==='domestic'||full.country==='TR') origHtml='<span style="font-size:10px;font-weight:700;color:#16a34a;white-space:nowrap">🇹🇷 '+(EN?'Local':'Yerli')+'</span>';
+        else if (full.country) origHtml='<span style="font-size:10px;font-weight:600;color:#64748b;white-space:nowrap">🌍 '+escHtml(full.country)+'</span>';
+        // Aciklama
+        var desc=(full.description||'').trim(); if(desc.length>92) desc=desc.slice(0,92)+'…';
+        var descHtml = desc ? '<div style="font-size:11px;color:#64748b;line-height:1.5;margin-top:9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+escHtml(desc)+'</div>' : '';
+        // Fiyat (ikincil) + Sponsorlu
+        var priceHtml = p.unitPrice ? '<span style="font-size:11px;color:#94a3b8;font-weight:600">₺'+p.unitPrice.toLocaleString('tr-TR')+'</span>' : '<span></span>';
+        var sponHtml = '<span style="font-size:8.5px;font-weight:800;color:#d97706;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.25);padding:2px 8px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;flex-shrink:0">'+t('feat.sponsored','Sponsorlu')+'</span>';
+
+        // KART
+        html += '<div class="ftd-product-card" data-product="'+p.productId+'" style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:0;overflow:hidden;cursor:pointer;display:flex;flex-direction:column">';
         html += '<div style="height:5px;background:linear-gradient(90deg,'+g[0]+','+g[1]+')"></div>';
-        html += '<div style="padding:13px 14px">';
-        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">'+logoF+'<div style="min-width:0;flex:1"><div style="font-size:13.5px;font-weight:800;color:#0f172a;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.productName||'')+'</div><div style="font-size:11px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.category?escHtml(p.category):'')+(p.brand?' · '+escHtml(p.brand):'')+'</div></div></div>';
-        html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px"><span style="font-size:11.5px;color:#64748b;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.vendorName||'')+'</span>'+tierBadge+'</div>';
-        if (p.unitPrice) html += '<div style="font-size:13px;font-weight:800;color:'+g[1]+';margin-top:7px">₺'+p.unitPrice.toLocaleString('tr-TR')+'</div>';
+        html += '<div style="padding:14px 15px;display:flex;flex-direction:column;flex:1">';
+        html += '<div style="display:flex;align-items:flex-start;gap:10px">'+logoF+'<div style="min-width:0;flex:1"><div style="display:flex;align-items:center;justify-content:space-between;gap:6px"><div style="font-size:9.5px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.category||'')+'</div>'+sponHtml+'</div><div style="font-size:14.5px;font-weight:800;color:#0f172a;line-height:1.25;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escHtml(p.productName||'')+'">'+escHtml(p.productName||'')+'</div></div></div>';
+        html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px"><span style="font-size:11.5px;color:#64748b;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px">'+escHtml(p.vendorName||'')+'</span>'+verHtml+'</div>';
+        if (evHtml||ratHtml) html += '<div style="display:flex;align-items:center;gap:10px;margin-top:11px">'+evHtml+((ratHtml||pocHtml)?'<div style="display:flex;flex-direction:column;gap:2px">'+ratHtml+pocHtml+'</div>':'')+'</div>';
+        html += specHtml;
+        if (secHtml||origHtml) html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px">'+(secHtml||'<span></span>')+origHtml+'</div>';
+        html += descHtml;
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:12px">'+priceHtml+'<span style="font-size:12px;font-weight:800;color:'+g[1]+'">'+(EN?'View →':'İncele →')+'</span></div>';
         html += '</div></div>';
       });
       html += '</div></div>';
@@ -23538,7 +23589,7 @@ async function loadFeaturedCarousels() {
       });
     });
     section.querySelectorAll('.ftd-product-card').forEach(function(c){
-      c.addEventListener('click', function(){ go('catalog'); });
+      c.addEventListener('click', function(){ var _pid=c.getAttribute('data-product'); if(_pid && typeof openProductDetailModal==='function'){ openProductDetailModal(_pid); } else { go('catalog'); } });
     });
     el('ftd-all-vendors')?.addEventListener('click', function(){ go('catalog'); });
     el('ftd-all-products')?.addEventListener('click', function(){ go('catalog'); });
