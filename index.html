@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.90 | pochub.co -->
+<!-- PoCHub v7.91 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.90';
+const VERSION = 'v7.91';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.91': ['ADMIN URUN DUZENLEME = TAM PARITE: Admin Urun Onaylari-nda Duzenle artik uretici ile AYNI zengin editoru (openEditProd) aciyor — tum alanlar: ad/kategori/mensei/aciklama/uretici-URL/sektorler/destek-modeli + KATEGORI-BAZLI TEKNIK OZELLIKLER (getCatFields). Eski 4-alanli zayif modal (openAdmProdEditModal) artik kullanilmiyor (dead, silinmedi). MIMARI: openEditProd-a ADDITIVE adminMode parametresi (vendor cagrilari 9 arg gectigi icin onlarin yolu HIC degismez = sifir vendor riski). Kaydetme updateDoc oldugu icin sahiplik/vendorId/onay-durumu KORUNUR (admin baska vendor urununu duzenlese bile sahibi ezmez). Onay/red mantigi standalone _admApproveProduct/_admRejectProduct fonksiyonlarina cikarildi; adminMode-da urun onay bekliyorsa footer-a ✓ Onayla / ✗ Reddet bari DOM ile enjekte edilir (bildirim+toast aynen). Save sonrasi adminMode-da admProducts tazelenir. node+harness 0.'],
   'v7.90': ['KATILIMCILARA DOGRUDAN MESAJ + ARSIV KATILIMCI BUTONU: (1) Katilimci modaline 📨 Katilimcilara Mesaj butonu + yeni openEventAttendeesBroadcastModal: uretici konu+mesaj yazar, tum AKTIF katilimcilara EmailJS ile (sendEmail dongusu, 250ms ara, ilerleme N/N, onay) gonderilir; HTML sablonlu, gonderen adi alttа. Mevcut Mail Gonder -> Listeyi Gonder olarak netlestirildi (liste vs mesaj ayrimi). Spark uyumlu (Cloud Function YOK, client EmailJS). (2) ARSIV etkinlik satirina da 👥 Katilimci butonu eklendi (vev-attendees handler v7.89-dan ortak). Locale-aware etiketler, SOZLUKSUZ. node+harness 0.'],
   'v7.89': ['URETICI KATILIMCI ERISIMI: Etkinlik sahibi uretici artik kendi etkinliginin katilimci listesini gorebiliyor. Etkinliklerim listesine \u0022👥 N Katilimci\u0022 butonu eklendi (locale-aware etiket, sozluksuz) -> mevcut openEventAttendeesModal (katilimci listesi + 📄 PDF indir + 📧 listeyi e-postayla gonder, EmailJS) acilir. IZIN-GUVENLI SORGU: admin eventId ile, URETICI vendorId==uid ile ceker (tek esitlik filtresi -> composite index GEREKMEZ) ve eventId JS-te suzulur; firestore.rules zaten isOwner(vendorId) okumaya izin veriyor (degismedi). NOT: mail modali listeyi yazilan alicilara gonderir (uretici kendine/ekibine); katilimcilara DOGRUDAN toplu mail ayri bir gelistirme. KVKK: katilimci kayit akisinda riza mevcut. node+harness 0.'],
   'v7.88': ['(1) OZEL FACET label_en (locale-aware): Filtre Yonetimi modalinde her facet satirina EN etiket input-u eklendi (TR-nin altinda). Kaydedilince config.filters.{catalog,events}[].label_en olarak saklanir; applyFilterLayout CAT/EV_LABEL_OVR_EN map-lerini doldurur; facetLabel EN modda once EN etiketi (ovrEn[key] || f.label_en) dener, yoksa TR/cflt davranisi. Boylece SATIS TIPI/LISANS MODELI gibi ozel facetler EN modda admin-girilen EN adi gosterir. buildCustomFacets/customOut DEGISMEDI (EN override map uzerinden). (2) catFacetVal ikon-onek FIX: 📦 Diger gibi ikon-onekli degerler VT map-ine takilmiyordu; artik ikon ayrilip govde cevriliyor (📦 Diger -> 📦 Other), Direkt Satis vb. zaten calisiyordu. SOZLUGE YENI ANAHTAR EKLENMEDI (mevcut cflt.* + override map). node+harness 0.'],
@@ -16584,7 +16585,27 @@ async function loadVendTab() {
   }
 }
 
-function openEditProd(prodId, name, category, country, description, supportModel, catFieldsData, sectorsData, productUrl) {
+async function _admApproveProduct(prodId, prodName, vendorId, onDone){
+  if (!confirm('"'+prodName+'" ürününü onaylamak istiyor musunuz? Onaylanan ürün katalogda görünür hale gelecek.')) return;
+  try {
+    await updateDoc(doc(db,'products',prodId), { status:'active', publishStatus:'ready', approvedAt:serverTimestamp(), approvedBy:CUR_USER.uid });
+    if (vendorId) await addDoc(collection(db,'notifications'), { userId:vendorId, type:'product_approved', title:t('aprod.notif_approved','Ürününüz Onaylandı 🎉'), message:'"'+prodName+'" ürününüz incelendi ve PoCHub kataloğunda yayınlandı!', productId:prodId, productName:prodName, senderId:CUR_USER.uid, senderName:CUR_PROFILE?.displayName||'PoCHub Admin', senderEmail:CUR_USER.email||'', senderPhoto:CUR_PROFILE?.photoBase64||CUR_PROFILE?.logoUrl||'', read:false, createdAt:serverTimestamp() });
+    showToast(t('ape.approved','✓ Ürün onaylandı, vendora bildirim gönderildi'));
+    if (onDone) onDone();
+  } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); }
+}
+async function _admRejectProduct(prodId, prodName, vendorId, onDone){
+  var reason = prompt(t('tst.reject_reason','Reddetme gerekçesi (vendora gösterilecek):'));
+  if (reason === null) return;
+  try {
+    await updateDoc(doc(db,'products',prodId), { status:'rejected', rejectionReason:reason||'', rejectedAt:serverTimestamp(), rejectedBy:CUR_USER.uid });
+    if (vendorId) await addDoc(collection(db,'notifications'), { userId:vendorId, type:'product_rejected', title:t('ntf.prod_application','Ürün Başvurusu Hakkında'), message:'"'+prodName+'" ürününüz şu an için onaylanamadı.'+(reason?' Gerekçe: '+reason:''), productId:prodId, productName:prodName, senderId:CUR_USER.uid, senderName:CUR_PROFILE?.displayName||'PoCHub Admin', senderEmail:CUR_USER.email||'', senderPhoto:CUR_PROFILE?.photoBase64||CUR_PROFILE?.logoUrl||'', read:false, createdAt:serverTimestamp() });
+    showToast(t('ape.rejected','✕ Ürün reddedildi, vendora bildirim gönderildi'));
+    if (onDone) onDone();
+  } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); }
+}
+
+function openEditProd(prodId, name, category, country, description, supportModel, catFieldsData, sectorsData, productUrl, adminMode) {
   var modal = document.createElement('div');
   modal.className = 'modal-bg on';
   modal.id = 'prod-edit-modal';
@@ -16671,6 +16692,27 @@ function openEditProd(prodId, name, category, country, description, supportModel
   fillCatSelect(modal.querySelector('#edit-cat'), category);
   wireSectorPills(modal);
 
+  // v7.91: admin modu — onay/red bari (urun admin onayi bekliyorsa)
+  if (adminMode) {
+    var _ap = adminMode;
+    var _needsApp = (_ap.publishStatus||'awaiting_admin')==='awaiting_admin' && _ap.status!=='rejected' && _ap.status!=='archived';
+    if (_needsApp) {
+      var _cancelBtn = modal.querySelector('#edit-cancel');
+      var _foot = _cancelBtn ? _cancelBtn.parentNode : null;
+      if (_foot) {
+        var _wrap = document.createElement('div');
+        _wrap.style.cssText = 'display:flex;gap:8px;margin-right:8px';
+        _wrap.innerHTML =
+          '<button id="edit-approve" style="background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.35);padding:9px 16px;border-radius:8px;font-weight:700;cursor:pointer">'+(window.CUR_LOCALE==='en'?'✓ Approve':'✓ Onayla')+'</button>'+
+          '<button id="edit-reject" style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.35);padding:9px 16px;border-radius:8px;font-weight:700;cursor:pointer">'+(window.CUR_LOCALE==='en'?'✗ Reject':'✗ Reddet')+'</button>';
+        _foot.insertBefore(_wrap, _cancelBtn);
+        var _admClose = function(){ modal.remove(); delete window._updateEditCatPanel; var _am2=el('adm-main')||el('panel-main'); if(_am2) admProducts(_am2); };
+        _wrap.querySelector('#edit-approve').addEventListener('click', function(){ _admApproveProduct(prodId, (modal.querySelector('#edit-name').value||name), _ap.vendorId, _admClose); });
+        _wrap.querySelector('#edit-reject').addEventListener('click', function(){ _admRejectProduct(prodId, (modal.querySelector('#edit-name').value||name), _ap.vendorId, _admClose); });
+      }
+    }
+  }
+
   // Kategori yüklendikten sonra mevcut alanları göster
   setTimeout(function() {
     if (category) window._updateEditCatPanel(category);
@@ -16698,7 +16740,7 @@ function openEditProd(prodId, name, category, country, description, supportModel
       modal.remove();
       delete window._updateEditCatPanel;
       showToast(t('tst.prod_updated','Ürün güncellendi!'));
-      loadVendTab();
+      if (adminMode) { var _am=el('adm-main')||el('panel-main'); if(_am) admProducts(_am); } else { loadVendTab(); }
     } catch(e) {
       errDiv.textContent = e.message;
       btn.disabled = false; btn.textContent = t('credit.update','Güncelle');
@@ -26718,7 +26760,8 @@ async function admProducts(m) {
     });
     tbody.querySelectorAll('.ap-edit').forEach(function(b) {
       b.addEventListener('click', function() {
-        openAdmProdEditModal(b.dataset.id,b.dataset.name,b.dataset.cat,b.dataset.desc,b.dataset.country);
+        var _pe = all.find(function(x){return x.id===b.dataset.id;})||{};
+        openEditProd(b.dataset.id, _pe.name||b.dataset.name, _pe.category||b.dataset.cat, _pe.country||'TR', _pe.description||b.dataset.desc, _pe.supportModel||'', _pe.catFields||{}, _pe.sectors||[], _pe.productUrl||'', _pe);
       });
     });
     tbody.querySelectorAll('.ap-del').forEach(function(b) {
