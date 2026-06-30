@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.92 | pochub.co -->
+<!-- PoCHub v7.93 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.92';
+const VERSION = 'v7.93';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.93': ['ONE CIKAN URUN ONCELIK SIRASI (#2): calculateDailyFeatured urun secimi yeniden yazildi. Sira: (1) ADMIN PIN — pochub_config/featured_curation.pinnedProducts[] (sirali, public-read; yazma UI v7.94), (2) PAID BOOST — product.featured===true & featuredUntil>now, EN SON ODEME BASTA (yeni product.featuredAt zaman damgasina gore desc), (3) TIER — her featured vendor icin 1 urun (gunluk deterministik hash), hepsi dedupe (_usedProd) + CAP 12. Onceki sistem paid Boost-u HIC dikkate almiyordu (sadece tier-vendor + gunluk hash) — Hasan-in -rastgele gorunuyor- tespiti boylece cozuldu. featuredAt iki boost-aktivasyon noktasina eklendi (vendor oto-aktive 39890 + admin onay). Anonim anasayfa featured_purchases okuyamadigi icin sira ÜRÜN dokumanindaki public alanlardan (featured/featuredUntil/featuredAt) turetilir. KURALLAR DEGISMEDI (products read:if true, pochub_config read:if true, featuredAt admin/owner update kapsaminda). Cache-e source alani (admin/paid/tier) eklendi. node+harness 0.'],
   'v7.92': ['ONE CIKAN URUN KARTI DONATILDI (#3 — mankenin podyumu): Anasayfa featured urun karti artik zengin/premium. Render aninda her featured urunun (<=6) TAM dokumani cekilir (window._ftProdFull) ve kart su anda gosterir: KANIT SKORU (computeEvidenceScore, /100 + evidenceColor renk paneli), ★ puan + (degerlendirme sayisi), ✓ Dogrulanmis rozeti (getVendorBadgeRow), EN AZ 3 kilit teknik ozellik (getCatFields ∩ catFields, pfield.* etiket), sektor cipleri (sectorLabel, locale), mensei (🇹🇷 Yerli / 🌍 ulke), PoC degerlendirme sayisi, 2-satir aciklama, Sponsorlu rozeti, ve guclu CTA. Tiklama artik go(catalog) yerine openProductDetailModal(productId) acar. FIYAT IKINCIL (kucuk/soluk). Tier rozeti (Pro/Business/Enterprise) KALDIRILDI — v5.84 ilkesi: abonelik duzeyi alicidan gizli. Grid 200->260px genisletildi. Tum etiketler INLINE locale (yeni dict YOK). Veri: ekstra <=6 okuma; evidence/rating denormalize alanlardan (yeni okuma yok). node+harness 0.'],
   'v7.91': ['ADMIN URUN DUZENLEME = TAM PARITE: Admin Urun Onaylari-nda Duzenle artik uretici ile AYNI zengin editoru (openEditProd) aciyor — tum alanlar: ad/kategori/mensei/aciklama/uretici-URL/sektorler/destek-modeli + KATEGORI-BAZLI TEKNIK OZELLIKLER (getCatFields). Eski 4-alanli zayif modal (openAdmProdEditModal) artik kullanilmiyor (dead, silinmedi). MIMARI: openEditProd-a ADDITIVE adminMode parametresi (vendor cagrilari 9 arg gectigi icin onlarin yolu HIC degismez = sifir vendor riski). Kaydetme updateDoc oldugu icin sahiplik/vendorId/onay-durumu KORUNUR (admin baska vendor urununu duzenlese bile sahibi ezmez). Onay/red mantigi standalone _admApproveProduct/_admRejectProduct fonksiyonlarina cikarildi; adminMode-da urun onay bekliyorsa footer-a ✓ Onayla / ✗ Reddet bari DOM ile enjekte edilir (bildirim+toast aynen). Save sonrasi adminMode-da admProducts tazelenir. node+harness 0.'],
   'v7.90': ['KATILIMCILARA DOGRUDAN MESAJ + ARSIV KATILIMCI BUTONU: (1) Katilimci modaline 📨 Katilimcilara Mesaj butonu + yeni openEventAttendeesBroadcastModal: uretici konu+mesaj yazar, tum AKTIF katilimcilara EmailJS ile (sendEmail dongusu, 250ms ara, ilerleme N/N, onay) gonderilir; HTML sablonlu, gonderen adi alttа. Mevcut Mail Gonder -> Listeyi Gonder olarak netlestirildi (liste vs mesaj ayrimi). Spark uyumlu (Cloud Function YOK, client EmailJS). (2) ARSIV etkinlik satirina da 👥 Katilimci butonu eklendi (vev-attendees handler v7.89-dan ortak). Locale-aware etiketler, SOZLUKSUZ. node+harness 0.'],
@@ -23352,9 +23353,60 @@ async function calculateDailyFeatured() {
     featuredVendors.push({vendorId:v.id, vendorName:v.company||v.displayName, tier:tier, position:featuredVendors.length+1, isFreeSlot:true});
   });
 
-  // Featured ürünler — her featured vendor için 1 ürün
+  // Featured ürünler — ONCELIK SIRASI (v7.93): admin-pin -> paid(en son odeme basta) -> tier -> oto
   var featuredProducts = [];
-  for (var i = 0; i < featuredVendors.length; i++) {
+  var _usedProd = {};
+  var _nowMs = Date.now();
+  var FEATURED_PRODUCT_CAP = 12;
+  function _pushFeatured(p, vId, vName, tier, source){
+    if (!p || !p.id || _usedProd[p.id]) return;
+    _usedProd[p.id] = true;
+    featuredProducts.push({
+      productId: p.id,
+      productName: p.name || p.productName,
+      category: p.category,
+      brand: p.brand,
+      unitPrice: p.unitPrice,
+      vendorId: vId || p.vendorId,
+      vendorName: vName || p.vendorName,
+      tier: tier || null,
+      source: source,
+      position: featuredProducts.length + 1,
+    });
+  }
+
+  // (1) ADMIN PIN — pochub_config/featured_curation.pinnedProducts[] (sirali, en ust; UI v7.94)
+  try {
+    var _curSnap = await getDoc(doc(db,'pochub_config','featured_curation'));
+    var _pinnedIds = (_curSnap.exists() && Array.isArray(_curSnap.data().pinnedProducts)) ? _curSnap.data().pinnedProducts : [];
+    for (var _pi=0; _pi<_pinnedIds.length && featuredProducts.length<FEATURED_PRODUCT_CAP; _pi++) {
+      var _pid = _pinnedIds[_pi];
+      if (!_pid || _usedProd[_pid]) continue;
+      try {
+        var _pinDoc = await getDoc(doc(db,'products',_pid));
+        if (_pinDoc.exists()) {
+          var _pp = {...(_pinDoc.data()), id:_pinDoc.id};
+          if (_pp.status==='active') _pushFeatured(_pp, _pp.vendorId, _pp.vendorName, null, 'admin');
+        }
+      } catch(e){}
+    }
+  } catch(e){}
+
+  // (2) PAID BOOST — featured===true & featuredUntil>now; en son odeme (featuredAt) basta
+  try {
+    var _paidSnap = await getDocs(query(collection(db,'products'), where('featured','==',true)));
+    var _paid = _paidSnap.docs.map(function(d){ return {...d.data(), id:d.id}; }).filter(function(p){
+      if (p.status!=='active' || !p.featuredUntil) return false;
+      var _u = p.featuredUntil.toDate ? p.featuredUntil.toDate().getTime() : new Date(p.featuredUntil).getTime();
+      return _u > _nowMs;
+    });
+    var _featTs = function(p){ var f=p.featuredAt||p.featuredUntil; if(!f) return 0; return f.toDate?f.toDate().getTime():new Date(f).getTime(); };
+    _paid.sort(function(a,b){ return _featTs(b) - _featTs(a); });
+    _paid.forEach(function(p){ if(featuredProducts.length<FEATURED_PRODUCT_CAP) _pushFeatured(p, p.vendorId, p.vendorName, null, 'paid'); });
+  } catch(e){}
+
+  // (3) TIER — her featured vendor icin 1 urun (deterministik gunluk)
+  for (var i = 0; i < featuredVendors.length && featuredProducts.length<FEATURED_PRODUCT_CAP; i++) {
     var fv = featuredVendors[i];
     try {
       const prSnap = await getDocs(query(
@@ -23362,22 +23414,11 @@ async function calculateDailyFeatured() {
         where('vendorId','==',fv.vendorId),
         where('status','==','active')
       ));
-      var prods = prSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+      var prods = prSnap.docs.map(function(d){ return {...d.data(), id:d.id}; }).filter(function(p){ return !_usedProd[p.id]; });
       if (prods.length > 0) {
         // Deterministik: aynı gün aynı ürün
         prods.sort(function(a,b){ return _hash(a.id + todayKey) - _hash(b.id + todayKey); });
-        var p = prods[0];
-        featuredProducts.push({
-          productId: p.id,
-          productName: p.name || p.productName,
-          category: p.category,
-          brand: p.brand,
-          unitPrice: p.unitPrice,
-          vendorId: fv.vendorId,
-          vendorName: fv.vendorName,
-          tier: fv.tier,
-          position: featuredProducts.length + 1,
-        });
+        _pushFeatured(prods[0], fv.vendorId, fv.vendorName, fv.tier, 'tier');
       }
     } catch(e) { console.error('Product fetch error:', e); }
   }
@@ -39887,7 +39928,7 @@ async function openFeaturedBoostModal(pid, pname, product) {
         createdAt: serverTimestamp(),
       });
       if (autoActivate) {
-        await updateDoc(doc(db,'products', pid), { featured: true, featuredUntil: Timestamp.fromDate(c.endAt) });
+        await updateDoc(doc(db,'products', pid), { featured: true, featuredUntil: Timestamp.fromDate(c.endAt), featuredAt: serverTimestamp() });
         // v5.55: Cari hesaba borç işle — poc_charges + vendor_billing.
         //   deltaCount=0: featured borcu PoC-suspend sayacına GİRMEZ (yanlış askıyı önler).
         try {
@@ -40143,7 +40184,7 @@ async function renderFeaturedLedger(m) {
         var o=all.find(function(x){return x.id===b.dataset.id;}); if(!o)return;
         try {
           await updateDoc(doc(db,'featured_purchases',o.id), { status:'active' });
-          if (o.productId) await updateDoc(doc(db,'products',o.productId), { featured:true, featuredUntil:o.endAt||null });
+          if (o.productId) await updateDoc(doc(db,'products',o.productId), { featured:true, featuredUntil:o.endAt||null, featuredAt:serverTimestamp() });
           // v5.55: cari hesaba borç (bir kez)
           if (!o.chargeId) {
             try {
