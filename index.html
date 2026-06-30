@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.94 | pochub.co -->
+<!-- PoCHub v7.95 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.94';
+const VERSION = 'v7.95';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.95': ['LISTEDEN ONE CIKAR (Hasan UX): Admin urun listesinde her AKTIF urun satirina One Cikar / Vitrinde toggle (ap-pin). Tek tikla pochub_config/featured_curation.pinnedProducts[]-e ekler/cikarir (setDoc merge) + o gunun pochub_daily_featured cache-ini siler (anasayfa aninda yeni sira). Buton YERINDE guncellenir (filtre bozulmaz); pinnedSet admProducts basinda yuklenir. Reklam/Vitrin sekmesinde ikinci arama derdi bitti; Vitrin artik yalniz SIRALAMA + kaldir. Pin yalniz aktif urunlerde. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.94': ['ADMIN VITRIN SIRALAMASI UI (#2 tamamlandi — -admin son sozu soyler-): Reklam/One Cikan ekranina 3. sekme 📌 Vitrin + renderFeaturedCuration. Admin urun arar (ad/uretici, aktif urunler client-filter), sabitler (pin), ▲▼ ile sirayi belirler, ✕ ile kaldirir, Kaydet ile pochub_config/featured_curation.pinnedProducts[]-e yazar (setDoc merge, admin-write). Kayitta bugunun pochub_daily_featured/{todayKey} cache-i SILINIR (deleteDoc, admin-write) -> anasayfa yeni sirayla yeniden hesaplar (yarini beklemez). v7.93-teki oncelik mantigi bu listeyi zaten EN USTTE okuyordu; bu surum yazma arayuzunu ekledi. Tum metinler INLINE locale (yeni dict YOK). createElement tabanli dinamik liste. KURALLAR DEGISMEDI (pochub_config + pochub_daily_featured write:if isAdmin zaten var). node+harness 0.'],
   'v7.93': ['ONE CIKAN URUN ONCELIK SIRASI (#2): calculateDailyFeatured urun secimi yeniden yazildi. Sira: (1) ADMIN PIN — pochub_config/featured_curation.pinnedProducts[] (sirali, public-read; yazma UI v7.94), (2) PAID BOOST — product.featured===true & featuredUntil>now, EN SON ODEME BASTA (yeni product.featuredAt zaman damgasina gore desc), (3) TIER — her featured vendor icin 1 urun (gunluk deterministik hash), hepsi dedupe (_usedProd) + CAP 12. Onceki sistem paid Boost-u HIC dikkate almiyordu (sadece tier-vendor + gunluk hash) — Hasan-in -rastgele gorunuyor- tespiti boylece cozuldu. featuredAt iki boost-aktivasyon noktasina eklendi (vendor oto-aktive 39890 + admin onay). Anonim anasayfa featured_purchases okuyamadigi icin sira ÜRÜN dokumanindaki public alanlardan (featured/featuredUntil/featuredAt) turetilir. KURALLAR DEGISMEDI (products read:if true, pochub_config read:if true, featuredAt admin/owner update kapsaminda). Cache-e source alani (admin/paid/tier) eklendi. node+harness 0.'],
   'v7.92': ['ONE CIKAN URUN KARTI DONATILDI (#3 — mankenin podyumu): Anasayfa featured urun karti artik zengin/premium. Render aninda her featured urunun (<=6) TAM dokumani cekilir (window._ftProdFull) ve kart su anda gosterir: KANIT SKORU (computeEvidenceScore, /100 + evidenceColor renk paneli), ★ puan + (degerlendirme sayisi), ✓ Dogrulanmis rozeti (getVendorBadgeRow), EN AZ 3 kilit teknik ozellik (getCatFields ∩ catFields, pfield.* etiket), sektor cipleri (sectorLabel, locale), mensei (🇹🇷 Yerli / 🌍 ulke), PoC degerlendirme sayisi, 2-satir aciklama, Sponsorlu rozeti, ve guclu CTA. Tiklama artik go(catalog) yerine openProductDetailModal(productId) acar. FIYAT IKINCIL (kucuk/soluk). Tier rozeti (Pro/Business/Enterprise) KALDIRILDI — v5.84 ilkesi: abonelik duzeyi alicidan gizli. Grid 200->260px genisletildi. Tum etiketler INLINE locale (yeni dict YOK). Veri: ekstra <=6 okuma; evidence/rating denormalize alanlardan (yeni okuma yok). node+harness 0.'],
@@ -26647,6 +26648,9 @@ async function admProducts(m) {
   // Admin için çöptekileri filtreyle ayır — varsayılan görünümde gizli
   var all = allRaw.filter(function(p){ return getLifecycleState(p) !== 'trash'; });
   var trashedAdminProds = allRaw.filter(function(p){ return getLifecycleState(p) === 'trash'; });
+  // v7.95: vitrin pin durumu (her satirda toggle icin)
+  var pinnedSet = new Set();
+  try { var _pcs = await getDoc(doc(db,'pochub_config','featured_curation')); if(_pcs.exists() && Array.isArray(_pcs.data().pinnedProducts)) pinnedSet = new Set(_pcs.data().pinnedProducts); } catch(e){}
   all.sort(function(a,b){ return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0); });
 
   // Dinamik filtre seçenekleri
@@ -26738,6 +26742,9 @@ async function admProducts(m) {
       var approveBtn = '';
       var rejectBtn  = '';
       var archiveBtn = '';
+      // v7.95: vitrine sabitle/kaldir (yalniz aktif urunler)
+      var _isPin = pinnedSet.has(p.id);
+      var pinBtn = (p.status==='active') ? ('<button class="ap-pin" data-id="'+p.id+'" data-pinned="'+(_isPin?'1':'0')+'" style="background:'+(_isPin?'rgba(245,158,11,.15)':'rgba(15,23,42,.04)')+';color:'+(_isPin?'#d97706':'var(--text-muted)')+';border:1px solid '+(_isPin?'rgba(245,158,11,.4)':'var(--border)')+';border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-left:6px" title="'+(_isPin?(window.CUR_LOCALE==='en'?'Pinned — click to remove':'Vitrinde — kaldırmak için tıkla'):(window.CUR_LOCALE==='en'?'Pin to homepage showcase':'Ana sayfa vitrinine sabitle'))+'">'+(_isPin?(window.CUR_LOCALE==='en'?'⭐ Featured':'⭐ Vitrinde'):(window.CUR_LOCALE==='en'?'☆ Feature':'☆ Öne Çıkar'))+'</button>') : '';
 
       // v5.15 CRITICAL FIX: Onay kararı SADECE publishStatus'a gore verilmeli
       // Eski v5.07 fix yanlisti: status='active' ürünleri de eğer publishStatus='awaiting_admin' ise onay bekliyor
@@ -26774,7 +26781,7 @@ async function admProducts(m) {
         '<td>'+publishStatusBadge(p.publishStatus||'awaiting_admin', p.origin, (p.distributors||[]).length, (p.integrators||[]).length)+'</td>'+
         '<td class="fs11-muted">'+dateStr+'</td>'+
         '<td style="white-space:nowrap">'+
-          approveBtn + rejectBtn + archiveBtn +
+          approveBtn + rejectBtn + archiveBtn + pinBtn +
           '<button class="ap-edit" data-id="'+p.id+'" data-name="'+p.name+
             '" data-cat="'+(p.category||'')+'" data-desc="'+(p.description||'')+
             '" data-country="'+(p.country||'')+'" style="background:rgba(37,99,235,.1);color:#2563eb;border:1px solid rgba(37,99,235,.25);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px">'+t('aprod.edit','✎ Düzenle')+'</button>'+
@@ -26855,6 +26862,29 @@ async function admProducts(m) {
       b.addEventListener('click', function() {
         var _pe = all.find(function(x){return x.id===b.dataset.id;})||{};
         openEditProd(b.dataset.id, _pe.name||b.dataset.name, _pe.category||b.dataset.cat, _pe.country||'TR', _pe.description||b.dataset.desc, _pe.supportModel||'', _pe.catFields||{}, _pe.sectors||[], _pe.productUrl||'', _pe);
+      });
+    });
+    tbody.querySelectorAll('.ap-pin').forEach(function(b) {
+      b.addEventListener('click', async function() {
+        var pid=b.dataset.id; var wasPinned=b.dataset.pinned==='1'; var EN=(window.CUR_LOCALE==='en');
+        b.disabled=true; var _ot=b.innerHTML; b.innerHTML='…';
+        try {
+          var cs=await getDoc(doc(db,'pochub_config','featured_curation'));
+          var arr=(cs.exists()&&Array.isArray(cs.data().pinnedProducts))?cs.data().pinnedProducts.slice():[];
+          if(wasPinned){ arr=arr.filter(function(x){return x!==pid;}); } else if(arr.indexOf(pid)<0){ arr.push(pid); }
+          await setDoc(doc(db,'pochub_config','featured_curation'),{pinnedProducts:arr,updatedAt:serverTimestamp(),updatedBy:CUR_USER.uid},{merge:true});
+          try{ await deleteDoc(doc(db,'pochub_daily_featured',getTodayKey())); }catch(_e){}
+          if(wasPinned) pinnedSet.delete(pid); else pinnedSet.add(pid);
+          var nowP=!wasPinned;
+          b.dataset.pinned=nowP?'1':'0';
+          b.style.background=nowP?'rgba(245,158,11,.15)':'rgba(15,23,42,.04)';
+          b.style.color=nowP?'#d97706':'var(--text-muted)';
+          b.style.borderColor=nowP?'rgba(245,158,11,.4)':'var(--border)';
+          b.innerHTML=nowP?(EN?'⭐ Featured':'⭐ Vitrinde'):(EN?'☆ Feature':'☆ Öne Çıkar');
+          b.title=nowP?(EN?'Pinned — click to remove':'Vitrinde — kaldırmak için tıkla'):(EN?'Pin to homepage showcase':'Ana sayfa vitrinine sabitle');
+          showToast(nowP?(EN?'⭐ Pinned to showcase':'⭐ Vitrine sabitlendi'):(EN?'Removed from showcase':'Vitrinden kaldırıldı'));
+        } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); b.innerHTML=_ot; }
+        b.disabled=false;
       });
     });
     tbody.querySelectorAll('.ap-del').forEach(function(b) {
