@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.97 | pochub.co -->
+<!-- PoCHub v7.98 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.97';
+const VERSION = 'v7.98';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.98': ['ADMIN KATEGORI SECIM UI (karma sistemin admin tarafi): Reklam/One Cikan > Vitrin sekmesine -One Cikan Kategoriler- bolumu eklendi. Admin getCategories listesinden kategori secip ekler (select+Ekle), ▲▼ ile sirayi belirler, ✕ ile kaldirir, Kategorileri Kaydet ile pochub_config/featured_curation.pinnedCategories[]-e yazar (setDoc merge -> urun pinleri bozulmaz), o gunun pochub_daily_featured cache-i silinir (anasayfa aninda). v7.97 ana sayfa kategori satirlari bu listeyi zaten EN ONCE okuyor; pinlenen/sponsor urunlerin kategorileri yine otomatik gelir (karma). Bagimsiz kaydet butonu (urun bolumune dokunmaz). Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.97': ['ANA SAYFA ONE CIKAN -> KATEGORI BAZLI SATIRLAR + ESKI ROTATOR KALDIRILDI (kok bug + gelir tasarimi). KOK BUG: ayni #featured-carousel-section-a IKI fonksiyon yaziyordu (yeni loadFeaturedCarousels + eski loadFeaturedProducts rotator, 7sn timer) -> yeni zengin karusel render olup eski rotator eziyordu = -gelip gidiyor-/-kayboluyor-. loadFeaturedProducts cagrisi kaldirildi (tek renderer). YENI TASARIM: urun bolumu artik 3 KATEGORI SATIRI; her satir kategori basligi + Tumunu Gor (kategori-filtreli katalog) + 4 zengin podyum kart. Karma kategori secimi: admin-pin kategori (pinnedCategories[]) -> pinli/sponsor urun kategorisi -> aktif urun sayisina gore oto-doldur. Satir ici sira: admin-pin -> sponsor(en son odeme/featuredAt) -> KANIT SKORU -> puan. MARKA DENGESI: -Sponsorlu- rozeti YALNIZ gercekten odeyen urunde; yuksek kanit skorlu urunler para odemeden de yukselir (kanit>gorus korunur). Zengin kart _ftProductCard(p) fonksiyonuna cikarildi (kendi try/catch-i + minimal yedek kart). loadFeaturedCarousels erken-cikisi kaldirildi (kategori satirlari aktif urunlerden bagimsiz). Tumunu Gor -> window._pendingCatFilter -> katalog CAT_FILTERS.category. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.96': ['FEATURED AKISI DAYANIKLILIK + DUZELTME (Hasan bildirimi): KOK NEDEN — loadFeaturedCarousels dis catch-i render hatasinda section.innerHTML=-- ile TUM featured bolumunu siliyordu, ve v7.92 zengin urun karti dongusu URUN-BASINA try/catch ile sarili degildi; pin-lenen bir urunde herhangi bir helper aksamasi ana ekranda featured-i KOMPLE goturuyordu. Cozum: (1) her kart try/catch icinde — hata olursa o urunun yarim HTML fragment-i geri alinir (html.slice(0,_before)) ve minimal guvenli kart (ad+uretici+CTA) basilir, bolum asla cokmez; (2) dis catch artik bolumu silmiyor (yalniz hic cocuk yoksa), hatayi console-a yazar; (3) Vitrin sekmesi (renderFeaturedCuration) artik TUM cop-disi urunleri yukler -> sabitlenen urunler her durumda cozulur/gorunur (eski where(status,active) bos donerse pin-ler -bulunamadi- gorunuyordu), picker yine yalniz aktifleri onerir. KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.95': ['LISTEDEN ONE CIKAR (Hasan UX): Admin urun listesinde her AKTIF urun satirina One Cikar / Vitrinde toggle (ap-pin). Tek tikla pochub_config/featured_curation.pinnedProducts[]-e ekler/cikarir (setDoc merge) + o gunun pochub_daily_featured cache-ini siler (anasayfa aninda yeni sira). Buton YERINDE guncellenir (filtre bozulmaz); pinnedSet admProducts basinda yuklenir. Reklam/Vitrin sekmesinde ikinci arama derdi bitti; Vitrin artik yalniz SIRALAMA + kaldir. Pin yalniz aktif urunlerde. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
@@ -40076,10 +40077,12 @@ async function renderFeaturedCuration(m) {
   try {
     var curSnap = await getDoc(doc(db,'pochub_config','featured_curation'));
     var pinned = (curSnap.exists() && Array.isArray(curSnap.data().pinnedProducts)) ? curSnap.data().pinnedProducts.slice() : [];
+    var catPinned = (curSnap.exists() && Array.isArray(curSnap.data().pinnedCategories)) ? curSnap.data().pinnedCategories.slice() : [];
     var prodSnap = await getDocs(collection(db,'products'));
     var _allRaw = prodSnap.docs.map(function(d){ return {...d.data(), id:d.id}; }).filter(function(p){ return getLifecycleState(p)!=='trash'; });
     var byId = {}; _allRaw.forEach(function(p){ byId[p.id]=p; });
     var allProds = _allRaw.filter(function(p){ return p.status==='active'; });
+    var _allCats = []; try { _allCats = (await getCategories()||[]).map(function(c){ return (c&&c.name)||c; }).filter(Boolean); } catch(e){}
 
     m.innerHTML = '';
 
@@ -40089,6 +40092,56 @@ async function renderFeaturedCuration(m) {
       ? '<b style="color:#334155">Showcase order</b> — products you pin here appear FIRST in the homepage featured row, above paid boosts and tier slots. Use ▲▼ to order. This is your final say; it overrides payment order.'
       : '<b style="color:#334155">Vitrin sıralaması</b> — burada sabitlediğin ürünler ana sayfa öne çıkanlarda EN ÜSTTE görünür (ödemeli boost ve tier slotlarının önünde). ▲▼ ile sırala. Son söz sende; ödeme sırasını da geçersiz kılar.';
     m.appendChild(intro);
+
+    // ===== ONE CIKAN KATEGORILER (v7.98) — admin secer + sira; merge ile urun pinleri bozulmaz =====
+    var catCard = document.createElement('div');
+    catCard.style.cssText='background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:18px';
+    var catHd = document.createElement('div'); catHd.style.cssText='font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px'; catHd.textContent=(EN?'📂 Featured Categories':'📂 Öne Çıkan Kategoriler'); catCard.appendChild(catHd);
+    var catHint = document.createElement('div'); catHint.style.cssText='font-size:11.5px;color:#64748b;margin-bottom:10px;line-height:1.5'; catHint.textContent=(EN?'Choose which category rows appear on the homepage and in what order. Categories of pinned / sponsored products also appear automatically.':'Ana sayfada hangi kategori satırları, hangi sırada görünsün. Pinlenen / sponsor ürünlerin kategorileri ayrıca otomatik gelir.'); catCard.appendChild(catHint);
+    var catListW = document.createElement('div'); catListW.style.cssText='margin-bottom:10px'; catCard.appendChild(catListW);
+    var catAddRow = document.createElement('div'); catAddRow.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:12px';
+    var catSel = document.createElement('select'); catSel.className='inp'; catSel.style.cssText='flex:1';
+    var catAddBtn = document.createElement('button'); catAddBtn.className='btn-g btn-sm'; catAddBtn.textContent=(EN?'+ Add':'+ Ekle');
+    catAddRow.appendChild(catSel); catAddRow.appendChild(catAddBtn); catCard.appendChild(catAddRow);
+    var catSaveBar = document.createElement('div'); catSaveBar.style.cssText='display:flex;justify-content:flex-end';
+    var catSaveBtn = document.createElement('button'); catSaveBtn.className='btn-p btn-sm'; catSaveBtn.textContent=(EN?'Save categories':'Kategorileri Kaydet'); catSaveBar.appendChild(catSaveBtn); catCard.appendChild(catSaveBar);
+    m.appendChild(catCard);
+
+    function _mkCatBtn(txt, disabled){ var b=document.createElement('button'); b.className='btn-g btn-sm'; b.textContent=txt; b.style.cssText='padding:4px 9px;font-size:12px;line-height:1'; if(disabled){ b.disabled=true; b.style.opacity='.35'; b.style.cursor='default'; } return b; }
+    function catPaintSelect(){
+      catSel.innerHTML='';
+      var avail = _allCats.filter(function(c){ return catPinned.indexOf(c)<0; });
+      if(!avail.length){ var o0=document.createElement('option'); o0.value=''; o0.textContent=(EN?'(all added)':'(hepsi eklendi)'); catSel.appendChild(o0); catSel.disabled=true; catAddBtn.disabled=true; return; }
+      catSel.disabled=false; catAddBtn.disabled=false;
+      var ph=document.createElement('option'); ph.value=''; ph.textContent=(EN?'Select category…':'Kategori seç…'); catSel.appendChild(ph);
+      avail.forEach(function(c){ var o=document.createElement('option'); o.value=c; o.textContent=(catLabelEN(c)||c); catSel.appendChild(o); });
+    }
+    function catPaintList(){
+      catListW.innerHTML='';
+      if(!catPinned.length){ var em=document.createElement('div'); em.style.cssText='font-size:12px;color:#94a3b8;padding:6px 0'; em.textContent=(EN?'No featured categories yet — product categories still auto-appear.':'Henüz seçili kategori yok — ürün kategorileri yine otomatik gelir.'); catListW.appendChild(em); return; }
+      catPinned.forEach(function(cat, idx){
+        var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:9px;margin-bottom:6px';
+        var num=document.createElement('div'); num.style.cssText='font-size:12px;font-weight:800;color:#2563eb;width:20px;flex-shrink:0;text-align:center'; num.textContent=(idx+1); row.appendChild(num);
+        var nm=document.createElement('div'); nm.style.cssText='flex:1;min-width:0;font-size:13px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'; nm.textContent=(catLabelEN(cat)||cat); row.appendChild(nm);
+        var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:4px;flex-shrink:0';
+        var up=_mkCatBtn('▲', idx===0); up.addEventListener('click',function(){ if(idx>0){ var t=catPinned[idx-1]; catPinned[idx-1]=catPinned[idx]; catPinned[idx]=t; catPaintList(); } });
+        var dn=_mkCatBtn('▼', idx===catPinned.length-1); dn.addEventListener('click',function(){ if(idx<catPinned.length-1){ var t=catPinned[idx+1]; catPinned[idx+1]=catPinned[idx]; catPinned[idx]=t; catPaintList(); } });
+        var rm=_mkCatBtn('✕', false); rm.style.color='#dc2626'; rm.addEventListener('click',function(){ catPinned.splice(idx,1); catPaintList(); catPaintSelect(); });
+        btns.appendChild(up); btns.appendChild(dn); btns.appendChild(rm); row.appendChild(btns);
+        catListW.appendChild(row);
+      });
+    }
+    catAddBtn.addEventListener('click',function(){ var v=catSel.value; if(v && catPinned.indexOf(v)<0){ catPinned.push(v); catPaintList(); catPaintSelect(); } });
+    catSaveBtn.addEventListener('click',async function(){
+      catSaveBtn.disabled=true; var _co=catSaveBtn.textContent; catSaveBtn.textContent=(EN?'Saving...':'Kaydediliyor...');
+      try {
+        await setDoc(doc(db,'pochub_config','featured_curation'), { pinnedCategories:catPinned, updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid }, { merge:true });
+        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_e){}
+        showToast(EN?'✓ Featured categories saved':'✓ Öne çıkan kategoriler kaydedildi');
+      } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
+      catSaveBtn.disabled=false; catSaveBtn.textContent=_co;
+    });
+    catPaintList(); catPaintSelect();
 
     var listWrap = document.createElement('div'); listWrap.style.cssText='margin-bottom:18px';
     m.appendChild(listWrap);
