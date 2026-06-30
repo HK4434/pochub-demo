@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.95 | pochub.co -->
+<!-- PoCHub v7.96 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.95';
+const VERSION = 'v7.96';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.96': ['FEATURED AKISI DAYANIKLILIK + DUZELTME (Hasan bildirimi): KOK NEDEN — loadFeaturedCarousels dis catch-i render hatasinda section.innerHTML=-- ile TUM featured bolumunu siliyordu, ve v7.92 zengin urun karti dongusu URUN-BASINA try/catch ile sarili degildi; pin-lenen bir urunde herhangi bir helper aksamasi ana ekranda featured-i KOMPLE goturuyordu. Cozum: (1) her kart try/catch icinde — hata olursa o urunun yarim HTML fragment-i geri alinir (html.slice(0,_before)) ve minimal guvenli kart (ad+uretici+CTA) basilir, bolum asla cokmez; (2) dis catch artik bolumu silmiyor (yalniz hic cocuk yoksa), hatayi console-a yazar; (3) Vitrin sekmesi (renderFeaturedCuration) artik TUM cop-disi urunleri yukler -> sabitlenen urunler her durumda cozulur/gorunur (eski where(status,active) bos donerse pin-ler -bulunamadi- gorunuyordu), picker yine yalniz aktifleri onerir. KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.95': ['LISTEDEN ONE CIKAR (Hasan UX): Admin urun listesinde her AKTIF urun satirina One Cikar / Vitrinde toggle (ap-pin). Tek tikla pochub_config/featured_curation.pinnedProducts[]-e ekler/cikarir (setDoc merge) + o gunun pochub_daily_featured cache-ini siler (anasayfa aninda yeni sira). Buton YERINDE guncellenir (filtre bozulmaz); pinnedSet admProducts basinda yuklenir. Reklam/Vitrin sekmesinde ikinci arama derdi bitti; Vitrin artik yalniz SIRALAMA + kaldir. Pin yalniz aktif urunlerde. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.94': ['ADMIN VITRIN SIRALAMASI UI (#2 tamamlandi — -admin son sozu soyler-): Reklam/One Cikan ekranina 3. sekme 📌 Vitrin + renderFeaturedCuration. Admin urun arar (ad/uretici, aktif urunler client-filter), sabitler (pin), ▲▼ ile sirayi belirler, ✕ ile kaldirir, Kaydet ile pochub_config/featured_curation.pinnedProducts[]-e yazar (setDoc merge, admin-write). Kayitta bugunun pochub_daily_featured/{todayKey} cache-i SILINIR (deleteDoc, admin-write) -> anasayfa yeni sirayla yeniden hesaplar (yarini beklemez). v7.93-teki oncelik mantigi bu listeyi zaten EN USTTE okuyordu; bu surum yazma arayuzunu ekledi. Tum metinler INLINE locale (yeni dict YOK). createElement tabanli dinamik liste. KURALLAR DEGISMEDI (pochub_config + pochub_daily_featured write:if isAdmin zaten var). node+harness 0.'],
   'v7.93': ['ONE CIKAN URUN ONCELIK SIRASI (#2): calculateDailyFeatured urun secimi yeniden yazildi. Sira: (1) ADMIN PIN — pochub_config/featured_curation.pinnedProducts[] (sirali, public-read; yazma UI v7.94), (2) PAID BOOST — product.featured===true & featuredUntil>now, EN SON ODEME BASTA (yeni product.featuredAt zaman damgasina gore desc), (3) TIER — her featured vendor icin 1 urun (gunluk deterministik hash), hepsi dedupe (_usedProd) + CAP 12. Onceki sistem paid Boost-u HIC dikkate almiyordu (sadece tier-vendor + gunluk hash) — Hasan-in -rastgele gorunuyor- tespiti boylece cozuldu. featuredAt iki boost-aktivasyon noktasina eklendi (vendor oto-aktive 39890 + admin onay). Anonim anasayfa featured_purchases okuyamadigi icin sira ÜRÜN dokumanindaki public alanlardan (featured/featuredUntil/featuredAt) turetilir. KURALLAR DEGISMEDI (products read:if true, pochub_config read:if true, featuredAt admin/owner update kapsaminda). Cache-e source alani (admin/paid/tier) eklendi. node+harness 0.'],
@@ -23562,6 +23563,8 @@ async function loadFeaturedCarousels() {
         _ftDocs.forEach(function(r){ if(r) window._ftProdFull[r.id]=r.d; });
       } catch(e){}
       data.featuredProducts.slice(0, 6).forEach(function(p){
+        var _before = html.length;
+        try {
         var full = (window._ftProdFull && window._ftProdFull[p.productId]) || {};
         var g=EV_GRADS[_evHash(String(p.vendorId||p.vendorName||p.productName||''))%EV_GRADS.length];
         var EN = (window.CUR_LOCALE==='en');
@@ -23618,6 +23621,7 @@ async function loadFeaturedCarousels() {
         html += descHtml;
         html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:12px">'+priceHtml+'<span style="font-size:12px;font-weight:800;color:'+g[1]+'">'+(EN?'View →':'İncele →')+'</span></div>';
         html += '</div></div>';
+        } catch(_cardErr){ html = html.slice(0, _before); try { var _gf=EV_GRADS[0]; html += '<div class="ftd-product-card" data-product="'+(p.productId||'')+'" style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 15px;cursor:pointer;display:flex;flex-direction:column;min-height:120px"><div style="font-size:14px;font-weight:800;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.productName||'')+'</div><div style="font-size:11.5px;color:#64748b;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.vendorName||'')+(p.category?' · '+escHtml(p.category):'')+'</div><div style="margin-top:auto;padding-top:12px;font-size:12px;font-weight:800;color:'+_gf[1]+'">'+(window.CUR_LOCALE==='en'?'View →':'İncele →')+'</div></div>'; } catch(_e2){} }
       });
       html += '</div></div>';
     }
@@ -23637,8 +23641,9 @@ async function loadFeaturedCarousels() {
     el('ftd-all-vendors')?.addEventListener('click', function(){ go('catalog'); });
     el('ftd-all-products')?.addEventListener('click', function(){ go('catalog'); });
   } catch(e) {
-    // v4.84.1: arkaplan featured cache yazma sessiz fail
-    section.innerHTML = '';
+    // v7.96: render hatasinda TUM bolumu silme — tek bir urun featured-i komple goturmesin
+    console.error('loadFeaturedCarousels error:', e);
+    if (section && !section.children.length) section.innerHTML = '';
   }
 }
 
@@ -40064,9 +40069,10 @@ async function renderFeaturedCuration(m) {
   try {
     var curSnap = await getDoc(doc(db,'pochub_config','featured_curation'));
     var pinned = (curSnap.exists() && Array.isArray(curSnap.data().pinnedProducts)) ? curSnap.data().pinnedProducts.slice() : [];
-    var prodSnap = await getDocs(query(collection(db,'products'), where('status','==','active')));
-    var allProds = prodSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
-    var byId = {}; allProds.forEach(function(p){ byId[p.id]=p; });
+    var prodSnap = await getDocs(collection(db,'products'));
+    var _allRaw = prodSnap.docs.map(function(d){ return {...d.data(), id:d.id}; }).filter(function(p){ return getLifecycleState(p)!=='trash'; });
+    var byId = {}; _allRaw.forEach(function(p){ byId[p.id]=p; });
+    var allProds = _allRaw.filter(function(p){ return p.status==='active'; });
 
     m.innerHTML = '';
 
