@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.99 | pochub.co -->
+<!-- PoCHub v8.00 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.99';
+const VERSION = 'v8.00';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.00': ['TUMUNU GOR (gercek kok neden) + URUN DETAYINDA SEKTORLER. (#2) -Tumunu Gor- hala bos donuyordu: ana sayfa kategori satirlari aktif urunleri publishStatus-a BAKMADAN gosteriyordu; katalog ise yalniz publishStatus ready/awaiting_admin/yok olanlari alir (awaiting_integrator vb. HARIC). Yani ana sayfada gorunup katalogda olmayan urun -> filtreli katalog bos. Cozum: ana sayfa kategori satirlari artik KATALOGLA AYNI uygunluk filtresini kullanir (publishStatus + getLifecycleState==active). Boylece ana sayfadaki her urun katalogda da vardir; Tumunu Gor tutarli. (#1) Urun detay modali kaydederken girilen SEKTORLERI gostermiyordu — SEKTORLER bolumu eklendi (sectorLabel, locale). Teknik ozellikler (catFields) zaten gosteriliyordu. KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.99': ['TUMUNU GOR DUZELTME + ADMIN SATIR/URUN SAYISI. (1) BUG: kategori satirindaki -Tumunu Gor- kataloga geciyor ama urun listelemiyordu. Neden: go(catalog) yalniz hash-i degistiriyor; URL-deki eski ?search facet parametreleri (sektor/lisans/vb.) kaliyor, readCatalogURL bunlardan CAT_FILTERS-i dolduruyordu; pending kategori sadece category-yi eziyor, eski filtreler kalip kategori+eski-filtre = BOS sonuc veriyordu. Cozum: _pendingCatFilter uygulanirken TUM CAT_FILTERS sifirlanir, yalniz secili kategori kalir (temiz kategori gorunumu). (2) ADMIN AYAR: Reklam/One Cikan > Vitrin > One Cikan Kategoriler bolumune -Ana sayfada satir sayisi- (1-8) ve -Satir basina urun- (1-6) inputlari; featured_curation.homeRows/homePerRow olarak kaydedilir, loadFeaturedCarousels bunlari okur (varsayilan 3/4). Inline locale. KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.98': ['ADMIN KATEGORI SECIM UI (karma sistemin admin tarafi): Reklam/One Cikan > Vitrin sekmesine -One Cikan Kategoriler- bolumu eklendi. Admin getCategories listesinden kategori secip ekler (select+Ekle), ▲▼ ile sirayi belirler, ✕ ile kaldirir, Kategorileri Kaydet ile pochub_config/featured_curation.pinnedCategories[]-e yazar (setDoc merge -> urun pinleri bozulmaz), o gunun pochub_daily_featured cache-i silinir (anasayfa aninda). v7.97 ana sayfa kategori satirlari bu listeyi zaten EN ONCE okuyor; pinlenen/sponsor urunlerin kategorileri yine otomatik gelir (karma). Bagimsiz kaydet butonu (urun bolumune dokunmaz). Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.97': ['ANA SAYFA ONE CIKAN -> KATEGORI BAZLI SATIRLAR + ESKI ROTATOR KALDIRILDI (kok bug + gelir tasarimi). KOK BUG: ayni #featured-carousel-section-a IKI fonksiyon yaziyordu (yeni loadFeaturedCarousels + eski loadFeaturedProducts rotator, 7sn timer) -> yeni zengin karusel render olup eski rotator eziyordu = -gelip gidiyor-/-kayboluyor-. loadFeaturedProducts cagrisi kaldirildi (tek renderer). YENI TASARIM: urun bolumu artik 3 KATEGORI SATIRI; her satir kategori basligi + Tumunu Gor (kategori-filtreli katalog) + 4 zengin podyum kart. Karma kategori secimi: admin-pin kategori (pinnedCategories[]) -> pinli/sponsor urun kategorisi -> aktif urun sayisina gore oto-doldur. Satir ici sira: admin-pin -> sponsor(en son odeme/featuredAt) -> KANIT SKORU -> puan. MARKA DENGESI: -Sponsorlu- rozeti YALNIZ gercekten odeyen urunde; yuksek kanit skorlu urunler para odemeden de yukselir (kanit>gorus korunur). Zengin kart _ftProductCard(p) fonksiyonuna cikarildi (kendi try/catch-i + minimal yedek kart). loadFeaturedCarousels erken-cikisi kaldirildi (kategori satirlari aktif urunlerden bagimsiz). Tumunu Gor -> window._pendingCatFilter -> katalog CAT_FILTERS.category. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
@@ -6186,6 +6187,8 @@ async function openProductDetailModal(productId) {
           : '<button class="btn-p" id="prod-detail-poc-btn" style="width:100%;padding:12px;font-size:14px;margin-top:4px">'+t('cpd.cta_poc_demo','PoC / Demo Talebi Oluştur →')+'</button>')
       : '<button class="btn-p" id="prod-detail-login-btn" style="width:100%;padding:12px;font-size:14px;margin-top:4px">'+t('cpd.cta_login_poc','Giriş Yaparak PoC Talebi Oluştur →')+'</button>';
 
+    var _psecs = (p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]);
+    var sectorsHtml = _psecs.length ? '<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.6px;margin-bottom:8px">'+(window.CUR_LOCALE==='en'?'SECTORS':'SEKTÖRLER')+'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+_psecs.map(function(sc){ return '<span style="font-size:11.5px;font-weight:600;color:#475569;background:rgba(15,23,42,.05);border:1px solid var(--border);padding:4px 10px;border-radius:20px">'+escHtml(typeof sectorLabel==='function'?sectorLabel(sc):sc)+'</span>'; }).join('')+'</div></div>' : '';
     modal.innerHTML =
       '<div class="modal" style="max-width:700px;width:95vw;padding:0;border-radius:14px;display:flex;flex-direction:column;max-height:88vh">' +
 
@@ -6217,6 +6220,9 @@ async function openProductDetailModal(productId) {
 
       // Açıklama
       (p.description ? '<div style="font-size:14px;color:#c8cfdb;line-height:1.7;margin-bottom:16px">'+(p.description)+'</div>' : '') +
+
+      // Sektörler
+      sectorsHtml +
 
       // Üreticinin ürün sayfası linki
       urlHtml +
@@ -23595,7 +23601,8 @@ async function loadFeaturedCarousels() {
       var _pinnedC = Array.isArray(_cur.pinnedCategories)?_cur.pinnedCategories:[];
       var _pinIdx = {}; _pinnedP.forEach(function(id,i){ _pinIdx[id]=i; });
       var _apSnap = await getDocs(query(collection(db,'products'), where('status','==','active')));
-      var _aprods = _apSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+      var _aprods = _apSnap.docs.map(function(d){ return {...d.data(), id:d.id}; })
+        .filter(function(p){ return (!p.publishStatus || p.publishStatus==='ready' || p.publishStatus==='awaiting_admin') && (typeof getLifecycleState!=='function' || getLifecycleState(p)==='active'); });
       var _nowMs2 = Date.now();
       function _isPaidActive(p){ if(p.featured!==true||!p.featuredUntil) return false; var u=p.featuredUntil.toDate?p.featuredUntil.toDate().getTime():new Date(p.featuredUntil).getTime(); return u>_nowMs2; }
       function _featTs2(p){ var f=p.featuredAt||p.featuredUntil; if(!f) return 0; return f.toDate?f.toDate().getTime():new Date(f).getTime(); }
