@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v7.98 | pochub.co -->
+<!-- PoCHub v7.99 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v7.98';
+const VERSION = 'v7.99';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v7.99': ['TUMUNU GOR DUZELTME + ADMIN SATIR/URUN SAYISI. (1) BUG: kategori satirindaki -Tumunu Gor- kataloga geciyor ama urun listelemiyordu. Neden: go(catalog) yalniz hash-i degistiriyor; URL-deki eski ?search facet parametreleri (sektor/lisans/vb.) kaliyor, readCatalogURL bunlardan CAT_FILTERS-i dolduruyordu; pending kategori sadece category-yi eziyor, eski filtreler kalip kategori+eski-filtre = BOS sonuc veriyordu. Cozum: _pendingCatFilter uygulanirken TUM CAT_FILTERS sifirlanir, yalniz secili kategori kalir (temiz kategori gorunumu). (2) ADMIN AYAR: Reklam/One Cikan > Vitrin > One Cikan Kategoriler bolumune -Ana sayfada satir sayisi- (1-8) ve -Satir basina urun- (1-6) inputlari; featured_curation.homeRows/homePerRow olarak kaydedilir, loadFeaturedCarousels bunlari okur (varsayilan 3/4). Inline locale. KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.98': ['ADMIN KATEGORI SECIM UI (karma sistemin admin tarafi): Reklam/One Cikan > Vitrin sekmesine -One Cikan Kategoriler- bolumu eklendi. Admin getCategories listesinden kategori secip ekler (select+Ekle), ▲▼ ile sirayi belirler, ✕ ile kaldirir, Kategorileri Kaydet ile pochub_config/featured_curation.pinnedCategories[]-e yazar (setDoc merge -> urun pinleri bozulmaz), o gunun pochub_daily_featured cache-i silinir (anasayfa aninda). v7.97 ana sayfa kategori satirlari bu listeyi zaten EN ONCE okuyor; pinlenen/sponsor urunlerin kategorileri yine otomatik gelir (karma). Bagimsiz kaydet butonu (urun bolumune dokunmaz). Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.97': ['ANA SAYFA ONE CIKAN -> KATEGORI BAZLI SATIRLAR + ESKI ROTATOR KALDIRILDI (kok bug + gelir tasarimi). KOK BUG: ayni #featured-carousel-section-a IKI fonksiyon yaziyordu (yeni loadFeaturedCarousels + eski loadFeaturedProducts rotator, 7sn timer) -> yeni zengin karusel render olup eski rotator eziyordu = -gelip gidiyor-/-kayboluyor-. loadFeaturedProducts cagrisi kaldirildi (tek renderer). YENI TASARIM: urun bolumu artik 3 KATEGORI SATIRI; her satir kategori basligi + Tumunu Gor (kategori-filtreli katalog) + 4 zengin podyum kart. Karma kategori secimi: admin-pin kategori (pinnedCategories[]) -> pinli/sponsor urun kategorisi -> aktif urun sayisina gore oto-doldur. Satir ici sira: admin-pin -> sponsor(en son odeme/featuredAt) -> KANIT SKORU -> puan. MARKA DENGESI: -Sponsorlu- rozeti YALNIZ gercekten odeyen urunde; yuksek kanit skorlu urunler para odemeden de yukselir (kanit>gorus korunur). Zengin kart _ftProductCard(p) fonksiyonuna cikarildi (kendi try/catch-i + minimal yedek kart). loadFeaturedCarousels erken-cikisi kaldirildi (kategori satirlari aktif urunlerden bagimsiz). Tumunu Gor -> window._pendingCatFilter -> katalog CAT_FILTERS.category. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.96': ['FEATURED AKISI DAYANIKLILIK + DUZELTME (Hasan bildirimi): KOK NEDEN — loadFeaturedCarousels dis catch-i render hatasinda section.innerHTML=-- ile TUM featured bolumunu siliyordu, ve v7.92 zengin urun karti dongusu URUN-BASINA try/catch ile sarili degildi; pin-lenen bir urunde herhangi bir helper aksamasi ana ekranda featured-i KOMPLE goturuyordu. Cozum: (1) her kart try/catch icinde — hata olursa o urunun yarim HTML fragment-i geri alinir (html.slice(0,_before)) ve minimal guvenli kart (ad+uretici+CTA) basilir, bolum asla cokmez; (2) dis catch artik bolumu silmiyor (yalniz hic cocuk yoksa), hatayi console-a yazar; (3) Vitrin sekmesi (renderFeaturedCuration) artik TUM cop-disi urunleri yukler -> sabitlenen urunler her durumda cozulur/gorunur (eski where(status,active) bos donerse pin-ler -bulunamadi- gorunuyordu), picker yine yalniz aktifleri onerir. KURALLAR DEGISMEDI. node+harness 0.'],
@@ -8727,7 +8728,7 @@ function readCatalogURL(){
     CAT_VIEW = params.get('view')==='list' ? 'list' : (params.get('view')==='quadrant' ? 'quadrant' : 'grid');
     if (window._pendingCatView){ CAT_VIEW = window._pendingCatView; window._pendingCatView=null; }
     if (window._pendingCatSort){ CAT_SORT = window._pendingCatSort; window._pendingCatSort=null; }
-    if (window._pendingCatFilter){ CAT_FILTERS.category = [window._pendingCatFilter]; window._pendingCatFilter=null; }
+    if (window._pendingCatFilter){ Object.keys(CAT_FILTERS).forEach(function(k){ CAT_FILTERS[k]=[]; }); CAT_FILTERS.category = [window._pendingCatFilter]; window._pendingCatFilter=null; }
   } catch(e){ CAT_FACETS.forEach(function(f){ CAT_FILTERS[f.key]=[]; }); }
 }
 function toggleCatFacet(key, v){ var a=CAT_FILTERS[key]; if(!a) return; var i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v); if(key==='category'){ Object.keys(CAT_FILTERS).forEach(function(k){ if(k.indexOf('cf:')===0) CAT_FILTERS[k]=[]; }); } loadCatalog(); }
@@ -23606,7 +23607,8 @@ async function loadFeaturedCarousels() {
       _aprods.filter(_isPaidActive).sort(function(a,b){ return _featTs2(b)-_featTs2(a); }).forEach(function(p){ _addCat(p.category); });
       var _catCount={}; _aprods.forEach(function(p){ if(p.category) _catCount[p.category]=(_catCount[p.category]||0)+1; });
       Object.keys(_catCount).sort(function(a,b){ return _catCount[b]-_catCount[a]; }).forEach(_addCat);
-      var _MAX_ROWS=3, _PER_ROW=4;
+      var _MAX_ROWS=(Number(_cur.homeRows)>=1&&Number(_cur.homeRows)<=8)?Number(_cur.homeRows):3;
+      var _PER_ROW=(Number(_cur.homePerRow)>=1&&Number(_cur.homePerRow)<=6)?Number(_cur.homePerRow):4;
       function _orderCat(list){ return list.slice().sort(function(a,b){
         var pa=(a.id in _pinIdx)?_pinIdx[a.id]:1e9, pb=(b.id in _pinIdx)?_pinIdx[b.id]:1e9; if(pa!==pb) return pa-pb;
         var qa=_isPaidActive(a)?1:0, qb=_isPaidActive(b)?1:0; if(qa!==qb) return qb-qa;
@@ -40098,6 +40100,11 @@ async function renderFeaturedCuration(m) {
     catCard.style.cssText='background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:18px';
     var catHd = document.createElement('div'); catHd.style.cssText='font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px'; catHd.textContent=(EN?'📂 Featured Categories':'📂 Öne Çıkan Kategoriler'); catCard.appendChild(catHd);
     var catHint = document.createElement('div'); catHint.style.cssText='font-size:11.5px;color:#64748b;margin-bottom:10px;line-height:1.5'; catHint.textContent=(EN?'Choose which category rows appear on the homepage and in what order. Categories of pinned / sponsored products also appear automatically.':'Ana sayfada hangi kategori satırları, hangi sırada görünsün. Pinlenen / sponsor ürünlerin kategorileri ayrıca otomatik gelir.'); catCard.appendChild(catHint);
+    var catCfgRow = document.createElement('div'); catCfgRow.style.cssText='display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:9px';
+    catCfgRow.innerHTML = '<label style="font-size:12px;color:#334155;font-weight:600;display:flex;align-items:center;gap:6px">'+(EN?'Rows on homepage':'Ana sayfada satır sayısı')+': <input id="fc-rows" type="number" min="1" max="8" class="inp" style="width:66px;padding:5px 8px"></label>'+'<label style="font-size:12px;color:#334155;font-weight:600;display:flex;align-items:center;gap:6px">'+(EN?'Products per row':'Satır başına ürün')+': <input id="fc-perrow" type="number" min="1" max="6" class="inp" style="width:66px;padding:5px 8px"></label>';
+    catCard.appendChild(catCfgRow);
+    catCfgRow.querySelector('#fc-rows').value = (curSnap.exists() && curSnap.data().homeRows) ? curSnap.data().homeRows : 3;
+    catCfgRow.querySelector('#fc-perrow').value = (curSnap.exists() && curSnap.data().homePerRow) ? curSnap.data().homePerRow : 4;
     var catListW = document.createElement('div'); catListW.style.cssText='margin-bottom:10px'; catCard.appendChild(catListW);
     var catAddRow = document.createElement('div'); catAddRow.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:12px';
     var catSel = document.createElement('select'); catSel.className='inp'; catSel.style.cssText='flex:1';
@@ -40135,7 +40142,9 @@ async function renderFeaturedCuration(m) {
     catSaveBtn.addEventListener('click',async function(){
       catSaveBtn.disabled=true; var _co=catSaveBtn.textContent; catSaveBtn.textContent=(EN?'Saving...':'Kaydediliyor...');
       try {
-        await setDoc(doc(db,'pochub_config','featured_curation'), { pinnedCategories:catPinned, updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid }, { merge:true });
+        var _rows = Math.max(1, Math.min(8, parseInt(catCfgRow.querySelector('#fc-rows').value,10)||3));
+        var _per = Math.max(1, Math.min(6, parseInt(catCfgRow.querySelector('#fc-perrow').value,10)||4));
+        await setDoc(doc(db,'pochub_config','featured_curation'), { pinnedCategories:catPinned, homeRows:_rows, homePerRow:_per, updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid }, { merge:true });
         try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_e){}
         showToast(EN?'✓ Featured categories saved':'✓ Öne çıkan kategoriler kaydedildi');
       } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
