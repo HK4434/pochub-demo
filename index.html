@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.00 | pochub.co -->
+<!-- PoCHub v8.01 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -746,7 +746,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.00';
+const VERSION = 'v8.01';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1005,6 +1005,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.01': ['URUN DETAY MODALI SEKMELI (Hasan tasarimi): openProductDetailModal artik 4 sekme — Genel Bakis (varsayilan) / Teknik Ozellikler / Kanit & Puan / Yorumlar(N). SABIT BASLIK: kategori, ad, uretici + ✓ Dogrulanmis + tiklanabilir Kanit Skoru rozeti (-> Kanit & Puan sekmesi). SABIT ALT CTA: Demo/PoC butonu her sekmede gorunur. Genel Bakis: rozetler+aciklama+sektorler+uretici-link + -Tum teknik ozellikleri gor-> (specs sekmesine atlar). Teknik Ozellikler: kaydedilen TUM catFields (bos ise bilgi). Kanit & Puan: kanit skoru paneli + akran puani ozeti. Yorumlar: tekil degerlendirmeler (giris yoksa uyari). Tum parca degiskenleri (badges/description/sectors/url/evidence/review/catFields/pocBtn) korundu; sadece sekmeli yapiya tasindi + gecis JS. Handler ID-leri (close/badge/share/ev-card/poc/login/pd-reviews-list) korundu. Inline locale (yeni dict YOK). node+harness 0.'],
   'v8.00': ['TUMUNU GOR (gercek kok neden) + URUN DETAYINDA SEKTORLER. (#2) -Tumunu Gor- hala bos donuyordu: ana sayfa kategori satirlari aktif urunleri publishStatus-a BAKMADAN gosteriyordu; katalog ise yalniz publishStatus ready/awaiting_admin/yok olanlari alir (awaiting_integrator vb. HARIC). Yani ana sayfada gorunup katalogda olmayan urun -> filtreli katalog bos. Cozum: ana sayfa kategori satirlari artik KATALOGLA AYNI uygunluk filtresini kullanir (publishStatus + getLifecycleState==active). Boylece ana sayfadaki her urun katalogda da vardir; Tumunu Gor tutarli. (#1) Urun detay modali kaydederken girilen SEKTORLERI gostermiyordu — SEKTORLER bolumu eklendi (sectorLabel, locale). Teknik ozellikler (catFields) zaten gosteriliyordu. KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.99': ['TUMUNU GOR DUZELTME + ADMIN SATIR/URUN SAYISI. (1) BUG: kategori satirindaki -Tumunu Gor- kataloga geciyor ama urun listelemiyordu. Neden: go(catalog) yalniz hash-i degistiriyor; URL-deki eski ?search facet parametreleri (sektor/lisans/vb.) kaliyor, readCatalogURL bunlardan CAT_FILTERS-i dolduruyordu; pending kategori sadece category-yi eziyor, eski filtreler kalip kategori+eski-filtre = BOS sonuc veriyordu. Cozum: _pendingCatFilter uygulanirken TUM CAT_FILTERS sifirlanir, yalniz secili kategori kalir (temiz kategori gorunumu). (2) ADMIN AYAR: Reklam/One Cikan > Vitrin > One Cikan Kategoriler bolumune -Ana sayfada satir sayisi- (1-8) ve -Satir basina urun- (1-6) inputlari; featured_curation.homeRows/homePerRow olarak kaydedilir, loadFeaturedCarousels bunlari okur (varsayilan 3/4). Inline locale. KURALLAR DEGISMEDI. node+harness 0.'],
   'v7.98': ['ADMIN KATEGORI SECIM UI (karma sistemin admin tarafi): Reklam/One Cikan > Vitrin sekmesine -One Cikan Kategoriler- bolumu eklendi. Admin getCategories listesinden kategori secip ekler (select+Ekle), ▲▼ ile sirayi belirler, ✕ ile kaldirir, Kategorileri Kaydet ile pochub_config/featured_curation.pinnedCategories[]-e yazar (setDoc merge -> urun pinleri bozulmaz), o gunun pochub_daily_featured cache-i silinir (anasayfa aninda). v7.97 ana sayfa kategori satirlari bu listeyi zaten EN ONCE okuyor; pinlenen/sponsor urunlerin kategorileri yine otomatik gelir (karma). Bagimsiz kaydet butonu (urun bolumune dokunmaz). Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
@@ -6189,6 +6190,15 @@ async function openProductDetailModal(productId) {
 
     var _psecs = (p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]);
     var sectorsHtml = _psecs.length ? '<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.6px;margin-bottom:8px">'+(window.CUR_LOCALE==='en'?'SECTORS':'SEKTÖRLER')+'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+_psecs.map(function(sc){ return '<span style="font-size:11.5px;font-weight:600;color:#475569;background:rgba(15,23,42,.05);border:1px solid var(--border);padding:4px 10px;border-radius:20px">'+escHtml(typeof sectorLabel==='function'?sectorLabel(sc):sc)+'</span>'; }).join('')+'</div></div>' : '';
+    var EN2 = (window.CUR_LOCALE==='en');
+    var _verHtml = (typeof getVendorBadgeRow==='function') ? getVendorBadgeRow(p.vendorId) : '';
+    var _hdrScore = _ev ? ('<button class="pd-tab-jump" data-tab="evidence" style="cursor:pointer;border:1px solid '+evidenceColor(_ev.score)+'55;background:'+evidenceColor(_ev.score)+'14;color:'+evidenceColor(_ev.score)+';border-radius:9px;padding:6px 12px;font-weight:900;font-size:15px;display:inline-flex;align-items:center;gap:6px;line-height:1">'+_ev.score+'<span style="font-size:10px;font-weight:700">/100</span> <span style="font-size:10px;font-weight:800;letter-spacing:.4px">'+(EN2?'EVIDENCE':'KANIT')+'</span></button>') : '';
+    var _revCount = p.ratingCount || 0;
+    var _pdTabBase = 'background:none;border:none;border-bottom:2px solid transparent;padding:12px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;color:#94a3b8';
+    function _pdTabStyle(a){ return a ? _pdTabBase+';color:#2563eb;border-bottom-color:#2563eb;font-weight:800' : _pdTabBase; }
+    var _specsEmpty = '<div style="text-align:center;color:#94a3b8;font-size:13px;padding:30px 10px">'+(EN2?'No technical specs entered for this product yet.':'Bu ürün için henüz teknik özellik girilmemiş.')+'</div>';
+    var _evEmpty = '<div style="text-align:center;color:#94a3b8;font-size:13px;padding:30px 10px">'+(EN2?'No evidence/rating data yet.':'Henüz kanıt/puan verisi yok.')+'</div>';
+    var _revLoginHint = '<div style="text-align:center;color:#94a3b8;font-size:13px;padding:20px 10px">'+(EN2?'Sign in to see individual reviews.':'Tekil değerlendirmeleri görmek için giriş yapın.')+'</div>';
     modal.innerHTML =
       '<div class="modal" style="max-width:700px;width:95vw;padding:0;border-radius:14px;display:flex;flex-direction:column;max-height:88vh">' +
 
@@ -6197,7 +6207,8 @@ async function openProductDetailModal(productId) {
       '<div>' +
       '<div style="font-size:11px;color:#2563eb;font-weight:700;letter-spacing:.5px;margin-bottom:6px">'+catLabelEN(p.category||'')+'</div>' +
       '<div style="font-size:20px;font-weight:700;margin-bottom:4px">'+(p.name||'')+'</div>' +
-      '<div style="font-size:13px;color:#64748b">'+(p.vendorName||'')+'</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap'+(_hdrScore?';margin-bottom:10px':'')+'"><span style="font-size:13px;color:#64748b">'+(p.vendorName||'')+'</span>'+_verHtml+'</div>' +
+      _hdrScore +
       '</div>' +
       '<div style="display:flex;gap:6px;align-items:flex-start;flex-shrink:0">' +
       (CUR_USER && CUR_USER.uid===p.vendorId ? '<button id="badge-prod-detail" title="Web sitesi rozeti al" style="background:none;border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-size:12px;font-weight:700;padding:5px 9px;border-radius:7px;flex-shrink:0">🛡 Rozet</button>' : '') +
@@ -6207,9 +6218,19 @@ async function openProductDetailModal(productId) {
       '</div>' +
 
       // İçerik — scrollable
-      '<div style="padding:20px 24px;overflow-y:auto;flex:1">' +
+      // SEKME CUBUGU (v8.01)
+      '<div id="pd-tabs" style="display:flex;gap:2px;padding:0 24px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto">' +
+        '<button class="pd-tab" data-tab="overview" style="'+_pdTabStyle(true)+'">'+(EN2?'Overview':'Genel Bakış')+'</button>' +
+        '<button class="pd-tab" data-tab="specs" style="'+_pdTabStyle(false)+'">'+(EN2?'Technical Specs':'Teknik Özellikler')+'</button>' +
+        '<button class="pd-tab" data-tab="evidence" style="'+_pdTabStyle(false)+'">'+(EN2?'Evidence & Rating':'Kanıt & Puan')+'</button>' +
+        '<button class="pd-tab" data-tab="reviews" style="'+_pdTabStyle(false)+'">'+(EN2?'Reviews':'Yorumlar')+(_revCount?' ('+_revCount+')':'')+'</button>' +
+      '</div>' +
 
-      // Rozetler
+      // ICERIK — sekme panelleri (scrollable)
+      '<div id="pd-content" style="padding:20px 24px;overflow-y:auto;flex:1">' +
+
+      // PANEL: Genel Bakis
+      '<div class="pd-panel" data-panel="overview">' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">' +
       '<span style="font-size:11.5px;padding:4px 10px;border-radius:6px;background:rgba(15,23,42,.04);color:#64748b">' +
       cc(p.country||'TR') + ' ' + (p.country||'TR') + '</span>' +
@@ -6217,27 +6238,21 @@ async function openProductDetailModal(productId) {
       (p.supportModel==='inhouse'?t('cpd.sm_inhouse','🏢 Kendi Bünyesi'):p.supportModel==='outsource'?t('cpd.sm_outsource','🤝 Dış Kaynak'):t('cpd.sm_hybrid','🔄 Hibrit')) + '</span>' +
       (p.featured ? '<span style="font-size:11.5px;padding:4px 10px;border-radius:6px;background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">'+t('feat.featured','⭐ Öne Çıkan Ürün')+'</span>' : '') +
       '</div>' +
-
-      // Açıklama
       (p.description ? '<div style="font-size:14px;color:#c8cfdb;line-height:1.7;margin-bottom:16px">'+(p.description)+'</div>' : '') +
-
-      // Sektörler
       sectorsHtml +
-
-      // Üreticinin ürün sayfası linki
       urlHtml +
+      (catFieldsHtml ? '<button class="pd-tab-jump" data-tab="specs" style="margin-top:4px;background:none;border:none;color:#2563eb;font-weight:700;font-size:13px;cursor:pointer;padding:6px 0">'+(EN2?'See all technical specs →':'Tüm teknik özellikleri gör →')+'</button>' : '') +
+      '</div>' +
 
-      // Kanıt Skoru paneli
-      evidenceHtml +
+      // PANEL: Teknik Ozellikler
+      '<div class="pd-panel" data-panel="specs" style="display:none">' + (catFieldsHtml || _specsEmpty) + '</div>' +
 
-      // Akran puanı özeti
-      reviewHtml +
+      // PANEL: Kanit & Puan
+      '<div class="pd-panel" data-panel="evidence" style="display:none">' + evidenceHtml + reviewHtml + ((!evidenceHtml && !reviewHtml) ? _evEmpty : '') + '</div>' +
 
-      // Bireysel değerlendirmeler (giriş yapmış kullanıcı)
-      '<div id="pd-reviews-list"></div>' +
+      // PANEL: Yorumlar
+      '<div class="pd-panel" data-panel="reviews" style="display:none"><div id="pd-reviews-list"></div>' + (!CUR_USER ? _revLoginHint : '') + '</div>' +
 
-      // Teknik özellikler
-      catFieldsHtml +
       '</div>' +
 
       // Alt bar — PoC butonu
@@ -6280,6 +6295,14 @@ async function openProductDetailModal(productId) {
         openAuthModal('customer','');
       });
     }
+    // v8.01: sekme gecisleri (ust sekmeler + panel-ici atlama linkleri + skor rozeti)
+    function _pdSwitch(tn){
+      modal.querySelectorAll('.pd-tab').forEach(function(tb){ tb.setAttribute('style', _pdTabStyle(tb.getAttribute('data-tab')===tn)); });
+      modal.querySelectorAll('.pd-panel').forEach(function(pn){ pn.style.display = (pn.getAttribute('data-panel')===tn)?'':'none'; });
+      var _c=modal.querySelector('#pd-content'); if(_c) _c.scrollTop=0;
+    }
+    modal.querySelectorAll('.pd-tab').forEach(function(tb){ tb.addEventListener('click', function(){ _pdSwitch(tb.getAttribute('data-tab')); }); });
+    modal.querySelectorAll('.pd-tab-jump').forEach(function(jb){ jb.addEventListener('click', function(){ _pdSwitch(jb.getAttribute('data-tab')); }); });
   } catch(e2) {
     showToast(t('tst.prod_load_err','Ürün detayı yüklenemedi: ')+e2.message,'err');
   }
