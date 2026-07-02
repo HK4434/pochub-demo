@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.06 | pochub.co -->
+<!-- PoCHub v8.07 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.06';
+const VERSION = 'v8.07';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.07': ['ICERIK YONETIMI FAQ KAYIT HATASI DUZELTILDI (Hasan: -setDoc called with invalid data. Unsupported field value: undefined (pochub_content/help)-). KOK NEDEN: icerik editorleri kaydederken ord alanini nesneden kopyaliyordu (question.ord/cat.ord/step.ord); eski/seed veride ord alani yoksa undefined oluyor, Firestore undefined-i reddediyor -> tum kayit patliyordu. COZUM: UC editorde de (soru + kategori + wizard adimi) ord artik asla undefined olamaz — mevcutsa korunur, yoksa index*10 (yenide uzunluk*10) ile hesaplanir. Diger metin alanlari zaten ||-, ile korunuyordu; acik olan ord idi. KURALLAR DEGISMEDI. node+harness 0.'],
   'v8.06': ['FIREBASE FUNCTIONS SAGLIK PANELI DURUSTLESTIRILDI (Hasan: gecis plani yok ama ileride lazim olursa kalsin). Panel v4.75 iskelesi; proje Spark planinda oldugundan Cloud Functions deploy edilemez -> 3 test (helloWorld/getServerTime/getCurrentUser) hep hata veriyordu, kafa karistiriyordu. Islevi degistirmeden ACIKLIGA kavusturuldu: (1) Bilgi kutusu -Ileride kullanim icin; Spark planinda testlerin basarisiz olmasi NORMAL; Blaze-e gecip deploy edilince calisir- cercevesiyle yeniden yazildi (inline locale, iki dilli). (2) Test hatalari artik kirmizi ham hata yerine AMBER durum karti: _fnNotReady(e) ne yapilmasi gerektigini (Blaze + deploy) acikca yazar, hatanin Spark-ta beklenen mi yoksa gercekten beklenmedik mi oldugunu ayirt eder (code/message yine debug icin gosterilir). Panel + iskele ileride sunucu-tarafi (or. e-posta broadcast/MS Graph) icin duruyor. Islevsel calisan fonksiyon YOK; yalnizca UI/mesaj netlestirildi. KURALLAR DEGISMEDI. node+harness 0.'],
   'v8.05': ['ONE CIKAN VENDOR: BAYAT CACHE + 0-URUN TEMIZLIGI (Hasan onayi). SORUN: anasayfa -One Cikan Vendorlar- gunluk cache-ten (pochub_daily_featured/<tarih>) okur; calculateDailyFeatured o gunun cache-i varsa AYNEN doner, yeniden hesaplamaz. v8.02 oncesi tier-tabanli cache duruyordu -> yeni kart formati productCount okudugu icin -0 urun- yazan 3 test vendor gorunuyordu. COZUM: (a) SEMA KONTROLU: cache yalniz featuredSchema===2 ise gecerli sayilir; eski cache-ler (bu alan yok) bayat kabul edilip yeniden hesaplanir + schema:2 ile yeniden yazilir (elle Kaydet gerekmez). (b) SECIM: pinli olsa BILE aktif/yayinda urunu olmayan vendor one cikanlara girmez (auto-fill zaten count>0 istiyordu; pin adimina da eklendi). (c) RENDER: 0-urunlu vendor kartlari gizlenir (_fvList filtresi) — mevcut bayat cache dahil aninda temizler; tum liste 0 ise bolum hic gorunmez (ici bos -one cikan- olmaz). Boylece: pin yok + urunlu vendor yok => bolum gizli; urunu olan vendorlar Kanit Skoruna gore dizilir; pinli vendor ancak yayinda urunu olunca gorunur. KURALLAR DEGISMEDI. node+harness 0.'],
   'v8.04': ['KATALOGDA VENDOR (SAGLAYICI) FILTRESI (Hasan istegi — eksik tamamlandi). (1) Katalog facet sistemine yeni -Saglayici- grubu eklendi (CAT_FACETS key:vendor, get:p.vendorId). Jenerik faceting sayesinde grup-ici OR / gruplar-arasi AND, sayaclar, chip, URL/temizle otomatik calisir. (2) Vendor secenekleri DINAMIK: loadCatalog aktif urunlerin vendorId->vendorName eslesmesinden turetir (setVendorFacetOptions), ada gore sirali; makeGroup zaten sifir-sayimli secenekleri gizledigi icin yalniz sonuc kumesinde urunu olan vendorlar listelenir (uzun liste sorunu yok). label_en=Vendor (EN modda -Vendor-). orderFacetList yeni grubu sona koyar; admin Filtre Yonetimi ile gizlenebilir/tasinabilir. (3) DEEP-LINK: public vendor profiline -🗂 Katalogda tumunu gor- butonu; window._pendingVendorFilter ile (kategori _pendingCatFilter deseninin aynisi) kataloga gecer, TUM filtreler sifirlanip yalniz o vendor secilir (bayat-filtre bug-u onlenir). Boylece Vendorlar->profil->katalogda-o-vendor akisi da tamam. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
@@ -39252,7 +39253,7 @@ function openCategoryEditor(ci, helpData, m) {
         desc: modal.querySelector('#cat-desc').value.trim(),
         title_en: modal.querySelector('#cat-title-en')?.value.trim() || '',
         desc_en: modal.querySelector('#cat-desc-en')?.value.trim() || '',
-        ord: cat.ord,
+        ord: (cat.ord != null ? cat.ord : (ci != null ? ci*10 : (helpData ? helpData.length : 0)*10)),
         questions: cat.questions || [],
       };
       if (!newCat.id || !newCat.title) { alert(t('acnt.err_id_title','ID ve Başlık zorunlu')); btn.disabled = false; btn.textContent = t('common.save','💾 Kaydet'); return; }
@@ -39309,7 +39310,7 @@ function openQuestionEditor(ci, qi, helpData, m) {
         a: modal.querySelector('#q-a').value.trim(),
         q_en: modal.querySelector('#q-q-en')?.value.trim() || '',
         a_en: modal.querySelector('#q-a-en')?.value.trim() || '',
-        ord: question.ord,
+        ord: (question.ord != null ? question.ord : (qi != null ? qi*10 : ((cat.questions ? cat.questions.length : 0)*10))),
       };
       if (!newQ.q || !newQ.a) { alert(t('acnt.err_q_a','Soru ve Cevap zorunlu')); btn.disabled = false; btn.textContent = t('common.save','💾 Kaydet'); return; }
 
@@ -39471,7 +39472,7 @@ function openWizardStepEditor(si, steps, m) {
         title: modal.querySelector('#ws-title').value.trim(),
         body: modal.querySelector('#ws-body').value.trim(),
         ctaText: modal.querySelector('#ws-cta').value.trim() || 'Devam →',
-        ord: step.ord,
+        ord: (step.ord != null ? step.ord : (si != null ? si*10 : (steps ? steps.length : 0)*10)),
       };
       if (!newStep.title || !newStep.body) { alert(t('wse.required','Başlık ve İçerik zorunlu')); btn.disabled = false; btn.textContent = t('common.save','💾 Kaydet'); return; }
 
