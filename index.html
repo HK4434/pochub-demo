@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.05 | pochub.co -->
+<!-- PoCHub v8.06 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.05';
+const VERSION = 'v8.06';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.06': ['FIREBASE FUNCTIONS SAGLIK PANELI DURUSTLESTIRILDI (Hasan: gecis plani yok ama ileride lazim olursa kalsin). Panel v4.75 iskelesi; proje Spark planinda oldugundan Cloud Functions deploy edilemez -> 3 test (helloWorld/getServerTime/getCurrentUser) hep hata veriyordu, kafa karistiriyordu. Islevi degistirmeden ACIKLIGA kavusturuldu: (1) Bilgi kutusu -Ileride kullanim icin; Spark planinda testlerin basarisiz olmasi NORMAL; Blaze-e gecip deploy edilince calisir- cercevesiyle yeniden yazildi (inline locale, iki dilli). (2) Test hatalari artik kirmizi ham hata yerine AMBER durum karti: _fnNotReady(e) ne yapilmasi gerektigini (Blaze + deploy) acikca yazar, hatanin Spark-ta beklenen mi yoksa gercekten beklenmedik mi oldugunu ayirt eder (code/message yine debug icin gosterilir). Panel + iskele ileride sunucu-tarafi (or. e-posta broadcast/MS Graph) icin duruyor. Islevsel calisan fonksiyon YOK; yalnizca UI/mesaj netlestirildi. KURALLAR DEGISMEDI. node+harness 0.'],
   'v8.05': ['ONE CIKAN VENDOR: BAYAT CACHE + 0-URUN TEMIZLIGI (Hasan onayi). SORUN: anasayfa -One Cikan Vendorlar- gunluk cache-ten (pochub_daily_featured/<tarih>) okur; calculateDailyFeatured o gunun cache-i varsa AYNEN doner, yeniden hesaplamaz. v8.02 oncesi tier-tabanli cache duruyordu -> yeni kart formati productCount okudugu icin -0 urun- yazan 3 test vendor gorunuyordu. COZUM: (a) SEMA KONTROLU: cache yalniz featuredSchema===2 ise gecerli sayilir; eski cache-ler (bu alan yok) bayat kabul edilip yeniden hesaplanir + schema:2 ile yeniden yazilir (elle Kaydet gerekmez). (b) SECIM: pinli olsa BILE aktif/yayinda urunu olmayan vendor one cikanlara girmez (auto-fill zaten count>0 istiyordu; pin adimina da eklendi). (c) RENDER: 0-urunlu vendor kartlari gizlenir (_fvList filtresi) — mevcut bayat cache dahil aninda temizler; tum liste 0 ise bolum hic gorunmez (ici bos -one cikan- olmaz). Boylece: pin yok + urunlu vendor yok => bolum gizli; urunu olan vendorlar Kanit Skoruna gore dizilir; pinli vendor ancak yayinda urunu olunca gorunur. KURALLAR DEGISMEDI. node+harness 0.'],
   'v8.04': ['KATALOGDA VENDOR (SAGLAYICI) FILTRESI (Hasan istegi — eksik tamamlandi). (1) Katalog facet sistemine yeni -Saglayici- grubu eklendi (CAT_FACETS key:vendor, get:p.vendorId). Jenerik faceting sayesinde grup-ici OR / gruplar-arasi AND, sayaclar, chip, URL/temizle otomatik calisir. (2) Vendor secenekleri DINAMIK: loadCatalog aktif urunlerin vendorId->vendorName eslesmesinden turetir (setVendorFacetOptions), ada gore sirali; makeGroup zaten sifir-sayimli secenekleri gizledigi icin yalniz sonuc kumesinde urunu olan vendorlar listelenir (uzun liste sorunu yok). label_en=Vendor (EN modda -Vendor-). orderFacetList yeni grubu sona koyar; admin Filtre Yonetimi ile gizlenebilir/tasinabilir. (3) DEEP-LINK: public vendor profiline -🗂 Katalogda tumunu gor- butonu; window._pendingVendorFilter ile (kategori _pendingCatFilter deseninin aynisi) kataloga gecer, TUM filtreler sifirlanip yalniz o vendor secilir (bayat-filtre bug-u onlenir). Boylece Vendorlar->profil->katalogda-o-vendor akisi da tamam. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v8.03': ['VENDOR PROFILI URUN AKISI TAMAMLANDI (Hasan tespiti — akis cikmaz sokakta bitiyordu): (1) Public vendor profilindeki urun kartlari artik TIKLANABILIR -> sekmeli urun detay modalini acar (openProductDetailModal; Genel Bakis/Teknik/Kanit&Puan/Yorumlar/PoC CTA). Boylece dongu tamamlandi: Vendorlar -> vendor profili -> urun -> detay. (2) Kartlar zenginlestirildi: KANIT SKORU rozeti (🛡 /100, evidenceColor) + ★ puan/(degerlendirme) + hover + -Incele-> ipucu (eskiden duz div, hicbir sinyal yok). (3) Profil urun fetch limit 12->60 + render 12-slice kaldirildi: vendorun TUM aktif urunleri gorunur (gizli kalan yok). Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
@@ -38331,10 +38332,12 @@ async function admSettings(m) {
     var fnInfo = document.createElement('div');
     fnInfo.style.cssText = 'background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:8px;padding:12px;margin-bottom:10px;font-size:11.5px;color:var(--text-muted);line-height:1.6';
     fnInfo.innerHTML =
-      '⚠️ Functions deploy yapılmamışsa testler başarısız olur.<br>'
+      (window.CUR_LOCALE==='en'
+        ? 'ℹ️ <b>For future use.</b> This project is on the <b>Spark</b> plan — Cloud Functions are not deployed, so these tests are <b>expected to fail</b> for now. They will work after upgrading to Blaze and deploying.<br><br>'
+        : 'ℹ️ <b>İleride kullanım için.</b> Bu proje <b>Spark</b> planında — Cloud Functions deploy edilmemiş, bu yüzden testlerin <b>şimdilik başarısız olması normaldir</b>. Blaze\'e geçip deploy edilince çalışır.<br><br>')
       + 'Region: <code>europe-west1</code><br>'
       + 'Deploy: <code>cd functions && npm run deploy</code><br>'
-      + 'Logları görmek: <code>firebase functions:log</code>';
+      + (window.CUR_LOCALE==='en'?'Logs: ':'Loglar: ')+'<code>firebase functions:log</code>';
     s13.appendChild(fnInfo);
 
     var fnTestRow = document.createElement('div');
@@ -38351,11 +38354,20 @@ async function admSettings(m) {
     function showFnResult(label, result, isError) {
       var resEl = el('fn-test-result');
       resEl.style.display = 'block';
-      resEl.style.color = isError ? '#dc2626' : '#16a34a';
+      resEl.style.color = (isError==='warn') ? '#d97706' : (isError ? '#dc2626' : '#16a34a');
       var ts = new Date().toLocaleTimeString(LDATE());
       resEl.textContent = '[' + ts + '] ' + label + ':\n' + JSON.stringify(result, null, 2);
     }
 
+    function _fnNotReady(e){
+      var c=(e&&e.code)||''; var m=(e&&e.message)||String(e); var EN=window.CUR_LOCALE==='en';
+      var expected=/not-found|internal|unavailable|failed-precondition|deadline|cors|failed to fetch|network|load failed/i.test(c+' '+m);
+      return {
+        durum: EN ? 'Cloud Functions are NOT deployed. On the Spark plan they cannot run. After upgrading to Blaze and running "cd functions && npm run deploy" these tests will work. This panel is kept for that future setup.' : 'Cloud Functions deploy EDILMEMIS. Spark planinda calisamaz. Blaze\'e gecip "cd functions && npm run deploy" calistirinca bu testler calisir. Bu panel ileride o kurulum icin duruyor.',
+        beklenen_mi: expected ? (EN?'Yes — expected on Spark':'Evet — Spark\'ta beklenen') : (EN?'Unexpected — worth checking':'Beklenmedik — incelenmeli'),
+        code: c, message: m
+      };
+    }
     setTimeout(function(){
       el('fn-test-hello')?.addEventListener('click', async function(){
         var btn = this; btn.disabled = true; btn.textContent = '⏳ Test ediliyor...';
@@ -38363,7 +38375,7 @@ async function admSettings(m) {
           var res = await window.callFunction('helloWorld', { test: 'admin-ping', time: Date.now() });
           showFnResult('✅ helloWorld', res, false);
         } catch(e) {
-          showFnResult('❌ helloWorld HATA', { code: e.code, message: e.message }, true);
+          showFnResult('⏸ helloWorld — ' + (window.CUR_LOCALE==='en'?'Functions not active':'Functions aktif değil'), _fnNotReady(e), 'warn');
         }
         btn.disabled = false; btn.textContent = '🔵 helloWorld testi';
       });
@@ -38376,7 +38388,7 @@ async function admSettings(m) {
           res.clientSkewMs = skew;
           showFnResult('✅ getServerTime (skew=' + skew + 'ms)', res, false);
         } catch(e) {
-          showFnResult('❌ getServerTime HATA', { code: e.code, message: e.message }, true);
+          showFnResult('⏸ getServerTime — ' + (window.CUR_LOCALE==='en'?'Functions not active':'Functions aktif değil'), _fnNotReady(e), 'warn');
         }
         btn.disabled = false; btn.textContent = '⏰ getServerTime testi';
       });
@@ -38386,7 +38398,7 @@ async function admSettings(m) {
           var res = await window.callFunction('getCurrentUser');
           showFnResult('✅ getCurrentUser', res, false);
         } catch(e) {
-          showFnResult('❌ getCurrentUser HATA', { code: e.code, message: e.message }, true);
+          showFnResult('⏸ getCurrentUser — ' + (window.CUR_LOCALE==='en'?'Functions not active':'Functions aktif değil'), _fnNotReady(e), 'warn');
         }
         btn.disabled = false; btn.textContent = '👤 getCurrentUser testi';
       });
