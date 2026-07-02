@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.09 | pochub.co -->
+<!-- PoCHub v8.10 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.09';
+const VERSION = 'v8.10';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.10': ['KATEGORI ALAN MOTORU — ADMIN FIELD-MANAGER UI (v8.09 motorunun yonetim yuzu). Sistem Ayarlari > yeni -🧬 Urun Alanlari (Kategori Semasi)- bolumu: kategori sec + -Alanlari Duzenle- -> openProductFieldsEditorModal. MODAL (tam CRUD, createElement): her alan icin id (sabit, monospace), tip (Metin/Sayi/Secim/Coklu/Evet-Hayir), TR+EN etiket, grup, tip=number-da BIRIM / tip=select|multiselect-te opsiyonlar (virgulle, tip degisince otomatik goster/gizle), TR+EN yardim, Zorunlu/Kartta(key)/Filtre bayraklari; ▲▼ sirala, ✕ sil, + Alan Ekle. Kaydet -> pochub_config/product_fields (fields.<kategori>=[...], merge; PRODUCT_FIELDS_OVR aninda guncellenir). Varsayilana Don -> config-ten o kategoriyi siler (dokuman okunup fields[cat] silinerek geri yazilir), getCatFields hardcoded-a duser. Inline locale (yeni dict YOK). KURALLAR DEGISMEDI (config write:isAdmin mevcut). Sonraki: Firewall pilotu (v8.11). node+harness 0.'],
   'v8.09': ['KATEGORI ALAN MOTORU — FAZ 0 CEKIRDEK (Hasan onayli blueprint). Amac: urun girisini serbest-metin listesinden YAPILANDIRILMIS teknik sartnameye tasimak. (1) GENISLETILMIS ALAN SEMASI: type artik number|select|multiselect|bool|text; number-da KANONIK sabit birim (unit) — deger olarak yalniz SAYI saklanir (karsilastirilabilir/siralanabilir), birim gosterimde eklenir; ayrica label_en/help_en (iki dilli), help (tanim/tooltip), key (kartta one cikar), filter (facet olsun). (2) ADMIN-EDITABLE ALTYAPI: yeni pochub_config/product_fields = {fields:{kategori:[...]}}; ensureProductFields() bir kez yukler (ensureTaxonomy deseni); getCatFields artik ONCE config-i (PRODUCT_FIELDS_OVR, TR-normalize), yoksa hardcoded CATEGORY_FIELDS-i, yoksa Diger-i doner. Hardcoded = tohum/varsayilan; admin kaydettikce config ezer. (3) RENDER/COLLECT/VALIDATE yeni tipleri destekler: number (sayi input + birim etiketi), multiselect (checkbox -> dizi), bool (Evet/Hayir -> true/false), help ipucu, EN etiket. (4) URUN DETAYI: number birimiyle, bool Evet/Hayir, multiselect virgullu; sema-disi eski alanlar yine Diger altinda (geriye uyumlu). (5) FACET: select + multiselect dinamik facet olur (get dizi-uyumlu). Sayisal ARALIK filtresi ve admin field-manager UI sonraki surumlerde (v8.10 UI, v8.11 Firewall pilotu). Mevcut veri/idler korunur; config bos oldugundan davranis birebir ayni baslar. KURALLAR DEGISMEDI (config write:isAdmin mevcut). node+harness 0.'],
   'v8.08': ['ILETISIM E-POSTASI KURUMSALLASTIRILDI (Hasan: kisisel -> info@). Koddaki tum sabit hasan.kayapinar@gitsteknoloji.com -> info@gitsteknoloji.com (12 yer): HELP_DATA (Yardim Merkezi FAQ fallback+seed), Demo Talebi sayfasi mailto-lari, Yardim Merkezi iletisim CTA, anasayfa SSS seridi footer. kvkk@ ve hukuk@ ayri yasal/rol adresleri oldugundan DOKUNULMADI. NOT: canli Yardim Merkezi FAQ icerigi Firestore-da (pochub_content/help); kod degisikligi onu degistirmez — kalan Iletisim cevaplari admin-den guncellenmeli ya da yeniden seed edilmeli. KURALLAR DEGISMEDI. node+harness 0.'],
   'v8.07': ['ICERIK YONETIMI FAQ KAYIT HATASI DUZELTILDI (Hasan: -setDoc called with invalid data. Unsupported field value: undefined (pochub_content/help)-). KOK NEDEN: icerik editorleri kaydederken ord alanini nesneden kopyaliyordu (question.ord/cat.ord/step.ord); eski/seed veride ord alani yoksa undefined oluyor, Firestore undefined-i reddediyor -> tum kayit patliyordu. COZUM: UC editorde de (soru + kategori + wizard adimi) ord artik asla undefined olamaz — mevcutsa korunur, yoksa index*10 (yenide uzunluk*10) ile hesaplanir. Diger metin alanlari zaten ||-, ile korunuyordu; acik olan ord idi. KURALLAR DEGISMEDI. node+harness 0.'],
@@ -37825,6 +37826,112 @@ async function admSectors(m) {
   });
 }
 
+async function openProductFieldsEditorModal(catName){
+  try { await ensureProductFields(true); } catch(e){}
+  var EN=window.CUR_LOCALE==='en';
+  var fields=(getCatFields(catName)||[]).map(function(f){ return Object.assign({}, f); });
+  var modal=document.createElement('div'); modal.className='modal-overlay';
+  modal.innerHTML='<div style="background:var(--bg-surface);border-radius:14px;max-width:840px;width:100%;max-height:90vh;overflow-y:auto;padding:22px;position:relative">'
+    + '<button id="pf-close" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>'
+    + '<div style="font-size:17px;font-weight:800;margin-bottom:2px">🧬 '+escHtml(catName)+' — '+(EN?'Product Fields':'Ürün Alanları')+'</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.5">'+(EN?'These fields appear when a vendor adds a product in this category. number = numeric value + fixed unit (comparable/sortable). The id is stable — do not change it for existing fields (product data is keyed by id).':'Bu alanlar, bu kategoride ürün eklenirken vendor\'a gösterilir. number = sayısal değer + sabit birim (karşılaştırılabilir/sıralanabilir). id sabittir — mevcut alanların id\'sini değiştirme (ürün verisi id\'ye bağlı).')+'</div>'
+    + '<div id="pf-list"></div>'
+    + '<button id="pf-add" class="btn-g btn-sm" style="margin-top:8px">'+(EN?'+ Add Field':'+ Alan Ekle')+'</button>'
+    + '<div style="display:flex;gap:8px;margin-top:20px"><button class="btn-p" id="pf-save" style="flex:1">'+t('common.save','💾 Kaydet')+'</button><button class="btn-g" id="pf-reset">'+(EN?'Reset to default':'Varsayılana Dön')+'</button></div>'
+    + '</div>';
+  document.body.appendChild(modal);
+  var list=modal.querySelector('#pf-list');
+  var TYPES=[['text',EN?'Text':'Metin'],['number',EN?'Number':'Sayı'],['select',EN?'Select':'Seçim'],['multiselect',EN?'Multi-select':'Çoklu Seçim'],['bool',EN?'Yes/No':'Evet/Hayır']];
+  function esc(x){ return (x==null?'':String(x)).replace(/"/g,'&quot;'); }
+  function addRow(f){
+    f=f||{};
+    var row=document.createElement('div'); row.className='pf-row';
+    row.style.cssText='border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--bg-elevated)';
+    var typeOpts=TYPES.map(function(tp){return '<option value="'+tp[0]+'"'+((f.type||'text')===tp[0]?' selected':'')+'>'+tp[1]+'</option>';}).join('');
+    row.innerHTML=
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'
+      + '<button type="button" class="pf-up btn-g btn-sm" style="padding:3px 8px">▲</button>'
+      + '<button type="button" class="pf-dn btn-g btn-sm" style="padding:3px 8px">▼</button>'
+      + '<input class="inp pf-id" placeholder="id (örn: fw_throughput)" value="'+esc(f.id)+'" style="flex:1;font-family:monospace;font-size:12px">'
+      + '<select class="inp pf-type" style="width:130px">'+typeOpts+'</select>'
+      + '<button type="button" class="pf-del btn-g btn-sm" style="padding:3px 9px;color:#dc2626">✕</button>'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'
+      + '<input class="inp pf-label" placeholder="'+(EN?'Label TR *':'Etiket TR *')+'" value="'+esc(f.label)+'">'
+      + '<input class="inp pf-label-en" placeholder="Label EN" value="'+esc(f.label_en)+'">'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:140px 130px 1fr;gap:6px;margin-bottom:6px">'
+      + '<input class="inp pf-group" placeholder="'+(EN?'Group':'Grup')+'" value="'+esc(f.group)+'">'
+      + '<input class="inp pf-unit" placeholder="'+(EN?'Unit (Gbps)':'Birim (Gbps)')+'" value="'+esc(f.unit)+'">'
+      + '<input class="inp pf-opts" placeholder="'+(EN?'Options (comma-separated)':'Opsiyonlar (virgülle)')+'" value="'+esc((f.opts||[]).join(', '))+'">'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'
+      + '<input class="inp pf-help" placeholder="'+(EN?'Help/definition TR':'Yardım/tanım TR')+'" value="'+esc(f.help)+'">'
+      + '<input class="inp pf-help-en" placeholder="Help EN" value="'+esc(f.help_en)+'">'
+      + '</div>'
+      + '<div style="display:flex;gap:16px;font-size:12px;color:var(--text-secondary);flex-wrap:wrap">'
+      + '<label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" class="pf-req"'+(f.req?' checked':'')+'> '+(EN?'Required':'Zorunlu')+'</label>'
+      + '<label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" class="pf-key"'+(f.key?' checked':'')+'> '+(EN?'On card':'Kartta')+'</label>'
+      + '<label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" class="pf-filter"'+(f.filter?' checked':'')+'> '+(EN?'Filter':'Filtre')+'</label>'
+      + '</div>';
+    var typeSel=row.querySelector('.pf-type'), unitI=row.querySelector('.pf-unit'), optsI=row.querySelector('.pf-opts');
+    function syncType(){ var tp=typeSel.value; unitI.style.display=(tp==='number')?'':'none'; optsI.style.display=(tp==='select'||tp==='multiselect')?'':'none'; }
+    typeSel.addEventListener('change', syncType); syncType();
+    row.querySelector('.pf-del').addEventListener('click', function(){ row.remove(); });
+    row.querySelector('.pf-up').addEventListener('click', function(){ var p=row.previousElementSibling; if(p) list.insertBefore(row,p); });
+    row.querySelector('.pf-dn').addEventListener('click', function(){ var n=row.nextElementSibling; if(n) list.insertBefore(n,row); });
+    list.appendChild(row);
+  }
+  fields.forEach(addRow);
+  modal.querySelector('#pf-add').addEventListener('click', function(){ addRow({type:'text'}); });
+  modal.querySelector('#pf-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  function slug(x){ return (x||'').toLowerCase().replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40) || ('f'+(Date.now()%100000)); }
+  modal.querySelector('#pf-save').addEventListener('click', async function(){
+    var btn=this; btn.disabled=true; btn.textContent=t('common.saving','⏳ Kaydediliyor...');
+    try {
+      var out=[], used={};
+      [].slice.call(list.querySelectorAll('.pf-row')).forEach(function(row){
+        var label=(row.querySelector('.pf-label').value||'').trim();
+        var id=(row.querySelector('.pf-id').value||'').trim()||slug(label);
+        if(!label && !id) return;
+        while(used[id]) id=id+'_2'; used[id]=1;
+        var type=row.querySelector('.pf-type').value||'text';
+        var f={ id:id, label:label||id, type:type };
+        var le=(row.querySelector('.pf-label-en').value||'').trim(); if(le) f.label_en=le;
+        var gr=(row.querySelector('.pf-group').value||'').trim(); if(gr) f.group=gr;
+        var hp=(row.querySelector('.pf-help').value||'').trim(); if(hp) f.help=hp;
+        var he=(row.querySelector('.pf-help-en').value||'').trim(); if(he) f.help_en=he;
+        if(type==='number'){ var u=(row.querySelector('.pf-unit').value||'').trim(); if(u) f.unit=u; }
+        if(type==='select'||type==='multiselect'){ var op=(row.querySelector('.pf-opts').value||'').split(',').map(function(x){return x.trim();}).filter(Boolean); if(op.length) f.opts=op; }
+        if(row.querySelector('.pf-req').checked) f.req=true;
+        if(row.querySelector('.pf-key').checked) f.key=true;
+        if(row.querySelector('.pf-filter').checked) f.filter=true;
+        out.push(f);
+      });
+      var ref=doc(db,'pochub_config','product_fields');
+      var payload={}; payload[catName]=out;
+      await setDoc(ref, { fields: payload, updatedAt: serverTimestamp(), updatedBy: CUR_USER.uid }, { merge:true });
+      PRODUCT_FIELDS_OVR[catName]=out;
+      showToast(EN?'✓ Fields saved':'✓ Alanlar kaydedildi');
+      modal.remove();
+    } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); btn.disabled=false; btn.textContent=t('common.save','💾 Kaydet'); }
+  });
+  modal.querySelector('#pf-reset').addEventListener('click', async function(){
+    if(!confirm(EN?'Reset this category to code defaults? (applies immediately)':'Bu kategori kod varsayılanlarına dönsün mü? (hemen uygulanır)')) return;
+    var btn=this; btn.disabled=true;
+    try {
+      var ref=doc(db,'pochub_config','product_fields');
+      var snap=await getDoc(ref); var data=snap.exists()?snap.data():{};
+      if(data.fields) delete data.fields[catName];
+      data.updatedAt=serverTimestamp(); data.updatedBy=CUR_USER.uid;
+      await setDoc(ref, data);
+      delete PRODUCT_FIELDS_OVR[catName];
+      showToast(EN?'✓ Reset to default':'✓ Varsayılana dönüldü');
+      modal.remove();
+    } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); btn.disabled=false; }
+  });
+}
 function openTaxonomyEditorModal(){
   var modal=document.createElement('div'); modal.className='modal-overlay';
   modal.innerHTML = '<div style="background:var(--bg-surface);border-radius:14px;max-width:660px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;position:relative">'
@@ -38389,6 +38496,20 @@ async function admSettings(m) {
       + '<div id="fn-test-result" style="font-size:11px;font-family:monospace;background:var(--bg-elevated);border-radius:6px;padding:10px;min-height:60px;max-height:200px;overflow-y:auto;color:var(--text-secondary);white-space:pre-wrap;display:none"></div>';
     s13.appendChild(fnTestRow);
     m.appendChild(s13);
+
+    // v8.10: Ürün Alanları (Kategori Şeması) — admin field manager
+    var s14 = section((window.CUR_LOCALE==='en'?'🧬 Product Fields (Category Schema)':'🧬 Ürün Alanları (Kategori Şeması)'), '#0891b2');
+    var pfInfo=document.createElement('div');
+    pfInfo.style.cssText='font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.5';
+    pfInfo.innerHTML=(window.CUR_LOCALE==='en'?'Define the technical spec fields vendors fill when adding a product in each category (number+unit, select, multi-select, yes/no, text). Saved schema overrides code defaults per category.':'Her kategoride ürün eklenirken vendor\'ın dolduracağı teknik özellik alanlarını tanımla (sayı+birim, seçim, çoklu seçim, evet/hayır, metin). Kaydettiğin şema o kategorinin kod varsayılanını ezer.');
+    s14.appendChild(pfInfo);
+    var pfRow=document.createElement('div'); pfRow.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    var _pfCats=[]; try { _pfCats=await getCategories(); } catch(e){}
+    pfRow.innerHTML='<select id="pf-cat" class="inp" style="flex:1;min-width:200px">'+_pfCats.map(function(c){ var nm=(c&&c.name)||c; return '<option value="'+String(nm).replace(/"/g,'&quot;')+'">'+escHtml((typeof catLabel==='function')?catLabel(c):nm)+'</option>'; }).join('')+'</select>'
+      + '<button id="pf-edit" class="btn-p btn-sm">'+(window.CUR_LOCALE==='en'?'Edit fields →':'Alanları Düzenle →')+'</button>';
+    s14.appendChild(pfRow);
+    m.appendChild(s14);
+    el('pf-edit')?.addEventListener('click', function(){ var c=el('pf-cat')?.value; if(c) openProductFieldsEditorModal(c); });
 
     // Test handlers
     function showFnResult(label, result, isError) {
