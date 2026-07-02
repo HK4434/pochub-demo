@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.02 | pochub.co -->
+<!-- PoCHub v8.03 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.02';
+const VERSION = 'v8.03';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.03': ['VENDOR PROFILI URUN AKISI TAMAMLANDI (Hasan tespiti — akis cikmaz sokakta bitiyordu): (1) Public vendor profilindeki urun kartlari artik TIKLANABILIR -> sekmeli urun detay modalini acar (openProductDetailModal; Genel Bakis/Teknik/Kanit&Puan/Yorumlar/PoC CTA). Boylece dongu tamamlandi: Vendorlar -> vendor profili -> urun -> detay. (2) Kartlar zenginlestirildi: KANIT SKORU rozeti (🛡 /100, evidenceColor) + ★ puan/(degerlendirme) + hover + -Incele-> ipucu (eskiden duz div, hicbir sinyal yok). (3) Profil urun fetch limit 12->60 + render 12-slice kaldirildi: vendorun TUM aktif urunleri gorunur (gizli kalan yok). Inline locale (yeni dict YOK). KURALLAR DEGISMEDI. node+harness 0.'],
   'v8.02': ['VENDORLAR KESIF SAYFASI + ONE CIKAN VENDOR YENIDEN KURGU (Hasan). (1) YENI PUBLIC SAYFA #vendors + ust menude -🏢 Vendorlar- (Liderler yani): tum aktif vendorlarin kanit-temelli dizini. Vendor karti: logo, ad, ✓ Dogrulanmis, tip (uretici/distributor/entegrator), AKTIF URUN SAYISI, ortalama KANIT SKORU (urunlerinden), yildiz puan/degerlendirme, sektor cipleri. ARAMA (ad) + SIRALA (A-Z varsayilan / Kanit Skoru / en cok urun / puan) + FILTRE (sektor, tip, yalniz dogrulanmis). Karta tikla -> mevcut public profil (#v/slug). Tum public veriden turetilir (anonim guvenli). (2) -Tumunu Gor- (one cikan vendorlar) artik #vendors-e gider (eskiden yanlislikla katalog-a gidiyordu). (3) ONE CIKAN VENDOR SECIMI: tier-tabanli birakildi -> ADMIN-PIN (featured_curation.pinnedVendors) + KANIT SKORU siralamasi (ilke: odeme ile uste cikilmaz). Anasayfa one cikan vendor kartlari artik TIKLANABILIR (#v/slug) + tier rozeti YERINE ✓/urun sayisi/kanit skoru. (4) TIER ROZETLERI PUBLIC-ten KALDIRILDI: one cikan kartlar + public vendor profili (ENTERPRISE/PRO/FREE artik aliciya gosterilmez — urun kartlariyla tutarli). (5) ADMIN VITRIN: -One Cikan Vendorlar- bolumu (vendor sec + ▲▼ sira + ✕ + Kaydet -> pinnedVendors, cache invalidate). Inline locale (yeni dict YOK). KURALLAR DEGISMEDI (users read, pochub_config write:isAdmin zaten var). node+harness 0.'],
   'v8.01': ['URUN DETAY MODALI SEKMELI (Hasan tasarimi): openProductDetailModal artik 4 sekme — Genel Bakis (varsayilan) / Teknik Ozellikler / Kanit & Puan / Yorumlar(N). SABIT BASLIK: kategori, ad, uretici + ✓ Dogrulanmis + tiklanabilir Kanit Skoru rozeti (-> Kanit & Puan sekmesi). SABIT ALT CTA: Demo/PoC butonu her sekmede gorunur. Genel Bakis: rozetler+aciklama+sektorler+uretici-link + -Tum teknik ozellikleri gor-> (specs sekmesine atlar). Teknik Ozellikler: kaydedilen TUM catFields (bos ise bilgi). Kanit & Puan: kanit skoru paneli + akran puani ozeti. Yorumlar: tekil degerlendirmeler (giris yoksa uyari). Tum parca degiskenleri (badges/description/sectors/url/evidence/review/catFields/pocBtn) korundu; sadece sekmeli yapiya tasindi + gecis JS. Handler ID-leri (close/badge/share/ev-card/poc/login/pd-reviews-list) korundu. Inline locale (yeni dict YOK). node+harness 0.'],
   'v8.00': ['TUMUNU GOR (gercek kok neden) + URUN DETAYINDA SEKTORLER. (#2) -Tumunu Gor- hala bos donuyordu: ana sayfa kategori satirlari aktif urunleri publishStatus-a BAKMADAN gosteriyordu; katalog ise yalniz publishStatus ready/awaiting_admin/yok olanlari alir (awaiting_integrator vb. HARIC). Yani ana sayfada gorunup katalogda olmayan urun -> filtreli katalog bos. Cozum: ana sayfa kategori satirlari artik KATALOGLA AYNI uygunluk filtresini kullanir (publishStatus + getLifecycleState==active). Boylece ana sayfadaki her urun katalogda da vardir; Tumunu Gor tutarli. (#1) Urun detay modali kaydederken girilen SEKTORLERI gostermiyordu — SEKTORLER bolumu eklendi (sectorLabel, locale). Teknik ozellikler (catFields) zaten gosteriliyordu. KURALLAR DEGISMEDI. node+harness 0.'],
@@ -41816,7 +41817,7 @@ async function renderVendorPublic(slug) {
     // Vendor'ın ürünleri çek
     var products = [];
     try {
-      var pSnap = await getDocs(query(collection(db,'products'), where('vendorId','==',vendor.uid), limit(12)));
+      var pSnap = await getDocs(query(collection(db,'products'), where('vendorId','==',vendor.uid), limit(60)));
       products = pSnap.docs.map(function(d){ return { ...d.data(), id:d.id }; });
     } catch(e) {}
     // Sadece active veya admin onaylı ürünleri göster
@@ -41916,12 +41917,18 @@ async function renderVendorPublic(slug) {
         ? '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px">'
           + '<h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0 0 14px">'+t('vpub.products','📦 Ürünler')+' ('+visibleProducts.length+')</h3>'
           + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">'
-          + visibleProducts.slice(0,12).map(function(p){
-              return '<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px">'
-                + '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px">'+(p.name||'—')+'</div>'
-                + (p.brand ? '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">'+p.brand+'</div>' : '')
-                + (p.category ? '<span style="display:inline-block;font-size:10px;background:rgba(37,99,235,.15);color:#5a9ee0;padding:2px 7px;border-radius:4px;font-weight:600">'+p.category+'</span>' : '')
-                + (p.description ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+p.description+'</div>' : '')
+          + visibleProducts.map(function(p){
+              var _es = (typeof computeEvidenceScore==='function') ? computeEvidenceScore(p) : null;
+              var _evc = _es ? evidenceColor(_es.score) : '';
+              var _rc = p.ratingCount||0;
+              var _catTxt = (p.category ? ((typeof catLabelEN==='function' && window.CUR_LOCALE==='en') ? (catLabelEN(p.category)||p.category) : p.category) : '');
+              return '<div class="vp-prod-card" data-pid="'+p.id+'" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column" onmouseover="this.style.borderColor=\'rgba(37,99,235,.45)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'translateY(0)\'">'
+                + '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px">'+escHtml(p.name||'—')+'</div>'
+                + (p.brand ? '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">'+escHtml(p.brand)+'</div>' : '')
+                + (_catTxt ? '<span style="display:inline-block;font-size:10px;background:rgba(37,99,235,.15);color:#5a9ee0;padding:2px 7px;border-radius:4px;font-weight:600">'+escHtml(_catTxt)+'</span>' : '')
+                + ((_es || _rc>0) ? '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">' + (_es ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:800;color:'+_evc+'">🛡 '+_es.score+'<span style="font-size:9px;font-weight:700">/100</span></span>' : '') + (_rc>0 ? '<span style="font-size:11.5px;color:#f59e0b;font-weight:700">★ '+(p.avgRating||0).toFixed(1)+'</span><span style="font-size:10.5px;color:var(--text-muted)">('+_rc+')</span>' : '') + '</div>' : '')
+                + (p.description ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+escHtml(p.description)+'</div>' : '')
+                + '<div style="margin-top:auto;padding-top:10px;font-size:11.5px;color:#2563eb;font-weight:700">'+(window.CUR_LOCALE==='en'?'View details →':'İncele →')+'</div>'
                 + '</div>';
             }).join('')
           + '</div>'
@@ -41955,6 +41962,7 @@ async function renderVendorPublic(slug) {
       + '</div>';
 
     scr.innerHTML = html;
+    scr.querySelectorAll('.vp-prod-card').forEach(function(c){ c.addEventListener('click', function(){ if(typeof openProductDetailModal==='function') openProductDetailModal(c.dataset.pid); }); });
 
     // Schema.org JSON-LD
     addJsonLdSchema({
