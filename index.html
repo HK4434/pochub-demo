@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.22 | pochub.co -->
+<!-- PoCHub v8.23 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.22';
+const VERSION = 'v8.23';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.23': ['KATEGORIM YOK -> TALEP AKISI (v8.22 gorunurluk switchinin tamamlayicisi; Hasan ilk sorusu -kategori yoksa ne olur-). (1) URUN EKLEME formunda kategori dropdownu artik yalniz VISIBLE kategorileri gosterir; altina -Kategorim listede yok mu? Talep et- linki. (2) openCategoryRequestModal: vendor kategori adi + opsiyonel not girer -> category_requests koleksiyonuna yazilir (vendorId/vendorName/status:pending/createdAt). (3) ADMIN > Kategoriler ustunde -Bekleyen kategori talepleri- paneli: her talep icin -Ekle- (kategoriyi visible:true olusturur + talebi approved yapar) / -Reddet- (rejected). Boylece vendor tikanmaz, admin taksonomiyi kontrol eder. FIRESTORE KURALI GEREKLI (ayri dosyada eklendi, deploy Hasan-da): category_requests create:isSignedIn, read/list/update/delete:isAdmin. Kural deploy edilene kadar talep yazma/okuma sessizce basarisiz olur (UI kirilmaz). node+harness 0.'],
   'v8.22': ['KATEGORI GORUNURLUK SWITCHI (Hasan fikri — ~200 Gartner kategorisi vendor-u boguyordu). Her kategori dokumanina visible alani (varsayilan gorunur; alan yoksa gorunur sayilir - geriye uyumlu). (1) ADMIN > Kategoriler: her satirda 👁/🙈 toggle butonu -> setDoc(merge visible) + cache invalidate + gizli kategoriye -gizli- rozeti. (2) fillCatSelect (urun ekleme/duzenleme kategori dropdownu) artik yalniz VISIBLE kategorileri gosterir; duzenlenen urunun mevcut kategorisi gizli olsa bile korunur (veri kaybi yok). Boylece admin sadece sunmak istedigi cekirdek kategorileri gorunur yapar, 190 bos Gartner satiri silinmeden gizli kalir; vendor temiz bir listeden secer. KURALLAR DEGISMEDI (categories admin-update zaten var; sadece alan eklendi). Katalog kategori faceti urun-bazli oldugundan etkilenmez. Sonraki (v8.23): -kategorim yok- talep akisi. node+harness 0.'],
   'v8.21': ['GUVENLIK AILESI — 4 YENI PROFESYONEL SEMA (Hasan: Security cok genis, alt urun siniflarina bolunmeli). Datasheet-temelli (Fortinet FortiWeb, F5, Imperva, Cloudflare, Check Point, Cisco ISE, Proofpoint/Mimecast konvansiyonu arastirildi). YENI KATEGORILER: (1) WAF (16 alan: dagitim, throughput, koruma kapsami=OWASP/API/bot/L7-DDoS/ATO, tespit modeli, API guvenlik, bot yonetimi, sanal yama, yonetim modeli, entegrasyon, uyumluluk). (2) IPS / IDS (16 alan: sistem tipi NIPS/NIDS/HIPS, throughput/gecikme, tespit imza/anomali/ML, otomatik mudahale, fail-open, MITRE, sertifika). (3) NAC (16 alan: dagitim, kimlik dogrulama 802.1X/MAB/EAP-TLS/SAML, ajan tipi, posture, cihaz profilleme, IoT/OT, segmentasyon, ZTNA, entegrasyon AD/MDM/SIEM). (4) Email Security (16 alan: dagitim SEG/ICES/gateway, platform M365/Workspace, koruma anti-phishing/BEC/sandbox/DLP, SPF/DKIM/DMARC, ATO). Hepsi key/filter isaretli, label_en+help, kanonik birim (Gbps/µs). NOT: -Email Security- canli listede zaten var; WAF/IPS-IDS/NAC icin admin bu adlarla kategori olusturmali. Boylece Security ailesi tek catidan cikip her biri kendi datasheet semasina kavustu. node+harness 0.'],
   'v8.20': ['CLOUD PILOTU — DATASHEET/KARSILASTIRMA-TEMELLI PROFESYONEL SEMA (AWS/Azure/GCP + egemen bulut + Turkiye/KVKK acisi arastirildi). Canli -Cloud- kategorisi (23 urun). Sema 22 alana yapilandirildi (eskiden cogu serbest metindi), GRUPLU: Model & Dagitim (hizmet modeli IaaS/PaaS/SaaS/FaaS/CaaS=multiselect, dagitim public/private/hibrit/multi/egemen, saglayici), Bolge & SLA (bolgeler, yerli/Turkiye bolgesi, coklu-AZ, SLA), Hesaplama & Depolama (compute/storage=multiselect, GPU/AI), Ag & Baglanti (VPC/LB/CDN + Direct Connect/VPN/SD-WAN), Yonetilen Servisler (K8s/serverless/DB/AI/IoT), Guvenlik & Uyumluluk (IAM/WAF/DDoS/KMS/CSPM, sertifikalar ISO/SOC2/PCI/KVKK/HIPAA/FedRAMP, veri egemenligi), Yonetim & Otomasyon (IaC/API, FinOps maliyet), Ticari & Destek (fiyat modeli, destek plani, goc araclari). Kilit specler (hizmet+dagitim modeli) key:true; secim/coklu alanlar filter:true. -Cloud- adi canli listeyle birebir eslesiyor (alias gerekmedi). Mevcut idler korundu; text->coklu gecisi geriye uyumlu. node+harness 0.'],
@@ -25303,6 +25304,23 @@ async function openEditEventModal(evId, evData) {
   });
 }
 
+async function openCategoryRequestModal(){
+  var EN = window.CUR_LOCALE==='en';
+  var name = prompt(EN?'Which category is missing? Enter its name:':'Hangi kategori eksik? Adını yaz:');
+  if(name===null) return;
+  name=(name||'').trim();
+  if(!name){ showToast(EN?'Category name required':'Kategori adı gerekli','err'); return; }
+  var note = (prompt(EN?'Optional note (example products / vendor):':'İsteğe bağlı not (örnek ürün / üretici):')||'').trim();
+  try {
+    await addDoc(collection(db,'category_requests'), {
+      name: name, note: note,
+      vendorId: (CUR_USER&&CUR_USER.uid)||null,
+      vendorName: (CUR_USER&&(CUR_USER.displayName||CUR_USER.email))||'',
+      status: 'pending', createdAt: serverTimestamp()
+    });
+    showToast(EN?'\u2713 Request sent to admin':'\u2713 Talebin admine iletildi');
+  } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
+}
 async function openAddProductModal(prefillCat) {
   await ensureTaxonomy(); await ensureProductFields();
   var cats = await getCategories();
@@ -25376,10 +25394,11 @@ async function openAddProductModal(prefillCat) {
     '<label class="lbl t-w8">'+t('vpf.f_category','Kategori')+' <span class="t-red">*</span></label>' +
     '<select class="inp" id="pr-cat" style="margin-bottom:14px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155">' +
     '<option value="">'+t('vpf.cat_select','Kategori seçin...')+'</option>' +
-    cats.map(function(ct){
+    cats.filter(function(_c){return _c.visible!==false;}).map(function(ct){
       return '<option value="'+ct.name+'"'+(prefillCat===ct.name?' selected':'')+'>'+catLabel(ct)+'</option>';
     }).join('') +
     '</select>' +
+    '<div style="margin:-8px 0 14px"><a href="#" id="pr-cat-req" style="font-size:11.5px;color:#2563eb;text-decoration:none;font-weight:600">'+(window.CUR_LOCALE==='en'?'\u25B8 Category not listed? Request it':'\u25B8 Kategorim listede yok mu? Talep et')+'</a></div>' +
 
     '<label class="lbl t-w8">'+t('vpf.f_country','Menşei Ülke')+'</label>' +
     '<div id="pr-country-cont" class="mb14"></div>' +
@@ -25453,6 +25472,7 @@ async function openAddProductModal(prefillCat) {
 
   // Kapatma
   modal.querySelector('#close-prod-modal').addEventListener('click', function(){ modal.remove(); delete window._updateProdCatPanel; });
+  modal.querySelector('#pr-cat-req')?.addEventListener('click', function(e){ e.preventDefault(); openCategoryRequestModal(); });
   modal.querySelector('#pr-cancel').addEventListener('click', function(){ modal.remove(); delete window._updateProdCatPanel; });
   modal.addEventListener('click', function(e){ if(e.target===modal){ modal.remove(); delete window._updateProdCatPanel; } });
 
@@ -41517,6 +41537,7 @@ async function admCategories(m) {
       '<button class="btn-g btn-sm fs12" id="sync-cats-btn">'+t('acat.sync_missing','🔄 Eksik Kategorileri Ekle')+'</button>' +
       '<button class="btn-p btn-sm" id="add-cat-btn" style="margin-left:6px">'+t('acnt.add_cat','+ Yeni Kategori')+'</button>' + '<button class="btn-g btn-sm" id="cat-autotr" style="margin-left:6px">'+t('admin.translate_all','🌐 Tümünü İngilizceye Çevir (MyMemory)')+'</button><span id="cat-autotr-status" style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>' +
       '</div></div>' +
+      '<div id="cat-req-panel" style="margin-bottom:14px"></div>' +
       '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
       '<th style="background:var(--bg-elevated);padding:9px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;color:#64748b">'+t('acat.col_name','Kategori Adı')+'</th>' +
@@ -41530,6 +41551,35 @@ async function admCategories(m) {
     var missingCats = ALL_CATS_V4.filter(function(n){ return !existingCatNames.includes(n); });
 
     m.querySelector('#add-cat-btn').addEventListener('click', function() { openCatModal(null); });
+
+    (async function loadCatRequests(){
+      var panel = m.querySelector('#cat-req-panel'); if(!panel) return;
+      var EN = window.CUR_LOCALE==='en';
+      try {
+        var rs = await getDocs(query(collection(db,'category_requests'), where('status','==','pending')));
+        var reqs = rs.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; });
+        if(!reqs.length){ panel.innerHTML=''; return; }
+        panel.innerHTML = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px">'
+          + '<div style="font-weight:800;font-size:13px;margin-bottom:8px;color:#92400e">'+(EN?'Pending category requests':'Bekleyen kategori talepleri')+' ('+reqs.length+')</div>'
+          + reqs.map(function(r){ return '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;padding:7px 0;border-top:1px solid #fde68a">'
+              + '<div style="min-width:0"><span style="font-weight:700">'+escHtml(r.name||'')+'</span>'+(r.note?' <span style="color:#92400e;font-size:12px">- '+escHtml(r.note)+'</span>':'')+(r.vendorName?' <span style="color:#b45309;font-size:11px">('+escHtml(r.vendorName)+')</span>':'')+'</div>'
+              + '<div style="white-space:nowrap;display:flex;gap:6px"><button class="btn-p btn-sm creq-add" data-id="'+r.id+'" data-name="'+escHtml(r.name||'')+'">'+(EN?'Add':'Ekle')+'</button><button class="btn-g btn-sm creq-rej" data-id="'+r.id+'">'+(EN?'Reject':'Reddet')+'</button></div>'
+              + '</div>'; }).join('')
+          + '</div>';
+        panel.querySelectorAll('.creq-add').forEach(function(b){ b.addEventListener('click', async function(){
+          var nm=b.dataset.name; if(!nm) return;
+          try {
+            await addDoc(collection(db,'categories'), { name:nm, description:'', order:999, visible:true, createdAt:serverTimestamp() });
+            await setDoc(doc(db,'category_requests',b.dataset.id), { status:'approved' }, { merge:true });
+            invalidateCatCache(); showToast(EN?'Category added':'Kategori eklendi'); admCategories(m);
+          } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
+        }); });
+        panel.querySelectorAll('.creq-rej').forEach(function(b){ b.addEventListener('click', async function(){
+          try { await setDoc(doc(db,'category_requests',b.dataset.id), { status:'rejected' }, { merge:true }); showToast(EN?'Rejected':'Reddedildi'); admCategories(m); }
+          catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
+        }); });
+      } catch(e){ panel.innerHTML=''; }
+    })();
 
     m.querySelector('#cat-autotr')?.addEventListener('click', async function(){
       var btn=this, st=m.querySelector('#cat-autotr-status');
