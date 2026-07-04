@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.23 | pochub.co -->
+<!-- PoCHub v8.24 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.23';
+const VERSION = 'v8.24';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.24': ['URUN EKLEME — ARANABILIR KATEGORI SECIMI (Hasan: dropdown-da arama yok, mouse ile asagi inmek gerekiyordu). Duz <select> yerine COMBOBOX: yazarak filtreleyen arama kutusu + altinda filtreli liste (gorunur kategoriler; ad veya EN etiket eslesmesi) + gizli #pr-cat degeri. Secince liste kapanir, arama kutusu etikete doner, change event tetiklenir (sag teknik-ozellik paneli aynen guncellenir). Odaklaninca tum liste acilir; disari tiklayinca/ESC kapanir; hover vurgusu. Mevcut change-handler + submit (#pr-cat.value) degismeden calisir; prefillCat destekli. Yeni dict anahtari YOK (placeholder/eslesme-yok inline locale). AYRICA firestore.rules v1.4-e guncellendi (category_requests kurali eklendi, ayri dosyada teslim). node 0.'],
   'v8.23': ['KATEGORIM YOK -> TALEP AKISI (v8.22 gorunurluk switchinin tamamlayicisi; Hasan ilk sorusu -kategori yoksa ne olur-). (1) URUN EKLEME formunda kategori dropdownu artik yalniz VISIBLE kategorileri gosterir; altina -Kategorim listede yok mu? Talep et- linki. (2) openCategoryRequestModal: vendor kategori adi + opsiyonel not girer -> category_requests koleksiyonuna yazilir (vendorId/vendorName/status:pending/createdAt). (3) ADMIN > Kategoriler ustunde -Bekleyen kategori talepleri- paneli: her talep icin -Ekle- (kategoriyi visible:true olusturur + talebi approved yapar) / -Reddet- (rejected). Boylece vendor tikanmaz, admin taksonomiyi kontrol eder. FIRESTORE KURALI GEREKLI (ayri dosyada eklendi, deploy Hasan-da): category_requests create:isSignedIn, read/list/update/delete:isAdmin. Kural deploy edilene kadar talep yazma/okuma sessizce basarisiz olur (UI kirilmaz). node+harness 0.'],
   'v8.22': ['KATEGORI GORUNURLUK SWITCHI (Hasan fikri — ~200 Gartner kategorisi vendor-u boguyordu). Her kategori dokumanina visible alani (varsayilan gorunur; alan yoksa gorunur sayilir - geriye uyumlu). (1) ADMIN > Kategoriler: her satirda 👁/🙈 toggle butonu -> setDoc(merge visible) + cache invalidate + gizli kategoriye -gizli- rozeti. (2) fillCatSelect (urun ekleme/duzenleme kategori dropdownu) artik yalniz VISIBLE kategorileri gosterir; duzenlenen urunun mevcut kategorisi gizli olsa bile korunur (veri kaybi yok). Boylece admin sadece sunmak istedigi cekirdek kategorileri gorunur yapar, 190 bos Gartner satiri silinmeden gizli kalir; vendor temiz bir listeden secer. KURALLAR DEGISMEDI (categories admin-update zaten var; sadece alan eklendi). Katalog kategori faceti urun-bazli oldugundan etkilenmez. Sonraki (v8.23): -kategorim yok- talep akisi. node+harness 0.'],
   'v8.21': ['GUVENLIK AILESI — 4 YENI PROFESYONEL SEMA (Hasan: Security cok genis, alt urun siniflarina bolunmeli). Datasheet-temelli (Fortinet FortiWeb, F5, Imperva, Cloudflare, Check Point, Cisco ISE, Proofpoint/Mimecast konvansiyonu arastirildi). YENI KATEGORILER: (1) WAF (16 alan: dagitim, throughput, koruma kapsami=OWASP/API/bot/L7-DDoS/ATO, tespit modeli, API guvenlik, bot yonetimi, sanal yama, yonetim modeli, entegrasyon, uyumluluk). (2) IPS / IDS (16 alan: sistem tipi NIPS/NIDS/HIPS, throughput/gecikme, tespit imza/anomali/ML, otomatik mudahale, fail-open, MITRE, sertifika). (3) NAC (16 alan: dagitim, kimlik dogrulama 802.1X/MAB/EAP-TLS/SAML, ajan tipi, posture, cihaz profilleme, IoT/OT, segmentasyon, ZTNA, entegrasyon AD/MDM/SIEM). (4) Email Security (16 alan: dagitim SEG/ICES/gateway, platform M365/Workspace, koruma anti-phishing/BEC/sandbox/DLP, SPF/DKIM/DMARC, ATO). Hepsi key/filter isaretli, label_en+help, kanonik birim (Gbps/µs). NOT: -Email Security- canli listede zaten var; WAF/IPS-IDS/NAC icin admin bu adlarla kategori olusturmali. Boylece Security ailesi tek catidan cikip her biri kendi datasheet semasina kavustu. node+harness 0.'],
@@ -25392,12 +25393,11 @@ async function openAddProductModal(prefillCat) {
     '<input class="inp" id="pr-name" placeholder="'+t('vpf.ph_name','Ürün adı')+'" style="margin-bottom:14px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155">' +
 
     '<label class="lbl t-w8">'+t('vpf.f_category','Kategori')+' <span class="t-red">*</span></label>' +
-    '<select class="inp" id="pr-cat" style="margin-bottom:14px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155">' +
-    '<option value="">'+t('vpf.cat_select','Kategori seçin...')+'</option>' +
-    cats.filter(function(_c){return _c.visible!==false;}).map(function(ct){
-      return '<option value="'+ct.name+'"'+(prefillCat===ct.name?' selected':'')+'>'+catLabel(ct)+'</option>';
-    }).join('') +
-    '</select>' +
+    '<div id="pr-cat-combo" style="position:relative;margin-bottom:14px">' +
+      '<input class="inp" id="pr-cat-search" type="text" autocomplete="off" placeholder="'+(window.CUR_LOCALE==='en'?'Search or select category...':'Kategori ara veya seç...')+'" style="font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155">' +
+      '<input type="hidden" id="pr-cat" value="">' +
+      '<div id="pr-cat-list" style="display:none;position:absolute;z-index:60;left:0;right:0;top:100%;margin-top:3px;background:#ffffff;border:1px solid rgba(15,23,42,.14);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.12);max-height:240px;overflow-y:auto"></div>' +
+    '</div>' +
     '<div style="margin:-8px 0 14px"><a href="#" id="pr-cat-req" style="font-size:11.5px;color:#2563eb;text-decoration:none;font-weight:600">'+(window.CUR_LOCALE==='en'?'\u25B8 Category not listed? Request it':'\u25B8 Kategorim listede yok mu? Talep et')+'</a></div>' +
 
     '<label class="lbl t-w8">'+t('vpf.f_country','Menşei Ülke')+'</label>' +
@@ -25480,6 +25480,41 @@ async function openAddProductModal(prefillCat) {
   modal.querySelector('#pr-cat')?.addEventListener('change', function() {
     window._updateProdCatPanel(this.value);
   });
+  (function(){
+    var searchEl = modal.querySelector('#pr-cat-search');
+    var hiddenEl = modal.querySelector('#pr-cat');
+    var listEl   = modal.querySelector('#pr-cat-list');
+    var comboEl  = modal.querySelector('#pr-cat-combo');
+    if(!searchEl||!hiddenEl||!listEl||!comboEl) return;
+    var visCats = cats.filter(function(c){ return c.visible!==false; });
+    function pick(val){
+      var c = visCats.filter(function(x){ return x.name===val; })[0];
+      hiddenEl.value = val;
+      searchEl.value = c ? catLabel(c) : val;
+      listEl.style.display='none';
+      hiddenEl.dispatchEvent(new Event('change'));
+    }
+    function render(q){
+      q=(q||'').toLowerCase().trim();
+      var matched = visCats.filter(function(c){ return !q || catLabel(c).toLowerCase().indexOf(q)>=0 || (c.name||'').toLowerCase().indexOf(q)>=0; });
+      if(!matched.length){
+        listEl.innerHTML='<div style="padding:10px 12px;color:#94a3b8;font-size:13px">'+(window.CUR_LOCALE==='en'?'No match':'Eşleşme yok')+'</div>';
+      } else {
+        listEl.innerHTML = matched.slice(0,80).map(function(c){ return '<div class="pr-cat-opt" data-v="'+escHtml(c.name)+'" style="padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9;color:#334155">'+escHtml(catLabel(c))+'</div>'; }).join('');
+        listEl.querySelectorAll('.pr-cat-opt').forEach(function(o){
+          o.addEventListener('mouseenter', function(){ o.style.background='#f1f5f9'; });
+          o.addEventListener('mouseleave', function(){ o.style.background='#ffffff'; });
+          o.addEventListener('mousedown', function(e){ e.preventDefault(); pick(o.dataset.v); });
+        });
+      }
+      listEl.style.display='block';
+    }
+    searchEl.addEventListener('focus', function(){ render(hiddenEl.value?'':searchEl.value); });
+    searchEl.addEventListener('input', function(){ hiddenEl.value=''; render(searchEl.value); });
+    searchEl.addEventListener('keydown', function(e){ if(e.key==='Escape') listEl.style.display='none'; });
+    modal.addEventListener('mousedown', function(e){ if(comboEl && !comboEl.contains(e.target)) listEl.style.display='none'; });
+    if(prefillCat){ pick(prefillCat); }
+  })();
   modal.querySelectorAll('input[name="pr-origin"]').forEach(function(radio) {
     radio.addEventListener('change', function() {
       window._prOriginChange(this.value);
