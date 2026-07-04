@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.24 | pochub.co -->
+<!-- PoCHub v8.25 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.24';
+const VERSION = 'v8.25';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.25': ['VERITABANI (DATABASE) PILOTU — DATASHEET-TEMELLI PROFESYONEL SEMA (Oracle, PostgreSQL, SQL Server, MySQL, MongoDB, Redis + NewSQL TiDB/CockroachDB/Spanner + vektor/HTAP konvansiyonu arastirildi). -Veritabani- semasi 26 alana cikarildi, GRUPLU: Tip & Model (db tipi RDBMS/NoSQL/NewSQL/Vektor/Graph/TimeSeries/Warehouse=select, motor/surum, dagitim On-prem/DBaaS/Serverless, is yuku OLTP/OLAP/HTAP/Vektor-AI=multiselect), Olcek & Performans (maks boyut=TB, baglanti, OLTP=TPS, okuma gecikmesi=ms, yatay olcekleme), Yuksek Erisilebilirlik (HA mimarisi, replikasyon modlari=multiselect, sharding, otomatik failover, cografi dagitim), Veri Koruma (yedekleme=multiselect PITR/WAL, sifreleme TDE, RLS, audit), Ozellikler & Uyum (ACID, SQL standardi, VEKTOR/AI arama, uzantilar, baglanti JDBC/REST/Kafka-CDC, OLAP notu), Ticari & Uyumluluk (lisans acik-kaynak/tuketim/BYOL, uyumluluk). Kilit specler (db tipi/maks boyut) key:true; secim/coklu alanlar filter:true. MUKERRER TEMIZLIGI: Turkce ikiz -Veritabani- + canli adlar -Database-/-DB- -> -Veritabani- semasina ALIAS. Mevcut idler korundu; text->number/multiselect gecisi geriye uyumlu. node 0.'],
   'v8.24': ['URUN EKLEME — ARANABILIR KATEGORI SECIMI (Hasan: dropdown-da arama yok, mouse ile asagi inmek gerekiyordu). Duz <select> yerine COMBOBOX: yazarak filtreleyen arama kutusu + altinda filtreli liste (gorunur kategoriler; ad veya EN etiket eslesmesi) + gizli #pr-cat degeri. Secince liste kapanir, arama kutusu etikete doner, change event tetiklenir (sag teknik-ozellik paneli aynen guncellenir). Odaklaninca tum liste acilir; disari tiklayinca/ESC kapanir; hover vurgusu. Mevcut change-handler + submit (#pr-cat.value) degismeden calisir; prefillCat destekli. Yeni dict anahtari YOK (placeholder/eslesme-yok inline locale). AYRICA firestore.rules v1.4-e guncellendi (category_requests kurali eklendi, ayri dosyada teslim). node 0.'],
   'v8.23': ['KATEGORIM YOK -> TALEP AKISI (v8.22 gorunurluk switchinin tamamlayicisi; Hasan ilk sorusu -kategori yoksa ne olur-). (1) URUN EKLEME formunda kategori dropdownu artik yalniz VISIBLE kategorileri gosterir; altina -Kategorim listede yok mu? Talep et- linki. (2) openCategoryRequestModal: vendor kategori adi + opsiyonel not girer -> category_requests koleksiyonuna yazilir (vendorId/vendorName/status:pending/createdAt). (3) ADMIN > Kategoriler ustunde -Bekleyen kategori talepleri- paneli: her talep icin -Ekle- (kategoriyi visible:true olusturur + talebi approved yapar) / -Reddet- (rejected). Boylece vendor tikanmaz, admin taksonomiyi kontrol eder. FIRESTORE KURALI GEREKLI (ayri dosyada eklendi, deploy Hasan-da): category_requests create:isSignedIn, read/list/update/delete:isAdmin. Kural deploy edilene kadar talep yazma/okuma sessizce basarisiz olur (UI kirilmaz). node+harness 0.'],
   'v8.22': ['KATEGORI GORUNURLUK SWITCHI (Hasan fikri — ~200 Gartner kategorisi vendor-u boguyordu). Her kategori dokumanina visible alani (varsayilan gorunur; alan yoksa gorunur sayilir - geriye uyumlu). (1) ADMIN > Kategoriler: her satirda 👁/🙈 toggle butonu -> setDoc(merge visible) + cache invalidate + gizli kategoriye -gizli- rozeti. (2) fillCatSelect (urun ekleme/duzenleme kategori dropdownu) artik yalniz VISIBLE kategorileri gosterir; duzenlenen urunun mevcut kategorisi gizli olsa bile korunur (veri kaybi yok). Boylece admin sadece sunmak istedigi cekirdek kategorileri gorunur yapar, 190 bos Gartner satiri silinmeden gizli kalir; vendor temiz bir listeden secer. KURALLAR DEGISMEDI (categories admin-update zaten var; sadece alan eklendi). Katalog kategori faceti urun-bazli oldugundan etkilenmez. Sonraki (v8.23): -kategorim yok- talep akisi. node+harness 0.'],
@@ -1779,23 +1780,38 @@ var CATEGORY_FIELDS = {
      Referans: Oracle, PostgreSQL, MongoDB, Microsoft SQL Server datasheets
   ══════════════════════════════════════════════════════ */
   'Veritabani': [
-    {id:'db_type',            label:'Veritabanı Modeli',              type:'select', req:true, opts:['İlişkisel (RDBMS/SQL)','Döküman (MongoDB, CouchDB)','Key-Value (Redis, DynamoDB)','Geniş Kolon (Cassandra, HBase)','Graf (Neo4j, ArangoDB)','Zaman Serisi (InfluxDB, TimescaleDB)','NewSQL (CockroachDB, YugabyteDB)','Çok Modelli','HTAP (OLTP+OLAP)']},
-    {id:'deployment_model',   label:'Dağıtım Modeli',                 type:'select', req:true, opts:['On-Premise','Cloud (DBaaS)','Self-Managed Cloud','Hybrid','Serverless']},
-    {id:'engine_version',     label:'Motor / Versiyon',               type:'text',   ph:'Örn: Oracle 23c, PostgreSQL 17, SQL Server 2022'},
-    {id:'max_db_size',        label:'Maks. Veritabanı Boyutu',        type:'text',   ph:'Örn: Sınırsız (bölümleme ile)'},
-    {id:'max_connections',    label:'Maks. Bağlantı Sayısı',          type:'text',   ph:'Örn: 100,000 bağlantı (pgBouncer ile)'},
-    {id:'oltp_performance',   label:'OLTP Performansı (TPS)',         type:'text',   ph:'Örn: 1M+ TPS (Oracle Exadata)'},
-    {id:'olap_performance',   label:'OLAP Performansı',               type:'text',   ph:'Örn: PB ölçeğinde sorgu, 100x hız (Columnar)'},
-    {id:'ha_architecture',    label:'HA Mimarisi',                    type:'select', opts:['Active-Active Cluster','Primary-Standby (Sync)','Primary-Standby (Async)','Multi-Master','Shared-Nothing Cluster','Galera/Patroni']},
-    {id:'replication_modes',  label:'Replikasyon Modları',            type:'text',   ph:'Streaming, Logical, Physical, Cross-Region, CDC'},
-    {id:'sharding',           label:'Sharding/Yatay Ölçekleme',      type:'select', opts:['Otomatik Sharding','Manuel Sharding','Partitioning','Hayır']},
-    {id:'backup_methods',     label:'Yedekleme Yöntemleri',           type:'text',   ph:'Hot Backup, RMAN, Dump/Export, WAL Shipping, PITR'},
-    {id:'encryption',         label:'Şifreleme',                      type:'select', opts:['TDE (Transparent Data Encryption)','Column-Level','In-Transit (TLS)','TDE+TLS','Hayır']},
-    {id:'row_level_security', label:'Satır/Sütun Güvenliği',          type:'select', opts:['Row Level Security (RLS)','Column Masking','Her İkisi','Hayır']},
-    {id:'sql_standards',      label:'SQL/Standart Uyumluluğu',       type:'text',   ph:'SQL:2023, ANSI SQL, Oracle PL/SQL, T-SQL, PL/pgSQL'},
-    {id:'extensions',         label:'Uzantı/Eklenti Ekosistemi',      type:'text',   ph:'PostGIS, TimescaleDB, pgvector, Citus, 100+ eklenti'},
-    {id:'license_model',      label:'Lisans Modeli',                  type:'select', opts:['Açık Kaynak (PostgreSQL/MySQL)','Ticari Lisans (Oracle/SQL Server)','Çekirdek Bazlı','Kullanıcı CAL','DBaaS Tüketim Bazlı']},
-    {id:'compliance',         label:'Uyumluluk',                      type:'text',   ph:'GDPR, KVKK, HIPAA, PCI-DSS, FedRAMP, FIPS 140-2'},
+    // ── Tip & Model ──
+    {id:'db_type',            label:'Veritabanı Tipi',               label_en:'Database Type',               group:'Tip & Model', type:'select', filter:true, key:true, opts:['Relational (RDBMS)','Document (NoSQL)','Key-Value','Wide-Column','Graph','Time-Series','Vektör (Vector)','NewSQL (Distributed SQL)','Data Warehouse (OLAP)','In-Memory']},
+    {id:'engine_version',     label:'Motor / Sürüm',                 label_en:'Engine / Version',            group:'Tip & Model', type:'text', ph:'Örn: PostgreSQL 16, Oracle 23ai, MongoDB 7'},
+    {id:'deployment_model',   label:'Dağıtım Modeli',                label_en:'Deployment Model',            group:'Tip & Model', type:'select', filter:true, opts:['On-prem','Self-managed (Cloud VM)','Yönetilen / DBaaS','Serverless','Hibrit']},
+    {id:'workload_type',      label:'İş Yükü Tipi',                  label_en:'Workload Type',               group:'Tip & Model', type:'multiselect', filter:true, opts:['OLTP','OLAP / Analitik','HTAP','Vektör / AI']},
+    // ── Ölçek & Performans ──
+    {id:'max_db_size',        label:'Maks. Veritabanı Boyutu',       label_en:'Max Database Size',           group:'Ölçek & Performans', type:'number', unit:'TB', key:true},
+    {id:'max_connections',    label:'Maks. Eş Zamanlı Bağlantı',     label_en:'Max Concurrent Connections',  group:'Ölçek & Performans', type:'number'},
+    {id:'oltp_performance',   label:'OLTP Throughput',               label_en:'OLTP Throughput',             group:'Ölçek & Performans', type:'number', unit:'TPS', help:'sysbench / TPC-C işlem/saniye', help_en:'sysbench / TPC-C transactions per second'},
+    {id:'read_latency',       label:'Okuma Gecikmesi',               label_en:'Read Latency',                group:'Ölçek & Performans', type:'number', unit:'ms'},
+    {id:'horizontal_scaling', label:'Yatay Ölçekleme',               label_en:'Horizontal Scaling',          group:'Ölçek & Performans', type:'bool', help:'Scale-out / dağıtık düğümler', help_en:'Scale-out / distributed nodes'},
+    // ── Yüksek Erişilebilirlik ──
+    {id:'ha_architecture',    label:'HA Mimarisi',                   label_en:'HA Architecture',             group:'Yüksek Erişilebilirlik', type:'select', filter:true, opts:['Primary-Replica','Multi-Primary (Active-Active)','Cluster (Shared-nothing)','Cluster (Shared-disk / RAC)','Yok']},
+    {id:'replication_modes',  label:'Replikasyon Modları',           label_en:'Replication Modes',           group:'Yüksek Erişilebilirlik', type:'multiselect', filter:true, opts:['Senkron','Asenkron','Semi-sync','Streaming (WAL / binlog)','Logical']},
+    {id:'sharding',           label:'Sharding / Partitioning',       label_en:'Sharding / Partitioning',     group:'Yüksek Erişilebilirlik', type:'bool'},
+    {id:'auto_failover',      label:'Otomatik Failover',             label_en:'Automatic Failover',          group:'Yüksek Erişilebilirlik', type:'bool'},
+    {id:'geo_distribution',   label:'Coğrafi Dağıtım (Multi-Region)',label_en:'Geo-Distribution (Multi-Region)',group:'Yüksek Erişilebilirlik', type:'bool'},
+    // ── Veri Koruma ──
+    {id:'backup_methods',     label:'Yedekleme Yöntemleri',          label_en:'Backup Methods',              group:'Veri Koruma', type:'multiselect', filter:true, opts:['Full','Incremental','PITR (Point-in-Time)','Snapshot','Continuous (WAL)']},
+    {id:'encryption',         label:'Şifreleme',                     label_en:'Encryption',                  group:'Veri Koruma', type:'select', filter:true, opts:['TDE (Durağan)','In-transit (TLS)','Her İkisi','Yok']},
+    {id:'row_level_security', label:'Satır Seviyesi Güvenlik (RLS)', label_en:'Row-Level Security (RLS)',     group:'Veri Koruma', type:'bool'},
+    {id:'audit_logging',      label:'Denetim Günlüğü (Audit)',       label_en:'Audit Logging',               group:'Veri Koruma', type:'bool'},
+    // ── Özellikler & Uyum ──
+    {id:'acid_compliance',    label:'ACID Uyumu',                    label_en:'ACID Compliance',             group:'Özellikler & Uyum', type:'bool', help:'Tam ACID işlem garantisi', help_en:'Full ACID transaction guarantee'},
+    {id:'sql_standards',      label:'SQL Standardı',                 label_en:'SQL Standard',                group:'Özellikler & Uyum', type:'text', ph:'Örn: SQL:2016, ANSI SQL'},
+    {id:'ai_vector',          label:'Vektör / AI Arama',             label_en:'Vector / AI Search',          group:'Özellikler & Uyum', type:'bool', help:'pgvector / embedding / benzerlik araması', help_en:'pgvector / embeddings / similarity search'},
+    {id:'extensions',         label:'Eklentiler / Uzantılar',        label_en:'Extensions / Plugins',        group:'Özellikler & Uyum', type:'text', ph:'Örn: PostGIS, pgvector, Citus'},
+    {id:'connectors',         label:'Bağlantı / Arayüz',             label_en:'Connectors / Interfaces',     group:'Özellikler & Uyum', type:'multiselect', filter:true, opts:['JDBC / ODBC','REST / GraphQL','Kafka / CDC','ORM (Hibernate / Prisma)']},
+    {id:'olap_performance',   label:'Analitik / OLAP Notu',          label_en:'Analytics / OLAP Note',       group:'Özellikler & Uyum', type:'text', ph:'Örn: kolonsal motor, MPP'},
+    // ── Ticari & Uyumluluk ──
+    {id:'license_model',      label:'Lisans Modeli',                 label_en:'License Model',               group:'Ticari & Uyumluluk', type:'select', filter:true, opts:['Açık Kaynak','Ticari (Perpetual)','Abonelik','Bulut Tüketim (per-hour / DBU)','Core / Socket Bazlı','BYOL']},
+    {id:'compliance',         label:'Uyumluluk',                     label_en:'Compliance',                  group:'Ticari & Uyumluluk', type:'multiselect', filter:true, opts:['ISO 27001','SOC 2','PCI DSS','KVKK / GDPR','HIPAA','Common Criteria']},
   ],
 
   /* ══════════════════════════════════════════════════════
@@ -2058,20 +2074,7 @@ var CATEGORY_FIELDS = {
     {id:'license_model',    label:'Lisans Modeli',                   type:'select', opts:['Kullanıcı Başı/Ay','Host Başı','Enterprise','SaaS Abonelik']},
   ],
 
-  'Veritabanı': [
-    {id:'db_type',          label:'Veritabanı Modeli',               type:'select', req:true, opts:['İlişkisel (RDBMS/SQL)','NoSQL Döküman (MongoDB)','NoSQL Key-Value (Redis)','Geniş Kolon (Cassandra)','Graf (Neo4j)','Zaman Serisi (InfluxDB)','NewSQL (CockroachDB)','Çok Modelli','HTAP (OLTP+OLAP)']},
-    {id:'deployment',       label:'Dağıtım Modeli',                  type:'select', req:true, opts:['On-Premise','Cloud DBaaS','Self-Managed Cloud','Hybrid','Serverless']},
-    {id:'engine',           label:'Motor / Versiyon',                type:'text',   ph:'Oracle 23c, PostgreSQL 17, SQL Server 2022, MySQL 8.4'},
-    {id:'max_db_size',      label:'Maks. Veritabanı Boyutu',         type:'text',   ph:'Örn: Sınırsız (bölümleme ile), 500 TB (Express)'},
-    {id:'max_connections',  label:'Maks. Bağlantı',                  type:'text',   ph:'Örn: 100,000 (pgBouncer ile), 32,767 (PostgreSQL native)'},
-    {id:'oltp_performance', label:'OLTP Performansı (TPS)',          type:'text',   ph:'Örn: 1M+ TPS (Oracle Exadata), 100K TPS (PostgreSQL)'},
-    {id:'ha',               label:'HA Mimarisi',                     type:'select', opts:['Active-Active Cluster','Primary-Standby Senkron','Primary-Standby Asenkron','Multi-Master','Galera/Patroni']},
-    {id:'replication',      label:'Replikasyon',                     type:'text',   ph:'Streaming, Logical, Physical, Cross-Region, CDC (Debezium)'},
-    {id:'backup',           label:'Yedekleme',                       type:'text',   ph:'Hot Backup, RMAN, Dump, WAL Shipping, PITR'},
-    {id:'encryption',       label:'Şifreleme',                       type:'select', opts:['TDE + TLS (Her İkisi)','TDE (Dinlenme)','TLS (İletim)','Hayır']},
-    {id:'license_model',    label:'Lisans Modeli',                   type:'select', opts:['Açık Kaynak','Ticari (Oracle/SQL Server)','Çekirdek Bazlı','DBaaS Tüketim']},
-    {id:'compliance',       label:'Uyumluluk',                       type:'text',   ph:'GDPR, KVKK, HIPAA, PCI-DSS, FIPS 140-2'},
-  ],
+  'Veritabanı': [], // v8.25: aşağıda 'Veritabani' profesyonel şemasına alias
 
   'DevOps Araçları': [
     {id:'tool_category',    label:'Araç Kategorisi',                 type:'select', req:true, opts:['CI/CD Platform (GitLab/Jenkins)','SCM (GitHub/Bitbucket)','Konteyner Orkestrasyon (K8s)','IaC (Terraform/Ansible)','Artifact Repository (Nexus/JFrog)','Monitoring & Observability','Log Yönetimi (ELK/Splunk)','DevSecOps / SAST / DAST','Secret Management (Vault)']},
@@ -2199,6 +2202,9 @@ try { CATEGORY_FIELDS['Backup'] = CATEGORY_FIELDS['Yedekleme']; } catch(e){} // 
 try { CATEGORY_FIELDS['Sunucu Sistemleri (Servers)'] = CATEGORY_FIELDS['Server']; } catch(e){} // v8.18: Sunucu Sistemleri -> Server alias
 try { CATEGORY_FIELDS['Virtualization'] = CATEGORY_FIELDS['Sanallastirma']; } catch(e){} // v8.19: canli 'Virtualization' (29 urun) -> Sanallastirma profesyonel semasi
 try { CATEGORY_FIELDS['Sanallaştırma (Virtualization)'] = CATEGORY_FIELDS['Sanallastirma']; } catch(e){} // v8.19: Turkce ikiz alias
+try { CATEGORY_FIELDS['Veritabanı'] = CATEGORY_FIELDS['Veritabani']; } catch(e){} // v8.25: Turkce ikiz alias
+try { CATEGORY_FIELDS['Database'] = CATEGORY_FIELDS['Veritabani']; } catch(e){} // v8.25: canli ad alias
+try { CATEGORY_FIELDS['DB'] = CATEGORY_FIELDS['Veritabani']; } catch(e){} // v8.25: canli ad alias
 var PRODUCT_FIELDS_OVR = {}; // v8.09: admin-editable kategori şeması (pochub_config/product_fields)
 function _normCat(cat){ return String(cat||'').replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c'); }
 function _digerFields(){ return PRODUCT_FIELDS_OVR['Diger']||PRODUCT_FIELDS_OVR['Diğer']||CATEGORY_FIELDS['Diger']; }
