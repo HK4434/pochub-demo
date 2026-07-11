@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.47 | pochub.co -->
+<!-- PoCHub v8.48 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.47';
+const VERSION = 'v8.48';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.48': ['KATEGORI ISI TAMAMLAMA (2 not): (1) -Eksik Kategorileri Ekle- (sync-cats-btn) listesine 9 profesyonel alt-kategori hedefi eklendi: WAF, IPS/IDS, NAC, Email Security, Veri Guvenligi & DLP, SASE/SSE, Vulnerability Management, Privileged Access (PAM), Kimlik Yonetimi (IAM). (Firewall/Endpoint/SIEM zaten vardi.) Boylece Guvenlik-tasima araci hedeflerinin TAMAMI tek tikla canli kategori dokumani olarak olusturulabiliyor. (2) BULGU: vendor_products bagimsiz urun degil, portfoy/baglanti tablosu (productId + denormalize productCategory). Tasima araci dogru sekilde products-a yaziyor; ek olarak her tasinan urun icin vendor_products-taki eslesyen productId kayitlarinin denormalize productCategory-si de best-effort senkronlaniyor (portfoy gorunumleri tutarli kalir; hata olursa ana akisi bozmaz). node 0 + harness3 0 sorun.'],
   'v8.47': ['GUVENLIK URUN TASIMA ARACI — Admin -> Kategoriler ekranina -Guvenlik Urunlerini Tasi- butonu + modal eklendi. products koleksiyonundan genis Guvenlik kategorilerindeki (Guvenlik/Security/Ag Guvenligi/Siber Guvenlik/Bilgi Guvenligi...) urunleri ceker; her urun icin ad+marka+model+aciklamadan ANAHTAR-KELIME HEURISTIK ile hedef alt-kategori onerir (WAF/IPS-IDS/NAC/Email Security/Veri Guvenligi & DLP/SASE-SSE/Vulnerability Management/PAM + Firewall/Endpoint/SIEM/IAM). Urun-bazli dropdown (oneri on-secili), yalnizca DEGISEN satirlar onayli updateDoc ile products.category-e yazilir; sonra invalidateCatCache + admProducts refresh. Salt-degisenler yazilir; hedeflerin gorunur kategori olarak var olmasi gerekir. node 0 + harness3 0 sorun.'],
   'v8.46': ['KATEGORI TANI ARACI — Admin -> Kategoriler ekranina salt-okunur tani araci eklendi (buton: -Kategori Tani-). Canli categories koleksiyonundaki HER kategoriyi getCatFields cozumleme mantigiyla (PRODUCT_FIELDS_OVR -> CATEGORY_FIELDS[name|nc alias] -> Diger) esler ve gosterir: Cozulen sema + alan sayisi + durum (Profesyonel >=15 alan & key / Ince sema / DIGERe dusuyor / Yedek kova). Ozet sayaclar + Digere dusenler icin -alias ekle veya gizle- uyarisi. Digere dusenler ustte siralanir (aksiyon gerekenler). Boylece launch kuratorlugu (gorunurluk switch + alias/rename) canli-veri-temelli checklist-e doner. Salt-okunur (satir-basi listener yok) -> innerHTML guvenli. node 0 + harness3 0 sorun.'],
   'v8.45': ['TEMIZLIK: CATEGORY_FIELDS icindeki 9 gereksiz tek-satir bos stub (-Veri Depolama (Storage)-, -Veritabani-, -DevOps Araclari-, -Sanallastirma (Virtualization)-, -Sunucu Sistemleri-, -Yedekleme & Felaket Kurtarma (DR)-, -Ag Cozumleri-, -Uc Nokta Guvenligi-, -Kurumsal Yazilimlar (ERP/CRM)-) kaldirildi. Bunlar profesyonellestirme sirasinda bosaltilip -[]- olarak alias-lanmisti; alias satiri zaten anahtari zengin semaya yeniden atadigi icin silme davranisi degistirmez, sadece olu-kod ve harness lint-uyarilarini temizler. harness3.py tek-satir -[]- parse bug-i da duzeltildi. Sonuc: harness 0 sorun. node 0.'],
@@ -42099,7 +42100,7 @@ async function admCategories(m) {
       '<th style="background:var(--bg-elevated);padding:9px 14px;text-align:center;font-size:10.5px;text-transform:uppercase;color:#64748b">'+t('aevt.col_action','İşlem')+'</th>' +
       '</tr></thead><tbody id="cat-tbody"></tbody></table></div>';
 
-    var ALL_CATS_V4 = ['Cloud','DevOps','Endpoint','Firewall','Güvenlik','Network','SIEM','Sanallaştırma','Server','Storage','Veritabanı','Yazılım','Yedekleme','Diğer'];
+    var ALL_CATS_V4 = ['Cloud','DevOps','Endpoint','Firewall','Güvenlik','Network','SIEM','Sanallaştırma','Server','Storage','Veritabanı','Yazılım','Yedekleme','Diğer','WAF','IPS / IDS','NAC','Email Security','Veri Güvenliği & DLP','SASE / SSE','Vulnerability Management','Privileged Access (PAM)','Kimlik Yönetimi (IAM)'];
     var existingCatNames = cats.map(function(ct){ return ct.name; });
     var missingCats = ALL_CATS_V4.filter(function(n){ return !existingCatNames.includes(n); });
 
@@ -42300,8 +42301,12 @@ async function openSecurityMigrateModal(){
     var btn=this; btn.disabled=true; btn.textContent=EN?'Saving...':'Kaydediliyor...';
     var ok=0, err=0;
     for(var i=0;i<changes.length;i++){
-      try { await updateDoc(doc(db,'products',changes[i].dataset.id), { category: changes[i].value }); ok++; }
-      catch(e){ err++; }
+      var _id=changes[i].dataset.id, _cat=changes[i].value;
+      try {
+        await updateDoc(doc(db,'products',_id), { category: _cat }); ok++;
+        try { var _vps = await getDocs(query(collection(db,'vendor_products'), where('productId','==',_id)));
+          for(var k=0;k<_vps.docs.length;k++){ await updateDoc(doc(db,'vendor_products',_vps.docs[k].id), { productCategory: _cat }); } } catch(_e){}
+      } catch(e){ err++; }
     }
     invalidateCatCache();
     if(err) showToast((EN?'Done: ':'Tamam: ')+ok+(EN?' moved, ':' taşındı, ')+err+(EN?' failed':' hata'),'err');
