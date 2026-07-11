@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.46 | pochub.co -->
+<!-- PoCHub v8.47 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.46';
+const VERSION = 'v8.47';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.47': ['GUVENLIK URUN TASIMA ARACI — Admin -> Kategoriler ekranina -Guvenlik Urunlerini Tasi- butonu + modal eklendi. products koleksiyonundan genis Guvenlik kategorilerindeki (Guvenlik/Security/Ag Guvenligi/Siber Guvenlik/Bilgi Guvenligi...) urunleri ceker; her urun icin ad+marka+model+aciklamadan ANAHTAR-KELIME HEURISTIK ile hedef alt-kategori onerir (WAF/IPS-IDS/NAC/Email Security/Veri Guvenligi & DLP/SASE-SSE/Vulnerability Management/PAM + Firewall/Endpoint/SIEM/IAM). Urun-bazli dropdown (oneri on-secili), yalnizca DEGISEN satirlar onayli updateDoc ile products.category-e yazilir; sonra invalidateCatCache + admProducts refresh. Salt-degisenler yazilir; hedeflerin gorunur kategori olarak var olmasi gerekir. node 0 + harness3 0 sorun.'],
   'v8.46': ['KATEGORI TANI ARACI — Admin -> Kategoriler ekranina salt-okunur tani araci eklendi (buton: -Kategori Tani-). Canli categories koleksiyonundaki HER kategoriyi getCatFields cozumleme mantigiyla (PRODUCT_FIELDS_OVR -> CATEGORY_FIELDS[name|nc alias] -> Diger) esler ve gosterir: Cozulen sema + alan sayisi + durum (Profesyonel >=15 alan & key / Ince sema / DIGERe dusuyor / Yedek kova). Ozet sayaclar + Digere dusenler icin -alias ekle veya gizle- uyarisi. Digere dusenler ustte siralanir (aksiyon gerekenler). Boylece launch kuratorlugu (gorunurluk switch + alias/rename) canli-veri-temelli checklist-e doner. Salt-okunur (satir-basi listener yok) -> innerHTML guvenli. node 0 + harness3 0 sorun.'],
   'v8.45': ['TEMIZLIK: CATEGORY_FIELDS icindeki 9 gereksiz tek-satir bos stub (-Veri Depolama (Storage)-, -Veritabani-, -DevOps Araclari-, -Sanallastirma (Virtualization)-, -Sunucu Sistemleri-, -Yedekleme & Felaket Kurtarma (DR)-, -Ag Cozumleri-, -Uc Nokta Guvenligi-, -Kurumsal Yazilimlar (ERP/CRM)-) kaldirildi. Bunlar profesyonellestirme sirasinda bosaltilip -[]- olarak alias-lanmisti; alias satiri zaten anahtari zengin semaya yeniden atadigi icin silme davranisi degistirmez, sadece olu-kod ve harness lint-uyarilarini temizler. harness3.py tek-satir -[]- parse bug-i da duzeltildi. Sonuc: harness 0 sorun. node 0.'],
   'v8.44': ['KRITIK YAPISAL DUZELTME + BUTUNLUK DENETLEYICISI (harness3.py). DENETIM BULGUSU: v8.33-v8.42 arasi 9 -yeni- kategori (SASE/SSE, UEM/MDM, VDI/DaaS, API Management, Siber Kurtarma, Email & Isbirligi, PAM, GRC, PKI) apply-scriptlerimin dinamik kapanis-bulucusunun (dosya buyudukce baslangic ofseti gercek CATEGORY_FIELDS kapanisini gecti) yuzunden YANLISLIKLA var ROLE_PERMS={} nesnesine yazilmis; node --check geciyordu ama getCatFields() bu semalari CATEGORY_FIELDS-te bulamiyor + aliaslari undefined-a cozuluyordu (yani 9 kategori CANLIDA CALISMIYORDU). DUZELTME: 9 blok ROLE_PERMS-ten cikarilip CATEGORY_FIELDS-e (gercek kapanis oncesi) tasindi. Artik 52 base sema CF icinde; tum aliaslar gecerli hedefe cozuluyor. Ayrica kalici harness3.py eklendi: CF yapisal sinirlari, mukerrer kategori/field-id, type/label eksigi, alias hedef gecerliligi, alias-base cakismasi kontrolu. (v8.43-te VM zaten dogru CF-e eklenmisti.) node 0.'],
@@ -42085,6 +42086,7 @@ async function admCategories(m) {
       '<input class="inp" id="cat-search" placeholder="'+t('acat.search_ph','Kategori ara...')+'" style="width:220px;font-size:12.5px">' +
       '<button class="btn-g btn-sm fs12" id="sync-cats-btn">'+t('acat.sync_missing','🔄 Eksik Kategorileri Ekle')+'</button>' +
       '<button class="btn-g btn-sm fs12" id="cat-diag-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'🔍 Category Diagnostic':'🔍 Kategori Tanı')+'</button>' +
+      '<button class="btn-g btn-sm fs12" id="sec-migrate-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'🔀 Migrate Security':'🔀 Güvenlik Ürünlerini Taşı')+'</button>' +
       '<button class="btn-p btn-sm" id="add-cat-btn" style="margin-left:6px">'+t('acnt.add_cat','+ Yeni Kategori')+'</button>' + '<button class="btn-g btn-sm" id="cat-autotr" style="margin-left:6px">'+t('admin.translate_all','🌐 Tümünü İngilizceye Çevir (MyMemory)')+'</button><span id="cat-autotr-status" style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>' +
       '</div></div>' +
       '<div id="cat-req-panel" style="margin-bottom:14px"></div>' +
@@ -42102,6 +42104,7 @@ async function admCategories(m) {
     var missingCats = ALL_CATS_V4.filter(function(n){ return !existingCatNames.includes(n); });
 
     m.querySelector('#add-cat-btn').addEventListener('click', function() { openCatModal(null); });
+    m.querySelector('#sec-migrate-btn')?.addEventListener('click', function(){ openSecurityMigrateModal(); });
 
     // v8.46: Kategori Tani — canli kategorileri profesyonel semalara gore cozumle (salt-okunur)
     (function(){
@@ -42234,6 +42237,79 @@ async function admCategories(m) {
   }
 }
 
+// v8.47: Guvenlik urunlerini alt-kategoriye tasima araci (otomatik oneri + toplu kaydet)
+async function openSecurityMigrateModal(){
+  var EN = window.CUR_LOCALE==='en';
+  var SRC = ['guvenlik','security','ag guvenligi','guvenlik cozumleri','siber guvenlik','cyber security','network security','bilgi guvenligi'];
+  var TARGETS = ['WAF','IPS / IDS','NAC','Email Security','Veri Güvenliği & DLP','SASE / SSE','Vulnerability Management','Privileged Access (PAM)','Firewall','Endpoint','SIEM','Kimlik Yönetimi (IAM)'];
+  var RULES = [
+    ['WAF', /(waf|web ?application ?firewall|web app firewall)/i],
+    ['IPS / IDS', /(\bips\b|\bids\b|intrusion|snort|suricata)/i],
+    ['NAC', /(\bnac\b|network access control|802\.?1x|clearpass|forescout|cisco ise)/i],
+    ['Email Security', /(email security|e-?posta güven|anti-?spam|antispam|anti-?phish|proofpoint|mimecast|secure email|mail gateway|\bseg\b)/i],
+    ['Veri Güvenliği & DLP', /(\bdlp\b|data loss|veri sız|veri kayb|purview|forcepoint|varonis|bigid)/i],
+    ['SASE / SSE', /(\bsase\b|\bsse\b|zscaler|netskope|prisma|\bcato\b|\bswg\b|\bztna\b|sd-?wan)/i],
+    ['Vulnerability Management', /(vulnerab|zafiyet|tenable|qualys|nessus|rapid7|nexpose|openvas)/i],
+    ['Privileged Access (PAM)', /(\bpam\b|privileged|cyberark|beyondtrust|delinea|wallix|ayrıcalık)/i],
+    ['Firewall', /(firewall|\bngfw\b|güvenlik duvar|fortigate|palo alto|checkpoint|sonicwall|sophos)/i],
+    ['Endpoint', /(\bedr\b|\bxdr\b|endpoint|crowdstrike|sentinelone|antivir|kaspersky|defender)/i],
+    ['SIEM', /(\bsiem\b|splunk|qradar|log yönet|log management|logrhythm)/i],
+    ['Kimlik Yönetimi (IAM)', /(\biam\b|identity|kimlik|\bokta\b|\bentra\b|azure ad|\bsso\b|\bmfa\b|ping identity)/i]
+  ];
+  function _norm(x){ return String(x||'').toLowerCase().replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c'); }
+  function suggest(p){
+    var hay = ((p.name||'')+' '+(p.brand||'')+' '+(p.model||'')+' '+(p.description||'')).toLowerCase();
+    for (var i=0;i<RULES.length;i++){ if(RULES[i][1].test(hay)) return RULES[i][0]; }
+    return '';
+  }
+  var modal = document.createElement('div');
+  modal.className='modal-bg on';
+  modal.innerHTML='<div class="modal" style="max-width:780px"><div class="flx-bw-c-mb18"><h3 class="fs15-fw7">🔀 '+(EN?'Migrate Security Products':'Güvenlik Ürünlerini Taşı')+'</h3><button class="btn-close-x" id="sm-close">×</button></div><div id="sm-body" style="font-size:13px"><div class="loading"><div class="spinner"></div></div></div></div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#sm-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  var body = modal.querySelector('#sm-body');
+  var prods=[];
+  try {
+    var snap = await getDocs(collection(db,'products'));
+    prods = snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; })
+      .filter(function(p){ return SRC.indexOf(_norm(p.category))>=0; });
+  } catch(e){ body.innerHTML='<div style="color:#dc2626;padding:16px">'+(EN?'Load error: ':'Yükleme hatası: ')+escHtml(e.message)+'</div>'; return; }
+  if(!prods.length){ body.innerHTML='<div style="padding:24px;text-align:center;color:#64748b">'+(EN?'No products found under broad “Security” categories.':'Geniş “Güvenlik” kategorilerinde ürün bulunamadı.')+'</div>'; return; }
+  var nSug = prods.filter(function(p){ return suggest(p); }).length;
+  var rowsHtml = prods.map(function(p){
+    var sg = suggest(p);
+    var sel = '<select class="inp sm-sel" data-id="'+p.id+'" data-cur="'+escHtml(p.category||'')+'" style="font-size:12px;padding:5px 8px;min-width:210px"><option value="">'+(EN?'— keep —':'— değiştirme —')+'</option>'+
+      TARGETS.map(function(tg){ return '<option value="'+escHtml(tg)+'"'+(tg===sg?' selected':'')+'>'+escHtml(tg)+'</option>'; }).join('')+'</select>';
+    return '<tr style="border-top:1px solid var(--border)"><td style="padding:7px 10px;font-weight:600">'+escHtml(p.name||'—')+'<div style="font-size:10.5px;color:#94a3b8;font-weight:500">'+escHtml(p.brand||p.vendorName||'')+'</div></td>'+
+      '<td style="padding:7px 10px;color:#94a3b8;font-family:monospace">'+escHtml(p.category||'')+'</td>'+
+      '<td style="padding:7px 10px">'+sel+(sg?' <span style="font-size:10px;color:#16a34a;font-weight:600">'+(EN?'auto':'öneri')+'</span>':'')+'</td></tr>';
+  }).join('');
+  body.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">'+prods.length+' '+(EN?'products under broad Security · ':'ürün geniş Güvenlik altında · ')+nSug+' '+(EN?'auto-suggested. Adjust targets, then save.':'otomatik önerildi. Hedefleri ayarla, sonra kaydet.')+'</div>'+
+    '<div style="max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'+
+    '<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+(EN?'Product':'Ürün')+'</th>'+
+    '<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+(EN?'Current':'Mevcut')+'</th>'+
+    '<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+(EN?'Move to':'Taşı')+'</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px"><div style="font-size:11px;color:#94a3b8">'+(EN?'Only changed rows are written. Targets must exist as visible categories.':'Yalnızca değişen satırlar yazılır. Hedeflerin görünür kategori olarak var olması gerekir.')+'</div><div style="display:flex;gap:10px"><button class="btn-g btn-sm" id="sm-cancel">'+(EN?'Cancel':'İptal')+'</button><button class="btn-p btn-sm" id="sm-save">'+(EN?'Save changes':'Değişiklikleri Kaydet')+'</button></div></div>';
+  modal.querySelector('#sm-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#sm-save').addEventListener('click', async function(){
+    var sels = Array.prototype.slice.call(modal.querySelectorAll('.sm-sel'));
+    var changes = sels.filter(function(x){ return x.value && x.value!==x.dataset.cur; });
+    if(!changes.length){ showToast(EN?'No changes selected.':'Değişiklik seçilmedi.'); return; }
+    if(!confirm((EN?'Update category for ':'')+changes.length+(EN?' product(s)?':' ürünün kategorisi güncellenecek. Onaylıyor musun?'))) return;
+    var btn=this; btn.disabled=true; btn.textContent=EN?'Saving...':'Kaydediliyor...';
+    var ok=0, err=0;
+    for(var i=0;i<changes.length;i++){
+      try { await updateDoc(doc(db,'products',changes[i].dataset.id), { category: changes[i].value }); ok++; }
+      catch(e){ err++; }
+    }
+    invalidateCatCache();
+    if(err) showToast((EN?'Done: ':'Tamam: ')+ok+(EN?' moved, ':' taşındı, ')+err+(EN?' failed':' hata'),'err');
+    else showToast((EN?'Done: ':'Tamam: ')+ok+(EN?' products moved':' ürün taşındı'));
+    modal.remove();
+    try { var _am=el('adm-main')||el('panel-main'); if(_am && typeof admProducts==='function') admProducts(_am); } catch(e){}
+  });
+}
 function openCatModal(existing) {
   const isEdit = !!existing;
   const modal = document.createElement('div');
