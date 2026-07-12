@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.58 | pochub.co -->
+<!-- PoCHub v8.59 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.58';
+const VERSION = 'v8.59';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.59': ['TOPLU GORUNURLUK ARACI — Admin > Kategoriler > -Toplu Gorunurluk- butonu + modal. Tum canli kategorileri cozumleme durumuna gore (Profesyonel >=15 alan & key / Ince / Digere dusuyor) rozetleyip listeler; her satirda checkbox (isaretli=gorunur). AKILLI ONERI butonu: profesyonelleri ve -Diger- fallback-i acar, ince + Digere dusen pazarlama/dikey satirlari kapatir (tek tikla kuratorluk). -Tumu acik/kapali- kisayollari. Kaydet: yalnizca DEGISEN kategoriler setDoc(merge visible) ile yazilir, invalidateCatCache + admCategories refresh. Boylece 197 kategorinin gorunurluk kuratorlugu tek ekrandan, veri-temelli yapilir; 104 profesyonel gorunur, 85 bos satir gizli. node+harness3 0.'],
   'v8.58': ['SEMA PROFESYONELLESTIRME (kuyruk #9 - SON): -Tumlesik Iletisim (UCaaS)- ince semasi (12 alan serbest metin) 18 alan gruplu profesyonele cikarildi: Kapsam & Dagitim [hizmet turu UCaaS/CCaaS/CPaaS/toplanti, dagitim, maks kullanici/ajan], Iletisim Kanallari [sesli/video/chat/SMS/sosyal/WhatsApp, PSTN telefoni SIP, toplanti/webinar, takim mesajlasma], Iletisim Merkezi CCaaS [ACD/IVR, omnichannel, AI sanal ajan, WFM/kalite, analitik/duygu], Platform [API/SDK CPaaS, entegrasyon CRM/MS/ITSM, kayit], Kalite [SLA, uyumluluk PCI/HIPAA, lisans]. key/filter, label_en. Alias: Hizmet Olarak Iletisim Merkezi/Platformu/Birlesik Iletisim -> UCaaS. KUYRUK TAMAMLANDI (9/9 yeni+profesyonellestirilen sema). node+harness3 0.'],
   'v8.57': ['YENI SEMA (kuyruk #8): -SaaS Yonetim Platformlari- (SMP, 16 alan gruplu: Kapsam & Kesif [kesif SSO/finans/tarayici/API/proxy, dagitim, uygulama envanteri, shadow IT], Optimizasyon & Maliyet [lisans optimizasyonu, maliyet gorunurlugu, yenileme takibi, kullanim analitigi], Yonetim & Otomasyon [onboarding/offboarding, is akisi provizyon, entegrasyon SSO/ERP/HRIS/ITSM, erisim gozden gecirme], Guvenlik [SSPM duruşu, veri yerlesimi, uyumluluk]). key/filter, label_en+help. Alias: Yazilim Varlik Yonetimi Yonetilen Hizmetleri -> SMP. node+harness3 0.'],
   'v8.56': ['YENI SEMA (kuyruk #7): -Veri Golu Platformlari- (Data Platform & Governance, 17 alan gruplu — Veri Golu/Yonetisim/Meta Veri tek semada): Platform & Mimari [tur lakehouse/DW/katalog/yonetisim/MDM, dagitim, format Delta/Iceberg/Parquet/Hudi], Veri Isleme [Spark/SQL/streaming motorlari, ETL-ELT, gercek zamanli alim, acik format], Kataloglama & Yonetisim [veri katalogu, lineage soyagaci, veri kalitesi, meta veri/is sozlugu, MDM], Guvenlik [ince taneli erisim/maskeleme, politika bazli yonetisim, veri yerlesimi KVKK, uyumluluk]. key/filter, label_en+help. Alias: Veri ve Analitik Yonetisim + Meta Veri Yonetimi -> Veri Golu. node+harness3 0.'],
@@ -42318,6 +42319,7 @@ async function admCategories(m) {
       '<button class="btn-g btn-sm fs12" id="sync-cats-btn">'+t('acat.sync_missing','🔄 Eksik Kategorileri Ekle')+'</button>' +
       '<button class="btn-g btn-sm fs12" id="cat-diag-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'🔍 Category Diagnostic':'🔍 Kategori Tanı')+'</button>' +
       '<button class="btn-g btn-sm fs12" id="sec-migrate-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'🔀 Migrate Security':'🔀 Güvenlik Ürünlerini Taşı')+'</button>' +
+      '<button class="btn-g btn-sm fs12" id="bulk-vis-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'☑ Bulk Visibility':'☑ Toplu Görünürlük')+'</button>' +
       '<button class="btn-p btn-sm" id="add-cat-btn" style="margin-left:6px">'+t('acnt.add_cat','+ Yeni Kategori')+'</button>' + '<button class="btn-g btn-sm" id="cat-autotr" style="margin-left:6px">'+t('admin.translate_all','🌐 Tümünü İngilizceye Çevir (MyMemory)')+'</button><span id="cat-autotr-status" style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>' +
       '</div></div>' +
       '<div id="cat-req-panel" style="margin-bottom:14px"></div>' +
@@ -42336,6 +42338,7 @@ async function admCategories(m) {
 
     m.querySelector('#add-cat-btn').addEventListener('click', function() { openCatModal(null); });
     m.querySelector('#sec-migrate-btn')?.addEventListener('click', function(){ openSecurityMigrateModal(); });
+    m.querySelector('#bulk-vis-btn')?.addEventListener('click', function(){ openBulkVisibilityModal(); });
 
     // v8.46: Kategori Tani — canli kategorileri profesyonel semalara gore cozumle (salt-okunur)
     (function(){
@@ -42469,6 +42472,71 @@ async function admCategories(m) {
 }
 
 // v8.47: Guvenlik urunlerini alt-kategoriye tasima araci (otomatik oneri + toplu kaydet)
+// v8.59: Toplu gorunurluk — kategorileri cozumleme durumuna gore toplu goster/gizle
+async function openBulkVisibilityModal(){
+  var EN = window.CUR_LOCALE==='en';
+  function _resolveCat(name){
+    var nc=_normCat(name);
+    var ovr=PRODUCT_FIELDS_OVR[name]||PRODUCT_FIELDS_OVR[nc];
+    if(ovr&&ovr.length) return {fields:ovr.length,pro:true};
+    var key=(CATEGORY_FIELDS[name]&&CATEGORY_FIELDS[name].length)?name:((CATEGORY_FIELDS[nc]&&CATEGORY_FIELDS[nc].length)?nc:null);
+    if(key){ var arr=CATEGORY_FIELDS[key]; var hk=arr.some(function(f){return f&&f.key;}); var pro=(arr.length>=15&&hk); return {fields:arr.length,pro:pro,thin:!pro}; }
+    return {diger:true,fields:0};
+  }
+  var modal=document.createElement('div'); modal.className='modal-bg on';
+  modal.innerHTML='<div class="modal" style="max-width:820px"><div class="flx-bw-c-mb18"><h3 class="fs15-fw7">☑ '+(EN?'Bulk Visibility':'Toplu Görünürlük')+'</h3><button class="btn-close-x" id="bv-close">×</button></div><div id="bv-body" style="font-size:13px"><div class="loading"><div class="spinner"></div></div></div></div>';
+  document.body.appendChild(modal);
+  modal.querySelector('#bv-close').addEventListener('click', function(){ modal.remove(); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  var body=modal.querySelector('#bv-body');
+  var cats=[];
+  try { var snap=await getDocs(collection(db,'categories')); cats=snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }); }
+  catch(e){ body.innerHTML='<div style="color:#dc2626;padding:16px">'+(EN?'Load error: ':'Yükleme hatası: ')+escHtml(e.message)+'</div>'; return; }
+  if(!cats.length){ body.innerHTML='<div style="padding:24px;text-align:center;color:#64748b">'+(EN?'No categories.':'Kategori yok.')+'</div>'; return; }
+  cats.forEach(function(c){ var r=_resolveCat(c.name); c._pro=!!r.pro; c._thin=!!r.thin; c._diger=!!r.diger; c._fields=r.fields; });
+  cats.sort(function(a,b){ function rk(c){ return c._pro?0:(c._thin?1:2); } var d=rk(a)-rk(b); return d!==0?d:a.name.localeCompare(b.name); });
+  var nPro=cats.filter(function(c){return c._pro;}).length;
+  function rowHtml(c){
+    var badge = c._pro?'<span style="color:#16a34a;font-weight:600;font-size:11px">✓ '+(EN?'Pro':'Prof')+' ('+c._fields+')</span>'
+      : c._thin?'<span style="color:#d97706;font-weight:600;font-size:11px">○ '+(EN?'Thin':'İnce')+'</span>'
+      : '<span style="color:#dc2626;font-weight:600;font-size:11px">⚠ '+(EN?'Other':'Diğer')+'</span>';
+    var checked=(c.visible!==false)?'checked':'';
+    return '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 10px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" class="bv-chk" data-id="'+c.id+'" data-cur="'+(c.visible!==false?'1':'0')+'" '+checked+'><span style="font-weight:600">'+escHtml(c.name)+'</span></label></td><td style="padding:6px 10px;text-align:right">'+badge+'</td></tr>';
+  }
+  body.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">'+(EN?'Checked = visible in product form & catalog. Use the preset, adjust, then save.':'İşaretli = ürün formunda & katalogda görünür. Öneriyi uygula, ayarla, kaydet.')+'</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+      '<button class="btn-p btn-sm" id="bv-preset">'+(EN?'Smart preset (show Pro, hide rest)':'Akıllı öneri (Prof göster, gerisini gizle)')+'</button>'+
+      '<button class="btn-g btn-sm" id="bv-all">'+(EN?'All on':'Tümü açık')+'</button>'+
+      '<button class="btn-g btn-sm" id="bv-none">'+(EN?'All off':'Tümü kapalı')+'</button>'+
+    '</div>'+
+    '<div style="max-height:400px;overflow:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>'+cats.map(rowHtml).join('')+'</tbody></table></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px"><div style="font-size:11px;color:#94a3b8">'+nPro+' '+(EN?'professional categories detected':'profesyonel kategori tespit edildi')+'</div><div style="display:flex;gap:10px"><button class="btn-g btn-sm" id="bv-cancel">'+(EN?'Cancel':'İptal')+'</button><button class="btn-p btn-sm" id="bv-save">'+(EN?'Save changes':'Değişiklikleri Kaydet')+'</button></div></div>';
+  function setAll(v){ modal.querySelectorAll('.bv-chk').forEach(function(x){ x.checked=v; }); }
+  modal.querySelector('#bv-all').addEventListener('click', function(){ setAll(true); });
+  modal.querySelector('#bv-none').addEventListener('click', function(){ setAll(false); });
+  modal.querySelector('#bv-preset').addEventListener('click', function(){
+    var byId={}; cats.forEach(function(c){ byId[c.id]=c; });
+    modal.querySelectorAll('.bv-chk').forEach(function(x){ var c=byId[x.dataset.id]; if(!c) return; x.checked = c._pro || _normCat(c.name)==='Diger'; });
+  });
+  modal.querySelector('#bv-cancel').addEventListener('click', function(){ modal.remove(); });
+  modal.querySelector('#bv-save').addEventListener('click', async function(){
+    var chks=Array.prototype.slice.call(modal.querySelectorAll('.bv-chk'));
+    var changed=chks.filter(function(x){ return (x.checked?'1':'0')!==x.dataset.cur; });
+    if(!changed.length){ showToast(EN?'No changes.':'Değişiklik yok.'); return; }
+    if(!confirm((EN?'Update visibility for ':'')+changed.length+(EN?' categories?':' kategorinin görünürlüğü güncellenecek. Onaylıyor musun?'))) return;
+    var btn=this; btn.disabled=true; btn.textContent=EN?'Saving...':'Kaydediliyor...';
+    var ok=0,err=0;
+    for(var i=0;i<changed.length;i++){
+      try { await setDoc(doc(db,'categories',changed[i].dataset.id), { visible: changed[i].checked }, { merge:true }); ok++; }
+      catch(e){ err++; }
+    }
+    invalidateCatCache();
+    if(err) showToast((EN?'Done: ':'Tamam: ')+ok+(EN?' updated, ':' güncellendi, ')+err+(EN?' failed':' hata'),'err');
+    else showToast((EN?'Done: ':'Tamam: ')+ok+(EN?' categories updated':' kategori güncellendi'));
+    modal.remove();
+    try { var _am=el('adm-main')||el('panel-main'); if(_am && typeof admCategories==='function') admCategories(_am); } catch(e){}
+  });
+}
 async function openSecurityMigrateModal(){
   var EN = window.CUR_LOCALE==='en';
   var SRC = ['guvenlik','security','ag guvenligi','guvenlik cozumleri','siber guvenlik','cyber security','network security','bilgi guvenligi'];
