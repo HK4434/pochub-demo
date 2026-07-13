@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.71 | pochub.co -->
+<!-- PoCHub v8.72 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.71';
+const VERSION = 'v8.72';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1006,6 +1006,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.72': ['KAYIT AKISI DERIN REVIZYON — FAZ 2 (sifre & format dogrulama). (1) SIFRE TEKRAR alani eklendi (a-pass2) + canli GUC GOSTERGESI (renkli bar, 0-4 skor: uzunluk/buyuk-kucuk/rakam/sembol). (2) SUBMIT dogrulamalari: e-posta format regex, sifre min 6 (client-side, Firebase-e birakilmadan), sifre eslesme kontrolu, website format (https://... verildiyse). Onceden bu kontroller yoktu; hatali veri Firebase-e gidip belirsiz hata donuyordu. Artik net TR hata mesajlari. node 0.'],
   'v8.71': ['KAYIT AKISI DERIN REVIZYON — FAZ 1 (kategori secici + render bug + dogrulama). (1) RENDER BUG DUZELTMESI: uretici kayit formunda satir ~5993 template-literal icinde yanlislikla string-concat sozdizimi (-\'+t(...)+\'-) kullanilmis; kullanici ham kod goruyordu -> duzgun interpolasyona cevrildi. (2) CANLI KATEGORI SECICI: uretici/entegrator hardcode 14 kalemlik eski kategori listeleri (Guvenlik Cozumleri/SIEM & SOC/Endpoint Guvenlik gibi canli adlarla eslesmeyen) KALDIRILDI; yerine getCategories()-ten gorunur kategorileri (visible!==false) ceken ORTAK, ARANABILIR, secim-sayacli picker geldi (populateAuthCatPickers). Boylece 197 canli kategori/53 sema ile tam uyum + hardcode-icerik-yok kurali. (3) DISTRIBUTORE dagitilan-kategori secici eklendi (distributedCategories) — onceden hic kategori secemiyordu. (4) TELEFON dogrulamasi eklendi (UI-da zorunlu * vardi ama kontrol yoktu). (5) CUSTOM PoC MODALI: -Katalogda olmayan urun icin PoC ac- formundaki hardcode 14-kalemlik eski kategori select-i de canli getCategories() ile dolduruluyor (ayni eski-ad uyumsuzlugu vardi). node 0.'],
   'v8.70': ['197 TAMAMLAMA ADIM 10/10 (SON) — YENI SEMA: -Dijital Isyeri & Isbirligi- (Digital Workplace, 16 alan gruplu: Kapsam [tur intranet/isbirligi/arsivleme/erisilebilirlik/gizlilik/C2, dagitim], Isbirligi & Uretkenlik [intranet/portal, isbirligine-dayali is/gorev yonetimi, dokuman isbirligi, sosyal etkilesim, kurumsal arama], Yonetisim & Uyum [iletisim arsivleme, e-kesif/yasal tutma, WCAG erisilebilirlik, gizlilik/consent UX, saklama/yasam dongusu], Entegrasyon [M365/Google, UCaaS, HCM, SSO, mobil, WCAG 2.2]). 6 canli kategori baglandi (intranet, isbirligine-dayali is yonetimi, dijital erisilebilirlik, gizlilik UX, dijital iletisim arsivleme, UxS komuta&kontrol). Ayrica -Guvenlik- base ilk alanina key+filter eklendi (profesyonel). KUYRUK TAMAM: 197 kategorinin tamami profesyonel semaya cozuluyor (yalniz Diger fallback kova haric). node+harness3 0.'],
   'v8.69': ['197 TAMAMLAMA ADIM 9/10 — YENI SEMA: -CSP / Telko Cozumleri- (17 alan gruplu: Kapsam [alan ag-altyapisi-5G/BSS/OSS/CX/pazarlama, dagitim bulut-native/edge, ag nesli 5G-advanced/4G/fiber], Yetenekler [ag altyapisi RAN/Core, BSS gelir/faturalama, OSS operasyon, para kazanma, CX ops, AI-native, ag dilimleme/QoS], Operasyon & Standart [sifir dokunus otomasyon, 3GPP/TM-Forum/ETSI-NFV/O-RAN, servis guvencesi], Ticari [BTK uyumluluk, olcek, lisans abone/kapasite]). 4 canli CSP kategorisi baglandi (5G altyapi, AI gelir yonetimi/para kazanma, AI musteri deneyimi, AI pazarlama&satis). node+harness3 0.'],
@@ -5933,6 +5934,16 @@ function closeModal() {
   el('auth-modal').classList.remove('on');
 }
 
+// v8.72: Sifre guc gostergesi (0..4)
+function _authPassStrength(pw){
+  if(!pw) return 0;
+  var sc=0;
+  if(pw.length>=6) sc++; if(pw.length>=10) sc++;
+  if(/[A-Z]/.test(pw)&&/[a-z]/.test(pw)) sc++;
+  if(/[0-9]/.test(pw)) sc++;
+  if(/[^A-Za-z0-9]/.test(pw)) sc++;
+  return Math.min(sc,4);
+}
 // v8.71: Kayit formu canli & aranabilir kategori secici (getCategories -> gorunur kategoriler)
 async function populateAuthCatPickers(){
   var pickers = document.querySelectorAll('.a-cat-picker');
@@ -6075,6 +6086,10 @@ function renderAuthForm() {
   }
   html += `<label class="lbl">${t('auth.email','E-posta')} *</label><input class="inp" id="a-email" type="email" placeholder="ornek@sirket.com"><br>`;
   html += `<label class="lbl">${t('auth.password','Şifre')} *</label><input class="inp" id="a-pass" type="password" placeholder="${t('auth.password_ph','En az 6 karakter')}"><br>`;
+  if (AUTH_MODE !== 'login') {
+    html += `<div style="height:4px;border-radius:3px;background:var(--border);margin:-4px 0 10px;overflow:hidden"><div id="a-pass-strength-bar" style="height:100%;width:0;transition:width .2s,background .2s"></div></div>`;
+    html += `<label class="lbl">${t('auth.password2','Şifre (Tekrar)')} *</label><input class="inp" id="a-pass2" type="password" placeholder="${t('auth.password2_ph','Şifreyi tekrar girin')}"><br>`;
+  }
 
   // v5.16: KVKK/GDPR Onay Kutucukları (sadece kayıt modunda)
   if (AUTH_MODE !== 'login') {
@@ -6113,6 +6128,17 @@ function renderAuthForm() {
 
   el('auth-form').innerHTML = html;
   populateAuthCatPickers();
+  (function(){
+    var _pw = el('a-pass');
+    if(_pw && AUTH_MODE!=='login'){
+      _pw.addEventListener('input', function(){
+        var bar=el('a-pass-strength-bar'); if(!bar) return;
+        var lv=_authPassStrength(this.value);
+        var cols=['#dc2626','#dc2626','#d97706','#eab308','#16a34a'];
+        bar.style.width=(lv*25)+'%'; bar.style.background=cols[lv];
+      });
+    }
+  })();
   el('a-submit').addEventListener('click', handleAuth);
   [el('a-email'), el('a-pass')].forEach(inp => inp?.addEventListener('keydown', e => { if(e.key==='Enter') handleAuth(); }));
 
@@ -6222,6 +6248,24 @@ async function handleAuth() {
       }
       if (!phone) {
         errDiv.innerHTML = `<div class="alert alert-err">${t('auth.err_phone','Şirket telefonu zorunludur.')}</div>`;
+        btn.disabled=false; btn.textContent=t('auth.register_btn','Kayıt Ol'); return;
+      }
+      // v8.72: format + şifre doğrulamaları
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        errDiv.innerHTML = `<div class="alert alert-err">${t('auth.err_email','Geçerli bir e-posta adresi girin.')}</div>`;
+        btn.disabled=false; btn.textContent=t('auth.register_btn','Kayıt Ol'); return;
+      }
+      if ((pass||'').length < 6) {
+        errDiv.innerHTML = `<div class="alert alert-err">${t('auth.err_pass_short','Şifre en az 6 karakter olmalıdır.')}</div>`;
+        btn.disabled=false; btn.textContent=t('auth.register_btn','Kayıt Ol'); return;
+      }
+      if (pass !== (el('a-pass2')?.value || '')) {
+        errDiv.innerHTML = `<div class="alert alert-err">${t('auth.err_pass_match','Şifreler eşleşmiyor.')}</div>`;
+        btn.disabled=false; btn.textContent=t('auth.register_btn','Kayıt Ol'); return;
+      }
+      var _web = el('a-website')?.value.trim() || '';
+      if (_web && !/^https?:\/\/[^\s.]+\.[^\s]{2,}$/.test(_web)) {
+        errDiv.innerHTML = `<div class="alert alert-err">${t('auth.err_website','Web sitesi geçerli bir adres olmalı (https://... ).')}</div>`;
         btn.disabled=false; btn.textContent=t('auth.register_btn','Kayıt Ol'); return;
       }
 
