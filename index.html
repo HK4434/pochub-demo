@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.84 | pochub.co -->
+<!-- PoCHub v8.85 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.84';
+const VERSION = 'v8.85';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -782,6 +782,221 @@ async function gTranslate(texts, target){
   else if (typeof val === 'string') { d = new Date(val); }
   else { return String(val); }
   return d.toLocaleDateString(LDATE(), opts || {day:'numeric', month:'long', year:'numeric'});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  v8.85 — MASTER ÇEVİRİ ORKESTRATÖRÜ
+//  Tüm admin-yönetimli içeriği (Biz Kimiz, FAQ, Paketler, Kategoriler,
+//  Taksonomi) tek seferde EN'e çevirir. Bölüm butonları AYNEN DURUR;
+//  bu onların üstünde çalışan bir katmandır.
+//  Tasarım: kuru çalışma + kota hesabı + onay -> sıralı + throttle ->
+//           canlı ilerleme -> bitiş raporu. Idempotent (tekrar basılabilir).
+// ═══════════════════════════════════════════════════════════════════
+
+// Bir bölümün işlerini topla: {sec, label, jobs:[{get,set}], chars}
+async function _mtCollect(overwrite){
+  var secs=[];
+  function need(tr, en){ return !!(tr && String(tr).trim()) && (overwrite || !(en && String(en).trim())); }
+
+  // ── 1. Biz Kimiz (pochub_config/about) ──
+  try {
+    var aS=await getDoc(doc(db,'pochub_config','about'));
+    var a=aS.exists()?(aS.data()||{}):null;
+    if(a){
+      var aj=[];
+      var hero=a.hero||{}, hero_en=a.hero_en||{};
+      ['badge','title','subtitle','description'].forEach(function(k){
+        if(need(hero[k], hero_en[k])) aj.push({txt:hero[k], put:function(v){ a.hero_en=a.hero_en||{}; a.hero_en[k]=v; }});
+      });
+      ['whoWeAre','mission','vision'].forEach(function(k){
+        if(need(a[k], a[k+'_en'])) aj.push({txt:a[k], put:function(v){ a[k+'_en']=v; }});
+      });
+      [['values','values_en',['title','text']],['differentiators','differentiators_en',['title','text']],['stats','stats_en',['label']]].forEach(function(cfg){
+        var arr=a[cfg[0]]||[]; a[cfg[1]]=a[cfg[1]]||[];
+        arr.forEach(function(row,i){
+          a[cfg[1]][i]=a[cfg[1]][i]||{};
+          cfg[2].forEach(function(k){
+            if(need(row[k], a[cfg[1]][i][k])) aj.push({txt:row[k], put:(function(idx,key,enKey){ return function(v){ a[enKey][idx]=a[enKey][idx]||{}; a[enKey][idx][key]=v; }; })(i,k,cfg[1])});
+          });
+        });
+      });
+      if(aj.length) secs.push({key:'about', label:_L('About Us','Biz Kimiz'), jobs:aj, save:async function(){ await setDoc(doc(db,'pochub_config','about'), a, {merge:true}); if(typeof applyAbout==='function') applyAbout(a); }});
+    }
+  } catch(e){ secs.push({key:'about', label:_L('About Us','Biz Kimiz'), jobs:[], err:e.message}); }
+
+  // ── 2. FAQ (pochub_content/help) ──
+  try {
+    var hS=await getDoc(doc(db,'pochub_content','help'));
+    var hd=hS.exists()?((hS.data()||{}).categories||[]):[];
+    var hj=[];
+    hd.forEach(function(cat){
+      [['title','title_en'],['desc','desc_en']].forEach(function(pr){
+        if(need(cat[pr[0]], cat[pr[1]])) hj.push({txt:cat[pr[0]], put:(function(o,k){ return function(v){ o[k]=v; }; })(cat,pr[1])});
+      });
+      (cat.questions||[]).forEach(function(qa){
+        [['q','q_en'],['a','a_en']].forEach(function(pr){
+          if(need(qa[pr[0]], qa[pr[1]])) hj.push({txt:qa[pr[0]], put:(function(o,k){ return function(v){ o[k]=v; }; })(qa,pr[1])});
+        });
+      });
+    });
+    if(hj.length) secs.push({key:'faq', label:'FAQ', jobs:hj, save:async function(){ await setDoc(doc(db,'pochub_content','help'), { categories: hd }); }});
+  } catch(e){ secs.push({key:'faq', label:'FAQ', jobs:[], err:e.message}); }
+
+  // ── 3. Paketler (pochub_packages) ──
+  try {
+    var pS=await getDocs(collection(db,'pochub_packages'));
+    var pks=pS.docs.map(function(d){ var o=d.data()||{}; o.id=d.id; return o; });
+    var pj=[], touched={};
+    pks.forEach(function(pk){
+      if(need(pk.name, pk.name_en)) pj.push({txt:pk.name, put:(function(o){ return function(v){ o.name_en=v; touched[o.id]=1; }; })(pk)});
+      (pk.features||[]).forEach(function(f,fi){
+        var cur=(pk.features_en||[])[fi];
+        if(need(f, cur)) pj.push({txt:f, put:(function(o,idx){ return function(v){ if(!Array.isArray(o.features_en)) o.features_en=(o.features||[]).slice(); o.features_en[idx]=v; touched[o.id]=1; }; })(pk,fi)});
+      });
+    });
+    if(pj.length) secs.push({key:'pkg', label:_L('Packages','Paketler'), jobs:pj, save:async function(){
+      for(var i=0;i<pks.length;i++){ if(!touched[pks[i].id]) continue;
+        await setDoc(doc(db,'pochub_packages', pks[i].id), { name_en: pks[i].name_en||'', features_en: pks[i].features_en||[] }, {merge:true}); }
+    }});
+  } catch(e){ secs.push({key:'pkg', label:_L('Packages','Paketler'), jobs:[], err:e.message}); }
+
+  // ── 4. Kategoriler (categories) ──
+  try {
+    var cS=await getDocs(collection(db,'categories'));
+    var cts=cS.docs.map(function(d){ var o=d.data()||{}; o.id=d.id; return o; });
+    var cj=[], ctouch={};
+    cts.forEach(function(c){
+      if(need(c.name, c.name_en)) cj.push({txt:c.name, put:(function(o){ return function(v){ o.name_en=v; ctouch[o.id]=1; }; })(c)});
+      if(need(c.description, c.description_en)) cj.push({txt:c.description, put:(function(o){ return function(v){ o.description_en=v; ctouch[o.id]=1; }; })(c)});
+    });
+    if(cj.length) secs.push({key:'cat', label:_L('Categories','Kategoriler'), jobs:cj, save:async function(){
+      for(var i=0;i<cts.length;i++){ if(!ctouch[cts[i].id]) continue;
+        var upd={}; if(cts[i].name_en) upd.name_en=cts[i].name_en; if(cts[i].description_en) upd.description_en=cts[i].description_en;
+        if(Object.keys(upd).length) await setDoc(doc(db,'categories',cts[i].id), upd, {merge:true}); }
+      if(typeof invalidateCatCache==='function') invalidateCatCache();
+    }});
+  } catch(e){ secs.push({key:'cat', label:_L('Categories','Kategoriler'), jobs:[], err:e.message}); }
+
+  // ── 5. Taksonomi (pochub_config/system .taxonomy) ──
+  try {
+    var sS=await getDoc(doc(db,'pochub_config','system'));
+    var tax=sS.exists()?((sS.data()||{}).taxonomy||null):null;
+    if(tax){
+      var tj=[];
+      ['sectors','deployments','licenses'].forEach(function(grp){
+        (tax[grp]||[]).forEach(function(row){
+          if(need(row.label, row.label_en)) tj.push({txt:row.label, put:(function(o){ return function(v){ o.label_en=v; }; })(row)});
+        });
+      });
+      if(tj.length) secs.push({key:'tax', label:_L('Taxonomy','Taksonomi'), jobs:tj, save:async function(){
+        await setDoc(doc(db,'pochub_config','system'), { taxonomy: tax }, {merge:true});
+        if(typeof applyTaxonomy==='function'){ window._TAX_RAW=tax; applyTaxonomy(tax); }
+      }});
+    }
+  } catch(e){ secs.push({key:'tax', label:_L('Taxonomy','Taksonomi'), jobs:[], err:e.message}); }
+
+  return secs;
+}
+
+async function openMasterTranslateModal(){
+  var EN=window.CUR_LOCALE==='en';
+  var modal=document.createElement('div'); modal.className='modal-bg on';
+  modal.innerHTML='<div class="modal" style="max-width:640px"><div class="flx-bw-c-mb18"><h3 class="fs15-fw7">🌐 '+(EN?'Translate All Content to EN':'Tüm İçeriği EN\'e Çevir')+'</h3><button class="btn-close-x" id="mt-close">×</button></div><div id="mt-body" style="font-size:13px"><div class="loading"><div class="spinner"></div></div></div></div>';
+  document.body.appendChild(modal);
+  var body=modal.querySelector('#mt-body');
+  function close(){ modal.remove(); }
+  modal.querySelector('#mt-close').addEventListener('click', close);
+
+  var overwrite=false;
+  async function dryRun(){
+    body.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+    var secs=await _mtCollect(overwrite);
+    var total=0, chars=0;
+    secs.forEach(function(x){ total+=x.jobs.length; x.chars=x.jobs.reduce(function(a,j){ return a+String(j.txt||'').length; },0); chars+=x.chars; });
+    var quota=TRANSLATE_CFG.email?50000:5000;
+    var fits=chars<=quota;
+    var rows=secs.map(function(x){
+      var badge=x.err?('<span style="color:#dc2626">⚠ '+escHtml(x.err)+'</span>')
+                     :(x.jobs.length?('<span style="color:#2563eb">'+x.jobs.length+' '+(EN?'field':'alan')+' · ~'+x.chars+' '+(EN?'chars':'karakter')+'</span>')
+                                    :('<span style="color:#16a34a">✓ '+(EN?'up to date':'güncel')+'</span>'));
+      return '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 8px;font-weight:600">'+escHtml(x.label)+'</td><td style="padding:6px 8px;text-align:right">'+badge+'</td></tr>';
+    }).join('');
+    if(!total){
+      body.innerHTML='<div style="padding:20px;text-align:center"><div style="font-size:34px">✓</div><div style="font-weight:700;margin:8px 0">'+(EN?'Everything is already translated.':'Her şey zaten çevrilmiş.')+'</div><div style="font-size:12px;color:var(--text-muted)">'+(EN?'No empty EN fields found.':'Boş EN alanı bulunamadı.')+'</div>'
+        +'<label style="display:flex;align-items:center;justify-content:center;gap:7px;margin-top:14px;font-size:12px;cursor:pointer"><input type="checkbox" id="mt-ow" '+(overwrite?'checked':'')+'> '+(EN?'Also overwrite existing EN texts':'Mevcut EN metinleri de ez')+'</label>'
+        +'<div style="margin-top:14px"><button class="btn-g btn-sm" id="mt-cancel">'+(EN?'Close':'Kapat')+'</button></div></div>';
+      modal.querySelector('#mt-cancel').addEventListener('click', close);
+      modal.querySelector('#mt-ow').addEventListener('change', function(){ overwrite=this.checked; dryRun(); });
+      return;
+    }
+    body.innerHTML=
+      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">'+(EN?'Only empty EN fields are filled by default. Section buttons still work individually.':'Varsayılan olarak yalnızca boş EN alanları doldurulur. Bölüm butonları ayrı ayrı çalışmaya devam eder.')+'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>'+rows+'</tbody></table>'
+      +'<div style="margin-top:12px;padding:10px;border-radius:8px;background:'+(fits?'rgba(22,163,74,.08)':'rgba(217,119,6,.10)')+';font-size:12px">'
+        +'<b>'+total+'</b> '+(EN?'fields':'alan')+' · <b>~'+chars+'</b> '+(EN?'characters':'karakter')+' · '+(EN?'daily quota':'günlük kota')+': <b>'+quota+'</b>'+(TRANSLATE_CFG.email?'':' ('+(EN?'no email set':'e-posta girilmemiş')+')')
+        +'<br>'+(fits?('<span style="color:#16a34a">✓ '+(EN?'Quota is sufficient.':'Kota yeterli.')+'</span>')
+                    :('<span style="color:#d97706">⚠ '+(EN?'Quota may not be enough — roughly the first ':'Kota yetmeyebilir — kabaca ilk ')+Math.max(1,Math.floor(quota/Math.max(1,chars)*100))+'% '+(EN?'can be translated today; run again tomorrow for the rest.':'bugün çevrilebilir; kalanı için yarın tekrar çalıştır.')+'</span>'))
+      +'</div>'
+      +'<label style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12px;cursor:pointer"><input type="checkbox" id="mt-ow" '+(overwrite?'checked':'')+'> '+(EN?'Also overwrite existing EN texts':'Mevcut EN metinleri de ez')+'</label>'
+      +'<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn-g btn-sm" id="mt-cancel">'+(EN?'Cancel':'İptal')+'</button><button class="btn-p btn-sm" id="mt-start">'+(EN?'Start':'Başlat')+'</button></div>';
+    modal.querySelector('#mt-cancel').addEventListener('click', close);
+    modal.querySelector('#mt-ow').addEventListener('change', function(){ overwrite=this.checked; dryRun(); });
+    modal.querySelector('#mt-start').addEventListener('click', function(){ run(secs, total); });
+  }
+
+  async function run(secs, total){
+    var EN2=window.CUR_LOCALE==='en';
+    var live=secs.filter(function(x){ return x.jobs.length; });
+    body.innerHTML='<div id="mt-prog"></div><div style="height:6px;border-radius:4px;background:var(--border);margin:12px 0;overflow:hidden"><div id="mt-bar" style="height:100%;width:0;background:#2563eb;transition:width .3s"></div></div><div id="mt-note" style="font-size:11px;color:var(--text-muted)">'+(EN2?'Running… please keep this window open.':'Çalışıyor… bu pencereyi açık tut.')+'</div>';
+    var prog=modal.querySelector('#mt-prog'), bar=modal.querySelector('#mt-bar');
+    var state=live.map(function(x){ return {label:x.label, done:0, all:x.jobs.length, st:'wait', err:''}; });
+    function paint(){
+      prog.innerHTML=state.map(function(s){
+        var ic=s.st==='ok'?'✓':(s.st==='run'?'⏳':(s.st==='err'?'⚠':'⋯'));
+        var col=s.st==='ok'?'#16a34a':(s.st==='err'?'#dc2626':'var(--text-muted)');
+        return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12.5px"><span>'+ic+' '+escHtml(s.label)+'</span><span style="color:'+col+'">'+s.done+'/'+s.all+(s.err?(' · '+escHtml(s.err)):'')+'</span></div>';
+      }).join('');
+      var d=state.reduce(function(a,s){ return a+s.done; },0);
+      bar.style.width=Math.round(d/Math.max(1,total)*100)+'%';
+    }
+    paint();
+    var okN=0, errN=0, quotaHit=false;
+    for(var i=0;i<live.length;i++){
+      var sec=live[i]; state[i].st='run'; paint();
+      if(quotaHit){ state[i].st='err'; state[i].err=EN2?'quota':'kota'; paint(); continue; }
+      try {
+        // parça parça çevir (throttle + kısmi ilerleme)
+        var CH=8;
+        for(var b=0;b<sec.jobs.length;b+=CH){
+          var chunk=sec.jobs.slice(b,b+CH);
+          var outs=await gTranslate(chunk.map(function(j){ return j.txt; }),'en');
+          chunk.forEach(function(j,k){ if(outs[k]) j.put(outs[k]); });
+          state[i].done=Math.min(sec.jobs.length, b+chunk.length); paint();
+          await new Promise(function(r){ setTimeout(r, 900); });   // rate-limit koruması
+        }
+        await sec.save();
+        state[i].st='ok'; okN+=sec.jobs.length; paint();
+      } catch(e){
+        var msg=(e&&e.message)||'hata';
+        if(/kota|quota|LIMIT|ALL AVAILABLE/i.test(msg)) quotaHit=true;
+        state[i].st='err'; state[i].err=(quotaHit?(EN2?'quota exhausted':'kota bitti'):msg.slice(0,40)); errN++;
+        try { await sec.save(); } catch(_e){}   // kısmi çeviriyi yine de kaydet
+        paint();
+      }
+    }
+    var skipped=total-okN;
+    modal.querySelector('#mt-note').innerHTML=
+      '<div style="margin-top:10px;padding:12px;border-radius:8px;background:rgba(37,99,235,.06);font-size:12.5px;color:var(--text)">'
+      +'<b>'+(EN2?'Done.':'Bitti.')+'</b><br>✓ '+okN+' '+(EN2?'fields translated & saved':'alan çevrildi ve kaydedildi')
+      +(skipped>0?('<br>○ '+skipped+' '+(EN2?'not completed':'tamamlanmadı')):'')
+      +(errN?('<br>⚠ '+errN+' '+(EN2?'section(s) had errors':'bölümde hata')):'')
+      +(quotaHit?('<br><span style="color:#d97706">'+(EN2?'Daily quota exhausted. Partial results were saved — press the button again tomorrow to continue where it left off.':'Günlük kota bitti. Kısmi sonuçlar kaydedildi — yarın butona tekrar basınca kaldığı yerden devam eder.')+'</span>'):'')
+      +'<div style="margin-top:10px;text-align:right"><button class="btn-p btn-sm" id="mt-done">'+(EN2?'Close':'Kapat')+'</button></div></div>';
+    modal.querySelector('#mt-done').addEventListener('click', function(){ close(); if(typeof loadAdmTab==='function') loadAdmTab(); });
+    showToast(okN+' '+(EN2?'fields translated to EN.':'alan EN\'e çevrildi.'));
+  }
+
+  dryRun();
 }
 function formatTSShort(val) { return formatTS(val, {day:'2-digit', month:'2-digit', year:'numeric'}); }
 
@@ -1006,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.85': ['MASTER CEVIRI ORKESTRATORU — Admin > Icerik Yonetimi > -TUM Icerigi EN e Cevir (Master)- tek butonu. MEVCUT BOLUM BUTONLARI AYNEN DURUR (kota verimliligi, hata kurtarma, yedek); master onlarin USTUNDE calisan bir katmandir. MIMARI NOT: bolum handler-lari kendi ekranlarinin local scope verisine bagli ve butonlari yalnizca o sekme acikken DOM-da var; bu yuzden -butonlara tiklayan- bir master calismaz. Master, ayni gTranslate() cekirdegini kullanip Firestore-dan DOGRUDAN okuyup yazan bagimsiz orkestratordur. KAPSAM (5 icerik tipi): Biz Kimiz (pochub_config/about: hero/whoWeAre/mission/vision/values/differentiators/stats), FAQ (pochub_content/help: kategori title/desc + soru q/a), Paketler (pochub_packages: name/features), Kategoriler (categories: name/description), Taksonomi (pochub_config/system.taxonomy: sectors/deployments/licenses label). AKIS: (1) KURU CALISMA — bolum bazli alan+karakter sayimi, MyMemory kotasiyla (5K anahtarsiz / 50K e-postali) karsilastirma, yetmezse yuzde tahmini uyarisi, onay ister. (2) YURUTME — sirali, 8-lik parcalar, istekler arasi 900ms throttle (429 korumasi), her bolum try/catch — hata AKISI DURDURMAZ, kismi ceviri yine kaydedilir. (3) CANLI ILERLEME — bolum bazli sayac + yuzde bar. (4) BITIS RAPORU — cevrilen/tamamlanmayan/hatali + kota bitti ise nerede kaldigi. IDEMPOTENT: varsayilan yalnizca BOS EN alanlarini doldurur (elle duzeltilmis EN metinler korunur), -mevcut EN metinleri de ez- ayri onay kutusu; kota bitince tekrar basilinca kaldigi yerden devam eder. node 0.'],
   'v8.84': ['I18N SUPURME BATCH 10 (SON — satir-bazli islemci). +47 string _L ile cevrildi: cift-gecen etiketler (AD SOYAD/FIRMA, KAYIT TARIHI, Baslik, Amac, Yukari, Varsayilan), vendor onboarding/wizard cumleleri, admin editor yardim metinleri, davet/bonus, e-posta/SEO araclari. YENI GUVENLIK: satir-bazli islemci (yalnizca audit satirinda degistirir; replace-all riski yok) + i18n_audit.py-ye t(-key-, "fallback") CAGRI-SATIRI korumasi (cok satirli t() cagrilarinin devam satirlarina da dokunulmaz). Denetleyici artik: yasal/KVKK/sozlesme/cerez/DPA/wizard/odeme ICERIK-lerini, t() sozluk tanimlarini ve t() cagri satirlarini disliyor. node 0.'],
   'v8.83': ['I18N SUPURME BATCH 9 (admin/vendor UI, 3. sozluk). +67 string _L ile cevrildi: admin editor yardim metinleri (sira/gorunurluk/etiket aciklamalari, MyMemory kotasi, guven esigi), vendor onboarding/wizard metinleri, davet & bonus, ihlal/KVKK-operasyon arayuzu (yasal METIN degil, arayuz), e-posta gonderim araci, SEO uretim adimlari, cesitli placeholder/title/toast. GUVENLIK: i18n_audit.py-ye t() SOZLUK SATIRI korumasi eklendi (ns.key:"..." satirlari artik hic taranmaz) — onceki denemede sozluk fallback-i icindeki HTML-e dokunmak node-u kirmisti. node 0.'],
   'v8.82': ['I18N SUPURME BATCH 8 (admin UI, 2. sozluk). +36 admin-UI string _L ile cevrildi (ek butonlar, MyMemory ceviri paneli etiketleri, wizard aciklamalari, form etiketleri, davet/bonus metinleri). Islemci replace-all denemesi bir t() fallback HTML-i icindeki -gorunmez- kelimesini kirdi -> guvenli count==1 moduna geri alindi (tek-eslesme yoksa atlar). Cift-gecen ve t()-icine gomulu string-ler ayri ele alinacak. node 0.'],
@@ -40485,7 +40701,7 @@ async function renderHelpAdmin(m, subtabsHtml) {
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">'
     + '<div style="font-size:13px;color:var(--text-secondary)"><strong>' + helpData.length + '</strong> '+t('acnt.categories','kategori')+', <strong>' + helpData.reduce(function(acc, c){ return acc + (c.questions?.length || 0); }, 0) + '</strong> '+t('acnt.questions','soru')+'</div>'
     + '<button id="cnt-add-cat" class="btn-p btn-sm" style="padding:8px 14px;font-size:12.5px;font-weight:700">'+t('acnt.add_cat','+ Yeni Kategori')+'</button>'
-    + '<button id="cnt-autotr" class="btn-g btn-sm" style="padding:8px 14px;font-size:12.5px;font-weight:700;margin-left:8px">'+t('admin.translate_all','🌐 Tümünü İngilizceye Çevir (MyMemory)')+'</button><span id="cnt-autotr-status" style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>'
+    + '<button id="cnt-autotr" class="btn-g btn-sm" style="padding:8px 14px;font-size:12.5px;font-weight:700;margin-left:8px">'+t('admin.translate_all','🌐 Tümünü İngilizceye Çevir (MyMemory)')+'</button><span id="cnt-autotr-status" style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>'+ '<button id="cnt-master-tr" class="btn-p btn-sm" style="padding:8px 14px;font-size:12.5px;font-weight:700;margin-left:8px">'+_L("🌐 Translate ALL Content (Master)","🌐 TÜM İçeriği EN'e Çevir (Master)")+'</button>'
     + '</div>';
 
   // Kategori listesi (accordion benzeri)
@@ -40561,6 +40777,8 @@ async function renderHelpAdmin(m, subtabsHtml) {
   el('cnt-add-cat')?.addEventListener('click', function(){
     openCategoryEditor(null, helpData, m);
   });
+
+  el('cnt-master-tr')?.addEventListener('click', function(){ openMasterTranslateModal(); });
 
   el('cnt-autotr')?.addEventListener('click', async function(){
     var btn=this, st=el('cnt-autotr-status');
