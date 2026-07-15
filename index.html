@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.93 | pochub.co -->
+<!-- PoCHub v8.94 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.93';
+const VERSION = 'v8.94';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.94': ['RENDER HASARI TEMIZLIGI (KRITIK — kullanici HAM KOD goruyordu). Hasan-in ekran goruntusu: Distributor > Urunlerim basliginda -\'+_L("My Distribution Products","Dagitim Urunlerim")+\'- ham kod olarak gorunuyordu. KOK NEDEN: toplu i18n islemcim (v8.76-8.84) concat formu (\'+_L(..)+\') kullandi ama bu string-ler TEMPLATE LITERAL (backtick) icindeydi; orada ${..} gerekiyordu. Denetim 9 render hasari + 6 escape hasari buldu. DUZELTILEN: (a) benim _L hasarim 5 yerde (3925 Onayli rozeti, 9727 Etkinlikler yukleniyor, 9785 Duzenleyen, 11081 Dagitim Urunlerim basligi, 12640 katalog-disi PoC notu); (b) ESKI t() gecisinden kalma hasar 3 yerde (11091-11092 tablo basliklari, 12645 Yukleniyor); (c) ESKI escape hasari 6 satir (11106-11111: \\${p.name} gibi — urun adi/uretici/kategori/rozet yerine HAM ${p.name} metni basiyordu; yani distributor tablosu urun varken TAMAMEN bozuk cikacakti, 0 urun oldugu icin fark edilmemisti). Distributor urunleri blogu (11079-11117) bastan temiz yazildi + escHtml eklendi (XSS sertlestirme). (d) YANLIS POZITIF dogrulandi: ${..} IFADESI icindeki concat GECERLIDIR (7821, 4571) — dokunulmadi. KALICI KORUMA: i18n_audit.py-ye RENDER HASARI TESPITI eklendi — template literal icinde concat + escape-li ${..} tarar; bozuk v8.93-e karsi test edildi (9+6 yakaladi), duzeltilmis surumde TEMIZ. node 0.'],
   'v8.93': ['MARKA FAZ 5 (SON) — VENDOR PROFILINDE KATEGORI x MARKA GRUPLU GORUNUM. Hasan-in istegi: -Firmanin profiline bakildiginda hem kategorileri hem de calistigi markalari gorme firsati-. TASARIM: gruplama TURETILMIS — ekstra alan TUTULMAZ, dolayisiyla DRIFT OLMAZ (vendor_products denormalizasyon dersi). Mantik: vendor-in her kategorisi C icin, vendor-in markalari arasinda C ∈ marka.categories olanlar listelenir; hicbir kategoriye oturmayanlar -Diger- altinda toplanir. Ornek gorunum: -Firewall: Fortinet, Palo Alto · Storage: HPE, Dell-. KAYNAK: vendor-in categories + specializations + distributedCategories alanlari birlestirilir (uc rol de kapsanir). YERLER: public vendor profili (renderVendorPublic — marka cache-i await getBrands() ile isitilir), admin vendor detayi (vvd.brands), vendor detay paneli. GUVENLI FALLBACK: marka cache yuklenmemisse ya da hicbir marka kategoriye oturmuyorsa duz virgullu listeye duser (bozulmaz). node 0.'],
   'v8.92': ['KESFEDILEBILIRLIK DUZELTMESI — website/ana sirket gorunmuyordu. SORUN: v8.91-de 434 markanin website + ana sirket bilgisi BRAND_SEED-e eklendi (dogrulandi: 434/434 website, 93 parent) ama bu veri TARAYICIDAKI KODDA duruyor; Firestore-a YAZILMASI icin butona basilmasi gerekiyordu. Buton -Baslangic Markalarini YUKLE- diyordu; 434 marka zaten yukluyken kimse ona tekrar basmayi dusunmez. Mekanizma dogruydu ama KESFEDILEMEZDI — tasarim hatasi. COZUM: (1) Admin > Markalar-da, seed-de karsiligi olup DB-de BOS olan alan varsa UYARI BANDI: -N markanin website/ana sirket bilgisi eksik. Bu veri uygulamada hazir — veritabanina yazmak icin butona bas.- (2) Ayri, adi net, SAYACLI buton: -🔄 Eksik Alanlari Tamamla (N)- — yalnizca backfill, yeni marka EKLEMEZ. (3) Yalniz BOS alanlari doldurur, dolu olani ezmez; hata olursa gercek sebep gosterilir. Is bitince bant kaybolur = gorsel dogrulama. node 0.'],
   'v8.91': ['MARKA: WEBSITE + ANA SIRKET + FILTRE (eksik is tamamlandi). (1) WEBSITE: BRAND_SEED-deki 434 markanin TAMAMINA resmi website adresi eklendi (434/434, 0 eksik) — onceki surumde website:\'\' bosti, kullanicinin doldurmasi beklenmemeli. (2) ANA SIRKET: 5 eksik parent tamamlandi; toplamda satin alma zincirleri islendi (CyberArk->Palo Alto, Splunk/Duo->Cisco, Wiz/Mandiant/Looker/Apigee->Google, Juniper/Aruba/Zerto->HPE, VMware->Broadcom, Red Hat/HashiCorp->IBM, Veritas->Cohesity, Tableau/Slack/MuleSoft->Salesforce, Marketo/Workfront->Adobe, SuccessFactors/Ariba->SAP, Mendix->Siemens, Talend->Qlik, Guardicore->Akamai, Venafi->CyberArk, Chronosphere->Palo Alto, Blue Prism->SS&C, Featurespace->Visa, Dynamic Yield->Mastercard, Netcracker->NEC, Vonage->Ericsson, iyzico->Prosus, Innova->Turk Telekom, Intertech->Denizbank, Netsis->Logo, KocDigital->Koc, Sabanci DX->Sabanci vb.). (3) GERIYE DONUK TAMAMLAMA (kritik): seed IDEMPOTENT oldugu icin zaten yuklu 434 kaydi ATLIYORDU — yeni website/parent alanlari onlara ulasmazdi. Artik -Baslangic Markalarini Yukle- butonu iki is yapar: eksik markalari EKLER + mevcut markalarin BOS website/parent/kategori alanlarini seed-den TAMAMLAR. DOLU olan alan ASLA ezilmez (elle duzeltmelerin korunur). Onay diyaloglarinda -N marka eklenecek, M markanin bos alani doldurulacak- der. (4) FILTRE: Admin > Markalar-a kategori filtresi (marka sayisiyla birlikte), durum filtresi (Onayli/Bekleyen/Gizli/Kategorisiz/Websitesiz) ve Temizle butonu eklendi; arama ile birlesik calisir, -N / 434 marka gosteriliyor- sayaci. (5) Liste satirinda website linki (🔗) gosterilir, yoksa ⚠ uyarisi; yeni -Websitesiz- istatistik karti. node 0.'],
@@ -3922,7 +3923,7 @@ function renderEvProdList(prods, modal) {
         <div class="fs13-fw6">${p.name}</div>
         <div style="font-size:11.5px;color:#64748b">${catLabelEN(p.category)||'—'} · ${p.country||''}</div>
       </div>
-      <span style="font-size:10px;background:rgba(22,163,74,.1);color:#16a34a;padding:2px 7px;border-radius:4px;font-weight:700">'+_L("Approved","Onaylı")+'</span>
+      <span style="font-size:10px;background:rgba(22,163,74,.1);color:#16a34a;padding:2px 7px;border-radius:4px;font-weight:700">${_L("Approved","Onaylı")}</span>
     </div>`
   ).join('');
   list.querySelectorAll('.ev-prod-opt').forEach(opt => {
@@ -9724,7 +9725,7 @@ async function renderEvents() {
       <div style="flex:1;min-width:300px">
         <div id="ev-chips" style="margin-bottom:10px"></div>
         <div id="ev-results-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap"></div>
-        <div id="events-list"><div class="loading"><div class="spinner"></div>'+_L("Loading events...","Etkinlikler yükleniyor...")+'</div></div>
+        <div id="events-list"><div class="loading"><div class="spinner"></div>${_L("Loading events...","Etkinlikler yükleniyor...")}</div></div>
       </div>
     </div>
   </div>`;
@@ -9782,7 +9783,7 @@ async function openEventDetail(eventId) {
       ${e.description?`<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:13px;margin-bottom:16px;font-size:13px;color:#64748b;line-height:1.7">${e.description}</div>`:''}
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:#f8fafc;border:1px solid rgba(15,23,42,.08);border-radius:8px;margin-bottom:14px">
         <div>
-          <div style="font-size:12px;color:#64748b">'+_L("Organizer","Düzenleyen")+'</div>
+          <div style="font-size:12px;color:#64748b">${_L("Organizer","Düzenleyen")}</div>
           <div class="fs13-fw7">${e.vendorName||'—'}</div>
         </div>
         <div class="t-rgt">
@@ -11078,37 +11079,37 @@ async function vendDistributorProducts(m) {
 
     m.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h2 class="fs18-fw7">'+_L("My Distribution Products","Dağıtım Ürünlerim")+'</h2>
-        <div class="fs12-muted">${myProds.length} ürün atandı</div>
+        <h2 class="fs18-fw7">${_L("My Distribution Products","Dağıtım Ürünlerim")}</h2>
+        <div class="fs12-muted">${myProds.length} ${_L('products assigned','ürün atandı')}</div>
       </div>
       <div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:7px;padding:10px 14px;font-size:12px;color:#2563eb;margin-bottom:16px">
-        ℹ Distribütörler doğrudan müşteriye satış yapamaz. Her ürün için en az 1 entegratör/iş ortağı atamanız gerekmektedir.
+        ℹ ${_L('Distributors cannot sell directly to customers. You must assign at least 1 integrator/partner for each product.','Distribütörler doğrudan müşteriye satış yapamaz. Her ürün için en az 1 entegratör/iş ortağı atamanız gerekmektedir.')}
       </div>
       ${myProds.length === 0
         ? '<div class="empty"><div class="empty-icon">📦</div>'+t('vdp.empty','Henüz size atanmış ürün yok.')+'</div>'
         : `<table>
             <thead><tr>
-              <th>'+t('vdp.h_product','Ürün Adı')+'</th><th>'+t('vdp.h_maker','Üretici')+'</th><th>'+t('vdp.h_cat','Kategori')+'</th>
-              <th>'+t('vdp.h_integrator','Entegratör')+'</th><th>'+t('vdp.h_status','Durum')+'</th><th>'+t('vdp.h_action','İşlem')+'</th>
+              <th>${t('vdp.h_product','Ürün Adı')}</th><th>${t('vdp.h_maker','Üretici')}</th><th>${t('vdp.h_cat','Kategori')}</th>
+              <th>${t('vdp.h_integrator','Entegratör')}</th><th>${t('vdp.h_status','Durum')}</th><th>${t('vdp.h_action','İşlem')}</th>
             </tr></thead>
             <tbody>
               ${myProds.map(p => {
                 const intCount = (p.integrators||[]).length;
                 const badge = intCount > 0
                   ? '<span class="bdg" style="background:rgba(22,163,74,.1);color:#16a34a">' + intCount + _L(' integrators',' entegratör')+'</span>'
-                  : `<span class="bdg" style="background:rgba(220,38,38,.1);color:#dc2626">'+_L("Unassigned","Atanmadı")+'</span>`;
+                  : '<span class="bdg" style="background:rgba(220,38,38,.1);color:#dc2626">'+_L("Unassigned","Atanmadı")+'</span>';
                 const pubBadge = p.publishStatus === 'ready'
                   ? '<span class="bdg" style="background:rgba(22,163,74,.1);color:#16a34a">'+_L("Ready","Hazır")+'</span>'
                   : p.publishStatus === 'awaiting_integrator'
                   ? '<span class="bdg" style="background:rgba(217,119,6,.1);color:#d97706">'+_L("Awaiting Integrator","Entegratör Bekliyor")+'</span>'
                   : '<span class="bdg" style="background:rgba(94,113,228,.1);color:#6366f1">'+_L("Admin Approval","Admin Onayı")+'</span>';
                 return `<tr>
-                  <td class="fw6">\${p.name}</td>
-                  <td style="color:var(--text-secondary);font-size:12px">\${p.vendorName||'—'}</td>
-                  <td class="t-sec">\${p.category||'—'}</td>
-                  <td>\${badge}</td>
-                  <td>\${pubBadge}</td>
-                  <td><button class="btn-p btn-sm vdp-int-btn fs11" data-id="\${p.id}" data-name="\${p.name}">'+_L("🔗 Integrators","🔗 Entegratörler")+'</button></td>
+                  <td class="fw6">${escHtml(p.name||'—')}</td>
+                  <td style="color:var(--text-secondary);font-size:12px">${escHtml(p.vendorName||'—')}</td>
+                  <td class="t-sec">${escHtml(p.category||'—')}</td>
+                  <td>${badge}</td>
+                  <td>${pubBadge}</td>
+                  <td><button class="btn-p btn-sm vdp-int-btn fs11" data-id="${escHtml(p.id||'')}" data-name="${escHtml(p.name||'')}">${_L("🔗 Integrators","🔗 Entegratörler")}</button></td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -12637,12 +12638,12 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       <div style="background:#f0f7ff;border:1px solid rgba(0,102,204,.2);border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
         <div>
           <div style="font-size:12px;font-weight:600;color:#0066cc;margin-bottom:2px">${t('poc.not_in_catalog','Ürün katalogda yok mu?')}</div>
-          <div style="font-size:11px;color:var(--text-muted)">'+_L("You can also create PoC requests for non-catalog products","Katalog dışı ürünler için de PoC talebi oluşturabilirsiniz")+'</div>
+          <div style="font-size:11px;color:var(--text-muted)">${_L("You can also create PoC requests for non-catalog products","Katalog dışı ürünler için de PoC talebi oluşturabilirsiniz")}</div>
         </div>
         <button onclick="closeMultiPocAndOpenCustom()" style="background:#0066cc;color:#fff;border:none;border-radius:5px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:12px">${t('poc.manual_entry','Manuel Giriş →')}</button>
       </div>
       <div id="poc-cats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        <div class="loading"><div class="spinner"></div>'+t('common.loading','Yükleniyor...')+'</div>
+        <div class="loading"><div class="spinner"></div>${t('common.loading','Yükleniyor...')}</div>
       </div>
     </div>
 
