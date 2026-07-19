@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.94 | pochub.co -->
+<!-- PoCHub v8.94.1 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.94';
+const VERSION = 'v8.94.1';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.94.1': ['HOTFIX — v8.94 denetiminden kacan 1 render hasari daha (AST/acorn tabanli bagimsiz tarama ile bulundu). Admin erisim-reddi ekrani (renderAdmin, ~27455): backtick template icinde concat formu \'+_L("You do not have access...","Bu bolume erisim yetkiniz yok.")+\' kalmis — yetkisiz kullanici kilit ikonunun yaninda HAM KOD gorecekti. Dolar-suslu _L interpolasyonuna cevrildi. Dogrulama: acorn AST taramasi tum dosyada TEMPLATE_CONCAT_LEAK=0, STRING_DOLLAR_LEAK=0 (CHANGELOG metinlerindeki 4 yanlis pozitif haric), node --check OK, i18n_audit.py yeni sinif bulgu yok. RULES degismedi.'],
   'v8.94': ['RENDER HASARI TEMIZLIGI (KRITIK — kullanici HAM KOD goruyordu). Hasan-in ekran goruntusu: Distributor > Urunlerim basliginda -\'+_L("My Distribution Products","Dagitim Urunlerim")+\'- ham kod olarak gorunuyordu. KOK NEDEN: toplu i18n islemcim (v8.76-8.84) concat formu (\'+_L(..)+\') kullandi ama bu string-ler TEMPLATE LITERAL (backtick) icindeydi; orada ${..} gerekiyordu. Denetim 9 render hasari + 6 escape hasari buldu. DUZELTILEN: (a) benim _L hasarim 5 yerde (3925 Onayli rozeti, 9727 Etkinlikler yukleniyor, 9785 Duzenleyen, 11081 Dagitim Urunlerim basligi, 12640 katalog-disi PoC notu); (b) ESKI t() gecisinden kalma hasar 3 yerde (11091-11092 tablo basliklari, 12645 Yukleniyor); (c) ESKI escape hasari 6 satir (11106-11111: \\${p.name} gibi — urun adi/uretici/kategori/rozet yerine HAM ${p.name} metni basiyordu; yani distributor tablosu urun varken TAMAMEN bozuk cikacakti, 0 urun oldugu icin fark edilmemisti). Distributor urunleri blogu (11079-11117) bastan temiz yazildi + escHtml eklendi (XSS sertlestirme). (d) YANLIS POZITIF dogrulandi: ${..} IFADESI icindeki concat GECERLIDIR (7821, 4571) — dokunulmadi. KALICI KORUMA: i18n_audit.py-ye RENDER HASARI TESPITI eklendi — template literal icinde concat + escape-li ${..} tarar; bozuk v8.93-e karsi test edildi (9+6 yakaladi), duzeltilmis surumde TEMIZ. node 0.'],
   'v8.93': ['MARKA FAZ 5 (SON) — VENDOR PROFILINDE KATEGORI x MARKA GRUPLU GORUNUM. Hasan-in istegi: -Firmanin profiline bakildiginda hem kategorileri hem de calistigi markalari gorme firsati-. TASARIM: gruplama TURETILMIS — ekstra alan TUTULMAZ, dolayisiyla DRIFT OLMAZ (vendor_products denormalizasyon dersi). Mantik: vendor-in her kategorisi C icin, vendor-in markalari arasinda C ∈ marka.categories olanlar listelenir; hicbir kategoriye oturmayanlar -Diger- altinda toplanir. Ornek gorunum: -Firewall: Fortinet, Palo Alto · Storage: HPE, Dell-. KAYNAK: vendor-in categories + specializations + distributedCategories alanlari birlestirilir (uc rol de kapsanir). YERLER: public vendor profili (renderVendorPublic — marka cache-i await getBrands() ile isitilir), admin vendor detayi (vvd.brands), vendor detay paneli. GUVENLI FALLBACK: marka cache yuklenmemisse ya da hicbir marka kategoriye oturmuyorsa duz virgullu listeye duser (bozulmaz). node 0.'],
   'v8.92': ['KESFEDILEBILIRLIK DUZELTMESI — website/ana sirket gorunmuyordu. SORUN: v8.91-de 434 markanin website + ana sirket bilgisi BRAND_SEED-e eklendi (dogrulandi: 434/434 website, 93 parent) ama bu veri TARAYICIDAKI KODDA duruyor; Firestore-a YAZILMASI icin butona basilmasi gerekiyordu. Buton -Baslangic Markalarini YUKLE- diyordu; 434 marka zaten yukluyken kimse ona tekrar basmayi dusunmez. Mekanizma dogruydu ama KESFEDILEMEZDI — tasarim hatasi. COZUM: (1) Admin > Markalar-da, seed-de karsiligi olup DB-de BOS olan alan varsa UYARI BANDI: -N markanin website/ana sirket bilgisi eksik. Bu veri uygulamada hazir — veritabanina yazmak icin butona bas.- (2) Ayri, adi net, SAYACLI buton: -🔄 Eksik Alanlari Tamamla (N)- — yalnizca backfill, yeni marka EKLEMEZ. (3) Yalniz BOS alanlari doldurur, dolu olani ezmez; hata olursa gercek sebep gosterilir. Is bitince bant kaybolur = gorsel dogrulama. node 0.'],
@@ -27452,7 +27453,7 @@ function renderAdmin() {
   }
   document.body.className = 'role-admin';
   if (!CUR_USER || !isAdminLike(CUR_PROFILE?.role)) {
-    el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>'+_L("You don't have access to this section.","Bu bölüme erişim yetkiniz yok.")+'</div></div>`;
+    el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>${_L("You don't have access to this section.","Bu bölüme erişim yetkiniz yok.")}</div></div>`;
     return;
   }
   if (el('adm-main') && window._admNavLocale === window.CUR_LOCALE) { loadAdmTab(); return; }
