@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.95 | pochub.co -->
+<!-- PoCHub v8.96 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.95';
+const VERSION = 'v8.96';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.96': ['MARKA URUN AILESI SABLONLARI (Hasan-in istegi: 434 markanin urunleri + kategorileri) — MODEL A: canli urun DEGIL, REFERANS SABLONU; sahiplik modeli bozulmaz (sahipsiz urun PoC akisini kirar — v8.05 dersinin tersi). (1) VERI: BRAND_PRODUCT_SEED — 408 markaya 758 amiral urun ailesi (ad + canonical kategori). Kategoriler BRAND_SEED dagarcigi (196) + Guvenlik Sihirbazi hedefleriyle AYNI kumeden; benim taslak adlarim canonical kumede yoksa esleme tablosuyla cevrildi (orn. HCM -> 1.000-den Fazla Calisani Olan Isletmeler icin HCM Paketleri), 0 dagarcik-disi kaldi. 26 HIZMET markasi (danismanlik/ajans/lojistik) TASARIM GEREGI kapsam disi — urun ailesi kavrami uygulanamaz. (2) YENI KOLEKSIYON brand_products/{id}: brand, brandNorm, name, nameNorm, category, status, visible, order. getBrandProducts()+_bpCache+invalidateBrandProductCache()+brandProductsFor(). (3) YUKLEYICI: Admin > Markalar > -Urun Ailelerini Yukle- — IDEMPOTENT (brandNorm+nameNorm), canli kategoriye _normCat cozumlemesi (eslesmeyen RAPORLANIR, v8.87 deseni), DB-de olmayan markalar raporlanir (once marka seed), v8.89 hata kurali (_bulkErrAlert). (4) URUN FORMU CASCADE: Urun Ekle modalina -Marka & Urun Ailesi- blogu (opsiyonel) — canonical marka datalist-i + secilen markanin aile select-i; aile secilince URUN ADI + KATEGORI otomatik dolar (kategori canliya cozumlenir, kategori paneli tetiklenir). Serbest giris aynen kalir. Submit artik brand alanini da yazar (ana formda marka alani HIC YOKTU). (5) WIZARD: wiz-product-brand serbest metnine canonical datalist onerisi eklendi (davranis degismedi). node 0.'],
   'v8.95': ['GUVENLIK BOLME SIHIRBAZI (v8.60-ta ertelenen is) — v8.47 urun-tasima araci 4 adimli sihirbaza donusturuldu (openSecurityMigrateModal, buton: Guvenlik Bolme Sihirbazi). ADIM 1 HEDEF DOGRULAMA: 14 hedef canli kategorilere _norm ile cozumlenir; eksikler tek tikla olusturulur (addDoc visible:true), gizliler acilir — v8.47-nin -hedeflerin var olmasi gerekir- varsayimi artik dogrulaniyor (sessiz Digere dusme onlenir). ADIM 2 URUNLER: v8.47 cekirdegi korundu + GRC ve PKI/Sertifika hedefleri ve regex kurallari eklendi (v8.41/v8.42 profesyonel semalari araca bagli degildi); yazilan deger artik CANLI kategori ADI (onceden dahili hedef etiketi yaziliyordu — canli ad farkliysa uyumsuzluk olusurdu); vendor_products.productCategory denorm guncellemesi aynen. ADIM 3 VENDORLAR (YENI): categories/specializations/distributedCategories alanlarinda genis Guvenlik iceren vendorlar listelenir; oneri = tasinan urunlerinin suggest() sonuclari + marka kategorileri (brands kesisimi); kaydette genis kayit ilgili alanlardan cikarilir, secilen hedefler AYNI alanlara eklenir; hic secim yapilmayan vendor yazilmaz (kategorisiz birakma riski yok). Boylece kategori x marka gorunumu (v8.93) ve cascade marka secici de temizlenir. ADIM 4 KAPANIS (YENI): urun+vendor sayaclari canli sorgulanir; ikisi de 0 olunca genis Guvenlik kategorileri gizlenir (visible:false) — SILINMEZ, CATEGORY_FIELDS Guvenlik semasi eski veri icin fallback kalir. Tum toplu yazimlar v8.89 kuralina uygun: ilk hatada dur + _bulkErrAlert ile gercek sebep. Adimlar idempotent, serbest gezinilebilir. node 0.'],
   'v8.94.1': ['HOTFIX — v8.94 denetiminden kacan 1 render hasari daha (AST/acorn tabanli bagimsiz tarama ile bulundu). Admin erisim-reddi ekrani (renderAdmin, ~27455): backtick template icinde concat formu \'+_L("You do not have access...","Bu bolume erisim yetkiniz yok.")+\' kalmis — yetkisiz kullanici kilit ikonunun yaninda HAM KOD gorecekti. Dolar-suslu _L interpolasyonuna cevrildi. Dogrulama: acorn AST taramasi tum dosyada TEMPLATE_CONCAT_LEAK=0, STRING_DOLLAR_LEAK=0 (CHANGELOG metinlerindeki 4 yanlis pozitif haric), node --check OK, i18n_audit.py yeni sinif bulgu yok. RULES degismedi.'],
   'v8.94': ['RENDER HASARI TEMIZLIGI (KRITIK — kullanici HAM KOD goruyordu). Hasan-in ekran goruntusu: Distributor > Urunlerim basliginda -\'+_L("My Distribution Products","Dagitim Urunlerim")+\'- ham kod olarak gorunuyordu. KOK NEDEN: toplu i18n islemcim (v8.76-8.84) concat formu (\'+_L(..)+\') kullandi ama bu string-ler TEMPLATE LITERAL (backtick) icindeydi; orada ${..} gerekiyordu. Denetim 9 render hasari + 6 escape hasari buldu. DUZELTILEN: (a) benim _L hasarim 5 yerde (3925 Onayli rozeti, 9727 Etkinlikler yukleniyor, 9785 Duzenleyen, 11081 Dagitim Urunlerim basligi, 12640 katalog-disi PoC notu); (b) ESKI t() gecisinden kalma hasar 3 yerde (11091-11092 tablo basliklari, 12645 Yukleniyor); (c) ESKI escape hasari 6 satir (11106-11111: \\${p.name} gibi — urun adi/uretici/kategori/rozet yerine HAM ${p.name} metni basiyordu; yani distributor tablosu urun varken TAMAMEN bozuk cikacakti, 0 urun oldugu icin fark edilmemisti). Distributor urunleri blogu (11079-11117) bastan temiz yazildi + escHtml eklendi (XSS sertlestirme). (d) YANLIS POZITIF dogrulandi: ${..} IFADESI icindeki concat GECERLIDIR (7821, 4571) — dokunulmadi. KALICI KORUMA: i18n_audit.py-ye RENDER HASARI TESPITI eklendi — template literal icinde concat + escape-li ${..} tarar; bozuk v8.93-e karsi test edildi (9+6 yakaladi), duzeltilmis surumde TEMIZ. node 0.'],
@@ -23936,6 +23937,15 @@ function attachWizardHandlers(card) {
 
   // Adım 3 → Adım 4: ürün ekle (veya atla)
   if (WIZ_STEP === 3) {
+    // v8.96: wizard marka alanına canonical öneri listesi (serbest metin kalır ama önerilir)
+    (function(){
+      try {
+        var inp=card.querySelector('#wiz-product-brand'); if(!inp) return;
+        var dl=document.createElement('datalist'); dl.id='wiz-brand-dl'; card.appendChild(dl);
+        inp.setAttribute('list','wiz-brand-dl');
+        getBrands().then(function(bl){ dl.innerHTML=(bl||[]).filter(function(b){ return b.status!=='pending' && b.visible!==false; }).map(function(b){ return '<option value="'+escHtml(b.name)+'">'; }).join(''); }).catch(function(){});
+      } catch(e){}
+    })();
     card.querySelector('#wiz-skip-prod')?.addEventListener('click', function(){
       WIZ_STEP = 4; renderWizardStep(card);
     });
@@ -26859,6 +26869,11 @@ async function openAddProductModal(prefillCat) {
     '<div style="padding:20px;border-right:1px solid rgba(15,23,42,.08);overflow-y:auto;background:#ffffff">' +
     '<div style="font-size:10px;color:rgba(37,99,235,.9);font-weight:700;letter-spacing:.8px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(37,99,235,.2)">'+t('vpf.sec_basic','TEMEL BİLGİLER')+'</div>' +
 
+    '<label class="lbl t-w8">'+_L('Brand & Product Family','Marka & Ürün Ailesi')+' <span style="font-weight:400;color:#94a3b8;font-size:11px">'+_L('(optional — autofills name & category)','(opsiyonel — ad ve kategoriyi doldurur)')+'</span></label>' +
+    '<input class="inp" id="pr-brand" list="pr-brand-dl" autocomplete="off" placeholder="'+_L('Brand...','Marka...')+'" style="margin-bottom:8px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155">' +
+    '<datalist id="pr-brand-dl"></datalist>' +
+    '<select class="inp" id="pr-family" style="margin-bottom:14px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155;display:none"></select>' +
+
     '<label class="lbl t-w8">'+t('vpf.f_name','Ürün Adı')+' <span class="t-red">*</span></label>' +
     '<input class="inp" id="pr-name" placeholder="'+t('vpf.ph_name','Ürün adı')+'" style="margin-bottom:14px;font-size:13px;background:#ffffff;border-color:rgba(15,23,42,.10);color:#334155">' +
 
@@ -26984,6 +26999,37 @@ async function openAddProductModal(prefillCat) {
     searchEl.addEventListener('keydown', function(e){ if(e.key==='Escape') listEl.style.display='none'; });
     modal.addEventListener('mousedown', function(e){ if(comboEl && !comboEl.contains(e.target)) listEl.style.display='none'; });
     if(prefillCat){ pick(prefillCat); }
+  })();
+  // ── v8.96: marka → ürün ailesi → ad + kategori otomatik dolum (şablon = brand_products referansı)
+  (function(){
+    var bEl=modal.querySelector('#pr-brand'), dl=modal.querySelector('#pr-brand-dl'), fEl=modal.querySelector('#pr-family');
+    if(!bEl||!dl||!fEl) return;
+    function setCatByName(catName){
+      var hiddenEl=modal.querySelector('#pr-cat'), searchEl=modal.querySelector('#pr-cat-search');
+      var c=(cats||[]).filter(function(x){ return x.visible!==false && _normCat(x.name)===_normCat(catName); })[0];
+      if(!c||!hiddenEl) return false;
+      hiddenEl.value=c.name; if(searchEl) searchEl.value=catLabel(c);
+      hiddenEl.dispatchEvent(new Event('change'));
+      return true;
+    }
+    function refreshFam(){
+      var fams=brandProductsFor(bEl.value);
+      if(!fams.length){ fEl.style.display='none'; fEl.innerHTML=''; fEl._fams=[]; return; }
+      fEl.innerHTML='<option value="">'+_L('— pick product family (autofills) —','— ürün ailesi seç (otomatik doldurur) —')+'</option>'+fams.map(function(p,i){ return '<option value="'+i+'">'+escHtml(p.name)+(p.category?(' · '+escHtml(p.category)):'')+'</option>'; }).join('');
+      fEl.style.display='block'; fEl._fams=fams;
+    }
+    Promise.all([getBrands().catch(function(){return [];}), getBrandProducts().catch(function(){return [];})]).then(function(rs){
+      var bl=rs[0]||[];
+      dl.innerHTML = bl.filter(function(b){ return b.status!=='pending' && b.visible!==false; }).map(function(b){ return '<option value="'+escHtml(b.name)+'">'; }).join('');
+      refreshFam();
+    });
+    bEl.addEventListener('change', refreshFam);
+    bEl.addEventListener('input', refreshFam);
+    fEl.addEventListener('change', function(){
+      var p=(fEl._fams||[])[parseInt(fEl.value,10)]; if(!p) return;
+      var nameEl=modal.querySelector('#pr-name'); if(nameEl) nameEl.value=p.name;
+      if(p.category) setCatByName(p.category);
+    });
   })();
   modal.querySelectorAll('input[name="pr-origin"]').forEach(function(radio) {
     radio.addEventListener('change', function() {
@@ -27173,6 +27219,7 @@ async function openAddProductModal(prefillCat) {
         vendorId:      CUR_USER.uid,
         vendorName:    CUR_PROFILE?.displayName||CUR_USER.email,
         vendorEmail:   CUR_USER.email,
+        brand:         (modal.querySelector('#pr-brand')?.value||'').trim(),
         name, category: cat,
         origin,
         sectors:       readSectorPills(modal),
@@ -43007,6 +43054,420 @@ async function admOffers(m) {
 //  eşleşmeyenler admin ekranında raporlanır.
 //  Parti 1: Güvenlik ailesi (2025-26 M&A web'den doğrulandı)
 // ═══════════════════════════════════════════════════════════════════
+// v8.96: MARKA URUN AILESI SABLONLARI — canli urun DEGIL, referans sablonu (sahiplik modeli bozulmaz).
+// Kategori adlari BRAND_SEED dagarcigi + Guvenlik Sihirbazi hedefleriyle ayni canonical kumeden.
+// Hizmet markalari (danismanlik/ajans/lojistik) kapsam disi — urun ailesi kavrami uygulanamaz.
+var BRAND_PRODUCT_SVC = ['WPP','Publicis Sapient','Dentsu','Omnicom','DHL Supply Chain','Kuehne+Nagel','DSV','Ekol Lojistik','Accenture','Deloitte','PwC','EY','KPMG','Capgemini','Infosys','TCS','Wipro','Cognizant','DXC Technology','Atos','Kyndryl','HCLTech','Innova','Obase','Sabancı DX','KoçDigital'];
+var BRAND_PRODUCT_SEED = [
+{b:'1Password',i:[['1Password Business','Erişim Yönetimi']]},
+{b:'6sense',i:[['Revenue AI (ABM)','Hesap Odaklı Pazarlama Platformları']]},
+{b:'8x8',i:[['8x8 Work (UCaaS)','Hizmet Olarak Birleşik İletişim'],['8x8 Contact Center','Hizmet Olarak İletişim Merkezi']]},
+{b:'A10 Networks',i:[['Thunder ADC','Ağ Çözümleri (Networking)'],['Thunder TPS (DDoS)','Ağ Güvenliği'],['Thunder CGN','Network']]},
+{b:'ABBYY',i:[['Vantage (IDP)','Akıllı Belge İşleme'],['FineReader','Akıllı Belge İşleme']]},
+{b:'ACI Worldwide',i:[['ACI Enterprise Payments','Bankacılık Ödeme Merkezi Platformları'],['ACI Fraud Management','Bankacılık Ödemelerinde Dolandırıcılık Tespiti']]},
+{b:'ADP',i:[['ADP Workforce Now','1.000\'den Fazla Çalışanı Olan İşletmeler için HCM Paketleri'],['ADP GlobalView Payroll','1.000\'den Fazla Çalışanı Olan İşletmeler için HCM Paketleri']]},
+{b:'ASELSAN',i:[['Haberleşme Sistemleri','UxS Komuta ve Kontrol'],['Elektro-Optik Sistemler','UxS Komuta ve Kontrol'],['Radar Sistemleri','UxS Komuta ve Kontrol']]},
+{b:'Abnormal Security',i:[['Abnormal AI (Email)','E-posta Güvenliği']]},
+{b:'Acquia',i:[['Acquia Cloud (Drupal)','Dijital Deneyim Platformları'],['Acquia DAM','Dijital Varlık Yönetimi Platformları']]},
+{b:'Acronis',i:[['Cyber Protect','Yedekleme'],['Cyber Protect Cloud (MSP)','Yedekleme ve Veri Koruma Platformları']]},
+{b:'Adobe',i:[['Experience Manager (AEM)','Dijital Deneyim Platformları'],['Adobe Analytics','Müşteri Yolculuğu Analitiği ve Koordinasyonu'],['Adobe Commerce (Magento)','Dijital Ticaret'],['Marketo Engage','B2B Pazarlama Otomasyon Platformları'],['Creative Cloud','Yazılım'],['Adobe Experience Platform (CDP)','Müşteri Veri Platformları']]},
+{b:'Agiloft',i:[['Agiloft CLM','Sözleşme Yaşam Döngüsü Yönetimi']]},
+{b:'Akamai',i:[['App & API Protector','WAF'],['Guardicore Segmentation','Ağ Güvenliği Mikro-segmentasyonu'],['Prolexic (DDoS)','Ağ Güvenliği'],['CDN','Ağ Çözümleri (Networking)']]},
+{b:'Akeneo',i:[['Akeneo PIM','Ürün Bilgi Yönetimi Çözümleri']]},
+{b:'Alation',i:[['Data Catalog','Veri ve Analitik Yönetişim Platformları']]},
+{b:'Algolia',i:[['AI Search & Discovery','Arama ve Ürün Keşfi']]},
+{b:'Alibaba Cloud',i:[['ECS','Stratejik Bulut Platform Hizmetleri'],['ApsaraDB','Bulut Veritabanı Yönetim Sistemleri']]},
+{b:'Amazon Web Services',i:[['EC2 / Compute','Stratejik Bulut Platform Hizmetleri'],['S3 / Depolama','Stratejik Bulut Platform Hizmetleri'],['RDS / Aurora','Bulut Veritabanı Yönetim Sistemleri'],['EKS','Konteyner Yönetimi'],['Bedrock','Yapay Zeka Uygulama Geliştirme Platformları']]},
+{b:'Amdocs',i:[['CES (BSS/OSS Suite)','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri'],['Amdocs Billing','CSP AI Destekli Gelir Yönetimi ve Para Kazanma Çözümleri']]},
+{b:'Analytic Partners',i:[['GPS Enterprise (MMM)','Pazarlama Karması Modelleme Çözümleri']]},
+{b:'Anaplan',i:[['Anaplan Platform','Finansal Planlama Yazılımı']]},
+{b:'Anduril',i:[['Lattice OS','UxS Komuta ve Kontrol'],['Otonom Sistemler','UxS Komuta ve Kontrol']]},
+{b:'Anomali',i:[['ThreatStream','Siber Tehdit İstihbarat Teknolojileri']]},
+{b:'Anthropic',i:[['Claude for Enterprise','Kurumsal Yapay Zeka Asistanları'],['Claude API','Yapay Zeka Uygulama Geliştirme Platformları'],['Claude Code','Kurumsal Yapay Zeka Kodlama Ajanları']]},
+{b:'Apigee',i:[['Apigee API Management','API Yönetimi']]},
+{b:'Appian',i:[['Appian Platform','İş Süreçleri Koordinasyonu ve Otomasyon Teknolojileri']]},
+{b:'Aqua Security',i:[['Aqua Platform','Bulut Tabanlı Uygulama Koruma Platformları']]},
+{b:'Archer',i:[['Archer GRC','Yönetişim, Risk ve Uyumluluk Araçları']]},
+{b:'Ariba',i:[['SAP Ariba Procurement','Kaynak-Ödeme Paketleri']]},
+{b:'Arista Networks',i:[['7000 Serisi Switch','Network'],['CloudVision','Ağ Çözümleri (Networking)'],['NDR (Awake)','Ağ Algılama ve Müdahale']]},
+{b:'Aruba',i:[['Access Points (Wi-Fi)','Kurumsal Kablolu ve Kablosuz LAN'],['CX Switch Serisi','Network'],['ClearPass','NAC'],['EdgeConnect SD-WAN','Küresel WAN Hizmetleri'],['Aruba Central','Ağ Çözümleri (Networking)']]},
+{b:'Asana',i:[['Asana Work Management','İşbirliğine Dayalı İş Yönetimi']]},
+{b:'Atlassian',i:[['Jira','ITSM & Proje Yönetimi'],['Confluence','İşbirliğine Dayalı İş Yönetimi'],['Bitbucket','DevOps Araçları'],['Jira Service Management','BT Hizmet Yönetimi Platformları']]},
+{b:'Autodesk',i:[['AutoCAD','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['Fusion','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['Revit (BIM)','Kuruluşun Dijital İkizi Platformları']]},
+{b:'Automation Anywhere',i:[['Automation Success Platform','Robotik Süreç Otomasyonu']]},
+{b:'Barracuda',i:[['CloudGen Firewall','Firewall'],['Email Protection','E-posta Güvenliği'],['WAF-as-a-Service','WAF']]},
+{b:'Baykar',i:[['Bayraktar TB2/TB3','UxS Komuta ve Kontrol'],['Bayraktar AKINCI','UxS Komuta ve Kontrol'],['KIZILELMA','UxS Komuta ve Kontrol']]},
+{b:'Beekeeper',i:[['Frontline Success Platform','Ön Saf Çalışanları için İletişim Uygulamaları']]},
+{b:'Bentley Systems',i:[['iTwin / MicroStation','Kuruluşun Dijital İkizi Platformları']]},
+{b:'Berqnet',i:[['Berqnet Firewall','Firewall'],['SASE Çözümü','SASE Platformları']]},
+{b:'BeyondTrust',i:[['Password Safe / Privilege Management','Ayrıcalıklı Erişim Yönetimi'],['Remote Support','BT Hizmet Yönetimi Platformları']]},
+{b:'Bill.com',i:[['BILL AP/AR','Satıcı Borçları Uygulamaları']]},
+{b:'BitSight',i:[['Cyber Risk Ratings','Üçüncü Taraf Risk Yönetimi']]},
+{b:'Bitdefender',i:[['GravityZone','Uç Nokta Güvenliği (Endpoint)'],['GravityZone XDR','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Black Duck',i:[['Black Duck SCA','Yazılım Tedarik Zinciri Güvenliği']]},
+{b:'BlackLine',i:[['Financial Close Management','Mali Kapanış ve Konsolidasyon Çözümleri'],['Invoice-to-Cash','Alacak Hesapları Uygulamaları']]},
+{b:'Blue Prism',i:[['SS&C Blue Prism','Robotik Süreç Otomasyonu']]},
+{b:'Blue Yonder',i:[['Luminate Planning','Tedarik Zinciri Planlama Çözümleri'],['Warehouse Management','Depo Yönetim Sistemleri'],['Transportation Management','Taşımacılık Yönetim Sistemleri']]},
+{b:'Boomi',i:[['Boomi Enterprise Platform','Hizmet Olarak Entegrasyon Platformu']]},
+{b:'Brandefense',i:[['Dijital Risk Koruma','Siber Tehdit İstihbarat Teknolojileri']]},
+{b:'Brandwatch',i:[['Consumer Intelligence','Sosyal Medya Yönetimi ve Dinleme']]},
+{b:'Braze',i:[['Braze Customer Engagement','Çok Kanallı Pazarlama Merkezleri']]},
+{b:'Bynder',i:[['Bynder DAM','Dijital Varlık Yönetimi Platformları']]},
+{b:'Cato Networks',i:[['Cato SASE Cloud','SASE Platformları']]},
+{b:'Celonis',i:[['Process Intelligence Platform','Süreç Zekası Platformları']]},
+{b:'Chargebee',i:[['Chargebee Billing','Tekrarlayan Faturalandırma Uygulamaları']]},
+{b:'Check Point',i:[['Quantum (NGFW)','Firewall'],['Harmony SASE','SASE Platformları'],['Harmony Email & Collaboration','E-posta Güvenliği'],['CloudGuard','Bulut Tabanlı Uygulama Koruma Platformları'],['Harmony Endpoint','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Checkmarx',i:[['Checkmarx One','Uygulama Güvenliği Testleri']]},
+{b:'Chronosphere',i:[['Chronosphere Observability','Gözlemlenebilirlik Platformları']]},
+{b:'Cisco',i:[['Secure Firewall (Firepower)','Firewall'],['Catalyst Switch/AP','Network'],['Meraki','Ağ Çözümleri (Networking)'],['Cisco ISE','NAC'],['Umbrella','Ağ Güvenliği'],['Secure Endpoint','Uç Nokta Güvenliği (Endpoint)'],['Webex','Tümleşik İletişim (UCaaS)'],['Splunk','SIEM']]},
+{b:'Cision',i:[['CisionOne / PR Newswire','Halkla İlişkiler ve Medya İzleme Araçları'],['Brandwatch','Sosyal Medya Yönetimi ve Dinleme']]},
+{b:'Citrix',i:[['Citrix DaaS / Virtual Apps and Desktops','Hizmet Olarak Masaüstü'],['NetScaler','Ağ Çözümleri (Networking)']]},
+{b:'Clari',i:[['Revenue Platform','Gelir Oluşturma Platformları']]},
+{b:'CloudBees',i:[['CloudBees CI','DevOps Araçları']]},
+{b:'Cloudera',i:[['Cloudera Data Platform','Veri Gölü Platformları']]},
+{b:'Cloudflare',i:[['Cloudflare One (SASE)','SASE Platformları'],['WAF / DDoS','WAF'],['Workers (Edge)','Stratejik Bulut Platform Hizmetleri'],['Zero Trust Access','Güvenlik Hizmeti Kenarı']]},
+{b:'Cognition Devin',i:[['Devin (AI Yazılım Mühendisi)','Kurumsal Yapay Zeka Kodlama Ajanları']]},
+{b:'Cohesity',i:[['DataProtect','Yedekleme'],['FortKnox (Cyber Vault)','Yedekleme ve Veri Koruma Platformları'],['SmartFiles','Storage']]},
+{b:'Collibra',i:[['Data Intelligence Platform','Veri ve Analitik Yönetişim Platformları'],['Data Quality & Observability','Veri ve Analitik Yönetişim Platformları']]},
+{b:'Commvault',i:[['Commvault Cloud (Metallic)','Yedekleme ve Veri Koruma Platformları'],['Backup & Recovery','Yedekleme'],['HyperScale X','Yedekleme']]},
+{b:'Conga',i:[['Conga CPQ / CLM','Sözleşme Yaşam Döngüsü Yönetimi']]},
+{b:'Contentful',i:[['Composable Content Platform','Dijital Deneyim Platformları']]},
+{b:'Corelight',i:[['Open NDR Platform','Ağ Algılama ve Müdahale']]},
+{b:'Couchbase',i:[['Couchbase Server / Capella','Bulut Veritabanı Yönetim Sistemleri']]},
+{b:'Coupa',i:[['Coupa BSM (Source-to-Pay)','Kaynak-Ödeme Paketleri'],['Coupa Treasury','Bulut Finans Yönetimi Araçları']]},
+{b:'Coveo',i:[['Relevance Platform','Arama ve Ürün Keşfi']]},
+{b:'Crayon',i:[['Competitive Intelligence','Rekabet ve Pazar İstihbarat Platformları']]},
+{b:'Credo AI',i:[['AI Governance Platform','Yapay Zeka Yönetişim Platformları']]},
+{b:'Criteo',i:[['Commerce Media Platform','Reklam Platformları']]},
+{b:'CrowdStrike',i:[['Falcon Insight (EDR)','Uç Nokta Güvenliği (Endpoint)'],['Falcon Complete (MDR)','Uç Nokta Koruma'],['Falcon Cloud Security','Bulut Tabanlı Uygulama Koruma Platformları'],['Falcon Next-Gen SIEM','SIEM'],['Falcon Identity Protection','Kimlik Yönetimi (IAM)']]},
+{b:'Crypttech',i:[['CryptoSIM (SIEM)','SIEM'],['CryptoLOG','SIEM']]},
+{b:'Cursor',i:[['Cursor AI Editor','Kurumsal Yapay Zeka Kodlama Ajanları']]},
+{b:'CyberArk',i:[['Privileged Access Manager','Ayrıcalıklı Erişim Yönetimi'],['CyberArk Identity','Kimlik Yönetimi (IAM)'],['Conjur (Secrets)','Ayrıcalıklı Erişim Yönetimi']]},
+{b:'Cybereason',i:[['Defense Platform (EDR)','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Darktrace',i:[['Darktrace / NETWORK','Ağ Algılama ve Müdahale'],['Darktrace / EMAIL','E-posta Güvenliği']]},
+{b:'Dassault Systèmes',i:[['3DEXPERIENCE','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['CATIA','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['SOLIDWORKS','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['DELMIA','Ayrık Üretim Sektörlerinde PLM Yazılımı']]},
+{b:'DataRobot',i:[['AI Platform','Veri Bilimi ve Makine Öğrenimi için Yapay Zeka Platformları']]},
+{b:'Databricks',i:[['Data Intelligence Platform (Lakehouse)','Veri Gölü Platformları'],['Mosaic AI','Veri Bilimi ve Makine Öğrenimi için Yapay Zeka Platformları'],['Delta Lake','Veri Gölü Platformları']]},
+{b:'Datadog',i:[['Infrastructure Monitoring','Gözlemlenebilirlik Platformları'],['APM','Gözlemlenebilirlik Platformları'],['Log Management','Gözlemlenebilirlik Platformları'],['Cloud SIEM','SIEM']]},
+{b:'Dataiku',i:[['Dataiku Universal AI','Veri Bilimi ve Makine Öğrenimi için Yapay Zeka Platformları']]},
+{b:'Dayforce',i:[['Dayforce HCM','1.000\'den Fazla Çalışanı Olan İşletmeler için HCM Paketleri']]},
+{b:'Delinea',i:[['Secret Server','Ayrıcalıklı Erişim Yönetimi']]},
+{b:'Dell Technologies',i:[['PowerEdge','Server'],['PowerStore','Storage'],['PowerMax','Storage'],['PowerProtect / Data Domain','Yedekleme'],['VxRail','Dağıtılmış Hibrit Altyapı'],['PowerSwitch','Network']]},
+{b:'Demandbase',i:[['Demandbase One (ABM)','Hesap Odaklı Pazarlama Platformları']]},
+{b:'Deque Systems',i:[['axe DevTools','Dijital Erişilebilirlik']]},
+{b:'Descartes Systems',i:[['Global Logistics Network','Küresel Ticaret Uyumluluk Çözümleri'],['Descartes TMS','Taşımacılık Yönetim Sistemleri']]},
+{b:'DigiCert',i:[['TLS/PKI Sertifikaları','PKI / Sertifika Yönetimi'],['DigiCert ONE','PKI / Sertifika Yönetimi']]},
+{b:'DigitalOcean',i:[['Droplets','Altyapı Platformu Kullanım Hizmetleri'],['Managed Kubernetes (DOKS)','Konteyner Yönetimi']]},
+{b:'Diligent',i:[['Diligent One (Board/GRC)','Yönetişim, Risk ve Uyumluluk Araçları']]},
+{b:'Docker',i:[['Docker Desktop / Hub','Konteyner Yönetimi']]},
+{b:'DocuSign',i:[['eSignature','Sözleşme Yaşam Döngüsü Yönetimi'],['DocuSign CLM','Sözleşme Yaşam Döngüsü Yönetimi']]},
+{b:'Duck Creek Technologies',i:[['Duck Creek Suite','SaaS P&C Sigorta Çekirdek Platformları, Kuzey Amerika']]},
+{b:'Duo Security',i:[['Cisco Duo (MFA)','Kimlik Doğrulama']]},
+{b:'Dynamic Yield',i:[['Experience OS (Kişiselleştirme)','Kişiselleştirme Motorları']]},
+{b:'Dynatrace',i:[['Dynatrace Platform (Grail)','Gözlemlenebilirlik Platformları'],['Application Security','Bulut Tabanlı Uygulama Koruma Platformları']]},
+{b:'E2open',i:[['E2open Supply Chain Platform','Tedarik Zinciri Yönetimi Paketleri']]},
+{b:'ESET',i:[['PROTECT Platform','Uç Nokta Güvenliği (Endpoint)'],['ESET Inspect (XDR)','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'ETQ',i:[['ETQ Reliance (QMS)','Kalite Yönetim Sistemi Yazılımı']]},
+{b:'EfficientIP',i:[['SOLIDserver (DDI)','Ağ Çözümleri (Networking)'],['DNS Guardian','Ağ Güvenliği']]},
+{b:'Elastic',i:[['Elasticsearch','Arama ve Ürün Keşfi'],['Elastic Observability','Gözlemlenebilirlik Platformları'],['Kibana','Analitik ve İş Zekası Platformları']]},
+{b:'Elastic Security',i:[['Elastic Security (SIEM)','SIEM']]},
+{b:'Entrust',i:[['PKI / Certificate Solutions','PKI / Sertifika Yönetimi'],['nShield HSM','Veri Güvenliği & DLP']]},
+{b:'Envoy',i:[['Envoy Workplace','İş Yeri Deneyimi Uygulamaları']]},
+{b:'Epic Systems',i:[['Epic EHR','Kurumsal Elektronik Sağlık Kayıtları']]},
+{b:'Epicor',i:[['Kinetic (ERP)','Bulut ERP Hizmetleri'],['Prophet 21','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'Equinix',i:[['IBX Colocation','Veri Merkezi Dış Kaynak Hizmetleri'],['Equinix Fabric','Veri Merkezi Dış Kaynak Hizmetleri'],['Equinix Metal','Stratejik Bulut Platform Hizmetleri']]},
+{b:'Ericsson',i:[['Radio System (RAN)','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri'],['Cloud Core','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri'],['Ericsson Charging (BSS)','CSP AI Destekli Gelir Yönetimi ve Para Kazanma Çözümleri']]},
+{b:'Exabeam',i:[['New-Scale SIEM','SIEM']]},
+{b:'ExtraHop',i:[['RevealX (NDR)','Ağ Algılama ve Müdahale']]},
+{b:'Extreme Networks',i:[['Switch/AP Portföyü','Network'],['ExtremeCloud IQ','Ağ Çözümleri (Networking)'],['Fabric Connect','Network']]},
+{b:'F5',i:[['BIG-IP LTM/GTM','Ağ Çözümleri (Networking)'],['Advanced WAF','WAF'],['NGINX','Ağ Çözümleri (Networking)'],['Distributed Cloud (XC)','Bulut Tabanlı Uygulama Koruma Platformları']]},
+{b:'FIS',i:[['Modern Banking Platform','Temel Bankacılık Sistemleri'],['Worldpay','Bankacılık Ödeme Merkezi Platformları']]},
+{b:'Featurespace',i:[['ARIC Risk Hub','Bankacılık Ödemelerinde Dolandırıcılık Tespiti']]},
+{b:'Feedzai',i:[['Financial Crime Platform','Bankacılık Ödemelerinde Dolandırıcılık Tespiti']]},
+{b:'Finastra',i:[['Kondor / Treasury','Bulut Finans Yönetimi Araçları'],['Fusion Essence','Temel Bankacılık Sistemleri'],['Global PAYplus','Bankacılık Ödeme Merkezi Platformları']]},
+{b:'Fineksus',i:[['PayGate (SWIFT/Ödeme)','Bankacılık Ödeme Merkezi Platformları'],['AML Çözümleri','Bankacılık Ödemelerinde Dolandırıcılık Tespiti']]},
+{b:'Firstup',i:[['Intelligent Communication','Ön Saf Çalışanları için İletişim Uygulamaları']]},
+{b:'Fiserv',i:[['DNA / Signature (Core)','Temel Bankacılık Sistemleri'],['Clover','Bankacılık Ödeme Merkezi Platformları']]},
+{b:'Five9',i:[['Intelligent CX Platform','Hizmet Olarak İletişim Merkezi']]},
+{b:'Fivetran',i:[['Fivetran ELT','Veri Entegrasyon Araçları']]},
+{b:'Flexera',i:[['Flexera One','Yazılım Varlık Yönetimi Yönetilen Hizmetleri']]},
+{b:'Forcepoint',i:[['NGFW','Firewall'],['Forcepoint DLP','Veri Güvenliği & DLP'],['Forcepoint ONE (SSE)','SASE Platformları']]},
+{b:'Fortinet',i:[['FortiGate (NGFW)','Firewall'],['FortiSASE','SASE Platformları'],['FortiEDR','Uç Nokta Güvenliği (Endpoint)'],['FortiSIEM','SIEM'],['FortiMail','E-posta Güvenliği'],['FortiWeb (WAF)','WAF'],['FortiNAC','NAC'],['FortiSwitch/FortiAP','Network']]},
+{b:'FourKites',i:[['Real-Time Visibility','Tedarik Zinciri Yönetimi Paketleri']]},
+{b:'Freshworks',i:[['Freshdesk','CRM Müşteri Etkileşim Merkezi'],['Freshservice','BT Hizmet Yönetimi Platformları'],['Freshsales','CRM Satış Platformları']]},
+{b:'Fujitsu',i:[['PRIMERGY','Server'],['ETERNUS','Storage']]},
+{b:'Gainsight',i:[['Customer Success Platform','Müşteri Başarı Yönetimi Platformları']]},
+{b:'Genesys',i:[['Genesys Cloud CX','Hizmet Olarak İletişim Merkezi']]},
+{b:'GitHub',i:[['GitHub Enterprise','DevOps Araçları'],['GitHub Actions','DevOps Araçları'],['GitHub Advanced Security','DevSecOps Platformları'],['Copilot','Kurumsal Yapay Zeka Kodlama Ajanları']]},
+{b:'GitLab',i:[['GitLab DevSecOps Platform','DevSecOps Platformları'],['GitLab CI/CD','DevOps Araçları']]},
+{b:'Glean',i:[['Work AI (Kurumsal Arama)','Kurumsal Yapay Zeka Arama']]},
+{b:'Global Relay',i:[['Global Relay Archive','Dijital İletişim Yönetişimi ve Arşivleme Çözümleri']]},
+{b:'Gong',i:[['Revenue Intelligence','Gelir Oluşturma Platformları']]},
+{b:'Google Ads',i:[['Google Ads / DV360','Reklam Platformları']]},
+{b:'Google Cloud',i:[['Compute Engine','Stratejik Bulut Platform Hizmetleri'],['BigQuery','Veri Gölü Platformları'],['GKE','Konteyner Yönetimi'],['Cloud SQL / Spanner','Bulut Veritabanı Yönetim Sistemleri'],['Vertex AI','Yapay Zeka Uygulama Geliştirme Platformları']]},
+{b:'Google Gemini',i:[['Gemini for Workspace','Kurumsal Yapay Zeka Asistanları'],['Gemini API','Yapay Zeka Uygulama Geliştirme Platformları']]},
+{b:'Google Workspace',i:[['Google Workspace (Gmail/Drive/Meet)','Hibrit Çalışma Araçları']]},
+{b:'Grafana Labs',i:[['Grafana','Gözlemlenebilirlik Platformları'],['Loki / Tempo / Mimir','Gözlemlenebilirlik Platformları']]},
+{b:'Greenhouse',i:[['Greenhouse Recruiting','Yetenek Kazanımı (İşe Alım) Paketleri']]},
+{b:'Group-IB',i:[['Threat Intelligence','Siber Tehdit İstihbarat Teknolojileri'],['Fraud Protection','Bankacılık Ödemelerinde Dolandırıcılık Tespiti']]},
+{b:'Guardicore',i:[['Akamai Guardicore Segmentation','Ağ Güvenliği Mikro-segmentasyonu']]},
+{b:'Guidewire',i:[['InsuranceSuite (PolicyCenter/ClaimCenter)','SaaS P&C Sigorta Çekirdek Platformları, Kuzey Amerika']]},
+{b:'H2O.ai',i:[['H2O AI Cloud','Veri Bilimi ve Makine Öğrenimi için Yapay Zeka Platformları']]},
+{b:'HAVELSAN',i:[['ADVENT Komuta Kontrol','UxS Komuta ve Kontrol'],['Simülasyon Sistemleri','UxS Komuta ve Kontrol'],['DOOB / Kamu Yazılımları','Yazılım']]},
+{b:'HCL AppScan',i:[['AppScan (DAST/SAST)','Uygulama Güvenliği Testleri']]},
+{b:'HPE',i:[['ProLiant','Server'],['Alletra','Storage'],['SimpliVity','Dağıtılmış Hibrit Altyapı'],['GreenLake','Hibrit Bulut Çözümleri'],['StoreOnce','Yedekleme'],['Synergy','Server']]},
+{b:'Harness',i:[['Harness CD','DevOps Araçları'],['Harness CI','DevOps Araçları']]},
+{b:'HashiCorp',i:[['Terraform','Hizmet Koordinasyonu ve Otomasyon Platformları'],['Vault','Ayrıcalıklı Erişim Yönetimi'],['Consul','Hizmet Koordinasyonu ve Otomasyon Platformları'],['Nomad','Konteyner Yönetimi']]},
+{b:'HighRadius',i:[['Order-to-Cash Suite','Alacak Hesapları Uygulamaları']]},
+{b:'Hillstone Networks',i:[['A/E-Serisi NGFW','Firewall'],['sBDS (NDR)','Ağ Algılama ve Müdahale']]},
+{b:'Hitachi Vantara',i:[['VSP (Virtual Storage Platform)','Storage'],['HCP Object Storage','Storage'],['Pentaho','Analitik ve İş Zekası Platformları']]},
+{b:'Holistic AI',i:[['AI Governance & Risk','Yapay Zeka Yönetişim Platformları']]},
+{b:'Hootsuite',i:[['Hootsuite Social','Sosyal Medya Yönetimi ve Dinleme']]},
+{b:'Huawei',i:[['USG Firewall','Firewall'],['CloudEngine Switch','Network'],['OceanStor','Storage'],['FusionSphere','Sanallaştırma']]},
+{b:'HubSpot',i:[['Marketing Hub','B2B Pazarlama Otomasyon Platformları'],['Sales Hub','CRM Satış Platformları'],['Service Hub','CRM Müşteri Etkileşim Merkezi']]},
+{b:'Hyland',i:[['OnBase','Akıllı Belge İşleme'],['Alfresco','Akıllı Belge İşleme']]},
+{b:'IBM',i:[['Power Systems','Server'],['FlashSystem','Storage'],['Storage Defender','Yedekleme'],['watsonx','Yapay Zeka Uygulama Geliştirme Platformları'],['Db2','Veritabanı'],['WebSphere','Yazılım'],['Maximo','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'IBM QRadar',i:[['QRadar SIEM','SIEM'],['QRadar SOAR','SIEM']]},
+{b:'IFS',i:[['IFS Cloud','Bulut ERP Hizmetleri'],['IFS EAM','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'Icertis',i:[['Icertis CLM','Sözleşme Yaşam Döngüsü Yönetimi']]},
+{b:'Illumio',i:[['Illumio Core (Segmentation)','Ağ Güvenliği Mikro-segmentasyonu']]},
+{b:'Infinidat',i:[['InfiniBox','Storage'],['InfiniGuard','Yedekleme']]},
+{b:'Infobip',i:[['Omnichannel CPaaS','Hizmet Olarak İletişim Platformu']]},
+{b:'Infoblox',i:[['NIOS (DDI)','Ağ Çözümleri (Networking)'],['BloxOne Threat Defense','Ağ Güvenliği']]},
+{b:'Infor',i:[['CloudSuite (M3/LN)','Bulut ERP Hizmetleri'],['Infor WMS','Depo Yönetim Sistemleri']]},
+{b:'Informatica',i:[['IDMC (Intelligent Data Management Cloud)','Veri Entegrasyon Araçları'],['MDM','Meta Veri Yönetimi Çözümleri'],['Data Quality','Veri ve Analitik Yönetişim Platformları']]},
+{b:'InterSystems',i:[['IRIS Data Platform','Veritabanı'],['HealthShare / TrakCare','Kurumsal Elektronik Sağlık Kayıtları']]},
+{b:'Intertech',i:[['inter-Vision (Core Banking)','Temel Bankacılık Sistemleri']]},
+{b:'Invicti',i:[['Invicti (Netsparker) DAST','Uygulama Güvenliği Testleri']]},
+{b:'Ivalua',i:[['Ivalua Platform','Kaynak-Ödeme Paketleri']]},
+{b:'Ivanti',i:[['Neurons UEM','Uç Nokta Yönetim Araçları'],['Neurons ITSM','BT Hizmet Yönetimi Platformları'],['Neurons Patch Management','Uç Nokta Yönetim Araçları']]},
+{b:'JFrog',i:[['Artifactory','DevOps Araçları'],['JFrog Xray','Yazılım Tedarik Zinciri Güvenliği']]},
+{b:'Jaggaer',i:[['Jaggaer One','Kaynak-Ödeme Paketleri']]},
+{b:'Jamf',i:[['Jamf Pro','Uç Nokta Yönetim Araçları'],['Jamf Protect','Endpoint']]},
+{b:'Jenkins',i:[['Jenkins CI','DevOps Araçları']]},
+{b:'Juniper Networks',i:[['SRX Firewall','Firewall'],['EX/QFX Switch','Network'],['Mist AI (Wireless)','Kurumsal Kablolu ve Kablosuz LAN']]},
+{b:'Kariyer.net',i:[['İlan ve Aday Havuzu','Yetenek Kazanımı (İşe Alım) Paketleri']]},
+{b:'Kaspersky',i:[['Endpoint Security for Business','Uç Nokta Güvenliği (Endpoint)'],['KATA / KEDR','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Keeper Security',i:[['Keeper Enterprise','Erişim Yönetimi'],['KeeperPAM','Ayrıcalıklı Erişim Yönetimi']]},
+{b:'Kinaxis',i:[['Maestro (RapidResponse)','Tedarik Zinciri Planlama Çözümleri']]},
+{b:'Klaviyo',i:[['Klaviyo (E-posta/SMS)','E-posta Pazarlama']]},
+{b:'Klue',i:[['Klue CI Platform','Rekabet ve Pazar İstihbarat Platformları']]},
+{b:'Kofax',i:[['Tungsten TotalAgility','Akıllı Belge İşleme']]},
+{b:'Kolay İK',i:[['Kolay İK (Bordro/İzin)','1.000\'den Fazla Çalışanı Olan İşletmeler için HCM Paketleri']]},
+{b:'Kong',i:[['Kong Gateway','API Yönetimi'],['Kong Mesh','API Yönetimi']]},
+{b:'Kron',i:[['Krontech Single Connect (PAM)','Ayrıcalıklı Erişim Yönetimi']]},
+{b:'Kubernetes',i:[['Kubernetes (CNCF)','Konteyner Yönetimi']]},
+{b:'Körber',i:[['Körber WMS (HighJump)','Depo Yönetim Sistemleri']]},
+{b:'Labris Networks',i:[['Labris UTM','Firewall'],['Harpp DDoS Mitigator','Ağ Güvenliği']]},
+{b:'Lenovo',i:[['ThinkSystem','Server'],['ThinkAgile','Dağıtılmış Hibrit Altyapı']]},
+{b:'Level Access',i:[['Accessibility Platform','Dijital Erişilebilirlik']]},
+{b:'LogRhythm',i:[['LogRhythm SIEM','SIEM']]},
+{b:'LogicGate',i:[['Risk Cloud','Yönetişim, Risk ve Uyumluluk Araçları']]},
+{b:'Logo Yazılım',i:[['Logo Tiger','Kurumsal Yazılımlar (ERP/CRM)'],['Logo Netsis Wings','Kurumsal Yazılımlar (ERP/CRM)'],['Logo İşbaşı','Kurumsal Yazılımlar (ERP/CRM)'],['eLogo (e-Fatura)','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'Logsign',i:[['Logsign USO (SIEM)','SIEM']]},
+{b:'Looker',i:[['Looker (Google Cloud)','Analitik ve İş Zekası Platformları']]},
+{b:'LumApps',i:[['Employee Experience Platform','İntranet Paket Çözümleri']]},
+{b:'Mailchimp',i:[['Mailchimp (Intuit)','E-posta Pazarlama']]},
+{b:'Malwarebytes',i:[['ThreatDown (EDR)','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Mambu',i:[['Mambu Cloud Banking','Temel Bankacılık Sistemleri']]},
+{b:'ManageEngine',i:[['Endpoint Central','Uç Nokta Yönetim Araçları'],['ServiceDesk Plus','BT Hizmet Yönetimi Platformları'],['ADManager Plus','Kimlik Yönetimi (IAM)'],['OpManager','Ağ Çözümleri (Networking)'],['Log360','SIEM']]},
+{b:'Mandiant',i:[['Threat Intelligence','Siber Tehdit İstihbarat Teknolojileri'],['Mandiant IR (Google)','Siber Tehdit İstihbarat Teknolojileri']]},
+{b:'Manhattan Associates',i:[['Manhattan Active WM','Depo Yönetim Sistemleri'],['Manhattan Active TM','Taşımacılık Yönetim Sistemleri'],['Manhattan Active Omni','Dağıtılmış Sipariş Yönetimi']]},
+{b:'Marketo',i:[['Marketo Engage','B2B Pazarlama Otomasyon Platformları']]},
+{b:'MasterControl',i:[['Quality Excellence (QMS)','Kalite Yönetim Sistemi Yazılımı']]},
+{b:'Medallia',i:[['Medallia Experience Cloud','Müşteri Sesini Dile Getiren Platformlar']]},
+{b:'Meditech',i:[['Expanse EHR','Kurumsal Elektronik Sağlık Kayıtları']]},
+{b:'Meltwater',i:[['Media Intelligence Suite','Halkla İlişkiler ve Medya İzleme Araçları']]},
+{b:'Mendix',i:[['Mendix Platform','Kurumsal Düşük Kodlu Uygulama Platformları']]},
+{b:'Meta Ads',i:[['Meta Ads Manager','Reklam Platformları']]},
+{b:'MetricStream',i:[['ConnectedGRC','Yönetişim, Risk ve Uyumluluk Araçları']]},
+{b:'MicroStrategy',i:[['MicroStrategy ONE','Analitik ve İş Zekası Platformları']]},
+{b:'Microsoft 365',i:[['Microsoft 365 (Office/Teams)','Hibrit Çalışma Araçları'],['SharePoint','İntranet Paket Çözümleri'],['Exchange Online','Hibrit Çalışma Araçları']]},
+{b:'Microsoft Azure',i:[['Azure VM / Compute','Stratejik Bulut Platform Hizmetleri'],['Azure SQL','Bulut Veritabanı Yönetim Sistemleri'],['AKS','Konteyner Yönetimi'],['Azure OpenAI Service','Yapay Zeka Uygulama Geliştirme Platformları'],['Azure Arc','Hibrit Bulut Çözümleri']]},
+{b:'Microsoft Defender',i:[['Defender for Endpoint','Uç Nokta Güvenliği (Endpoint)'],['Defender for Office 365','E-posta Güvenliği'],['Defender for Cloud','Bulut Tabanlı Uygulama Koruma Platformları'],['Defender XDR','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Microsoft Dynamics 365',i:[['Dynamics 365 Finance & Operations','Bulut ERP Hizmetleri'],['Dynamics 365 Sales','CRM Satış Platformları'],['Business Central','Bulut ERP Hizmetleri'],['Dynamics 365 Customer Service','CRM Müşteri Etkileşim Merkezi']]},
+{b:'Microsoft Entra ID',i:[['Entra ID (Azure AD)','Kimlik Yönetimi (IAM)'],['Entra ID Governance','Kimlik Yönetimi (IAM)']]},
+{b:'Microsoft Intune',i:[['Intune UEM','Uç Nokta Yönetim Araçları']]},
+{b:'Microsoft Power Platform',i:[['Power Apps','Kurumsal Düşük Kodlu Uygulama Platformları'],['Power Automate','Robotik Süreç Otomasyonu'],['Power Pages','Kurumsal Düşük Kodlu Uygulama Platformları']]},
+{b:'Microsoft SQL Server',i:[['SQL Server 2022','Veritabanı']]},
+{b:'Microsoft Sentinel',i:[['Microsoft Sentinel (SIEM)','SIEM']]},
+{b:'Mikro Yazılım',i:[['Mikro Jump','Kurumsal Yazılımlar (ERP/CRM)'],['Mikro Fly','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'MikroTik',i:[['RouterOS / RouterBOARD','Network'],['CRS Switch Serisi','Network']]},
+{b:'Mimecast',i:[['Email Security','E-posta Güvenliği']]},
+{b:'Monday.com',i:[['monday work management','İşbirliğine Dayalı İş Yönetimi']]},
+{b:'MongoDB',i:[['MongoDB Atlas','Bulut Veritabanı Yönetim Sistemleri'],['Enterprise Advanced','Veritabanı']]},
+{b:'MuleSoft',i:[['Anypoint Platform','Hizmet Olarak Entegrasyon Platformu']]},
+{b:'NICE',i:[['CXone','Hizmet Olarak İletişim Merkezi'],['NICE WFM','İş Gücü Yönetimi (WFM) Teknolojisi']]},
+{b:'NICE Actimize',i:[['Xceed / AML Suite','Bankacılık Ödemelerinde Dolandırıcılık Tespiti']]},
+{b:'NVIDIA',i:[['DGX','Server'],['HGX / GPU Hızlandırıcılar','Bulut Yapay Zeka Altyapısı'],['AI Enterprise','Kurumsal Yapay Zeka Asistanları'],['Spectrum-X Networking','Network']]},
+{b:'Nebim',i:[['Nebim V3','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'NetApp',i:[['AFF / FAS (ONTAP)','Storage'],['StorageGRID','Storage'],['BlueXP','Hibrit Bulut Çözümleri']]},
+{b:'NetSuite',i:[['NetSuite ERP','Bulut ERP Hizmetleri'],['SuiteCommerce','Dijital Ticaret']]},
+{b:'Netaş',i:[['Telko Entegrasyon Çözümleri','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri'],['NOVA SOC Hizmetleri','Uç Nokta Koruma']]},
+{b:'Netcracker',i:[['Digital BSS/OSS','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri'],['Digital Platform','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri']]},
+{b:'Netgate pfSense',i:[['pfSense Plus','Firewall']]},
+{b:'Netsis',i:[['Netsis 3 Enterprise','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'Netskope',i:[['Netskope One (SSE)','SASE Platformları'],['Netskope CASB','Güvenlik Hizmeti Kenarı']]},
+{b:'New Relic',i:[['New Relic One','Gözlemlenebilirlik Platformları']]},
+{b:'Nielsen',i:[['Marketing Mix Modeling','Pazarlama Karması Modelleme Çözümleri']]},
+{b:'Nokia',i:[['AirScale RAN','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri'],['7750 SR Router','Network'],['NetGuard','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri']]},
+{b:'Notion',i:[['Notion Workspace','İşbirliğine Dayalı İş Yönetimi']]},
+{b:'Nutanix',i:[['Nutanix Cloud Infrastructure (AHV)','Dağıtılmış Hibrit Altyapı'],['Nutanix Unified Storage','Storage'],['Nutanix Database Service (NDB)','Veritabanı']]},
+{b:'Okta',i:[['Workforce Identity Cloud','Kimlik Yönetimi (IAM)'],['Customer Identity (Auth0)','Erişim Yönetimi']]},
+{b:'Omnissa',i:[['Workspace ONE','Uç Nokta Yönetim Araçları'],['Horizon 8','Hizmet Olarak Masaüstü']]},
+{b:'One Identity',i:[['Safeguard (PAM)','Ayrıcalıklı Erişim Yönetimi'],['Identity Manager (IGA)','Kimlik Yönetimi (IAM)']]},
+{b:'OneTrust',i:[['Privacy & Data Governance','Gizlilik Kullanıcı Deneyimi'],['GRC & Security Assurance','Yönetişim, Risk ve Uyumluluk Araçları']]},
+{b:'OpenAI',i:[['ChatGPT Enterprise','Kurumsal Yapay Zeka Asistanları'],['OpenAI API (GPT/o-serisi)','Yapay Zeka Uygulama Geliştirme Platformları']]},
+{b:'Optimizely',i:[['Optimizely One (DXP/Deney)','Dijital Deneyim Platformları'],['Web Experimentation','Kişiselleştirme Motorları']]},
+{b:'Oracle',i:[['Fusion Cloud ERP','Bulut ERP Hizmetleri'],['E-Business Suite','Kurumsal Yazılımlar (ERP/CRM)'],['JD Edwards','Kurumsal Yazılımlar (ERP/CRM)'],['PeopleSoft','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'Oracle Cloud',i:[['OCI Compute','Stratejik Bulut Platform Hizmetleri'],['Autonomous Database','Bulut Veritabanı Yönetim Sistemleri'],['Exadata Cloud','Veritabanı']]},
+{b:'Oracle Database',i:[['Oracle Database 23ai','Veritabanı'],['Exadata','Veritabanı'],['GoldenGate','Veri Entegrasyon Araçları']]},
+{b:'Oracle Health',i:[['Millennium (Cerner) EHR','Kurumsal Elektronik Sağlık Kayıtları']]},
+{b:'Orca Security',i:[['Orca Cloud Security Platform','Bulut Tabanlı Uygulama Koruma Platformları']]},
+{b:'OutSystems',i:[['OutSystems Developer Cloud','Kurumsal Düşük Kodlu Uygulama Platformları']]},
+{b:'Outreach',i:[['Sales Execution Platform','CRM Satış Platformları']]},
+{b:'PROS',i:[['Smart CPQ / Pricing','Konfigürasyon, Fiyatlandırma ve Teklif Uygulamaları']]},
+{b:'PRTG',i:[['PRTG Network Monitor','Ağ Çözümleri (Networking)']]},
+{b:'PTC',i:[['Windchill (PLM)','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['Creo CAD','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['Kepware','Küresel Endüstriyel AIoT Platformları']]},
+{b:'PTC ThingWorx',i:[['ThingWorx IIoT','Küresel Endüstriyel AIoT Platformları']]},
+{b:'Palantir',i:[['Foundry','Veri Gölü Platformları'],['AIP','Yapay Zeka Uygulama Geliştirme Platformları']]},
+{b:'Palo Alto Networks',i:[['PA Serisi (NGFW)','Firewall'],['Prisma Access (SASE)','SASE Platformları'],['Cortex XDR','Uç Nokta Güvenliği (Endpoint)'],['Cortex XSIAM','SIEM'],['Prisma Cloud','Bulut Tabanlı Uygulama Koruma Platformları'],['Cortex XSOAR','SIEM']]},
+{b:'Param',i:[['Param POS / Ödeme','Bankacılık Ödeme Merkezi Platformları']]},
+{b:'Pegasystems',i:[['Pega Platform','İş Süreçleri Koordinasyonu ve Otomasyon Teknolojileri'],['Pega Customer Service','CRM Müşteri Etkileşim Merkezi']]},
+{b:'Philips Healthcare',i:[['Tasy / Sağlık Bilişimi','Kurumsal Elektronik Sağlık Kayıtları'],['Görüntüleme Çözümleri (PACS)','Sağlık Hizmeti Sağlayıcıları Sektörü Bulut Platformları']]},
+{b:'Ping Identity',i:[['PingOne Platform','Kimlik Yönetimi (IAM)']]},
+{b:'Planful',i:[['Planful FP&A','Finansal Planlama Yazılımı']]},
+{b:'PostgreSQL',i:[['PostgreSQL','Veritabanı']]},
+{b:'Postman',i:[['Postman API Platform','API Yönetimi']]},
+{b:'Power BI',i:[['Microsoft Power BI','Analitik ve İş Zekası Platformları']]},
+{b:'Prevalent',i:[['TPRM Platform','Üçüncü Taraf Risk Yönetimi']]},
+{b:'Productiv',i:[['SaaS Intelligence','SaaS Yönetim Platformları']]},
+{b:'Proofpoint',i:[['Email Protection','E-posta Güvenliği'],['Enterprise DLP','Veri Güvenliği & DLP']]},
+{b:'Proxmox',i:[['Proxmox VE','Sanallaştırma'],['Proxmox Backup Server','Yedekleme']]},
+{b:'Pure Storage',i:[['FlashArray','Storage'],['FlashBlade','Storage'],['Portworx','Konteyner Yönetimi']]},
+{b:'QNAP',i:[['NAS Serisi','Storage'],['QuTS hero','Storage']]},
+{b:'Qlik',i:[['Qlik Sense','Analitik ve İş Zekası Platformları'],['Qlik Replicate','Veri Entegrasyon Araçları']]},
+{b:'Qualtrics',i:[['XM for Customer Experience','Müşteri Sesini Dile Getiren Platformlar'],['XM for Employee Experience','Dijital Çalışan Deneyimi Yönetimi Araçları']]},
+{b:'Qualys',i:[['VMDR','Maruz Kalma Değerlendirme Platformları'],['Qualys TotalCloud','Bulut Tabanlı Uygulama Koruma Platformları']]},
+{b:'RSA',i:[['SecurID','Kimlik Doğrulama'],['RSA Governance & Lifecycle','Kimlik Yönetimi (IAM)']]},
+{b:'Radore',i:[['Sunucu Barındırma','Veri Merkezi Dış Kaynak Hizmetleri'],['Bulut Sunucu','Altyapı Platformu Kullanım Hizmetleri']]},
+{b:'Radware',i:[['DefensePro (DDoS)','Ağ Güvenliği'],['AppWall / Cloud WAF','WAF'],['Alteon ADC','Ağ Çözümleri (Networking)']]},
+{b:'Rapid7',i:[['InsightIDR (SIEM)','SIEM'],['InsightVM','Maruz Kalma Değerlendirme Platformları'],['InsightAppSec (DAST)','Uygulama Güvenliği Testleri']]},
+{b:'Recorded Future',i:[['Intelligence Cloud','Siber Tehdit İstihbarat Teknolojileri']]},
+{b:'Red Hat',i:[['RHEL','Yazılım'],['OpenShift','Konteyner Yönetimi'],['Ansible Automation Platform','Hizmet Koordinasyonu ve Otomasyon Platformları'],['OpenStack Platform','Dağıtılmış Hibrit Altyapı']]},
+{b:'Redis',i:[['Redis Enterprise / Cloud','Bulut Veritabanı Yönetim Sistemleri']]},
+{b:'Retool',i:[['Retool Apps','Kurumsal Düşük Kodlu Uygulama Platformları']]},
+{b:'RingCentral',i:[['RingEX (UCaaS)','Hizmet Olarak Birleşik İletişim'],['RingCX','Hizmet Olarak İletişim Merkezi']]},
+{b:'Robin',i:[['Robin Workplace','İş Yeri Deneyimi Uygulamaları']]},
+{b:'Rubrik',i:[['Rubrik Security Cloud','Yedekleme'],['Anomaly Detection (Radar)','Yedekleme ve Veri Koruma Platformları']]},
+{b:'Ruijie Networks',i:[['Switch/AP Portföyü','Network'],['Ruijie Cloud','Ağ Çözümleri (Networking)']]},
+{b:'SAP',i:[['S/4HANA','Kurumsal Yazılımlar (ERP/CRM)'],['SAP HANA','Veritabanı'],['SAP Analytics Cloud','Analitik ve İş Zekası Platformları'],['SAP BTP','Hizmet Olarak Entegrasyon Platformu'],['Concur','Kaynak-Ödeme Paketleri']]},
+{b:'SAS',i:[['SAS Viya','Veri Bilimi ve Makine Öğrenimi için Yapay Zeka Platformları'],['SAS Fraud Management','Bankacılık Ödemelerinde Dolandırıcılık Tespiti']]},
+{b:'Sage',i:[['Sage X3','Kurumsal Yazılımlar (ERP/CRM)'],['Sage Intacct','Bulut Finans Yönetimi Araçları']]},
+{b:'SailPoint',i:[['Identity Security Cloud','Kimlik Yönetimi (IAM)']]},
+{b:'Salesforce',i:[['Sales Cloud','CRM Satış Platformları'],['Service Cloud','CRM Müşteri Etkileşim Merkezi'],['Marketing Cloud','B2B Pazarlama Otomasyon Platformları'],['Data Cloud (CDP)','Müşteri Veri Platformları'],['Agentforce','Kurumsal Yapay Zeka Asistanları']]},
+{b:'Salsify',i:[['PXM Platform','Ürün Bilgi Yönetimi Çözümleri']]},
+{b:'Samsung Networks',i:[['vRAN','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri'],['Compact Core','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri']]},
+{b:'Sapiens',i:[['CoreSuite / IDITSuite','SaaS P&C Sigorta Çekirdek Platformları, Kuzey Amerika']]},
+{b:'SecurityScorecard',i:[['Security Ratings','Üçüncü Taraf Risk Yönetimi']]},
+{b:'Securonix',i:[['Unified Defense SIEM','SIEM']]},
+{b:'Segment',i:[['Twilio Segment CDP','Müşteri Veri Platformları']]},
+{b:'SentinelOne',i:[['Singularity Endpoint','Uç Nokta Güvenliği (Endpoint)'],['Singularity Cloud Security','Bulut Tabanlı Uygulama Koruma Platformları'],['Singularity AI SIEM','SIEM']]},
+{b:'ServiceNow',i:[['ITSM','BT Hizmet Yönetimi Platformları'],['IRM / GRC','Yönetişim, Risk ve Uyumluluk Araçları'],['HR Service Delivery','Dijital Çalışan Deneyimi Yönetimi Araçları'],['CMDB / ITOM','Hizmet Koordinasyonu ve Otomasyon Platformları']]},
+{b:'Shield AI',i:[['Hivemind','UxS Komuta ve Kontrol']]},
+{b:'Shopify',i:[['Shopify Plus','Dijital Ticaret']]},
+{b:'Siemens Digital Industries',i:[['Teamcenter (PLM)','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['Opcenter (MES)','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['NX CAD','Ayrık Üretim Sektörlerinde PLM Yazılımı'],['Mendix','Kurumsal Düşük Kodlu Uygulama Platformları']]},
+{b:'Simpplr',i:[['AI-Powered Intranet','İntranet Paket Çözümleri']]},
+{b:'Sitecore',i:[['Sitecore XM Cloud','Dijital Deneyim Platformları'],['Sitecore CDP','Müşteri Veri Platformları']]},
+{b:'Siteimprove',i:[['Siteimprove Platform','Dijital Erişilebilirlik']]},
+{b:'Slack',i:[['Slack Enterprise','Hibrit Çalışma Araçları']]},
+{b:'Smarsh',i:[['Enterprise Archive','Dijital İletişim Yönetişimi ve Arşivleme Çözümleri']]},
+{b:'SmartBear',i:[['TestComplete','Yapay Zeka Destekli Yazılım Test Araçları'],['ReadyAPI','Yapay Zeka Destekli Yazılım Test Araçları'],['Zephyr','Yapay Zeka Destekli Yazılım Test Araçları']]},
+{b:'SmartRecruiters',i:[['Talent Acquisition Suite','Yetenek Kazanımı (İşe Alım) Paketleri']]},
+{b:'Smartsheet',i:[['Smartsheet Platform','İşbirliğine Dayalı İş Yönetimi']]},
+{b:'Snow Software',i:[['Snow Atlas','Yazılım Varlık Yönetimi Yönetilen Hizmetleri']]},
+{b:'Snowflake',i:[['Data Cloud','Veri Gölü Platformları'],['Snowpark','Veri Bilimi ve Makine Öğrenimi için Yapay Zeka Platformları'],['Cortex AI','Yapay Zeka Uygulama Geliştirme Platformları']]},
+{b:'Snyk',i:[['Snyk Platform (SCA/SAST)','Yazılım Tedarik Zinciri Güvenliği']]},
+{b:'Software AG',i:[['webMethods','Hizmet Olarak Entegrasyon Platformu'],['ARIS','İş Süreçleri Koordinasyonu ve Otomasyon Teknolojileri']]},
+{b:'SolarWinds',i:[['Network Performance Monitor','Ağ Çözümleri (Networking)'],['Observability SaaS','Gözlemlenebilirlik Platformları'],['Service Desk','BT Hizmet Yönetimi Platformları']]},
+{b:'SonarSource',i:[['SonarQube','Uygulama Güvenliği Testleri'],['SonarCloud','Uygulama Güvenliği Testleri']]},
+{b:'Sonatype',i:[['Nexus Repository / Lifecycle','Yazılım Tedarik Zinciri Güvenliği']]},
+{b:'SonicWall',i:[['TZ/NSa Firewall','Firewall'],['Capture Client','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Sophos',i:[['XGS Firewall','Firewall'],['Intercept X','Uç Nokta Güvenliği (Endpoint)'],['Sophos MDR','Uç Nokta Koruma']]},
+{b:'Sphera',i:[['EHS & ESG Platformu','Yönetişim, Risk ve Uyumluluk Araçları']]},
+{b:'Splunk',i:[['Splunk Enterprise Security','SIEM'],['Splunk SOAR','SIEM'],['Splunk Observability','Gözlemlenebilirlik Platformları']]},
+{b:'Sprinklr',i:[['Unified-CXM','Sosyal Medya Yönetimi ve Dinleme'],['Sprinklr Service','Hizmet Olarak İletişim Merkezi']]},
+{b:'Sprout Social',i:[['Sprout Social Platform','Sosyal Medya Yönetimi ve Dinleme']]},
+{b:'Staffbase',i:[['Employee Communications Platform','İntranet Paket Çözümleri']]},
+{b:'Stibo Systems',i:[['STEP (MDM/PIM)','Meta Veri Yönetimi Çözümleri']]},
+{b:'Stormshield',i:[['SN Serisi Firewall','Firewall'],['Stormshield Endpoint','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Stripe',i:[['Stripe Payments','Bankacılık Ödeme Merkezi Platformları'],['Stripe Billing','Tekrarlayan Faturalandırma Uygulamaları']]},
+{b:'SuccessFactors',i:[['SAP SuccessFactors HCM','1.000\'den Fazla Çalışanı Olan İşletmeler için HCM Paketleri']]},
+{b:'Supermicro',i:[['SuperServer','Server'],['BigTwin','Server']]},
+{b:'Synology',i:[['DiskStation NAS','Storage'],['Active Backup Suite','Yedekleme']]},
+{b:'Sysdig',i:[['Sysdig Secure','Bulut Tabanlı Uygulama Koruma Platformları']]},
+{b:'Tableau',i:[['Tableau Desktop/Server','Analitik ve İş Zekası Platformları']]},
+{b:'Talend',i:[['Talend Data Fabric','Veri Entegrasyon Araçları']]},
+{b:'Talkdesk',i:[['Talkdesk CX Cloud','Hizmet Olarak İletişim Merkezi']]},
+{b:'Tealium',i:[['Customer Data Hub','Müşteri Veri Platformları']]},
+{b:'Temenos',i:[['Temenos Core (Transact)','Temel Bankacılık Sistemleri'],['Temenos Payments','Bankacılık Ödeme Merkezi Platformları'],['Temenos Digital','Temel Bankacılık Sistemleri']]},
+{b:'Tenable',i:[['Nessus / Tenable VM','Maruz Kalma Değerlendirme Platformları'],['Tenable One','Maruz Kalma Değerlendirme Platformları'],['Tenable OT Security','Ağ Güvenliği']]},
+{b:'Teradata',i:[['VantageCloud','Veri Gölü Platformları']]},
+{b:'Terminus',i:[['Terminus ABM','Hesap Odaklı Pazarlama Platformları']]},
+{b:'Thales',i:[['CipherTrust','Veri Güvenliği & DLP'],['Luna HSM','Veri Güvenliği & DLP'],['SafeNet Trusted Access','Kimlik Doğrulama']]},
+{b:'The Trade Desk',i:[['Kokai (DSP)','Reklam Platformları']]},
+{b:'Thomson Reuters ONESOURCE',i:[['ONESOURCE (Küresel Ticaret/Vergi)','Küresel Ticaret Uyumluluk Çözümleri']]},
+{b:'Thought Machine',i:[['Vault Core','Temel Bankacılık Sistemleri']]},
+{b:'ThoughtSpot',i:[['ThoughtSpot Analytics','Analitik ve İş Zekası Platformları']]},
+{b:'Torii',i:[['Torii SMP','SaaS Yönetim Platformları']]},
+{b:'Trellix',i:[['Trellix Endpoint','Uç Nokta Güvenliği (Endpoint)'],['Trellix Email Security','E-posta Güvenliği'],['Trellix Helix (XDR)','Uç Nokta Güvenliği (Endpoint)']]},
+{b:'Trend Micro',i:[['Vision One (XDR)','Uç Nokta Güvenliği (Endpoint)'],['Apex One','Uç Nokta Güvenliği (Endpoint)'],['Deep Security / Cloud One','Bulut Tabanlı Uygulama Koruma Platformları']]},
+{b:'Tricentis',i:[['Tosca','Yapay Zeka Destekli Yazılım Test Araçları'],['NeoLoad','Yapay Zeka Destekli Yazılım Test Araçları']]},
+{b:'Turkcell Bulut',i:[['Bulut Sunucu (IaaS)','Altyapı Platformu Kullanım Hizmetleri'],['Yedekleme Hizmeti','Yedekleme ve Veri Koruma Platformları']]},
+{b:'Twilio',i:[['Programmable Messaging/Voice (CPaaS)','Hizmet Olarak İletişim Platformu'],['Twilio Flex','Hizmet Olarak İletişim Merkezi']]},
+{b:'Türk Telekom Bulut',i:[['Bulut Sunucu (IaaS)','Altyapı Platformu Kullanım Hizmetleri'],['Veri Merkezi Hizmetleri','Veri Merkezi Dış Kaynak Hizmetleri']]},
+{b:'UKG',i:[['UKG Pro','1.000\'den Fazla Çalışanı Olan İşletmeler için HCM Paketleri'],['UKG Dimensions (WFM)','İş Gücü Yönetimi (WFM) Teknolojisi']]},
+{b:'Ubiquiti',i:[['UniFi','Kurumsal Kablolu ve Kablosuz LAN'],['EdgeMax','Network']]},
+{b:'UiPath',i:[['UiPath Platform','Robotik Süreç Otomasyonu'],['Process Mining','Süreç Zekası Platformları'],['Document Understanding','Akıllı Belge İşleme']]},
+{b:'Unit4',i:[['Unit4 ERP','Bulut ERP Hizmetleri'],['Unit4 FP&A','Finansal Planlama Yazılımı']]},
+{b:'Uyumsoft',i:[['Uyumsoft ERP','Kurumsal Yazılımlar (ERP/CRM)'],['e-Dönüşüm Paketi','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'VMware',i:[['vSphere','Sanallaştırma'],['vSAN','Dağıtılmış Hibrit Altyapı'],['NSX','Ağ Çözümleri (Networking)'],['VMware Cloud Foundation','Hibrit Bulut Çözümleri'],['Horizon','Hizmet Olarak Masaüstü'],['Tanzu','Konteyner Yönetimi']]},
+{b:'VTEX',i:[['VTEX Commerce Platform','Dijital Ticaret']]},
+{b:'Vargonen',i:[['Bulut Sunucu','Altyapı Platformu Kullanım Hizmetleri'],['Colocation / Veri Merkezi','Veri Merkezi Dış Kaynak Hizmetleri']]},
+{b:'Varicent',i:[['Varicent SPM','Satış Performansı Yönetimi']]},
+{b:'Varonis',i:[['Data Security Platform','Veri Güvenliği & DLP']]},
+{b:'Vectra AI',i:[['Vectra AI Platform (NDR)','Ağ Algılama ve Müdahale']]},
+{b:'Veeam',i:[['Data Platform / Backup & Replication','Yedekleme'],['Veeam ONE','Yedekleme'],['Veeam Backup for M365','Yedekleme ve Veri Koruma Platformları']]},
+{b:'Vena Solutions',i:[['Vena Complete Planning','Finansal Planlama Yazılımı']]},
+{b:'Venafi',i:[['Control Plane (TLS Protect)','PKI / Sertifika Yönetimi']]},
+{b:'Veracode',i:[['Application Security Platform','Uygulama Güvenliği Testleri']]},
+{b:'Veritas',i:[['NetBackup','Yedekleme'],['Backup Exec','Yedekleme'],['Enterprise Vault','Dijital İletişim Yönetişimi ve Arşivleme Çözümleri']]},
+{b:'Versa Networks',i:[['Versa Unified SASE','SASE Platformları'],['Versa SD-WAN','Küresel WAN Hizmetleri']]},
+{b:'Vonage',i:[['Communications APIs (CPaaS)','Hizmet Olarak İletişim Platformu']]},
+{b:'WatchGuard',i:[['Firebox','Firewall'],['WatchGuard EPDR','Uç Nokta Güvenliği (Endpoint)'],['AuthPoint (MFA)','Kimlik Doğrulama']]},
+{b:'Wiz',i:[['Wiz CNAPP','Bulut Tabanlı Uygulama Koruma Platformları']]},
+{b:'Workato',i:[['Workato Automation','Hizmet Olarak Entegrasyon Platformu']]},
+{b:'Workday',i:[['Workday HCM','1.000\'den Fazla Çalışanı Olan İşletmeler için HCM Paketleri'],['Workday Financial Management','Bulut Finans Yönetimi Araçları'],['Workday Adaptive Planning','Finansal Planlama Yazılımı']]},
+{b:'Workfront',i:[['Adobe Workfront','Pazarlama İş Yönetimi Platformları']]},
+{b:'Workvivo',i:[['Employee Experience Platform','Dijital Çalışan Deneyimi Yönetimi Araçları']]},
+{b:'Wrike',i:[['Wrike Work Management','İşbirliğine Dayalı İş Yönetimi']]},
+{b:'Xactly',i:[['Incent (SPM)','Satış Performansı Yönetimi']]},
+{b:'Yubico',i:[['YubiKey','Kimlik Doğrulama']]},
+{b:'ZTE',i:[['RAN / Core Portföyü','CSP 5G-Gelişmiş Ağ Altyapısı Çözümleri'],['ZXR10 Router/Switch','Network']]},
+{b:'Zabbix',i:[['Zabbix Monitoring','Ağ Çözümleri (Networking)']]},
+{b:'Zendesk',i:[['Zendesk Suite','CRM Müşteri Etkileşim Merkezi'],['Zendesk Sell','CRM Satış Platformları']]},
+{b:'Zerto',i:[['Zerto (CDP Replikasyon/DR)','Yedekleme & Felaket Kurtarma (DR)']]},
+{b:'Zluri',i:[['SaaS Management Platform','SaaS Yönetim Platformları']]},
+{b:'Zoho',i:[['Zoho CRM','CRM Satış Platformları'],['Zoho Desk','CRM Müşteri Etkileşim Merkezi'],['Zoho One','Kurumsal Yazılımlar (ERP/CRM)']]},
+{b:'Zoom',i:[['Zoom Meetings','Tümleşik İletişim (UCaaS)'],['Zoom Phone','Hizmet Olarak Birleşik İletişim'],['Zoom Contact Center','Hizmet Olarak İletişim Merkezi']]},
+{b:'Zscaler',i:[['ZIA (Internet Access)','SASE Platformları'],['ZPA (Private Access)','Güvenlik Hizmeti Kenarı'],['ZDX','Dijital Çalışan Deneyimi Yönetimi Araçları']]},
+{b:'Zuora',i:[['Zuora Billing','Tekrarlayan Faturalandırma Uygulamaları']]},
+{b:'commercetools',i:[['Composable Commerce','Dijital Ticaret']]},
+{b:'iCIMS',i:[['iCIMS Talent Cloud','Yetenek Kazanımı (İşe Alım) Paketleri']]},
+{b:'iyzico',i:[['iyzico Ödeme Çözümleri','Bankacılık Ödeme Merkezi Platformları']]},
+{b:'o9 Solutions',i:[['o9 Digital Brain','Tedarik Zinciri Planlama Çözümleri']]},
+{b:'project44',i:[['Movement (Visibility)','Tedarik Zinciri Yönetimi Paketleri']]}
+];
 var BRAND_SEED = [
   // ═══ Parti 2 (v8.88): Altyapı · Bulut · Veri · DevOps ═══
   // ── Sunucu / Storage / HCI ──
@@ -43475,6 +43936,22 @@ var BRAND_SEED = [
 ];
 var _brandCache = null;
 function invalidateBrandCache(){ _brandCache = null; }
+// ── v8.96: MARKA URUN AILESI SABLONLARI (brand_products) — canli urun degil REFERANS; sahiplik modeli bozulmaz
+var _bpCache = null;
+function invalidateBrandProductCache(){ _bpCache = null; }
+async function getBrandProducts(force){
+  if(_bpCache && !force) return _bpCache;
+  try {
+    var snap = await getDocs(collection(db,'brand_products'));
+    var arr = snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }).filter(function(x){ return x.visible!==false; });
+    arr.sort(function(a,b){ return (a.order||0)-(b.order||0) || String(a.name||'').localeCompare(String(b.name||'')); });
+    _bpCache = arr; return arr;
+  } catch(e){ return []; }
+}
+function brandProductsFor(brandName){
+  var nb=_normBrand(brandName||''); if(!nb) return [];
+  return (_bpCache||[]).filter(function(p){ return p.brandNorm===nb; });
+}
 function _normBrand(x){
   return String(x||'').trim().toLowerCase()
     .replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ö/g,'o').replace(/ç/g,'c')
@@ -43667,7 +44144,7 @@ async function admBrands(m){
 
   m.innerHTML=
     '<div class="flx-bw-c-mb18" style="flex-wrap:wrap;gap:8px"><h3 class="fs15-fw7">🏭 '+_L('Brand Management','Marka Yönetimi')+'</h3>'
-    +'<div><button class="btn-g btn-sm" id="br-seed" style="margin-right:6px">'+_L('📥 Load Starter Brands','📥 Başlangıç Markalarını Yükle')+'</button><button class="btn-p btn-sm" id="br-add">'+_L('+ New Brand','+ Yeni Marka')+'</button></div></div>'
+    +'<div><button class="btn-g btn-sm" id="bp-seed" style="margin-right:6px">'+_L('📦 Load Product Families','📦 Ürün Ailelerini Yükle')+'</button><button class="btn-g btn-sm" id="br-seed" style="margin-right:6px">'+_L('📥 Load Starter Brands','📥 Başlangıç Markalarını Yükle')+'</button><button class="btn-p btn-sm" id="br-add">'+_L('+ New Brand','+ Yeni Marka')+'</button></div></div>'
     +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">'+_L('Brands that manufacturers, distributors and integrators can select. A brand can belong to multiple categories (Fortinet = Firewall + SASE + EDR).','Üretici, distribütör ve entegratörlerin seçebileceği markalar. Bir marka birden fazla kategoride olabilir (Fortinet = Firewall + SASE + EDR).')+'</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
       +'<div class="stat" style="flex:1;min-width:110px"><div class="stat-val">'+brands.length+'</div><div class="stat-lbl">'+_L('Total Brands','Toplam Marka')+'</div></div>'
@@ -43771,6 +44248,54 @@ async function admBrands(m){
     });
   });
 
+  // ── v8.96: urun ailesi sablonlarini yukle (IDEMPOTENT: brandNorm+nameNorm; hizmet markalari kapsam disi)
+  m.querySelector('#bp-seed')?.addEventListener('click', async function(){
+    var btn=this; btn.disabled=true; btn.textContent=_L('Checking…','Kontrol ediliyor…');
+    var existing=[];
+    try { var es = await getDocs(collection(db,'brand_products')); existing = es.docs.map(function(d){ return d.data()||{}; }); }
+    catch(e){ btn.disabled=false; btn.textContent=_L('📦 Load Product Families','📦 Ürün Ailelerini Yükle'); _bulkErrAlert(e, 0, 'brand_products'); return; }
+    var haveP={}; existing.forEach(function(p){ haveP[(p.brandNorm||'')+'|'+(p.nameNorm||'')]=1; });
+    var haveB={}; brands.forEach(function(b){ haveB[_normBrand(b.name)]=1; });
+    var live={}; cats.forEach(function(c){ live[_normCat(c.name)]=c.name; });
+    var toAdd=[], skipped=0, noBrand={}, unmatched={};
+    BRAND_PRODUCT_SEED.forEach(function(e){
+      var bn=_normBrand(e.b);
+      if(!haveB[bn]){ noBrand[e.b]=1; return; }
+      (e.i||[]).forEach(function(it){
+        var nm=it[0], ct=it[1];
+        if(haveP[bn+'|'+_normBrand(nm)]){ skipped++; return; }
+        var hit=live[_normCat(ct)];
+        if(!hit) unmatched[ct]=(unmatched[ct]||0)+1;
+        toAdd.push({ brand:e.b, brandNorm:bn, name:nm, nameNorm:_normBrand(nm), category:hit||ct });
+      });
+    });
+    var nb=Object.keys(noBrand), un=Object.keys(unmatched);
+    btn.textContent=_L('📦 Load Product Families','📦 Ürün Ailelerini Yükle');
+    if(!toAdd.length){ btn.disabled=false; showToast(_L('All product families are already loaded.','Tüm ürün aileleri zaten yüklü.')); return; }
+    var msg = toAdd.length+_L(' product family templates will be added.',' ürün ailesi şablonu eklenecek.')
+      + (skipped? ('\n'+skipped+_L(' already loaded (skipped).',' zaten yüklü (atlanır).')) : '')
+      + (nb.length? ('\n'+nb.length+_L(' brands are not in the DB yet — load Starter Brands first: ',' markanın DB kaydı yok — önce Başlangıç Markalarını yükle: ')+nb.slice(0,5).join(', ')+(nb.length>5?(' +'+(nb.length-5)):'')) : '')
+      + (un.length? ('\n'+_L('Categories not matched live (written as-is, reported): ','Canlıda eşleşmeyen kategoriler (olduğu gibi yazılır, raporlanır): ')+un.slice(0,5).join(', ')+(un.length>5?(' +'+(un.length-5)):'')) : '')
+      + '\n'+_L('Service brands (consulting/agency/logistics) are out of scope by design.','Hizmet markaları (danışmanlık/ajans/lojistik) tasarım gereği kapsam dışı.')
+      + '\n\n'+_L('Continue?','Devam?');
+    if(!confirm(msg)){ btn.disabled=false; return; }
+    var ok=0, firstErr=null;
+    for(var i=0;i<toAdd.length;i++){
+      btn.textContent=_L('Loading… ','Yükleniyor… ')+(i+1)+'/'+toAdd.length;
+      try {
+        await addDoc(collection(db,'brand_products'), {
+          brand:toAdd[i].brand, brandNorm:toAdd[i].brandNorm, name:toAdd[i].name, nameNorm:toAdd[i].nameNorm,
+          category:toAdd[i].category, status:'approved', visible:true, order:0,
+          createdAt:serverTimestamp(), updatedAt:serverTimestamp()
+        });
+        ok++;
+      } catch(e){ firstErr=e; break; }   // v8.89 kurali: ilk hatada dur, sebebi goster
+    }
+    invalidateBrandProductCache();
+    btn.disabled=false; btn.textContent=_L('📦 Load Product Families','📦 Ürün Ailelerini Yükle');
+    if(firstErr){ _bulkErrAlert(firstErr, ok, 'brand_products'); return; }
+    showToast(_L('Done: ','Tamam: ')+ok+_L(' product families loaded',' ürün ailesi yüklendi'));
+  });
   m.querySelector('#br-seed')?.addEventListener('click', async function(){
     var have={}; brands.forEach(function(b){ have[_normBrand(b.name)]=b; });
     var missing = BRAND_SEED.filter(function(x){ return !have[_normBrand(x.n)]; });
