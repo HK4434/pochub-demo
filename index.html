@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.94.1 | pochub.co -->
+<!-- PoCHub v8.95 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.94.1';
+const VERSION = 'v8.95';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.95': ['GUVENLIK BOLME SIHIRBAZI (v8.60-ta ertelenen is) — v8.47 urun-tasima araci 4 adimli sihirbaza donusturuldu (openSecurityMigrateModal, buton: Guvenlik Bolme Sihirbazi). ADIM 1 HEDEF DOGRULAMA: 14 hedef canli kategorilere _norm ile cozumlenir; eksikler tek tikla olusturulur (addDoc visible:true), gizliler acilir — v8.47-nin -hedeflerin var olmasi gerekir- varsayimi artik dogrulaniyor (sessiz Digere dusme onlenir). ADIM 2 URUNLER: v8.47 cekirdegi korundu + GRC ve PKI/Sertifika hedefleri ve regex kurallari eklendi (v8.41/v8.42 profesyonel semalari araca bagli degildi); yazilan deger artik CANLI kategori ADI (onceden dahili hedef etiketi yaziliyordu — canli ad farkliysa uyumsuzluk olusurdu); vendor_products.productCategory denorm guncellemesi aynen. ADIM 3 VENDORLAR (YENI): categories/specializations/distributedCategories alanlarinda genis Guvenlik iceren vendorlar listelenir; oneri = tasinan urunlerinin suggest() sonuclari + marka kategorileri (brands kesisimi); kaydette genis kayit ilgili alanlardan cikarilir, secilen hedefler AYNI alanlara eklenir; hic secim yapilmayan vendor yazilmaz (kategorisiz birakma riski yok). Boylece kategori x marka gorunumu (v8.93) ve cascade marka secici de temizlenir. ADIM 4 KAPANIS (YENI): urun+vendor sayaclari canli sorgulanir; ikisi de 0 olunca genis Guvenlik kategorileri gizlenir (visible:false) — SILINMEZ, CATEGORY_FIELDS Guvenlik semasi eski veri icin fallback kalir. Tum toplu yazimlar v8.89 kuralina uygun: ilk hatada dur + _bulkErrAlert ile gercek sebep. Adimlar idempotent, serbest gezinilebilir. node 0.'],
   'v8.94.1': ['HOTFIX — v8.94 denetiminden kacan 1 render hasari daha (AST/acorn tabanli bagimsiz tarama ile bulundu). Admin erisim-reddi ekrani (renderAdmin, ~27455): backtick template icinde concat formu \'+_L("You do not have access...","Bu bolume erisim yetkiniz yok.")+\' kalmis — yetkisiz kullanici kilit ikonunun yaninda HAM KOD gorecekti. Dolar-suslu _L interpolasyonuna cevrildi. Dogrulama: acorn AST taramasi tum dosyada TEMPLATE_CONCAT_LEAK=0, STRING_DOLLAR_LEAK=0 (CHANGELOG metinlerindeki 4 yanlis pozitif haric), node --check OK, i18n_audit.py yeni sinif bulgu yok. RULES degismedi.'],
   'v8.94': ['RENDER HASARI TEMIZLIGI (KRITIK — kullanici HAM KOD goruyordu). Hasan-in ekran goruntusu: Distributor > Urunlerim basliginda -\'+_L("My Distribution Products","Dagitim Urunlerim")+\'- ham kod olarak gorunuyordu. KOK NEDEN: toplu i18n islemcim (v8.76-8.84) concat formu (\'+_L(..)+\') kullandi ama bu string-ler TEMPLATE LITERAL (backtick) icindeydi; orada ${..} gerekiyordu. Denetim 9 render hasari + 6 escape hasari buldu. DUZELTILEN: (a) benim _L hasarim 5 yerde (3925 Onayli rozeti, 9727 Etkinlikler yukleniyor, 9785 Duzenleyen, 11081 Dagitim Urunlerim basligi, 12640 katalog-disi PoC notu); (b) ESKI t() gecisinden kalma hasar 3 yerde (11091-11092 tablo basliklari, 12645 Yukleniyor); (c) ESKI escape hasari 6 satir (11106-11111: \\${p.name} gibi — urun adi/uretici/kategori/rozet yerine HAM ${p.name} metni basiyordu; yani distributor tablosu urun varken TAMAMEN bozuk cikacakti, 0 urun oldugu icin fark edilmemisti). Distributor urunleri blogu (11079-11117) bastan temiz yazildi + escHtml eklendi (XSS sertlestirme). (d) YANLIS POZITIF dogrulandi: ${..} IFADESI icindeki concat GECERLIDIR (7821, 4571) — dokunulmadi. KALICI KORUMA: i18n_audit.py-ye RENDER HASARI TESPITI eklendi — template literal icinde concat + escape-li ${..} tarar; bozuk v8.93-e karsi test edildi (9+6 yakaladi), duzeltilmis surumde TEMIZ. node 0.'],
   'v8.93': ['MARKA FAZ 5 (SON) — VENDOR PROFILINDE KATEGORI x MARKA GRUPLU GORUNUM. Hasan-in istegi: -Firmanin profiline bakildiginda hem kategorileri hem de calistigi markalari gorme firsati-. TASARIM: gruplama TURETILMIS — ekstra alan TUTULMAZ, dolayisiyla DRIFT OLMAZ (vendor_products denormalizasyon dersi). Mantik: vendor-in her kategorisi C icin, vendor-in markalari arasinda C ∈ marka.categories olanlar listelenir; hicbir kategoriye oturmayanlar -Diger- altinda toplanir. Ornek gorunum: -Firewall: Fortinet, Palo Alto · Storage: HPE, Dell-. KAYNAK: vendor-in categories + specializations + distributedCategories alanlari birlestirilir (uc rol de kapsanir). YERLER: public vendor profili (renderVendorPublic — marka cache-i await getBrands() ile isitilir), admin vendor detayi (vvd.brands), vendor detay paneli. GUVENLI FALLBACK: marka cache yuklenmemisse ya da hicbir marka kategoriye oturmuyorsa duz virgullu listeye duser (bozulmaz). node 0.'],
@@ -43953,7 +43954,7 @@ async function admCategories(m) {
       '<input class="inp" id="cat-search" placeholder="'+t('acat.search_ph','Kategori ara...')+'" style="width:220px;font-size:12.5px">' +
       '<button class="btn-g btn-sm fs12" id="sync-cats-btn">'+t('acat.sync_missing','🔄 Eksik Kategorileri Ekle')+'</button>' +
       '<button class="btn-g btn-sm fs12" id="cat-diag-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'🔍 Category Diagnostic':'🔍 Kategori Tanı')+'</button>' +
-      '<button class="btn-g btn-sm fs12" id="sec-migrate-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'🔀 Migrate Security':'🔀 Güvenlik Ürünlerini Taşı')+'</button>' +
+      '<button class="btn-g btn-sm fs12" id="sec-migrate-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'🔀 Security Split Wizard':'🔀 Güvenlik Bölme Sihirbazı')+'</button>' +
       '<button class="btn-g btn-sm fs12" id="bulk-vis-btn" style="margin-left:6px">'+(window.CUR_LOCALE==='en'?'☑ Bulk Visibility':'☑ Toplu Görünürlük')+'</button>' +
       '<button class="btn-p btn-sm" id="add-cat-btn" style="margin-left:6px">'+t('acnt.add_cat','+ Yeni Kategori')+'</button>' + '<button class="btn-g btn-sm" id="cat-autotr" style="margin-left:6px">'+t('admin.translate_all','🌐 Tümünü İngilizceye Çevir (MyMemory)')+'</button><span id="cat-autotr-status" style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>' +
       '</div></div>' +
@@ -44175,7 +44176,8 @@ async function openBulkVisibilityModal(){
 async function openSecurityMigrateModal(){
   var EN = window.CUR_LOCALE==='en';
   var SRC = ['guvenlik','security','ag guvenligi','guvenlik cozumleri','siber guvenlik','cyber security','network security','bilgi guvenligi'];
-  var TARGETS = ['WAF','IPS / IDS','NAC','Email Security','Veri Güvenliği & DLP','SASE / SSE','Vulnerability Management','Privileged Access (PAM)','Firewall','Endpoint','SIEM','Kimlik Yönetimi (IAM)'];
+  // v8.95: GRC + PKI hedefleri eklendi (v8.41/v8.42 profesyonel semalari araca baglanmamisti)
+  var TARGETS = ['WAF','IPS / IDS','NAC','Email Security','Veri Güvenliği & DLP','SASE / SSE','Vulnerability Management','Privileged Access (PAM)','GRC (Yönetişim, Risk & Uyum)','PKI / Sertifika Yönetimi','Firewall','Endpoint','SIEM','Kimlik Yönetimi (IAM)'];
   var RULES = [
     ['WAF', /(waf|web ?application ?firewall|web app firewall)/i],
     ['IPS / IDS', /(\bips\b|\bids\b|intrusion|snort|suricata)/i],
@@ -44185,68 +44187,232 @@ async function openSecurityMigrateModal(){
     ['SASE / SSE', /(\bsase\b|\bsse\b|zscaler|netskope|prisma|\bcato\b|\bswg\b|\bztna\b|sd-?wan)/i],
     ['Vulnerability Management', /(vulnerab|zafiyet|tenable|qualys|nessus|rapid7|nexpose|openvas)/i],
     ['Privileged Access (PAM)', /(\bpam\b|privileged|cyberark|beyondtrust|delinea|wallix|ayrıcalık)/i],
+    ['GRC (Yönetişim, Risk & Uyum)', /(\bgrc\b|governance|yönetişim|yonetisim|archer|metricstream|onetrust|sai360|riskonnect|\birm\b)/i],
+    ['PKI / Sertifika Yönetimi', /(\bpki\b|sertifika|certificate|venafi|digicert|globalsign|sectigo|keyfactor|entrust|\bhsm\b)/i],
     ['Firewall', /(firewall|\bngfw\b|güvenlik duvar|fortigate|palo alto|checkpoint|sonicwall|sophos)/i],
     ['Endpoint', /(\bedr\b|\bxdr\b|endpoint|crowdstrike|sentinelone|antivir|kaspersky|defender)/i],
     ['SIEM', /(\bsiem\b|splunk|qradar|log yönet|log management|logrhythm)/i],
     ['Kimlik Yönetimi (IAM)', /(\biam\b|identity|kimlik|\bokta\b|\bentra\b|azure ad|\bsso\b|\bmfa\b|ping identity)/i]
   ];
   function _norm(x){ return String(x||'').toLowerCase().replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c'); }
+  function isBroad(n){ return SRC.indexOf(_norm(n))>=0; }
   function suggest(p){
     var hay = ((p.name||'')+' '+(p.brand||'')+' '+(p.model||'')+' '+(p.description||'')).toLowerCase();
     for (var i=0;i<RULES.length;i++){ if(RULES[i][1].test(hay)) return RULES[i][0]; }
     return '';
   }
-  var modal = document.createElement('div');
-  modal.className='modal-bg on';
-  modal.innerHTML='<div class="modal" style="max-width:780px"><div class="flx-bw-c-mb18"><h3 class="fs15-fw7">🔀 '+(EN?'Migrate Security Products':'Güvenlik Ürünlerini Taşı')+'</h3><button class="btn-close-x" id="sm-close">×</button></div><div id="sm-body" style="font-size:13px"><div class="loading"><div class="spinner"></div></div></div></div>';
+  var liveCats=null, prods=null, vendors=null, brandIdx=null, step=1;
+  function tmap(){
+    var m={}; if(!liveCats) return m;
+    TARGETS.forEach(function(tg){ var hit=liveCats.filter(function(c){ return _norm(c.name)===_norm(tg); })[0]; if(hit) m[tg]=hit; });
+    return m;
+  }
+  var modal=document.createElement('div'); modal.className='modal-bg on';
+  modal.innerHTML='<div class="modal" style="max-width:880px"><div class="flx-bw-c-mb18"><h3 class="fs15-fw7">🔀 '+_L('Security Split Wizard','Güvenlik Bölme Sihirbazı')+'</h3><button class="btn-close-x" id="sm-close">×</button></div><div id="sm-steps" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"></div><div id="sm-body" style="font-size:13px"><div class="loading"><div class="spinner"></div></div></div></div>';
   document.body.appendChild(modal);
   modal.querySelector('#sm-close').addEventListener('click', function(){ modal.remove(); });
   modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
-  var body = modal.querySelector('#sm-body');
-  var prods=[];
-  try {
-    var snap = await getDocs(collection(db,'products'));
-    prods = snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; })
-      .filter(function(p){ return SRC.indexOf(_norm(p.category))>=0; });
-  } catch(e){ body.innerHTML='<div style="color:#dc2626;padding:16px">'+(EN?'Load error: ':'Yükleme hatası: ')+escHtml(e.message)+'</div>'; return; }
-  if(!prods.length){ body.innerHTML='<div style="padding:24px;text-align:center;color:#64748b">'+(EN?'No products found under broad “Security” categories.':'Geniş “Güvenlik” kategorilerinde ürün bulunamadı.')+'</div>'; return; }
-  var nSug = prods.filter(function(p){ return suggest(p); }).length;
-  var rowsHtml = prods.map(function(p){
-    var sg = suggest(p);
-    var sel = '<select class="inp sm-sel" data-id="'+p.id+'" data-cur="'+escHtml(p.category||'')+'" style="font-size:12px;padding:5px 8px;min-width:210px"><option value="">'+(EN?'— keep —':'— değiştirme —')+'</option>'+
-      TARGETS.map(function(tg){ return '<option value="'+escHtml(tg)+'"'+(tg===sg?' selected':'')+'>'+escHtml(tg)+'</option>'; }).join('')+'</select>';
-    return '<tr style="border-top:1px solid var(--border)"><td style="padding:7px 10px;font-weight:600">'+escHtml(p.name||'—')+'<div style="font-size:10.5px;color:#94a3b8;font-weight:500">'+escHtml(p.brand||p.vendorName||'')+'</div></td>'+
-      '<td style="padding:7px 10px;color:#94a3b8;font-family:monospace">'+escHtml(p.category||'')+'</td>'+
-      '<td style="padding:7px 10px">'+sel+(sg?' <span style="font-size:10px;color:#16a34a;font-weight:600">'+(EN?'auto':'öneri')+'</span>':'')+'</td></tr>';
-  }).join('');
-  body.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">'+prods.length+' '+(EN?'products under broad Security · ':'ürün geniş Güvenlik altında · ')+nSug+' '+(EN?'auto-suggested. Adjust targets, then save.':'otomatik önerildi. Hedefleri ayarla, sonra kaydet.')+'</div>'+
-    '<div style="max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'+
-    '<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+(EN?'Product':'Ürün')+'</th>'+
-    '<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+(EN?'Current':'Mevcut')+'</th>'+
-    '<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+(EN?'Move to':'Taşı')+'</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px"><div style="font-size:11px;color:#94a3b8">'+(EN?'Only changed rows are written. Targets must exist as visible categories.':'Yalnızca değişen satırlar yazılır. Hedeflerin görünür kategori olarak var olması gerekir.')+'</div><div style="display:flex;gap:10px"><button class="btn-g btn-sm" id="sm-cancel">'+(EN?'Cancel':'İptal')+'</button><button class="btn-p btn-sm" id="sm-save">'+(EN?'Save changes':'Değişiklikleri Kaydet')+'</button></div></div>';
-  modal.querySelector('#sm-cancel').addEventListener('click', function(){ modal.remove(); });
-  modal.querySelector('#sm-save').addEventListener('click', async function(){
-    var sels = Array.prototype.slice.call(modal.querySelectorAll('.sm-sel'));
-    var changes = sels.filter(function(x){ return x.value && x.value!==x.dataset.cur; });
-    if(!changes.length){ showToast(EN?'No changes selected.':'Değişiklik seçilmedi.'); return; }
-    if(!confirm((EN?'Update category for ':'')+changes.length+(EN?' product(s)?':' ürünün kategorisi güncellenecek. Onaylıyor musun?'))) return;
-    var btn=this; btn.disabled=true; btn.textContent=EN?'Saving...':'Kaydediliyor...';
-    var ok=0, firstErr=null;
-    for(var i=0;i<changes.length;i++){
-      var _id=changes[i].dataset.id, _cat=changes[i].value;
-      try {
-        await updateDoc(doc(db,'products',_id), { category: _cat }); ok++;
-        try { var _vps = await getDocs(query(collection(db,'vendor_products'), where('productId','==',_id)));
-          for(var k=0;k<_vps.docs.length;k++){ await updateDoc(doc(db,'vendor_products',_vps.docs[k].id), { productCategory: _cat }); } } catch(_e){}
-      } catch(e){ firstErr=e; break; }   // v8.89: ilk hatada dur, sebebi goster
+  var body=modal.querySelector('#sm-body');
+  function stepsBar(){
+    var names=[_L('1 · Targets','1 · Hedefler'),_L('2 · Products','2 · Ürünler'),_L('3 · Vendors','3 · Vendorlar'),_L('4 · Finish','4 · Kapanış')];
+    modal.querySelector('#sm-steps').innerHTML=names.map(function(n,i){
+      return '<button class="btn-sm '+((i+1)===step?'btn-p':'btn-g')+' sm-step" data-s="'+(i+1)+'" style="font-size:11.5px">'+n+'</button>';
+    }).join('');
+    modal.querySelectorAll('.sm-step').forEach(function(b){ b.addEventListener('click', function(){ step=parseInt(this.dataset.s,10); render(); }); });
+  }
+  async function loadCats(force){ if(liveCats&&!force) return; var snap=await getDocs(collection(db,'categories')); liveCats=snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }); }
+  async function loadProds(force){ if(prods&&!force) return; var snap=await getDocs(collection(db,'products')); prods=snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }).filter(function(p){ return isBroad(p.category); }); }
+  async function loadVendors(force){ if(vendors&&!force) return; var snap=await getDocs(query(collection(db,'users'), where('role','==','vendor'))); vendors=snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }).filter(function(v){ return [].concat(v.categories||[], v.specializations||[], v.distributedCategories||[]).some(isBroad); }); }
+  async function loadBrandIdx(){ if(brandIdx) return; try { var bl=await getBrands(); brandIdx={}; (bl||[]).forEach(function(b){ brandIdx[_normBrand(b.name)]=b; }); } catch(e){ brandIdx={}; } }
+  function loadErr(e){ body.innerHTML='<div style="color:#dc2626;padding:16px">'+_L('Load error: ','Yükleme hatası: ')+escHtml((e&&e.message)||String(e))+'</div>'; }
+  async function render(){
+    stepsBar(); body.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+    try { if(step===1) await step1(); else if(step===2) await step2(); else if(step===3) await step3(); else await step4(); } catch(e){ loadErr(e); }
+  }
+  function nextBtn(to){ return '<button class="btn-p btn-sm sm-next" data-to="'+to+'">'+_L('Continue','Devam')+' →</button>'; }
+  function bindNext(){ modal.querySelectorAll('.sm-next').forEach(function(b){ b.addEventListener('click', function(){ step=parseInt(this.dataset.to,10); render(); }); }); }
+  // ── ADIM 1: hedef dogrulama — eksikleri olustur, gizlileri ac (sessiz veri kaybi onlenir)
+  async function step1(){
+    await loadCats(true);
+    var tm=tmap();
+    var missing=TARGETS.filter(function(tg){ return !tm[tg]; });
+    var hiddenT=TARGETS.filter(function(tg){ return tm[tg] && tm[tg].visible===false; });
+    var rows=TARGETS.map(function(tg){
+      var c=tm[tg];
+      var st=!c?'<span style="color:#dc2626;font-weight:600">✗ '+_L('missing','yok')+'</span>':(c.visible===false?'<span style="color:#d97706;font-weight:600">🙈 '+_L('hidden','gizli')+'</span>':'<span style="color:#16a34a;font-weight:600">✓ '+_L('visible','görünür')+'</span>');
+      return '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 10px;font-weight:600">'+escHtml(tg)+'</td><td style="padding:6px 10px;color:#94a3b8">'+(c?escHtml(c.name):'—')+'</td><td style="padding:6px 10px;text-align:right;font-size:11px">'+st+'</td></tr>';
+    }).join('');
+    body.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">'+_L('All 14 targets must exist and be visible before migration; missing targets are excluded from the product step (prevents silent data loss).','Taşımadan önce 14 hedefin canlıda var ve görünür olması gerekir; eksik hedefler ürün adımında listelenmez (sessiz veri kaybı önlenir).')+'</div>'
+      +'<div style="max-height:380px;overflow:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>'+rows+'</tbody></table></div>'
+      +'<div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap"><div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +(missing.length?'<button class="btn-p btn-sm" id="s1-create">➕ '+_L('Create missing','Eksikleri Oluştur')+' ('+missing.length+')</button>':'')
+      +(hiddenT.length?'<button class="btn-g btn-sm" id="s1-show">👁 '+_L('Unhide','Gizlileri Aç')+' ('+hiddenT.length+')</button>':'')
+      +'</div>'+nextBtn(2)+'</div>';
+    if(missing.length) modal.querySelector('#s1-create').addEventListener('click', async function(){
+      if(!confirm(missing.length+_L(' categories will be created (visible).',' kategori oluşturulacak (görünür). Onaylıyor musun?'))) return;
+      var btn=this; btn.disabled=true; var ok=0, firstErr=null;
+      for(var i=0;i<missing.length;i++){
+        try { await addDoc(collection(db,'categories'), { name:missing[i], description:'', order:999, visible:true, createdAt:serverTimestamp() }); ok++; }
+        catch(e){ firstErr=e; break; }
+      }
+      invalidateCatCache();
+      if(firstErr){ btn.disabled=false; _bulkErrAlert(firstErr, ok, 'categories'); return; }
+      showToast(ok+_L(' categories created',' kategori oluşturuldu')); render();
+    });
+    if(hiddenT.length) modal.querySelector('#s1-show').addEventListener('click', async function(){
+      var btn=this; btn.disabled=true; var ok=0, firstErr=null;
+      for(var i=0;i<hiddenT.length;i++){
+        try { await setDoc(doc(db,'categories',tm[hiddenT[i]].id), { visible:true }, { merge:true }); ok++; }
+        catch(e){ firstErr=e; break; }
+      }
+      invalidateCatCache();
+      if(firstErr){ btn.disabled=false; _bulkErrAlert(firstErr, ok, 'categories'); return; }
+      showToast(ok+_L(' categories made visible',' kategori görünür yapıldı')); render();
+    });
+    bindNext();
+  }
+  // ── ADIM 2: urun tasima (v8.47 cekirdegi + hedef=CANLI kategori adi yazilir)
+  async function step2(){
+    await loadCats(); await loadProds(true);
+    var tm=tmap();
+    var avail=TARGETS.filter(function(tg){ return tm[tg]; });
+    if(!prods.length){
+      body.innerHTML='<div style="padding:24px;text-align:center;color:#64748b">'+_L('No products left under broad Security. 🎉','Geniş Güvenlik altında ürün kalmadı. 🎉')+'</div><div style="display:flex;justify-content:flex-end;margin-top:12px">'+nextBtn(3)+'</div>';
+      bindNext(); return;
     }
-    invalidateCatCache();
-    if(firstErr){ btn.disabled=false; _bulkErrAlert(firstErr, ok, 'products'); return; }
-    showToast((EN?'Done: ':'Tamam: ')+ok+(EN?' products moved':' ürün taşındı'));
-    modal.remove();
-    try { var _am=el('adm-main')||el('panel-main'); if(_am && typeof admProducts==='function') admProducts(_am); } catch(e){}
-  });
+    var nSug=prods.filter(function(p){ return suggest(p); }).length;
+    var rowsHtml=prods.map(function(p){
+      var sg=suggest(p);
+      var sel='<select class="inp sm-sel" data-id="'+p.id+'" data-cur="'+escHtml(p.category||'')+'" style="font-size:12px;padding:5px 8px;min-width:210px"><option value="">'+_L('— keep —','— değiştirme —')+'</option>'+avail.map(function(tg){ return '<option value="'+escHtml(tm[tg].name)+'"'+(tg===sg?' selected':'')+'>'+escHtml(tg)+'</option>'; }).join('')+'</select>';
+      return '<tr style="border-top:1px solid var(--border)"><td style="padding:7px 10px;font-weight:600">'+escHtml(p.name||'—')+'<div style="font-size:10.5px;color:#94a3b8;font-weight:500">'+escHtml(p.brand||p.vendorName||'')+'</div></td>'
+        +'<td style="padding:7px 10px;color:#94a3b8;font-family:monospace">'+escHtml(p.category||'')+'</td>'
+        +'<td style="padding:7px 10px">'+sel+(sg?' <span style="font-size:10px;color:#16a34a;font-weight:600">'+_L('auto','öneri')+'</span>':'')+'</td></tr>';
+    }).join('');
+    body.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">'+prods.length+' '+_L('products under broad Security · ','ürün geniş Güvenlik altında · ')+nSug+' '+_L('auto-suggested. Written value is the LIVE category name.','otomatik önerildi. Yazılan değer CANLI kategori adıdır.')+'</div>'
+      +'<div style="max-height:400px;overflow:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'
+      +'<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+_L('Product','Ürün')+'</th>'
+      +'<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+_L('Current','Mevcut')+'</th>'
+      +'<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+_L('Move to','Taşı')+'</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px"><div style="font-size:11px;color:#94a3b8">'+_L('Only changed rows are written.','Yalnızca değişen satırlar yazılır.')+'</div><div style="display:flex;gap:10px"><button class="btn-p btn-sm" id="s2-save">'+_L('Save changes','Değişiklikleri Kaydet')+'</button>'+nextBtn(3)+'</div></div>';
+    modal.querySelector('#s2-save').addEventListener('click', async function(){
+      var sels=Array.prototype.slice.call(modal.querySelectorAll('.sm-sel'));
+      var changes=sels.filter(function(x){ return x.value && x.value!==x.dataset.cur; });
+      if(!changes.length){ showToast(_L('No changes selected.','Değişiklik seçilmedi.')); return; }
+      if(!confirm(changes.length+_L(' product(s) will be updated.',' ürünün kategorisi güncellenecek. Onaylıyor musun?'))) return;
+      var btn=this; btn.disabled=true; btn.textContent=_L('Saving...','Kaydediliyor...');
+      var ok=0, firstErr=null;
+      for(var i=0;i<changes.length;i++){
+        var _id=changes[i].dataset.id, _cat=changes[i].value;
+        try {
+          await updateDoc(doc(db,'products',_id), { category:_cat }); ok++;
+          try { var _vps=await getDocs(query(collection(db,'vendor_products'), where('productId','==',_id)));
+            for(var k=0;k<_vps.docs.length;k++){ await updateDoc(doc(db,'vendor_products',_vps.docs[k].id), { productCategory:_cat }); } } catch(_e){}
+        } catch(e){ firstErr=e; break; }
+      }
+      invalidateCatCache();
+      if(firstErr){ btn.disabled=false; btn.textContent=_L('Save changes','Değişiklikleri Kaydet'); _bulkErrAlert(firstErr, ok, 'products'); return; }
+      showToast(_L('Done: ','Tamam: ')+ok+_L(' products moved',' ürün taşındı'));
+      try { var _am=el('adm-main')||el('panel-main'); if(_am && typeof admProducts==='function') admProducts(_am); } catch(e){}
+      render();
+    });
+    bindNext();
+  }
+  // ── ADIM 3: vendor kategorileri — genis Guvenlik iceren categories/specializations/distributedCategories
+  async function step3(){
+    await loadCats(); await loadProds(); await loadVendors(true); await loadBrandIdx();
+    var tm=tmap();
+    var avail=TARGETS.filter(function(tg){ return tm[tg]; });
+    if(!vendors.length){
+      body.innerHTML='<div style="padding:24px;text-align:center;color:#64748b">'+_L('No vendors reference broad Security. 🎉','Geniş Güvenlik içeren vendor kalmadı. 🎉')+'</div><div style="display:flex;justify-content:flex-end;margin-top:12px">'+nextBtn(4)+'</div>';
+      bindNext(); return;
+    }
+    var byVendor={};
+    (prods||[]).forEach(function(p){ var sg=suggest(p); if(!sg||!p.vendorId) return; (byVendor[p.vendorId]=byVendor[p.vendorId]||{})[sg]=1; });
+    function vendorSug(v){
+      var s=byVendor[v.id]?Object.keys(byVendor[v.id]).reduce(function(a,k){ a[k]=1; return a; },{}):{};
+      (v.brands||[]).forEach(function(bn){
+        var b=brandIdx[_normBrand(bn)]; if(!b) return;
+        (b.categories||[]).forEach(function(c){ avail.forEach(function(tg){ if(_norm(c)===_norm(tg)||_norm(c)===_norm(tm[tg].name)) s[tg]=1; }); });
+      });
+      return s;
+    }
+    var FLDS=[['categories',_L('Categories','Kategoriler')],['specializations',_L('Expertise','Uzmanlıklar')],['distributedCategories',_L('Distributed','Dağıtılan')]];
+    var rowsHtml=vendors.map(function(v,vi){
+      var sug=vendorSug(v);
+      var fb=FLDS.filter(function(f){ return (v[f[0]]||[]).some(isBroad); }).map(function(f){ return '<span style="font-size:10px;background:rgba(220,38,38,.08);color:#dc2626;border-radius:4px;padding:2px 6px;font-weight:600">'+f[1]+'</span>'; }).join(' ');
+      var chips=avail.map(function(tg){
+        var ck=sug[tg]?' checked':'';
+        return '<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;cursor:pointer;margin:2px"><input type="checkbox" class="sm-vchk" data-vi="'+vi+'" value="'+escHtml(tm[tg].name)+'"'+ck+'>'+escHtml(tg)+'</label>';
+      }).join('');
+      return '<tr style="border-top:1px solid var(--border)"><td style="padding:8px 10px;vertical-align:top;min-width:170px"><div style="font-weight:600">'+escHtml(v.company||v.displayName||v.email||'—')+'</div><div style="font-size:10.5px;color:#94a3b8">'+escHtml(v.vendorType||'')+'</div><div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">'+fb+'</div></td>'
+        +'<td style="padding:8px 10px">'+chips+'</td></tr>';
+    }).join('');
+    body.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">'+vendors.length+' '+_L('vendors reference broad Security. Suggestions (pre-checked) come from their migrated products + brand categories. On save: broad entries are removed from the flagged fields and checked targets are added to those same fields. Vendors with nothing checked are skipped.','vendor geniş Güvenlik içeriyor. Öneriler (ön-seçili) taşınan ürünleri + marka kategorilerinden gelir. Kaydette: işaretli alanlardan geniş kayıt çıkarılır, seçilen hedefler aynı alanlara eklenir. Hiç seçim yapılmayan vendor atlanır.')+'</div>'
+      +'<div style="max-height:400px;overflow:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'
+      +'<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+_L('Vendor','Vendor')+'</th>'
+      +'<th style="text-align:left;padding:7px 10px;background:var(--bg-elevated);font-size:10px;text-transform:uppercase;color:#64748b;position:sticky;top:0">'+_L('New categories','Yeni kategoriler')+'</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px"><div style="font-size:11px;color:#94a3b8">'+_L('Only vendors with at least one checked target are written.','Yalnızca en az bir hedef işaretli vendorlar yazılır.')+'</div><div style="display:flex;gap:10px"><button class="btn-p btn-sm" id="s3-save">'+_L('Save changes','Değişiklikleri Kaydet')+'</button>'+nextBtn(4)+'</div></div>';
+    modal.querySelector('#s3-save').addEventListener('click', async function(){
+      var picks={};
+      modal.querySelectorAll('.sm-vchk').forEach(function(x){ if(!x.checked) return; var vi=x.dataset.vi; (picks[vi]=picks[vi]||[]).push(x.value); });
+      var vids=Object.keys(picks);
+      if(!vids.length){ showToast(_L('Nothing checked.','Hiç seçim yok.')); return; }
+      if(!confirm(vids.length+_L(' vendor(s) will be updated.',' vendorun kategorileri güncellenecek. Onaylıyor musun?'))) return;
+      var btn=this; btn.disabled=true; btn.textContent=_L('Saving...','Kaydediliyor...');
+      var ok=0, firstErr=null;
+      for(var i=0;i<vids.length;i++){
+        var v=vendors[parseInt(vids[i],10)], sel=picks[vids[i]], upd={};
+        ['categories','specializations','distributedCategories'].forEach(function(f){
+          var arr=v[f]||[]; if(!arr.some(isBroad)) return;
+          var kept=arr.filter(function(x){ return !isBroad(x); });
+          sel.forEach(function(nm){ if(!kept.some(function(x){ return _norm(x)===_norm(nm); })) kept.push(nm); });
+          upd[f]=kept;
+        });
+        if(!Object.keys(upd).length) continue;
+        try { await updateDoc(doc(db,'users',v.id), upd); ok++; }
+        catch(e){ firstErr=e; break; }
+      }
+      if(firstErr){ btn.disabled=false; btn.textContent=_L('Save changes','Değişiklikleri Kaydet'); _bulkErrAlert(firstErr, ok, 'users'); return; }
+      showToast(_L('Done: ','Tamam: ')+ok+_L(' vendors updated',' vendor güncellendi'));
+      render();
+    });
+    bindNext();
+  }
+  // ── ADIM 4: kapanis — 0 urun + 0 vendor kalinca genis Guvenlik kategorisi gizlenir (SILINMEZ; sema fallback kalir)
+  async function step4(){
+    await loadCats(true); await loadProds(true); await loadVendors(true);
+    var pN=prods.length, vN=vendors.length;
+    var broadCats=liveCats.filter(function(c){ return isBroad(c.name); });
+    var visBroad=broadCats.filter(function(c){ return c.visible!==false; });
+    var done=(pN===0 && vN===0);
+    var stat='<div style="display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap">'
+      +'<div style="border:1px solid var(--border);border-radius:8px;padding:12px 16px"><div style="font-size:20px;font-weight:700;color:'+(pN?'#dc2626':'#16a34a')+'">'+pN+'</div><div style="font-size:11px;color:#94a3b8">'+_L('products still broad','geniş kategoride ürün')+'</div></div>'
+      +'<div style="border:1px solid var(--border);border-radius:8px;padding:12px 16px"><div style="font-size:20px;font-weight:700;color:'+(vN?'#dc2626':'#16a34a')+'">'+vN+'</div><div style="font-size:11px;color:#94a3b8">'+_L('vendors still broad','geniş kategoride vendor')+'</div></div>'
+      +'<div style="border:1px solid var(--border);border-radius:8px;padding:12px 16px"><div style="font-size:20px;font-weight:700;color:'+(visBroad.length?'#d97706':'#16a34a')+'">'+visBroad.length+'</div><div style="font-size:11px;color:#94a3b8">'+_L('visible broad categories','görünür geniş kategori')+'</div></div></div>';
+    var act='';
+    if(done && visBroad.length){
+      act='<button class="btn-p btn-sm" id="s4-hide">🙈 '+_L('Hide broad Security categories','Geniş Güvenlik kategorilerini gizle')+' ('+visBroad.length+')</button>';
+    } else if(done){
+      act='<div style="color:#16a34a;font-weight:700">🎉 '+_L('Split complete. Broad Security is empty and hidden.','Bölme tamamlandı. Geniş Güvenlik boş ve gizli.')+'</div>';
+    } else {
+      act='<div style="color:#d97706;font-size:12px">'+_L('Finish steps 2-3 first; hiding is enabled when both counts are zero.','Önce 2-3. adımları bitir; iki sayaç da sıfır olunca gizleme aktif olur.')+'</div>';
+    }
+    body.innerHTML=stat+act+'<div style="font-size:11px;color:#94a3b8;margin-top:12px">'+_L('The category is hidden, never deleted — the Guvenlik schema stays as a fallback for legacy data.','Kategori gizlenir, silinmez — Guvenlik şeması eski veriler için fallback olarak kalır.')+'</div>';
+    if(done && visBroad.length) modal.querySelector('#s4-hide').addEventListener('click', async function(){
+      if(!confirm(visBroad.length+_L(' categories will be hidden.',' kategori gizlenecek. Onaylıyor musun?'))) return;
+      var btn=this; btn.disabled=true; var ok=0, firstErr=null;
+      for(var i=0;i<visBroad.length;i++){
+        try { await setDoc(doc(db,'categories',visBroad[i].id), { visible:false }, { merge:true }); ok++; }
+        catch(e){ firstErr=e; break; }
+      }
+      invalidateCatCache();
+      if(firstErr){ btn.disabled=false; _bulkErrAlert(firstErr, ok, 'categories'); return; }
+      showToast(ok+_L(' categories hidden',' kategori gizlendi'));
+      try { var _am=el('adm-main')||el('panel-main'); if(_am && typeof admCategories==='function') admCategories(_am); } catch(e){}
+      render();
+    });
+  }
+  render();
 }
 function openCatModal(existing) {
   const isEdit = !!existing;
