@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.97 | pochub.co -->
+<!-- PoCHub v8.98 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.97';
+const VERSION = 'v8.98';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.98': ['MARKALARIM SEKMESI + KATALOG MARKA BOYUTU (Hasan geri bildirimi: v8.97 vendor tarafi kesfedilemez ve vasat kalmisti — profil dibine gomulu, yalniz ownerVendorId atanmissa gorunuyordu; vendorin kayitta beyan ettigi brands[] tamamen yok sayiliyordu. KOK NEDEN kabul edildi, yeniden tasarlandi). (1) VENDOR PANELINE AYRI -🏷 Markalarim- SEKMESI (Urunlerim yaninda): kaynak birlesik — beyan edilen brands[] ∪ ownerVendorId sahipligi ∪ urunlerinde gecen markalar. Marka karti: rozet (Sahipligi dogrulanmis / Sahiplik talebi beklemede / Sahiplik Talep Et / Canonical listede yok uyarisi), aile sayisi + urun sayisi + KAPSAMA (N aileden M-inde urunun var). Aile satirlari: urunu OLAN aile yesil ✓, olmayanda -+ Urun Ekle- butonu — modal MARKA+AILE+KATEGORI ON-DOLU acilir (openAddProductModal prefillBrand/prefillFamilyNorm parametreleri). Markadaki kendi urunleri durum rozetiyle listelenir, ✎ mevcut openEditProd ile duzenlenir. Markasiz urunler ayri kartta uyariyla listelenir. Sahip oldugu markaya aile onerisi (pending) + geri cekme sekme icinde. Eski profil-eki vendOwnedBrandFamilies KALDIRILDI (yerini sekme aldi). (2) SAHIPLIK TALEP AKISI: yeni koleksiyon brand_ownership_requests (brandId, brandName, vendorId, vendorName, status) — vendor tek tikla talep acar; Admin > Markalar ustunde MAVI kuyruk: Onayla -> brands.ownerVendorId yazilir, Reddet -> status. rules v1.7. (3) KATALOG MARKA BOYUTU: arama artik p.brand alanini da tarar; yeni MARKA faceti (canli urunlerdeki markalardan dinamik, cok-secimli, URL-e yazilir — mevcut facet altyapisi, sifir ozel durum). Boylece musteri tek markanin tum urunlerini listeleyip degerlendirebilir. node 0.'],
   'v8.97': ['URUN AILESI YONETIMI (Faz 1 — Hasan: -admin mutlaka mudahale/duzenleme/silme yapabilmeli; sahip vendor kendine ait olani gorup mudahale edebilmeli-). (1) ADMIN MARKA EDITORU: -Urun Aileleri- bolumu — markanin tum sablonlari listelenir, ekle/duzenle/sil + bekleyen onerilerde tek tik onay; ayrica -Sahip Vendor- alani (datalist ile firma/e-posta secimi, ownerVendorId yazilir; eslesmeyen giris mevcut sahipligi BOZMAZ). (2) DENETIM MODALI: Admin > Markalar > -Aileler (N)- butonu — 758+ sablon tek listede, arama + kategori + durum (Onayli/Bekleyen) filtresi, satir-ici duzenleme (ad+kategori), sil, bekleyeni onayla; 400+ sonucta daraltma uyarisi. Istatistik karti: sablon sayisi + ailesiz marka (hizmet markalari haric). (3) VENDOR SAHIPLIK AKISI: ownerVendorId sahibi vendor, Profil sekmesinin altinda -Markalarim / Urun Aileleri- karti gorur: mevcut aileler + yeni aile ONERISI (status=pending, proposedBy/proposedByName ile) + kendi bekleyen onerisini geri cekme. brand_requests deseninin aynisi: dogrudan yayin YOK, admin suzgeci var. renderUserProfile paylasimli fonksiyonuna DOKUNULMADI — bolum loadVendTab-de sonradan append edilir (musteri profili etkilenmez). (4) GUVENLIK: brandProductsFor artik status=pending kayitlari CASCADE-e vermez (onaysiz iceriik urun formuna sizmaz); firestore.rules v1.6 — brand_products create: admin VEYA vendor(pending+proposedBy=uid+hasOnly), update: yalniz admin, delete: admin veya kendi pending-i. node 0.'],
   'v8.96': ['MARKA URUN AILESI SABLONLARI (Hasan-in istegi: 434 markanin urunleri + kategorileri) — MODEL A: canli urun DEGIL, REFERANS SABLONU; sahiplik modeli bozulmaz (sahipsiz urun PoC akisini kirar — v8.05 dersinin tersi). (1) VERI: BRAND_PRODUCT_SEED — 408 markaya 758 amiral urun ailesi (ad + canonical kategori). Kategoriler BRAND_SEED dagarcigi (196) + Guvenlik Sihirbazi hedefleriyle AYNI kumeden; benim taslak adlarim canonical kumede yoksa esleme tablosuyla cevrildi (orn. HCM -> 1.000-den Fazla Calisani Olan Isletmeler icin HCM Paketleri), 0 dagarcik-disi kaldi. 26 HIZMET markasi (danismanlik/ajans/lojistik) TASARIM GEREGI kapsam disi — urun ailesi kavrami uygulanamaz. (2) YENI KOLEKSIYON brand_products/{id}: brand, brandNorm, name, nameNorm, category, status, visible, order. getBrandProducts()+_bpCache+invalidateBrandProductCache()+brandProductsFor(). (3) YUKLEYICI: Admin > Markalar > -Urun Ailelerini Yukle- — IDEMPOTENT (brandNorm+nameNorm), canli kategoriye _normCat cozumlemesi (eslesmeyen RAPORLANIR, v8.87 deseni), DB-de olmayan markalar raporlanir (once marka seed), v8.89 hata kurali (_bulkErrAlert). (4) URUN FORMU CASCADE: Urun Ekle modalina -Marka & Urun Ailesi- blogu (opsiyonel) — canonical marka datalist-i + secilen markanin aile select-i; aile secilince URUN ADI + KATEGORI otomatik dolar (kategori canliya cozumlenir, kategori paneli tetiklenir). Serbest giris aynen kalir. Submit artik brand alanini da yazar (ana formda marka alani HIC YOKTU). (5) WIZARD: wiz-product-brand serbest metnine canonical datalist onerisi eklendi (davranis degismedi). node 0.'],
   'v8.95': ['GUVENLIK BOLME SIHIRBAZI (v8.60-ta ertelenen is) — v8.47 urun-tasima araci 4 adimli sihirbaza donusturuldu (openSecurityMigrateModal, buton: Guvenlik Bolme Sihirbazi). ADIM 1 HEDEF DOGRULAMA: 14 hedef canli kategorilere _norm ile cozumlenir; eksikler tek tikla olusturulur (addDoc visible:true), gizliler acilir — v8.47-nin -hedeflerin var olmasi gerekir- varsayimi artik dogrulaniyor (sessiz Digere dusme onlenir). ADIM 2 URUNLER: v8.47 cekirdegi korundu + GRC ve PKI/Sertifika hedefleri ve regex kurallari eklendi (v8.41/v8.42 profesyonel semalari araca bagli degildi); yazilan deger artik CANLI kategori ADI (onceden dahili hedef etiketi yaziliyordu — canli ad farkliysa uyumsuzluk olusurdu); vendor_products.productCategory denorm guncellemesi aynen. ADIM 3 VENDORLAR (YENI): categories/specializations/distributedCategories alanlarinda genis Guvenlik iceren vendorlar listelenir; oneri = tasinan urunlerinin suggest() sonuclari + marka kategorileri (brands kesisimi); kaydette genis kayit ilgili alanlardan cikarilir, secilen hedefler AYNI alanlara eklenir; hic secim yapilmayan vendor yazilmaz (kategorisiz birakma riski yok). Boylece kategori x marka gorunumu (v8.93) ve cascade marka secici de temizlenir. ADIM 4 KAPANIS (YENI): urun+vendor sayaclari canli sorgulanir; ikisi de 0 olunca genis Guvenlik kategorileri gizlenir (visible:false) — SILINMEZ, CATEGORY_FIELDS Guvenlik semasi eski veri icin fallback kalir. Tum toplu yazimlar v8.89 kuralina uygun: ilk hatada dur + _bulkErrAlert ile gercek sebep. Adimlar idempotent, serbest gezinilebilir. node 0.'],
@@ -9973,7 +9974,7 @@ var SECTORS = TAXONOMY_DEFAULTS.sectors.map(function(s){ return [s.value, s.labe
 var SECTOR_LABEL = {}; var SECTOR_LABEL_EN = {}; function _rebuildSectorLabel(){ SECTOR_LABEL={}; SECTORS.forEach(function(s){ SECTOR_LABEL[s[0]]=s[1]; }); } _rebuildSectorLabel();
 var TAX_DEPLOYMENTS = TAXONOMY_DEFAULTS.deployments.map(function(d){ return {value:d.value,label:d.label,match:(d.match||[]).slice()}; });
 var TAX_LICENSES = TAXONOMY_DEFAULTS.licenses.map(function(d){ return {value:d.value,label:d.label,match:(d.match||[]).slice()}; });
-var CAT_FILTERS = { category:[], sector:[], deployment:[], license:[], origin:[], verified:[], rating:[], vendor:[] }; // çok-gruplu facet seçimleri
+var CAT_FILTERS = { category:[], sector:[], deployment:[], license:[], origin:[], verified:[], rating:[], vendor:[], brand:[] }; // çok-gruplu facet seçimleri
 var CAT_VIEW = 'grid';        // grid | list | quadrant
 var CAT_QX = 'evidence', CAT_QY = 'recommend';  // Quadrant eksenleri
 var QUAD_COHORT = false;       // false | 'sector' | 'size'
@@ -10003,9 +10004,11 @@ function normalizeLicense(p){
 // Generic facet grupları (içi-OR / gruplar-AND)
 var CAT_CATEGORY_OPTS = [];
 var CAT_VENDOR_OPTS = [];
+var CAT_BRAND_OPTS = [];   // v8.98: marka faceti
 var CAT_FACETS = [
   { key:'category', label:'Kategori', options: CAT_CATEGORY_OPTS, get:function(p){ return p.category?[p.category]:[]; } },
   { key:'vendor', label:'Sağlayıcı', label_en:'Vendor', options: CAT_VENDOR_OPTS, get:function(p){ return p.vendorId?[p.vendorId]:[]; } },
+  { key:'brand', label:'Marka', label_en:'Brand', options: CAT_BRAND_OPTS, get:function(p){ return p.brand?[p.brand]:[]; } },
   { key:'sector', label:'Sektör', options: SECTORS, get:function(p){ return (p.sectors&&p.sectors.length)?p.sectors:(p.sector?[p.sector]:[]); } },
   { key:'deployment', label:'Dağıtım', options: TAX_DEPLOYMENTS.map(function(d){return [d.value,d.label];}), get:function(p){ var d=normalizeDeployment(p); return d?[d]:[]; } },
   { key:'license', label:'Lisans', options: TAX_LICENSES.map(function(d){return [d.value,d.label];}), get:function(p){ var l=normalizeLicense(p); return l?[l]:[]; } },
@@ -10015,6 +10018,7 @@ var CAT_FACETS = [
 ];
 function setCategoryFacetOptions(cats){ CAT_CATEGORY_OPTS.length=0; (cats||[]).forEach(function(c){ var n=(c&&c.name)||c; if(n) CAT_CATEGORY_OPTS.push([n,n]); }); var g=CAT_FACETS.filter(function(f){return f.key==='category';})[0]; if(g) g.options=CAT_CATEGORY_OPTS; _rebuildFacetLabel(); }
 function setVendorFacetOptions(pairs){ CAT_VENDOR_OPTS.length=0; (pairs||[]).forEach(function(pr){ if(pr&&pr[0]) CAT_VENDOR_OPTS.push([pr[0], pr[1]||pr[0]]); }); var gv=CAT_FACETS.filter(function(f){return f.key==='vendor';})[0]; if(gv) gv.options=CAT_VENDOR_OPTS; _rebuildFacetLabel(); }
+function setBrandFacetOptions(names){ CAT_BRAND_OPTS.length=0; (names||[]).forEach(function(nm){ if(nm) CAT_BRAND_OPTS.push([nm,nm]); }); var gb=CAT_FACETS.filter(function(f){return f.key==='brand';})[0]; if(gb) gb.options=CAT_BRAND_OPTS; _rebuildFacetLabel(); }   // v8.98
 var CAT_FACET_LABEL = {}; function _rebuildFacetLabel(){ CAT_FACET_LABEL={}; CAT_FACETS.forEach(function(f){ CAT_FACET_LABEL[f.key]={}; f.options.forEach(function(o){ CAT_FACET_LABEL[f.key][o[0]]=o[1]; }); }); } _rebuildFacetLabel();
 
 // Config'den gelen taksonomiyi uygula (yerinde mutasyon — referanslar korunur)
@@ -10711,9 +10715,10 @@ async function loadCatalog() {
       .filter(p => getLifecycleState(p) === 'active');
 
     const search = el('cat-search')?.value?.toLowerCase()||'';
-    if (search) prods = prods.filter(p => p.name?.toLowerCase().includes(search)||p.vendorName?.toLowerCase().includes(search)||p.category?.toLowerCase().includes(search));
+    if (search) prods = prods.filter(p => p.name?.toLowerCase().includes(search)||p.vendorName?.toLowerCase().includes(search)||p.category?.toLowerCase().includes(search)||p.brand?.toLowerCase().includes(search));   // v8.98: marka da aranir
     var allBase = prods.slice();
     try { var _vmap={}; allBase.forEach(function(p){ if(p.vendorId && !_vmap[p.vendorId]) _vmap[p.vendorId]=(p.vendorName||p.vendorId); }); setVendorFacetOptions(Object.keys(_vmap).map(function(id){return [id,_vmap[id]];}).sort(function(a,b){return String(a[1]).localeCompare(String(b[1]), window.CUR_LOCALE==='en'?'en':'tr', {sensitivity:'base'});})); } catch(e){}
+    try { var _bset={}; allBase.forEach(function(p){ var bn=(p.brand||'').trim(); if(bn) _bset[bn]=1; }); setBrandFacetOptions(Object.keys(_bset).sort(function(a,b){ return a.localeCompare(b, window.CUR_LOCALE==='en'?'en':'tr', {sensitivity:'base'}); })); } catch(e){}   // v8.98: marka faceti (canli urunlerden)
     allBase.forEach(function(p){ CAT_PROD_MAP[p.id]=p; }); // karşılaştırma çözümü için
     if (window._pendingCompare && window._pendingCompare.length>=2) {
       var _pc = window._pendingCompare.filter(function(id){ return CAT_PROD_MAP[id]; });
@@ -15173,7 +15178,7 @@ function renderVendor() {
     ['dashboard',t('tab.dashboard','Dashboard')],
     ...analyticsTab,
     ['requests',t('vtab.requests','PoC Talepleri')],['calendar',t('vtab.calendar','Takvim')],
-    ['products',t('vtab.products','Ürünlerim')],['portfolio',t('vtab.portfolio','Portföyüm')],['featured',t('vtab.featured','📢 Reklamlarım')],
+    ['products',t('vtab.products','Ürünlerim')],['brands','🏷 '+_L('My Brands','Markalarım')],['portfolio',t('vtab.portfolio','Portföyüm')],['featured',t('vtab.featured','📢 Reklamlarım')],
     ['events',t('vtab.events','Etkinliklerim')],['invites',t('vtab.invites','Davetlerim')],['offers-sent',t('vtab.offers_sent','💰 Tekliflerim')],['messages',t('tab.messages','💬 Mesajlar')],
     ['referrals',t('vtab.referrals','🎁 Davet Et')],
     ['subscription',t('vtab.subscription','💎 Aboneliğim')],['billing',t('vtab.billing','💳 Cari Hesap')],
@@ -15210,6 +15215,7 @@ async function loadVendTab() {
   m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('common.loading','Yükleniyor...')+'</div>';
 
   if (CUR_VEND_TAB === 'portfolio') { await vendPortfolio(m); return; }
+  if (CUR_VEND_TAB === 'brands')    { await vendBrands(m); return; }   // v8.98
   if (CUR_VEND_TAB === 'invites')   { await vendInvites(m);   return; }
   if (CUR_VEND_TAB === 'messages')  { await loadMessagesTab(m, 'vendor'); return; }
   if (CUR_VEND_TAB === 'requests')  { await vendRequests(m);  return; }
@@ -15218,7 +15224,7 @@ async function loadVendTab() {
   if (CUR_VEND_TAB === 'referrals') { await vendReferrals(m); return; }
   if (CUR_VEND_TAB === 'analytics') { await vendAnalytics(m); return; }
   if (CUR_VEND_TAB === 'featured')  { await vendFeatured(m); return; }
-  if (CUR_VEND_TAB === 'profile') { await renderUserProfile(m, 'vendor'); try { await vendOwnedBrandFamilies(m); } catch(e){} return; }   // v8.97
+  if (CUR_VEND_TAB === 'profile') { await renderUserProfile(m, 'vendor'); return; }
   if (CUR_VEND_TAB === 'dashboard') {
     // v5.12: Skeleton loader
     m.innerHTML = '<div style="height:60px;margin-bottom:18px"><div class="skel skel-line w30" style="height:14px"></div><div class="skel skel-line w50" style="height:22px;margin-top:6px"></div></div>'
@@ -26803,7 +26809,7 @@ async function openCategoryRequestModal(){
     showToast(EN?'\u2713 Request sent to admin':'\u2713 Talebin admine iletildi');
   } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
 }
-async function openAddProductModal(prefillCat) {
+async function openAddProductModal(prefillCat, prefillBrand, prefillFamilyNorm) {
   await ensureTaxonomy(); await ensureProductFields();
   var cats = await getCategories();
   var modal = document.createElement('div');
@@ -27005,6 +27011,7 @@ async function openAddProductModal(prefillCat) {
   (function(){
     var bEl=modal.querySelector('#pr-brand'), dl=modal.querySelector('#pr-brand-dl'), fEl=modal.querySelector('#pr-family');
     if(!bEl||!dl||!fEl) return;
+    if(prefillBrand){ bEl.value=prefillBrand; }   // v8.98: Markalarım sekmesinden ön-dolum
     function setCatByName(catName){
       var hiddenEl=modal.querySelector('#pr-cat'), searchEl=modal.querySelector('#pr-cat-search');
       var c=(cats||[]).filter(function(x){ return x.visible!==false && _normCat(x.name)===_normCat(catName); })[0];
@@ -27023,6 +27030,7 @@ async function openAddProductModal(prefillCat) {
       var bl=rs[0]||[];
       dl.innerHTML = bl.filter(function(b){ return b.status!=='pending' && b.visible!==false; }).map(function(b){ return '<option value="'+escHtml(b.name)+'">'; }).join('');
       refreshFam();
+      if(prefillFamilyNorm){ var _ix=-1; (fEl._fams||[]).forEach(function(p,i){ if(_ix<0 && p.nameNorm===prefillFamilyNorm) _ix=i; }); if(_ix>=0){ fEl.value=String(_ix); fEl.dispatchEvent(new Event('change')); } }   // v8.98
     });
     bEl.addEventListener('change', refreshFam);
     bEl.addEventListener('input', refreshFam);
@@ -44095,54 +44103,122 @@ async function openBrandProductAudit(host, cats){
   }
   render();
 }
-// ═══ v8.97: VENDOR — SAHIP OLUNAN MARKALARIN URUN AILELERI (profil sekmesine eklenir)
-async function vendOwnedBrandFamilies(m){
-  if(!CUR_USER || !m) return;
-  var owned=[];
-  try { owned=((await getBrands())||[]).filter(function(b){ return b.ownerVendorId===CUR_USER.uid; }); } catch(e){ return; }
-  if(!owned.length) return;
-  var bps=[]; try { bps=await getBrandProducts(true); } catch(e){}
-  var cats=[]; try { cats=((await getCategories())||[]).filter(function(c){ return c.visible!==false; }); } catch(e){}
+// ═══ v8.98: VENDOR "MARKALARIM" SEKMESI — marka → aile → ürün tek ekranda ═══
+// Kaynaklar birlesik: (a) kayitta beyan edilen brands[], (b) ownerVendorId sahipligi,
+// (c) urunlerinde gecen markalar. Kapsama gorunumu: hangi ailede urunu var/yok.
+async function vendBrands(m){
+  var uid = CUR_USER?.uid; if(!uid){ m.innerHTML=''; return; }
+  var all=[], bps=[], prods=[], oreqs=[], cats=[];
+  try { all=(await getBrands())||[]; } catch(e){}
+  try { bps=await getBrandProducts(true); } catch(e){}
+  try { cats=((await getCategories())||[]).filter(function(c){ return c.visible!==false; }); } catch(e){}
+  try { var ps=await getDocs(query(collection(db,'products'), where('vendorId','==',uid))); prods=ps.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }); } catch(e){}
+  try { var rs=await getDocs(query(collection(db,'brand_ownership_requests'), where('vendorId','==',uid))); oreqs=rs.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }); } catch(e){}
+  var pendReq={}; oreqs.forEach(function(r){ if(r.status==='pending') pendReq[_normBrand(r.brandName||'')]=r; });
+  var byName={}; all.forEach(function(b){ byName[_normBrand(b.name)]=b; });
+  var declared={}; [].concat(CUR_PROFILE?.brands||[]).forEach(function(n){ if(n) declared[_normBrand(n)]=n; });
+  var prodByBrand={}, noBrandProds=[];
+  prods.forEach(function(p){ var nb=_normBrand(p.brand||''); if(!nb){ noBrandProds.push(p); return; } (prodByBrand[nb]=prodByBrand[nb]||[]).push(p); });
+  // kart listesi: sahip oldugu ∪ beyan ettigi ∪ urun girdigi markalar
+  var seen={}, cards=[];
+  all.forEach(function(b){ var nb=_normBrand(b.name); if(b.ownerVendorId===uid){ cards.push(b); seen[nb]=1; } });
+  Object.keys(declared).forEach(function(nb){ if(seen[nb]) return; var b=byName[nb]; cards.push(b||{ name:declared[nb], _unresolved:true }); seen[nb]=1; });
+  Object.keys(prodByBrand).forEach(function(nb){ if(seen[nb]) return; var b=byName[nb]; cards.push(b||{ name:prodByBrand[nb][0].brand, _unresolved:true }); seen[nb]=1; });
+  cards.sort(function(a,b){ return String(a.name).localeCompare(String(b.name),'tr',{sensitivity:'base'}); });
+
   var catOpts=cats.map(function(c){ return '<option value="'+escHtml(c.name)+'">'+escHtml(c.name)+'</option>'; }).join('');
-  var wrap=document.createElement('div'); wrap.className='card'; wrap.style.marginTop='18px';
-  var inner='<h3 style="font-size:14px;font-weight:700;margin-bottom:4px">🏷 '+_L('My Brands — Product Families','Markalarım — Ürün Aileleri')+'</h3>'
-    +'<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:12px">'+_L('You own these brands. New family suggestions go live after admin approval.','Bu markaların sahibisin. Yeni aile önerileri admin onayından sonra yayınlanır.')+'</div>';
-  owned.forEach(function(bd,bi){
-    var fams=bps.filter(function(p){ return p.brandNorm===_normBrand(bd.name); });
-    var rows=fams.map(function(p){
-      var mine=p.status==='pending' && p.proposedBy===CUR_USER.uid;
-      var st=p.status==='pending'?(' <span style="font-size:10px;color:#d97706;font-weight:700">⏳ '+_L('awaiting approval','onay bekliyor')+'</span>'):'';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-bottom:1px solid var(--border);font-size:12px">'
-        +'<div style="flex:1"><b>'+escHtml(p.name)+'</b>'+st+'<span style="font-size:10.5px;color:var(--text-muted)"> · '+escHtml(p.category||'—')+'</span></div>'
-        +(mine?('<button class="btn-g btn-sm vob-del" data-id="'+p.id+'" style="color:#dc2626" title="'+_L('Withdraw','Geri çek')+'">🗑</button>'):'')+'</div>';
+  function statusBadge(p){
+    var st = p.publishStatus||p.status||'';
+    if(st==='active'||st==='approved') return '<span class="bdg" style="background:rgba(22,163,74,.12);color:#16a34a;font-size:10px">'+_L('Active','Aktif')+'</span>';
+    if(String(st).indexOf('awaiting')>=0||st==='pending') return '<span class="bdg" style="background:rgba(217,119,6,.12);color:#d97706;font-size:10px">'+_L('Pending','Onay Bekliyor')+'</span>';
+    if(st==='rejected') return '<span class="bdg" style="background:rgba(220,38,38,.12);color:#dc2626;font-size:10px">'+_L('Rejected','Reddedildi')+'</span>';
+    return '<span class="bdg" style="font-size:10px">'+escHtml(String(st)||'—')+'</span>';
+  }
+  function cardHtml(b, bi){
+    var nb=_normBrand(b.name);
+    var owned = !b._unresolved && b.ownerVendorId===uid;
+    var fams = b._unresolved ? [] : bps.filter(function(p){ return p.brandNorm===nb && (p.status!=='pending' || p.proposedBy===uid); });
+    var myP = prodByBrand[nb]||[];
+    var famProd={}; myP.forEach(function(p){ var hit=fams.filter(function(f){ return _normCat(p.category||'')===_normCat(f.category||'') || _normBrand(p.name||'').indexOf(f.nameNorm||'~~')>=0; })[0]; if(hit) (famProd[hit.id]=famProd[hit.id]||[]).push(p); });
+    var covered = fams.filter(function(f){ return famProd[f.id]; }).length;
+    var ownBadge = owned ? '<span class="bdg" style="background:rgba(22,163,74,.12);color:#16a34a;font-size:10.5px">✓ '+_L('Verified owner','Sahipliği doğrulanmış')+'</span>'
+      : (pendReq[nb] ? '<span class="bdg" style="background:rgba(217,119,6,.12);color:#d97706;font-size:10.5px">⏳ '+_L('Ownership requested','Sahiplik talebi beklemede')+'</span>'
+      : (b._unresolved ? '<span class="bdg" style="background:rgba(220,38,38,.10);color:#dc2626;font-size:10.5px">'+_L('Not in canonical list','Canonical listede yok')+'</span>'
+      : '<button class="btn-g btn-sm vb-own" data-bi="'+bi+'" style="font-size:11px">'+_L('Request ownership','Sahiplik Talep Et')+'</button>'));
+    var famRows = fams.map(function(f){
+      var got=famProd[f.id]||[];
+      var mine = f.status==='pending';
+      var right = mine
+        ? ('<span style="font-size:10px;color:#d97706;font-weight:700">⏳ '+_L('awaiting approval','onay bekliyor')+'</span> <button class="btn-g btn-sm vb-fam-del" data-id="'+f.id+'" style="color:#dc2626;font-size:10px" title="'+_L('Withdraw','Geri çek')+'">🗑</button>')
+        : (got.length
+          ? ('<span style="font-size:11px;color:#16a34a;font-weight:700">✓ '+got.length+' '+_L('product(s)','ürün')+'</span>')
+          : ('<button class="btn-p btn-sm vb-addp" data-brand="'+escHtml(b.name)+'" data-fam="'+escHtml(f.nameNorm||'')+'" style="font-size:10.5px;padding:4px 9px">+ '+_L('Add product','Ürün Ekle')+'</button>'));
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid var(--border);font-size:12px">'
+        +'<div style="flex:1"><b>'+escHtml(f.name)+'</b><span style="font-size:10.5px;color:var(--text-muted)"> · '+escHtml(f.category||'—')+'</span></div>'+right+'</div>';
     }).join('');
-    inner+='<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">'
-      +'<div style="font-weight:700;font-size:13px;margin-bottom:6px">'+escHtml(bd.name)+' <span style="font-size:11px;color:var(--text-muted);font-weight:400">('+fams.length+' '+_L('families','aile')+')</span></div>'
-      +'<div style="max-height:160px;overflow:auto">'+(rows||('<div style="font-size:12px;color:var(--text-muted);padding:4px">'+_L('No families yet.','Henüz aile yok.')+'</div>'))+'</div>'
-      +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
-      +'<input class="inp vob-name" data-bi="'+bi+'" placeholder="'+_L('New family name...','Yeni aile adı...')+'" style="flex:2;min-width:150px;font-size:12px;padding:7px 9px">'
-      +'<select class="inp vob-cat" data-bi="'+bi+'" style="flex:2;min-width:150px;font-size:12px;padding:7px 9px"><option value="">'+_L('Category...','Kategori...')+'</option>'+catOpts+'</select>'
-      +'<button class="btn-g btn-sm vob-add" data-bi="'+bi+'">'+_L('Suggest','Öner')+'</button></div></div>';
-  });
-  wrap.innerHTML=inner;
-  m.appendChild(wrap);
-  wrap.querySelectorAll('.vob-add').forEach(function(x){ x.addEventListener('click', async function(){
-    var bi=this.dataset.bi, bd=owned[parseInt(bi,10)];
-    var nm=wrap.querySelector('.vob-name[data-bi="'+bi+'"]').value.trim();
-    var ct=wrap.querySelector('.vob-cat[data-bi="'+bi+'"]').value;
-    if(!nm){ showToast(_L('Family name is required.','Aile adı zorunlu.'),'err'); return; }
-    var dup=bps.filter(function(p){ return p.brandNorm===_normBrand(bd.name) && _normBrand(p.name)===_normBrand(nm); })[0];
-    if(dup){ showToast(_L('This family already exists.','Bu aile zaten var.'),'err'); return; }
+    var prodRows = myP.map(function(p){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-bottom:1px solid var(--border);font-size:12px">'
+        +'<div style="flex:1">'+escHtml(p.name||'—')+' '+statusBadge(p)+'<span style="font-size:10.5px;color:var(--text-muted)"> · '+escHtml(p.category||'—')+'</span></div>'
+        +'<button class="btn-g btn-sm vb-editp" data-pid="'+p.id+'" title="'+_L('Edit','Düzenle')+'">✎</button></div>';
+    }).join('');
+    return '<div class="card" style="margin-bottom:14px" data-nb="'+escHtml(nb)+'">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">'
+        +'<div><div style="font-size:15px;font-weight:800">'+escHtml(b.name)+(b.parent?(' <span style="font-size:11px;color:var(--text-muted);font-weight:400">· '+escHtml(b.parent)+'</span>'):'')
+        +(b.website?(' <a href="'+escHtml(b.website)+'" target="_blank" rel="noopener" style="font-size:11px;text-decoration:none">🔗</a>'):'')+'</div>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px">'+fams.length+' '+_L('families','aile')+' · '+myP.length+' '+_L('of your products','ürünün')
+        +(fams.length?(' · '+_L('coverage ','kapsama ')+covered+'/'+fams.length):'')+'</div></div>'
+        +'<div>'+ownBadge+'</div></div>'
+      +(b._unresolved
+        ? ('<div style="font-size:11.5px;color:#d97706;background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.25);border-radius:8px;padding:8px 10px;margin-bottom:8px">'+_L('This brand is not in the canonical brand list. Ask the admin to add it (or use the brand request flow at registration/profile).','Bu marka canonical marka listesinde yok. Admin\'den eklemesini iste (veya profil/kayıttaki marka talep akışını kullan).')+'</div>')
+        : ('<div style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">'+(famRows||('<div style="font-size:12px;color:var(--text-muted);padding:8px">'+_L('No product families defined for this brand yet.','Bu marka için henüz ürün ailesi tanımlı değil.')+'</div>'))+'</div>'))
+      +(myP.length?('<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.5px">'+_L('Your products under this brand','Bu markadaki ürünlerin')+'</div><div style="max-height:180px;overflow:auto">'+prodRows+'</div>'):'')
+      +(owned?('<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
+        +'<input class="inp vb-sug-name" data-bi="'+bi+'" placeholder="'+_L('Suggest new family...','Yeni aile öner...')+'" style="flex:2;min-width:150px;font-size:12px;padding:7px 9px">'
+        +'<select class="inp vb-sug-cat" data-bi="'+bi+'" style="flex:2;min-width:150px;font-size:12px;padding:7px 9px"><option value="">'+_L('Category...','Kategori...')+'</option>'+catOpts+'</select>'
+        +'<button class="btn-g btn-sm vb-sug-add" data-bi="'+bi+'">'+_L('Suggest','Öner')+'</button></div>'):'')
+      +'</div>';
+  }
+
+  m.innerHTML = '<div class="flx-bw-c-mb18" style="flex-wrap:wrap;gap:8px"><div><h3 class="fs15-fw7">🏷 '+_L('My Brands','Markalarım')+'</h3>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px">'+_L('Brands you declared, own, or have products under — with family coverage. New family suggestions go live after admin approval.','Beyan ettiğin, sahibi olduğun veya ürünün bulunan markalar — aile kapsamasıyla. Yeni aile önerileri admin onayından sonra yayınlanır.')+'</div></div>'
+    +'<button class="btn-p btn-sm" id="vb-addprod">'+t('vd.add_product','+ Ürün Ekle')+'</button></div>'
+    +(cards.length ? cards.map(cardHtml).join('') : ('<div class="card" style="text-align:center;padding:28px;color:var(--text-muted)">'+_L('No brands yet. Add brands to your profile or add a product with a brand.','Henüz marka yok. Profiline marka ekle ya da markalı bir ürün gir.')+'</div>'))
+    +(noBrandProds.length?('<div class="card" style="margin-top:4px"><div style="font-size:12px;font-weight:700;margin-bottom:6px">⚠ '+noBrandProds.length+' '+_L('of your products have no brand — edit them to link a brand.','ürününde marka bilgisi yok — markayla ilişkilendirmek için düzenle.')+'</div>'
+      +noBrandProds.map(function(p){ return '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-bottom:1px solid var(--border);font-size:12px"><div style="flex:1">'+escHtml(p.name||'—')+' '+statusBadge(p)+'</div><button class="btn-g btn-sm vb-editp" data-pid="'+p.id+'">✎</button></div>'; }).join('')+'</div>'):'');
+
+  m.querySelector('#vb-addprod')?.addEventListener('click', function(){ openAddProductModal(); });
+  var prodById={}; prods.forEach(function(p){ prodById[p.id]=p; });
+  m.querySelectorAll('.vb-editp').forEach(function(x){ x.addEventListener('click', function(){
+    var p=prodById[this.dataset.pid]; if(!p) return;
+    openEditProd(p.id, p.name||'', p.category||'', p.country||'TR', p.description||'', p.supportModel||'', p.catFields||{}, p.sectors||[], p.productUrl||'', false);
+  }); });
+  m.querySelectorAll('.vb-addp').forEach(function(x){ x.addEventListener('click', function(){
+    openAddProductModal(null, this.dataset.brand, this.dataset.fam);
+  }); });
+  m.querySelectorAll('.vb-own').forEach(function(x){ x.addEventListener('click', async function(){
+    var b=cards[parseInt(this.dataset.bi,10)]; if(!b||!b.id) return;
+    if(!confirm('"'+b.name+'" '+_L('ownership will be requested (admin approval). Continue?','markası için sahiplik talebi gönderilecek (admin onaylı). Devam?'))) return;
     try {
-      await addDoc(collection(db,'brand_products'), { brand:bd.name, brandNorm:_normBrand(bd.name), name:nm, nameNorm:_normBrand(nm), category:ct, status:'pending', visible:true, order:0, proposedBy:CUR_USER.uid, proposedByName:(CUR_PROFILE?.company||CUR_PROFILE?.displayName||''), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
-      invalidateBrandProductCache(); showToast(_L('Suggestion sent for admin approval.','Öneri admin onayına gönderildi.'));
-      wrap.remove(); vendOwnedBrandFamilies(m);
+      await addDoc(collection(db,'brand_ownership_requests'), { brandId:b.id, brandName:b.name, vendorId:uid, vendorName:(CUR_PROFILE?.company||CUR_PROFILE?.displayName||''), note:'', status:'pending', createdAt:serverTimestamp() });
+      showToast(_L('Ownership request sent.','Sahiplik talebi gönderildi.')); vendBrands(m);
     } catch(e){ showToast(_L('Error: ','Hata: ')+e.message,'err'); }
   }); });
-  wrap.querySelectorAll('.vob-del').forEach(function(x){ x.addEventListener('click', async function(){
+  m.querySelectorAll('.vb-fam-del').forEach(function(x){ x.addEventListener('click', async function(){
     if(!confirm(_L('Withdraw this suggestion?','Bu öneri geri çekilsin mi?'))) return;
-    try { await deleteDoc(doc(db,'brand_products',this.dataset.id)); invalidateBrandProductCache(); showToast(_L('Withdrawn.','Geri çekildi.')); wrap.remove(); vendOwnedBrandFamilies(m); }
+    try { await deleteDoc(doc(db,'brand_products',this.dataset.id)); invalidateBrandProductCache(); showToast(_L('Withdrawn.','Geri çekildi.')); vendBrands(m); }
     catch(e){ showToast(_L('Error: ','Hata: ')+e.message,'err'); }
+  }); });
+  m.querySelectorAll('.vb-sug-add').forEach(function(x){ x.addEventListener('click', async function(){
+    var bi=this.dataset.bi, b=cards[parseInt(bi,10)]; if(!b) return;
+    var nm=m.querySelector('.vb-sug-name[data-bi="'+bi+'"]').value.trim();
+    var ct=m.querySelector('.vb-sug-cat[data-bi="'+bi+'"]').value;
+    if(!nm){ showToast(_L('Family name is required.','Aile adı zorunlu.'),'err'); return; }
+    var nb=_normBrand(b.name);
+    if(bps.some(function(p){ return p.brandNorm===nb && _normBrand(p.name)===_normBrand(nm); })){ showToast(_L('This family already exists.','Bu aile zaten var.'),'err'); return; }
+    try {
+      await addDoc(collection(db,'brand_products'), { brand:b.name, brandNorm:nb, name:nm, nameNorm:_normBrand(nm), category:ct, status:'pending', visible:true, order:0, proposedBy:uid, proposedByName:(CUR_PROFILE?.company||CUR_PROFILE?.displayName||''), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+      invalidateBrandProductCache(); showToast(_L('Suggestion sent for admin approval.','Öneri admin onayına gönderildi.')); vendBrands(m);
+    } catch(e){ showToast(_L('Error: ','Hata: ')+e.message,'err'); }
   }); });
 }
 async function openBrandEditor(brand, allBrands, host){
@@ -44328,6 +44404,9 @@ async function admBrands(m){
   // v8.90: bekleyen marka talepleri
   try { var rs = await getDocs(query(collection(db,'brand_requests'), where('status','==','pending')));
         reqs = rs.docs.map(function(d){ var o=d.data()||{}; o.id=d.id; return o; }); } catch(e){ reqs=[]; }
+  var oreqs=[];   // v8.98: sahiplik talepleri
+  try { var os = await getDocs(query(collection(db,'brand_ownership_requests'), where('status','==','pending')));
+        oreqs = os.docs.map(function(d){ var o=d.data()||{}; o.id=d.id; return o; }); } catch(e){ oreqs=[]; }
 
   var catCount={}; brands.forEach(function(b){ (b.categories||[]).forEach(function(c){ catCount[c]=(catCount[c]||0)+1; }); });
   var noCat = brands.filter(function(b){ return !(b.categories||[]).length; }).length;
@@ -44368,6 +44447,11 @@ async function admBrands(m){
       +'<div class="stat" style="flex:1;min-width:110px"><div class="stat-val" style="color:'+(noFam?'#d97706':'inherit')+'">'+bps.length+'</div><div class="stat-lbl">'+_L('Families','Ürün Ailesi')+(noFam?(' · '+noFam+' '+_L('brands w/o','markasız')):'')+'</div></div>'
       +'<div class="stat" style="flex:1;min-width:110px"><div class="stat-val" style="color:'+(emptyCats?'#d97706':'inherit')+'">'+emptyCats+'</div><div class="stat-lbl">'+_L('Categories w/o Brand','Markasız Kategori')+'</div></div>'
     +'</div>'
+    +(oreqs.length ? ('<div style="border:1px solid #2563eb;border-radius:8px;padding:12px;margin-bottom:14px;background:rgba(37,99,235,.06)">'
+        +'<div style="font-weight:700;font-size:13px;margin-bottom:8px">🤝 '+_L('Pending Ownership Requests','Bekleyen Sahiplik Talepleri')+' ('+oreqs.length+')</div>'
+        +oreqs.map(function(r){ return '<div style="border-top:1px solid var(--border);padding:8px 0;display:flex;justify-content:space-between;align-items:center;gap:10px">'
+          +'<div style="flex:1;font-size:12.5px"><b>'+escHtml(r.vendorName||'—')+'</b> → '+escHtml(r.brandName||'—')+'</div>'
+          +'<div style="display:flex;gap:6px"><button class="btn-p btn-sm obr-ok" data-id="'+r.id+'">✓ '+_L('Approve','Onayla')+'</button><button class="btn-g btn-sm obr-no" data-id="'+r.id+'" style="color:#dc2626">✗ '+_L('Reject','Reddet')+'</button></div></div>'; }).join('')+'</div>') : '')
     +(reqs.length ? ('<div style="border:1px solid #d97706;border-radius:8px;padding:12px;margin-bottom:14px;background:rgba(217,119,6,.06)">'
         +'<div style="font-weight:700;font-size:13px;margin-bottom:8px">⏳ '+_L('Pending Brand Requests','Bekleyen Marka Talepleri')+' ('+reqs.length+')</div>'
         +reqs.map(function(r){
@@ -44464,6 +44548,19 @@ async function admBrands(m){
   });
 
   m.querySelector('#bp-audit')?.addEventListener('click', function(){ openBrandProductAudit(m, cats); });   // v8.97
+  var _orById={}; oreqs.forEach(function(r){ _orById[r.id]=r; });   // v8.98
+  m.querySelectorAll('.obr-ok').forEach(function(x){ x.addEventListener('click', async function(){
+    var r=_orById[this.dataset.id]; if(!r||!r.brandId) return;
+    try {
+      await setDoc(doc(db,'brands', r.brandId), { ownerVendorId:r.vendorId, updatedAt:serverTimestamp() }, { merge:true });
+      await updateDoc(doc(db,'brand_ownership_requests', r.id), { status:'approved', decidedAt:serverTimestamp() });
+      invalidateBrandCache(); showToast(_L('Ownership approved.','Sahiplik onaylandı.')); admBrands(m);
+    } catch(e){ showToast(_L('Error: ','Hata: ')+e.message,'err'); }
+  }); });
+  m.querySelectorAll('.obr-no').forEach(function(x){ x.addEventListener('click', async function(){
+    try { await updateDoc(doc(db,'brand_ownership_requests', this.dataset.id), { status:'rejected', decidedAt:serverTimestamp() }); showToast(_L('Rejected.','Reddedildi.')); admBrands(m); }
+    catch(e){ showToast(_L('Error: ','Hata: ')+e.message,'err'); }
+  }); });
   // ── v8.96: urun ailesi sablonlarini yukle (IDEMPOTENT: brandNorm+nameNorm; hizmet markalari kapsam disi)
   m.querySelector('#bp-seed')?.addEventListener('click', async function(){
     var btn=this; btn.disabled=true; btn.textContent=_L('Checking…','Kontrol ediliyor…');
