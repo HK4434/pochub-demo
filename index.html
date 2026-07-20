@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.99.1 | pochub.co -->
+<!-- PoCHub v9.00 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.99.1';
+const VERSION = 'v9.00';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.00': ['ADMIN KATEGORI & URUN KATALOGU YENIDEN TASARIMI (Hasan geri bildirimi: Admin>Kategoriler ile katalog filtresi uyusmuyordu — admin 197 duz kategori listeliyor, katalog yalniz urunlu ~6 kategoriyi gosteriyordu; admin gorunumu vasat/tutarsizdi). admCategories duz tablodan KATEGORI+URUN gruplu gorunume cevrildi: her kategori altinda urunleri listelenir, DEFAULT tum kategori + tum urun acik. (1) UST OZET: 8 kartlik istatistik (kategori/urunlu/bos/gizli + toplam urun: aktif/onay-bekleyen/arsiv). (2) SIRALAMA — kategori (Isim A-Z default, Z-A, cok/az urunlu, manuel sira, en yeni) ve urun (Isim A-Z, puan, en yeni, dogrulanmis once, duruma gore) ayri ayri. (3) AKILLI FILTRELER (pill, cok-secimli): Kategori durumu (urunlu/bos/gorunur/gizli), Sema (Prof/Ince/Yok — canli sema cozumlemesi), Urun durumu (aktif/bekleyen/arsiv), Koken (Yerli/Yabanci), Ekstra (dogrulanmis satici, 4+ puan). Arama hem kategori adi hem urun adi/marka/vendor tarar. (4) Her kategori satiri katlanabilir; Tumunu Ac/Kapat; urun satiri tiklaninca detay modali. Kategori eylemleri (gorunurluk/duzenle/sil) + tum eski araclar (Eksik Ekle, Kategori Tani, Guvenlik Bolme, Toplu Gorunurluk, Yeni Kategori, Tumunu EN Cevir) KORUNDU. (5) Kategori eslemesi olmayan urunler ayri kovada. Yeni kategori/urun otomatik dusuyor (canli Firestore, salt-okuma). Tum yeni metinler _L(en,tr) — EN modunda otomatik. node 0, MODULE SYNTAX OK, i18n 63/63 _L cifti temiz.'],
   'v8.99.1': ['HOTFIX — MARKA KATALOGU BORU HATTI ENTEGRASYONU (Hasan-in ekran goruntusu: -filtreler uyumsuz, arama uyumsuz-. HAKLIYDI, 3 sorun): (1) MUKERRER FORTIGATE: kapsama kontrolu p.brand alanina bakiyordu ama v8.96 oncesi urunlerde brand YOK (bos) — FortiGate 100F/60F katalogda dururken FortiGate (NGFW) sablonu da cikiyordu. DUZELTME: kapsama artik ad+marka+vendorName birlesik haystack-inde marka cekirdegini arar (Fortinet TR -> fortinet) ve ARAMADAN BAGIMSIZ tum canli urunler uzerinden hesaplanir. (2) SAYAC/FILTRE UYUMSUZLUGU: -3 cozum- yazip 19 kart gorunuyordu; sablonlar boru hatti disindaki ayri bolumdeydi. DUZELTME: ayrik bolum KALDIRILDI — sablonlar ayni arama + kategori + marka filtresinden gecer, sayacta -N cozum · M marka katalogu- olarak gorunur, AYNI grid konteynerinin sonuna eklenir. (3) GORSEL TUTARSIZLIK: kesikli mini kartlar yerine gercek urun kartiyla ayni anatomi (renkli ust serit — notr gri degrade, kategori rozeti, marka avatari, ayni radius/padding) + -Marka Katalogu- rozeti; kart tiklaninca marka sayfasi, buton PoC on-dolu acar. Ayrica: gercek urun 0 + sablon varsa bos-durum ekrani yerine sablonlar gosterilir; limit 48, alfabetik. node 0.'],
   'v8.99': ['MARKA-TEMELLI KATALOG + PUBLIC MARKA SAYFASI + YETKILENDIRME (saha analizi sonucu — Fortinet/CrowdStrike/Logo siteleri incelendi; kritik kurgu hatasi: katalog uretici-varligina bagimliydi, global markalarin ureticisi platforma uye olmayacagi icin katalog bos kalirdi). (1) PUBLIC MARKA SAYFASI (#b/<brandNorm>, renderBrandPage): marka profili (ana sirket/website/kategoriler) + istatistik (aile/katalog urunu/temsilci/yetkili) + urun aileleri (her satirdan PoC talebi) + katalogdaki gercek urunler + markayi temsil eden vendorlar (yetkili rozeti onde, vendor-public linkli). (2) KATALOGDA MARKA KATALOGU BOLUMU: arama/kategori/marka niyeti varken, gercek urunle kapsanmayan aile sablonlari kesikli-cerceveli kartlarla listelenir (ilk 60); PoC Talep Et -> openCustomPoCModal ON-DOLU (ad+marka+kategori); diger facetler aktifken gizlenir, quadrant/karsilastirmaya karismaz (prod-card sinifi yok). (3) POC YONLENDIRME: custom PoC kaydina brandNorm izi eklendi; talep sonrasi markayi beyan eden vendorlara (ilk 25) hedefli bildirim — havuz modeli aynen durur, vendor talebi havuzdan sahiplenir. (4) YETKILENDIRME (brand_relations, docId=brandNorm_vendorId): admin marka editorunde -Temsilciler & Yetkilendirme- bolumu — markayi beyan eden vendorlar listelenir, tek isaretle Yetkili yapilir/kaldirilir; rozetler marka sayfasinda (Yetkili Distributor/Entegrator/Uretici) ve vendor Markalarim kartinda (Yetkili Temsilci) gorunur. Markalarim kart basligi artik marka sayfasina link. rules v1.8 (brand_relations: read herkes, write admin). (5) custom PoC kategori on-dolumu canli kategori cozumlemesiyle. node 0.'],
   'v8.98': ['MARKALARIM SEKMESI + KATALOG MARKA BOYUTU (Hasan geri bildirimi: v8.97 vendor tarafi kesfedilemez ve vasat kalmisti — profil dibine gomulu, yalniz ownerVendorId atanmissa gorunuyordu; vendorin kayitta beyan ettigi brands[] tamamen yok sayiliyordu. KOK NEDEN kabul edildi, yeniden tasarlandi). (1) VENDOR PANELINE AYRI -🏷 Markalarim- SEKMESI (Urunlerim yaninda): kaynak birlesik — beyan edilen brands[] ∪ ownerVendorId sahipligi ∪ urunlerinde gecen markalar. Marka karti: rozet (Sahipligi dogrulanmis / Sahiplik talebi beklemede / Sahiplik Talep Et / Canonical listede yok uyarisi), aile sayisi + urun sayisi + KAPSAMA (N aileden M-inde urunun var). Aile satirlari: urunu OLAN aile yesil ✓, olmayanda -+ Urun Ekle- butonu — modal MARKA+AILE+KATEGORI ON-DOLU acilir (openAddProductModal prefillBrand/prefillFamilyNorm parametreleri). Markadaki kendi urunleri durum rozetiyle listelenir, ✎ mevcut openEditProd ile duzenlenir. Markasiz urunler ayri kartta uyariyla listelenir. Sahip oldugu markaya aile onerisi (pending) + geri cekme sekme icinde. Eski profil-eki vendOwnedBrandFamilies KALDIRILDI (yerini sekme aldi). (2) SAHIPLIK TALEP AKISI: yeni koleksiyon brand_ownership_requests (brandId, brandName, vendorId, vendorName, status) — vendor tek tikla talep acar; Admin > Markalar ustunde MAVI kuyruk: Onayla -> brands.ownerVendorId yazilir, Reddet -> status. rules v1.7. (3) KATALOG MARKA BOYUTU: arama artik p.brand alanini da tarar; yeni MARKA faceti (canli urunlerdeki markalardan dinamik, cok-secimli, URL-e yazilir — mevcut facet altyapisi, sifir ozel durum). Boylece musteri tek markanin tum urunlerini listeleyip degerlendirebilir. node 0.'],
@@ -44855,61 +44856,252 @@ async function admBrands(m){
 
 async function admCategories(m) {
   try {
-    const snap = await getDocs(collection(db,'categories'));
-    var cats = snap.docs.map(d => ({...d.data(), id:d.id}));
+    await ensureProductFields();
+    const [catSnap, prodSnap] = await Promise.all([
+      getDocs(collection(db,'categories')),
+      getDocs(collection(db,'products'))
+    ]);
+    var cats = catSnap.docs.map(d => ({...d.data(), id:d.id}));
     cats = sortCatsLocale(cats);
+    var prods = prodSnap.docs.map(d => ({...d.data(), id:d.id})).filter(function(p){ return getLifecycleState(p)!=='trash'; });
+    try { await preloadVendorBadges([...new Set(prods.map(function(p){ return p.vendorId; }).filter(Boolean))]); } catch(e){}
+    var EN = window.CUR_LOCALE==='en';
+    var catByName = {}; cats.forEach(function(c){ catByName[c.name]=c; });
+    var byCat = {}, uncat = [];
+    prods.forEach(function(p){ var cn=p.category||''; if(cn && catByName[cn]) (byCat[cn]=byCat[cn]||[]).push(p); else uncat.push(p); });
+    if(!window._CATV) window._CATV = { q:'', catSort:'name', prodSort:'name', fCatState:[], fSchema:[], fProdStatus:[], fOrigin:[], fVerified:false, fRating4:false, collapsed:{} };
+    var CATV = window._CATV;
 
-    function renderRows(items) {
-      var tbody = m.querySelector('#cat-tbody');
-      var cnt = m.querySelector('#cat-cnt');
-      if (cnt) cnt.textContent = '(' + items.length + ')';
-      if (!tbody) return;
-      if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:#64748b">'+t('common.no_results','Sonuç bulunamadı.')+'</td></tr>';
-        return;
+    // ── v9.00: Kategori & Ürün Kataloğu — tüm kategoriler + altındaki ürünler, akıllı sıralama/filtre ──
+    function _prodName(p){ return (window.CUR_LOCALE==='en'&&p.name_en)?p.name_en:(p.name||'—'); }
+    function _prodStatus(p){ if(getLifecycleState(p)==='archived') return 'archived'; if(p.status==='pending'||p.publishStatus==='awaiting_admin') return 'pending'; return 'active'; }
+    function _isVerified(p){ return !!(window._vendorBadgeCache&&window._vendorBadgeCache[p.vendorId]&&window._vendorBadgeCache[p.vendorId].vendorStatus==='admin_verified'); }
+    function _prodOrigin(p){ return p.origin || (p.country==='TR'?'domestic':''); }
+    function _resolveCatState(name){
+      var nc=_normCat(name);
+      var ovr=(typeof PRODUCT_FIELDS_OVR!=='undefined')?(PRODUCT_FIELDS_OVR[name]||PRODUCT_FIELDS_OVR[nc]):null;
+      if(ovr&&ovr.length) return 'pro';
+      var CF=(typeof CATEGORY_FIELDS!=='undefined')?CATEGORY_FIELDS:{};
+      var key=(CF[name]&&CF[name].length)?name:((CF[nc]&&CF[nc].length)?nc:null);
+      if(key){ var arr=CF[key]; var hk=arr.some(function(f){return f&&f.key;}); return (arr.length>=15&&hk)?'pro':'thin'; }
+      return 'other';
+    }
+    function _schemaBadge(st){
+      if(st==='pro')  return '<span style="background:rgba(22,163,74,.10);color:#16a34a;font-weight:700;font-size:10px;padding:1px 8px;border-radius:20px">'+_L('Pro schema','Prof şema')+'</span>';
+      if(st==='thin') return '<span style="background:rgba(217,119,6,.10);color:#d97706;font-weight:700;font-size:10px;padding:1px 8px;border-radius:20px">'+_L('Thin','İnce şema')+'</span>';
+      return '<span style="background:rgba(100,116,139,.10);color:#64748b;font-weight:700;font-size:10px;padding:1px 8px;border-radius:20px">'+_L('No schema','Şemasız')+'</span>';
+    }
+    function _statusBadge(s){
+      if(s==='active')  return '<span style="background:rgba(22,163,74,.10);color:#16a34a;font-weight:700;font-size:10px;padding:1px 8px;border-radius:20px">'+_L('Active','Aktif')+'</span>';
+      if(s==='pending') return '<span style="background:rgba(217,119,6,.10);color:#d97706;font-weight:700;font-size:10px;padding:1px 8px;border-radius:20px">'+_L('Pending','Onay bekliyor')+'</span>';
+      return '<span style="background:rgba(100,116,139,.10);color:#64748b;font-weight:700;font-size:10px;padding:1px 8px;border-radius:20px">'+_L('Archived','Arşiv')+'</span>';
+    }
+    function _prodPasses(p){
+      if(CATV.fProdStatus.length && CATV.fProdStatus.indexOf(_prodStatus(p))<0) return false;
+      if(CATV.fOrigin.length && CATV.fOrigin.indexOf(_prodOrigin(p))<0) return false;
+      if(CATV.fVerified && !_isVerified(p)) return false;
+      if(CATV.fRating4 && (p.avgRating||0)<4) return false;
+      return true;
+    }
+    function _sortProds(arr){
+      var s=CATV.prodSort, loc=EN?'en':'tr';
+      return arr.slice().sort(function(a,b){
+        if(s==='rating'){ var ra=a.avgRating||0, rb=b.avgRating||0; if(ra!==rb) return rb-ra; return (b.ratingCount||0)-(a.ratingCount||0); }
+        if(s==='newest') return ((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0);
+        if(s==='verified'){ var va=_isVerified(a)?0:1, vb=_isVerified(b)?0:1; if(va!==vb) return va-vb; return _prodName(a).localeCompare(_prodName(b),loc,{sensitivity:'base'}); }
+        if(s==='status'){ var rk={active:0,pending:1,archived:2}; var da=rk[_prodStatus(a)], dbb=rk[_prodStatus(b)]; if(da!==dbb) return da-dbb; return _prodName(a).localeCompare(_prodName(b),loc,{sensitivity:'base'}); }
+        return _prodName(a).localeCompare(_prodName(b),loc,{sensitivity:'base'});
+      });
+    }
+    function _statCard(icon,n,label){
+      return '<div style="display:flex;align-items:center;gap:7px;background:var(--bg-surface);border:1px solid var(--border);border-radius:9px;padding:7px 11px"><span style="font-size:14px">'+icon+'</span><span style="font-weight:800;font-size:15px">'+n+'</span><span style="font-size:11px;color:var(--text-muted)">'+label+'</span></div>';
+    }
+    function _catSortOpts(){ return [['name',_L('Name A–Z','İsim A–Z')],['name_desc',_L('Name Z–A','İsim Z–A')],['count_desc',_L('Most products','Çok ürünlü')],['count_asc',_L('Fewest products','Az ürünlü')],['order',_L('Manual order','Manuel sıra')],['newest',_L('Newest category','En yeni kategori')]]; }
+    function _prodSortOpts(){ return [['name',_L('Name A–Z','İsim A–Z')],['rating',_L('Rating','Puan')],['newest',_L('Newest','En yeni')],['verified',_L('Verified first','Doğrulanmış önce')],['status',_L('By status','Duruma göre')]]; }
+    function _fGroups(){ return [
+      {g:'fCatState', title:_L('Category','Kategori'), opts:[['has',_L('With products','Ürünlü')],['empty',_L('Empty','Boş')],['visible',_L('Visible','Görünür')],['hidden',_L('Hidden','Gizli')]]},
+      {g:'fSchema',   title:_L('Schema','Şema'),      opts:[['pro',_L('Pro','Prof')],['thin',_L('Thin','İnce')],['other',_L('None','Yok')]]},
+      {g:'fProdStatus',title:_L('Product','Ürün'),    opts:[['active',_L('Active','Aktif')],['pending',_L('Pending','Bekleyen')],['archived',_L('Archived','Arşiv')]]},
+      {g:'fOrigin',   title:_L('Origin','Köken'),     opts:[['domestic','🇹🇷 '+_L('Domestic','Yerli')],['foreign','🌍 '+_L('Foreign','Yabancı')]]}
+    ]; }
+    function _pillHtml(group,val,label,active){
+      return '<span class="catv-pill" data-fg="'+group+'" data-fv="'+val+'" style="display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:16px;cursor:pointer;border:1px solid '+(active?'#2563eb':'var(--border)')+';background:'+(active?'rgba(37,99,235,.08)':'transparent')+';color:'+(active?'#2563eb':'var(--text-secondary)')+'">'+(active?'✓ ':'')+label+'</span>';
+    }
+    function _anyFilter(){ return !!(CATV.q || CATV.fCatState.length || CATV.fSchema.length || CATV.fProdStatus.length || CATV.fOrigin.length || CATV.fVerified || CATV.fRating4); }
+    function _controlsHtml(){
+      var h='<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px">';
+      // satır 1 — sıralama + görünüm eylemleri
+      h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">';
+      h+='<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted)">'+_L('Sort','Sırala')+'</span>';
+      h+='<label style="font-size:11.5px;color:var(--text-secondary);display:flex;align-items:center;gap:5px">'+_L('Categories','Kategori')+' <select class="inp" id="catv-catsort" style="width:auto;font-size:12px;padding:4px 7px">'+_catSortOpts().map(function(o){ return '<option value="'+o[0]+'"'+(CATV.catSort===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></label>';
+      h+='<label style="font-size:11.5px;color:var(--text-secondary);display:flex;align-items:center;gap:5px">'+_L('Products','Ürün')+' <select class="inp" id="catv-prodsort" style="width:auto;font-size:12px;padding:4px 7px">'+_prodSortOpts().map(function(o){ return '<option value="'+o[0]+'"'+(CATV.prodSort===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></label>';
+      h+='<div style="flex:1"></div>';
+      h+='<button class="btn-g btn-sm fs12" id="catv-expand">'+_L('Expand all','Tümünü aç')+'</button>';
+      h+='<button class="btn-g btn-sm fs12" id="catv-collapse">'+_L('Collapse all','Tümünü kapat')+'</button>';
+      if(_anyFilter()) h+='<button class="btn-g btn-sm fs12" id="catv-clear" style="color:#dc2626;border-color:#fecaca">'+_L('Clear filters','Filtreleri temizle')+'</button>';
+      h+='</div>';
+      // satır 2 — akıllı filtre pill'leri
+      h+='<div style="display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--border);padding-top:10px">';
+      _fGroups().forEach(function(fg){
+        h+='<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);width:64px;flex-shrink:0">'+fg.title+'</span>';
+        h+=fg.opts.map(function(o){ return _pillHtml(fg.g,o[0],o[1],(CATV[fg.g]||[]).indexOf(o[0])>=0); }).join('');
+        h+='</div>';
+      });
+      h+='<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);width:64px;flex-shrink:0">'+_L('Extra','Ekstra')+'</span>';
+      h+=_pillHtml('fVerified','1','✓ '+_L('Verified vendor','Doğrulanmış satıcı'),!!CATV.fVerified);
+      h+=_pillHtml('fRating4','1','⭐ 4+',!!CATV.fRating4);
+      h+='</div>';
+      h+='</div></div>';
+      return h;
+    }
+    function _prodRowHtml(p){
+      var meta=[];
+      if(p.brand) meta.push('<span style="font-size:11px;color:#475569;background:#f1f5f9;border-radius:5px;padding:1px 7px;font-weight:600">🏷 '+escHtml(p.brand)+'</span>');
+      if(p.vendorName) meta.push('<span style="font-size:11px;color:var(--text-muted);white-space:nowrap">'+escHtml(p.vendorName)+'</span>');
+      var o=_prodOrigin(p); if(o==='domestic') meta.push('<span title="'+_L('Domestic','Yerli')+'">🇹🇷</span>'); else if(o==='foreign') meta.push('<span title="'+_L('Foreign','Yabancı')+'">🌍</span>');
+      if(p.avgRating) meta.push('<span style="font-size:11px;color:#d97706;font-weight:700;white-space:nowrap">⭐ '+Number(p.avgRating).toFixed(1)+(p.ratingCount?' ('+p.ratingCount+')':'')+'</span>');
+      if(_isVerified(p)) meta.push('<span title="'+_L('Verified vendor','Doğrulanmış satıcı')+'" style="color:#2563eb;font-weight:800;font-size:12px">✓</span>');
+      meta.push(_statusBadge(_prodStatus(p)));
+      return '<div class="catv-prow" data-id="'+escHtml(p.id)+'" style="display:flex;align-items:center;gap:10px;padding:8px 14px 8px 34px;border-top:1px solid var(--border);cursor:pointer">'
+        + '<span style="font-weight:600;font-size:12.5px;flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(_prodName(p))+'</span>'
+        + '<span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">'+meta.join('')+'</span>'
+        + '</div>';
+    }
+    function _groupHtml(g){
+      var c=g.cat, syn=!!c._synthetic, cid=syn?'__uncat__':c.id;
+      var collapsed=!!CATV.collapsed[cid];
+      var actions='';
+      if(!syn){
+        actions='<div class="catv-acts" style="margin-left:auto;display:flex;gap:6px;align-items:center">'
+          + '<button class="btn-g btn-sm vis-cat-btn" data-id="'+escHtml(c.id)+'" data-vis="'+(c.visible!==false?'1':'0')+'" title="'+_L('Visibility in list','Listede görünürlük')+'">'+(c.visible!==false?'👁':'🙈')+'</button>'
+          + '<button class="btn-g btn-sm edit-cat-btn" data-id="'+escHtml(c.id)+'" data-name="'+escHtml(c.name||'')+'" data-order="'+(c.order||0)+'" data-desc="'+escHtml(c.description||'')+'" data-fields="'+btoa(unescape(encodeURIComponent(JSON.stringify(c.fields||[]))))+'">'+t('acat.edit','Düzenle')+'</button>'
+          + '<button class="btn-red btn-sm del-cat-btn" data-id="'+escHtml(c.id)+'" data-name="'+escHtml(c.name||'')+'">'+t('acat.delete','Sil')+'</button>'
+          + '</div>';
       }
-      tbody.innerHTML = items.map(function(cat) {
-        return '<tr style="border-top:1px solid var(--border)">' +
-          '<td style="padding:11px 14px;font-weight:700">' + catLabel(cat) + (cat.visible===false?' <span style="font-size:10px;color:#94a3b8;font-weight:600">· '+(window.CUR_LOCALE==='en'?'hidden':'gizli')+'</span>':'') + '</td>' +
-          '<td style="padding:11px 14px;color:var(--text-secondary);font-family:monospace">' + (cat.order||0) + '</td>' +
-          '<td style="padding:11px 14px;color:var(--text-secondary);font-size:12px">' + (window.CUR_LOCALE==='en' && cat.description_en ? cat.description_en : (cat.description||'—')) + '</td>' +
-          '<td style="padding:11px 14px;text-align:center;white-space:nowrap">' +
-          '<button class="btn-g btn-sm vis-cat-btn" data-id="' + cat.id + '" data-vis="' + (cat.visible!==false?'1':'0') + '" title="'+(window.CUR_LOCALE==='en'?'Visibility in list':'Listede görünürlük')+'" style="margin-right:6px">' + (cat.visible!==false?'👁':'🙈') + '</button>' +
-          '<button class="btn-g btn-sm edit-cat-btn" data-id="' + cat.id + '" data-name="' + cat.name + '" data-order="' + (cat.order||0) + '" data-desc="' + (cat.description||'') + '" data-fields="' + btoa(unescape(encodeURIComponent(JSON.stringify(cat.fields||[])))) + '" style="margin-right:6px">'+t('acat.edit','Düzenle')+'</button>' +
-          '<button class="btn-red btn-sm del-cat-btn" data-id="' + cat.id + '" data-name="' + cat.name + '">'+t('acat.delete','Sil')+'</button>' +
-          '</td></tr>';
-      }).join('');
-
-      m.querySelectorAll('.edit-cat-btn').forEach(function(b) {
-        b.addEventListener('click', function() {
-          openCatModal({id:b.dataset.id, name:b.dataset.name, order:parseInt(b.dataset.order)||0, description:b.dataset.desc, fields:JSON.parse(decodeURIComponent(escape(atob(b.dataset.fields||'W10='))))});
-        });
+      var title = syn ? ('📦 '+_L('Unmatched products','Kategori eşleşmeyen ürünler')) : escHtml(catLabel(c));
+      var badges='';
+      if(!syn){
+        badges += ' '+_schemaBadge(g.schema);
+        if(g.hidden) badges += ' <span style="background:rgba(148,163,184,.15);color:#64748b;font-weight:700;font-size:10px;padding:1px 8px;border-radius:20px">'+_L('hidden','gizli')+'</span>';
+      }
+      var cntCol = g.prods.length ? '#2563eb' : '#94a3b8';
+      var head = '<div class="catv-head" data-cid="'+escHtml(cid)+'" style="display:flex;align-items:center;gap:9px;padding:11px 14px;cursor:pointer;background:var(--bg-elevated)">'
+        + '<span class="catv-chev" style="font-size:11px;color:var(--text-muted);width:12px;flex-shrink:0">'+(collapsed?'▶':'▼')+'</span>'
+        + '<span style="font-weight:800;font-size:13.5px">'+title+'</span>'
+        + badges
+        + '<span style="font-size:11px;color:'+cntCol+';font-weight:700;background:rgba(37,99,235,.06);border-radius:20px;padding:1px 9px">'+g.prods.length+' '+_L('product','ürün')+'</span>'
+        + actions
+        + '</div>';
+      var body='';
+      if(!collapsed){
+        if(g.prods.length){ body = _sortProds(g.prods).map(_prodRowHtml).join(''); }
+        else { body = '<div style="padding:10px 14px 10px 34px;border-top:1px solid var(--border);font-size:12px;color:#94a3b8;font-style:italic">— '+_L('no products yet','henüz ürün yok')+' —</div>'; }
+      }
+      return '<div class="catv-cat" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px">'+head+body+'</div>';
+    }
+    function _wire(){
+      m.querySelectorAll('#cat-controls #catv-catsort').forEach(function(s){ s.addEventListener('change', function(){ CATV.catSort=this.value; renderView(); }); });
+      m.querySelectorAll('#cat-controls #catv-prodsort').forEach(function(s){ s.addEventListener('change', function(){ CATV.prodSort=this.value; renderView(); }); });
+      var _ex=m.querySelector('#catv-expand'); if(_ex) _ex.addEventListener('click', function(){ CATV.collapsed={}; renderView(); });
+      var _co=m.querySelector('#catv-collapse'); if(_co) _co.addEventListener('click', function(){ var mp={}; cats.forEach(function(c){ mp[c.id]=true; }); mp['__uncat__']=true; CATV.collapsed=mp; renderView(); });
+      var _cl=m.querySelector('#catv-clear'); if(_cl) _cl.addEventListener('click', function(){ CATV.q=''; CATV.fCatState=[]; CATV.fSchema=[]; CATV.fProdStatus=[]; CATV.fOrigin=[]; CATV.fVerified=false; CATV.fRating4=false; var cs=m.querySelector('#cat-search'); if(cs) cs.value=''; renderView(); });
+      m.querySelectorAll('.catv-pill').forEach(function(b){ b.addEventListener('click', function(){
+        var g=b.dataset.fg, v=b.dataset.fv;
+        if(g==='fVerified'){ CATV.fVerified=!CATV.fVerified; }
+        else if(g==='fRating4'){ CATV.fRating4=!CATV.fRating4; }
+        else { var arr=CATV[g]||[]; var i=arr.indexOf(v); if(i>=0) arr.splice(i,1); else arr.push(v); CATV[g]=arr; }
+        renderView();
+      }); });
+      m.querySelectorAll('.catv-head').forEach(function(hd){ hd.addEventListener('click', function(){ var id=hd.dataset.cid; CATV.collapsed[id]=!CATV.collapsed[id]; renderView(); }); });
+      m.querySelectorAll('.catv-prow').forEach(function(r){ r.addEventListener('click', function(e){ e.stopPropagation(); if(typeof openProductDetailModal==='function') openProductDetailModal(r.dataset.id); }); });
+      m.querySelectorAll('.edit-cat-btn').forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation();
+        openCatModal({id:b.dataset.id, name:b.dataset.name, order:parseInt(b.dataset.order)||0, description:b.dataset.desc, fields:JSON.parse(decodeURIComponent(escape(atob(b.dataset.fields||'W10='))))});
+      }); });
+      m.querySelectorAll('.del-cat-btn').forEach(function(b){ b.addEventListener('click', async function(e){ e.stopPropagation();
+        if(!confirm('"'+b.dataset.name+'" '+_L('delete this category?','kategorisini silmek istiyor musunuz?'))) return;
+        try { await deleteDoc(doc(db,'categories',b.dataset.id)); showToast(t('acat.toast_deleted','Kategori silindi.')); invalidateCatCache(); admCategories(m); }
+        catch(err){ showToast((EN?'Error: ':'Hata: ')+err.message,'err'); }
+      }); });
+      m.querySelectorAll('.vis-cat-btn').forEach(function(b){ b.addEventListener('click', async function(e){ e.stopPropagation();
+        var cur=b.dataset.vis==='1';
+        try { await setDoc(doc(db,'categories',b.dataset.id), { visible: !cur }, { merge:true }); invalidateCatCache();
+          showToast(!cur ? _L('\u2713 Shown in list','\u2713 Listede görünür') : _L('\u2713 Hidden from list','\u2713 Listeden gizlendi')); admCategories(m);
+        } catch(err){ showToast((EN?'Error: ':'Hata: ')+err.message,'err'); }
+      }); });
+    }
+    function renderView(){
+      var listEl=m.querySelector('#cat-list'), ctrlEl=m.querySelector('#cat-controls'), statEl=m.querySelector('#cat-stats'), cntEl=m.querySelector('#cat-cnt');
+      if(!listEl) return;
+      var q=(CATV.q||'').toLowerCase().trim();
+      // genel istatistik (filtreden bağımsız)
+      var totalCats=cats.length;
+      var catsWith=cats.filter(function(c){ return (byCat[c.name]||[]).length; }).length;
+      var pA=0,pP=0,pR=0; prods.forEach(function(p){ var s=_prodStatus(p); if(s==='active')pA++; else if(s==='pending')pP++; else pR++; });
+      if(statEl){ statEl.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'
+        + _statCard('📁',totalCats,_L('categories','kategori'))
+        + _statCard('✅',catsWith,_L('with products','ürünlü'))
+        + _statCard('⚪',totalCats-catsWith,_L('empty','boş'))
+        + _statCard('🙈',cats.filter(function(c){return c.visible===false;}).length,_L('hidden','gizli'))
+        + _statCard('📦',prods.length,_L('products','ürün'))
+        + _statCard('🟢',pA,_L('active','aktif'))
+        + _statCard('🟠',pP,_L('pending','onay bekleyen'))
+        + _statCard('⚫',pR,_L('archived','arşiv'))
+        + '</div>'; }
+      // filtrele
+      var prodFilterActive=(CATV.fProdStatus.length||CATV.fOrigin.length||CATV.fVerified||CATV.fRating4);
+      var groups=[];
+      cats.forEach(function(c){
+        var pf=(byCat[c.name]||[]).filter(_prodPasses);
+        var plist=pf;
+        if(q){
+          var catHit=((c.name||'').toLowerCase().indexOf(q)>=0)||((catLabel(c)||'').toLowerCase().indexOf(q)>=0)||((c.description||'').toLowerCase().indexOf(q)>=0);
+          if(!catHit){ plist=pf.filter(function(p){ return (_prodName(p)+' '+(p.brand||'')+' '+(p.vendorName||'')).toLowerCase().indexOf(q)>=0; }); if(!plist.length) return; }
+        }
+        var st=_resolveCatState(c.name);
+        if(CATV.fSchema.length && CATV.fSchema.indexOf(st)<0) return;
+        var hidden=(c.visible===false);
+        if(CATV.fCatState.length){
+          var ok=false;
+          if(CATV.fCatState.indexOf('has')>=0 && plist.length) ok=true;
+          if(CATV.fCatState.indexOf('empty')>=0 && !plist.length) ok=true;
+          if(CATV.fCatState.indexOf('hidden')>=0 && hidden) ok=true;
+          if(CATV.fCatState.indexOf('visible')>=0 && !hidden) ok=true;
+          if(!ok) return;
+        }
+        if(prodFilterActive && !plist.length) return;
+        groups.push({cat:c, prods:plist, schema:st, hidden:hidden});
       });
-      m.querySelectorAll('.del-cat-btn').forEach(function(b) {
-        b.addEventListener('click', async function() {
-          if (!confirm('"' + b.dataset.name + '" kategorisini silmek istiyor musunuz?')) return;
-          await deleteDoc(doc(db,'categories',b.dataset.id));
-          showToast(t('acat.toast_deleted','Kategori silindi.'));
-          invalidateCatCache();
-          loadAdmTab();
-        });
+      // eşleşmeyen ürünler kovası
+      if(uncat.length){
+        var upf=uncat.filter(_prodPasses);
+        if(q) upf=upf.filter(function(p){ return (_prodName(p)+' '+(p.brand||'')+' '+(p.vendorName||'')).toLowerCase().indexOf(q)>=0; });
+        var okSchema=!CATV.fSchema.length;
+        var okState=!CATV.fCatState.length || CATV.fCatState.indexOf('has')>=0;
+        if(upf.length && okSchema && okState) groups.push({cat:{name:'__uncat__', _synthetic:true}, prods:upf, schema:'other', hidden:false});
+      }
+      // kategori sıralama
+      var loc=EN?'en':'tr', s=CATV.catSort;
+      groups.sort(function(A,B){
+        if(A.cat._synthetic) return 1; if(B.cat._synthetic) return -1;
+        if(s==='count_desc'){ var d=B.prods.length-A.prods.length; if(d) return d; }
+        else if(s==='count_asc'){ var d2=A.prods.length-B.prods.length; if(d2) return d2; }
+        else if(s==='order'){ var d3=(A.cat.order||0)-(B.cat.order||0); if(d3) return d3; }
+        else if(s==='newest'){ var d4=((B.cat.createdAt&&B.cat.createdAt.seconds)||0)-((A.cat.createdAt&&A.cat.createdAt.seconds)||0); if(d4) return d4; }
+        else if(s==='name_desc'){ return catLabel(B.cat).localeCompare(catLabel(A.cat),loc,{sensitivity:'base',numeric:true}); }
+        return catLabel(A.cat).localeCompare(catLabel(B.cat),loc,{sensitivity:'base',numeric:true});
       });
-      m.querySelectorAll('.vis-cat-btn').forEach(function(b){
-        b.addEventListener('click', async function(){
-          var cur = b.dataset.vis==='1';
-          try {
-            await setDoc(doc(db,'categories',b.dataset.id), { visible: !cur }, { merge:true });
-            invalidateCatCache();
-            showToast(!cur ? (window.CUR_LOCALE==='en'?'\u2713 Shown in list':'\u2713 Listede görünür') : (window.CUR_LOCALE==='en'?'\u2713 Hidden from list':'\u2713 Listeden gizlendi'));
-            admCategories(m);
-          } catch(e){ showToast((window.CUR_LOCALE==='en'?'Error: ':'Hata: ')+e.message,'err'); }
-        });
-      });
+      var shownProds=groups.reduce(function(n,g){ return n+g.prods.length; },0);
+      var shownCats=groups.filter(function(g){ return !g.cat._synthetic; }).length;
+      if(cntEl) cntEl.textContent='('+shownCats+'/'+totalCats+' '+_L('cat','kat')+' · '+shownProds+' '+_L('prod','ürün')+')';
+      if(ctrlEl) ctrlEl.innerHTML=_controlsHtml();
+      if(!groups.length){ listEl.innerHTML='<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:34px;text-align:center;color:#64748b">🔍 '+_L('No category or product matches these filters.','Bu filtrelere uyan kategori/ürün yok.')+'</div>'; }
+      else { listEl.innerHTML=groups.map(_groupHtml).join(''); }
+      _wire();
     }
 
     m.innerHTML =
       '<div class="flx-bw-c-mb14b">' +
-      '<h2 class="fs18-fw7">'+t('acat.title','Kategori Yönetimi')+' <span id="cat-cnt" class="txt-sec-13"></span></h2>' +
+      '<h2 class="fs18-fw7">'+_L('Category & Product Catalog','Kategori & Ürün Kataloğu')+' <span id="cat-cnt" class="txt-sec-13"></span></h2>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
       '<input class="inp" id="cat-search" placeholder="'+t('acat.search_ph','Kategori ara...')+'" style="width:220px;font-size:12.5px">' +
       '<button class="btn-g btn-sm fs12" id="sync-cats-btn">'+t('acat.sync_missing','🔄 Eksik Kategorileri Ekle')+'</button>' +
@@ -44920,13 +45112,9 @@ async function admCategories(m) {
       '</div></div>' +
       '<div id="cat-req-panel" style="margin-bottom:14px"></div>' +
       '<div id="cat-diag-panel" data-open="0" style="margin-bottom:14px"></div>' +
-      '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
-      '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
-      '<th style="background:var(--bg-elevated);padding:9px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;color:#64748b">'+t('acat.col_name','Kategori Adı')+'</th>' +
-      '<th style="background:var(--bg-elevated);padding:9px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;color:#64748b">'+t('acat.col_order','Sıra')+'</th>' +
-      '<th style="background:var(--bg-elevated);padding:9px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;color:#64748b">'+t('acat.col_desc','Açıklama')+'</th>' +
-      '<th style="background:var(--bg-elevated);padding:9px 14px;text-align:center;font-size:10.5px;text-transform:uppercase;color:#64748b">'+t('aevt.col_action','İşlem')+'</th>' +
-      '</tr></thead><tbody id="cat-tbody"></tbody></table></div>';
+      '<div id="cat-stats" style="margin-bottom:12px"></div>' +
+      '<div id="cat-controls" style="margin-bottom:14px"></div>' +
+      '<div id="cat-list"></div>';
 
     var ALL_CATS_V4 = ['Cloud','DevOps','Endpoint','Firewall','Güvenlik','Network','SIEM','Sanallaştırma','Server','Storage','Veritabanı','Yazılım','Yedekleme','Diğer','WAF','IPS / IDS','NAC','Email Security','Veri Güvenliği & DLP','SASE / SSE','Vulnerability Management','Privileged Access (PAM)','Kimlik Yönetimi (IAM)'];
     var existingCatNames = cats.map(function(ct){ return ct.name; });
@@ -45055,13 +45243,12 @@ async function admCategories(m) {
       } catch(e) { showToast(t('common.error_prefix','Hata: ')+e.message,'err'); btn.disabled=false; btn.textContent='🔄 Eksik Kategorileri Ekle'; }
     });
     m.querySelector('#cat-search').addEventListener('input', function() {
-      var q = this.value.toLowerCase();
-      renderRows(q ? cats.filter(function(cat) {
-        return cat.name.toLowerCase().includes(q) || (cat.description||'').toLowerCase().includes(q);
-      }) : cats);
+      CATV.q = this.value;
+      renderView();
     });
 
-    renderRows(cats);
+    var _cs=m.querySelector('#cat-search'); if(_cs) _cs.value=CATV.q||'';
+    renderView();
   } catch(e) {
     m.innerHTML = '<div class="empty">'+t('common.load_error','Yükleme hatası: ')+e.message + '</div>';
   }
