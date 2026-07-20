@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v8.99 | pochub.co -->
+<!-- PoCHub v8.99.1 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v8.99';
+const VERSION = 'v8.99.1';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v8.99.1': ['HOTFIX — MARKA KATALOGU BORU HATTI ENTEGRASYONU (Hasan-in ekran goruntusu: -filtreler uyumsuz, arama uyumsuz-. HAKLIYDI, 3 sorun): (1) MUKERRER FORTIGATE: kapsama kontrolu p.brand alanina bakiyordu ama v8.96 oncesi urunlerde brand YOK (bos) — FortiGate 100F/60F katalogda dururken FortiGate (NGFW) sablonu da cikiyordu. DUZELTME: kapsama artik ad+marka+vendorName birlesik haystack-inde marka cekirdegini arar (Fortinet TR -> fortinet) ve ARAMADAN BAGIMSIZ tum canli urunler uzerinden hesaplanir. (2) SAYAC/FILTRE UYUMSUZLUGU: -3 cozum- yazip 19 kart gorunuyordu; sablonlar boru hatti disindaki ayri bolumdeydi. DUZELTME: ayrik bolum KALDIRILDI — sablonlar ayni arama + kategori + marka filtresinden gecer, sayacta -N cozum · M marka katalogu- olarak gorunur, AYNI grid konteynerinin sonuna eklenir. (3) GORSEL TUTARSIZLIK: kesikli mini kartlar yerine gercek urun kartiyla ayni anatomi (renkli ust serit — notr gri degrade, kategori rozeti, marka avatari, ayni radius/padding) + -Marka Katalogu- rozeti; kart tiklaninca marka sayfasi, buton PoC on-dolu acar. Ayrica: gercek urun 0 + sablon varsa bos-durum ekrani yerine sablonlar gosterilir; limit 48, alfabetik. node 0.'],
   'v8.99': ['MARKA-TEMELLI KATALOG + PUBLIC MARKA SAYFASI + YETKILENDIRME (saha analizi sonucu — Fortinet/CrowdStrike/Logo siteleri incelendi; kritik kurgu hatasi: katalog uretici-varligina bagimliydi, global markalarin ureticisi platforma uye olmayacagi icin katalog bos kalirdi). (1) PUBLIC MARKA SAYFASI (#b/<brandNorm>, renderBrandPage): marka profili (ana sirket/website/kategoriler) + istatistik (aile/katalog urunu/temsilci/yetkili) + urun aileleri (her satirdan PoC talebi) + katalogdaki gercek urunler + markayi temsil eden vendorlar (yetkili rozeti onde, vendor-public linkli). (2) KATALOGDA MARKA KATALOGU BOLUMU: arama/kategori/marka niyeti varken, gercek urunle kapsanmayan aile sablonlari kesikli-cerceveli kartlarla listelenir (ilk 60); PoC Talep Et -> openCustomPoCModal ON-DOLU (ad+marka+kategori); diger facetler aktifken gizlenir, quadrant/karsilastirmaya karismaz (prod-card sinifi yok). (3) POC YONLENDIRME: custom PoC kaydina brandNorm izi eklendi; talep sonrasi markayi beyan eden vendorlara (ilk 25) hedefli bildirim — havuz modeli aynen durur, vendor talebi havuzdan sahiplenir. (4) YETKILENDIRME (brand_relations, docId=brandNorm_vendorId): admin marka editorunde -Temsilciler & Yetkilendirme- bolumu — markayi beyan eden vendorlar listelenir, tek isaretle Yetkili yapilir/kaldirilir; rozetler marka sayfasinda (Yetkili Distributor/Entegrator/Uretici) ve vendor Markalarim kartinda (Yetkili Temsilci) gorunur. Markalarim kart basligi artik marka sayfasina link. rules v1.8 (brand_relations: read herkes, write admin). (5) custom PoC kategori on-dolumu canli kategori cozumlemesiyle. node 0.'],
   'v8.98': ['MARKALARIM SEKMESI + KATALOG MARKA BOYUTU (Hasan geri bildirimi: v8.97 vendor tarafi kesfedilemez ve vasat kalmisti — profil dibine gomulu, yalniz ownerVendorId atanmissa gorunuyordu; vendorin kayitta beyan ettigi brands[] tamamen yok sayiliyordu. KOK NEDEN kabul edildi, yeniden tasarlandi). (1) VENDOR PANELINE AYRI -🏷 Markalarim- SEKMESI (Urunlerim yaninda): kaynak birlesik — beyan edilen brands[] ∪ ownerVendorId sahipligi ∪ urunlerinde gecen markalar. Marka karti: rozet (Sahipligi dogrulanmis / Sahiplik talebi beklemede / Sahiplik Talep Et / Canonical listede yok uyarisi), aile sayisi + urun sayisi + KAPSAMA (N aileden M-inde urunun var). Aile satirlari: urunu OLAN aile yesil ✓, olmayanda -+ Urun Ekle- butonu — modal MARKA+AILE+KATEGORI ON-DOLU acilir (openAddProductModal prefillBrand/prefillFamilyNorm parametreleri). Markadaki kendi urunleri durum rozetiyle listelenir, ✎ mevcut openEditProd ile duzenlenir. Markasiz urunler ayri kartta uyariyla listelenir. Sahip oldugu markaya aile onerisi (pending) + geri cekme sekme icinde. Eski profil-eki vendOwnedBrandFamilies KALDIRILDI (yerini sekme aldi). (2) SAHIPLIK TALEP AKISI: yeni koleksiyon brand_ownership_requests (brandId, brandName, vendorId, vendorName, status) — vendor tek tikla talep acar; Admin > Markalar ustunde MAVI kuyruk: Onayla -> brands.ownerVendorId yazilir, Reddet -> status. rules v1.7. (3) KATALOG MARKA BOYUTU: arama artik p.brand alanini da tarar; yeni MARKA faceti (canli urunlerdeki markalardan dinamik, cok-secimli, URL-e yazilir — mevcut facet altyapisi, sifir ozel durum). Boylece musteri tek markanin tum urunlerini listeleyip degerlendirebilir. node 0.'],
   'v8.97': ['URUN AILESI YONETIMI (Faz 1 — Hasan: -admin mutlaka mudahale/duzenleme/silme yapabilmeli; sahip vendor kendine ait olani gorup mudahale edebilmeli-). (1) ADMIN MARKA EDITORU: -Urun Aileleri- bolumu — markanin tum sablonlari listelenir, ekle/duzenle/sil + bekleyen onerilerde tek tik onay; ayrica -Sahip Vendor- alani (datalist ile firma/e-posta secimi, ownerVendorId yazilir; eslesmeyen giris mevcut sahipligi BOZMAZ). (2) DENETIM MODALI: Admin > Markalar > -Aileler (N)- butonu — 758+ sablon tek listede, arama + kategori + durum (Onayli/Bekleyen) filtresi, satir-ici duzenleme (ad+kategori), sil, bekleyeni onayla; 400+ sonucta daraltma uyarisi. Istatistik karti: sablon sayisi + ailesiz marka (hizmet markalari haric). (3) VENDOR SAHIPLIK AKISI: ownerVendorId sahibi vendor, Profil sekmesinin altinda -Markalarim / Urun Aileleri- karti gorur: mevcut aileler + yeni aile ONERISI (status=pending, proposedBy/proposedByName ile) + kendi bekleyen onerisini geri cekme. brand_requests deseninin aynisi: dogrudan yayin YOK, admin suzgeci var. renderUserProfile paylasimli fonksiyonuna DOKUNULMADI — bolum loadVendTab-de sonradan append edilir (musteri profili etkilenmez). (4) GUVENLIK: brandProductsFor artik status=pending kayitlari CASCADE-e vermez (onaysiz iceriik urun formuna sizmaz); firestore.rules v1.6 — brand_products create: admin VEYA vendor(pending+proposedBy=uid+hasOnly), update: yalniz admin, delete: admin veya kendi pending-i. node 0.'],
@@ -10716,6 +10717,7 @@ async function loadCatalog() {
       .filter(p => getLifecycleState(p) === 'active');
 
     const search = el('cat-search')?.value?.toLowerCase()||'';
+    var _tplCovBase = prods.slice();   // v8.99.1: şablon kapsama tabanı (aramadan bağımsız TÜM canlı ürünler)
     if (search) prods = prods.filter(p => p.name?.toLowerCase().includes(search)||p.vendorName?.toLowerCase().includes(search)||p.category?.toLowerCase().includes(search)||p.brand?.toLowerCase().includes(search));   // v8.98: marka da aranir
     var allBase = prods.slice();
     try { var _vmap={}; allBase.forEach(function(p){ if(p.vendorId && !_vmap[p.vendorId]) _vmap[p.vendorId]=(p.vendorName||p.vendorId); }); setVendorFacetOptions(Object.keys(_vmap).map(function(id){return [id,_vmap[id]];}).sort(function(a,b){return String(a[1]).localeCompare(String(b[1]), window.CUR_LOCALE==='en'?'en':'tr', {sensitivity:'base'});})); } catch(e){}
@@ -10730,6 +10732,50 @@ async function loadCatalog() {
     updateCatalogFacetsAndChips(allBase);
     syncCatalogURL();
     prods = facetFiltered(allBase, null);
+    // ── v8.99.1: MARKA KATALOĞU boru hattı entegrasyonu — şablonlar ayni arama/kategori/marka filtresinden geçer,
+    //    sayaçta görünür, ayni grid içinde tutarli kart stiliyle EN SONA eklenir. (v8.99'daki ayrık bölüm kaldırıldı:
+    //    sayaç/filtre uyumsuzdu ve eski ürünlerde brand alanı boş olduğundan FortiGate gibi kapsanan aileler mükerrer görünüyordu.)
+    var _tplList = [];
+    try {
+      var _otherFacetOn = allFacets().some(function(f){ return f.key!=='category' && f.key!=='brand' && (CAT_FILTERS[f.key]||[]).length; });
+      var _selCat = CAT_FILTERS.category||[], _selBrand = CAT_FILTERS.brand||[];
+      if (CAT_VIEW!=='quadrant' && !_otherFacetOn && (search || _selCat.length || _selBrand.length)) {
+        var _tpls = await getBrandProducts();
+        // KAPSAMA (v8.99.1 düzeltmesi): eski ürünlerde p.brand YOK — ad+marka+vendorName birleşik haystack'inde
+        // marka çekirdeği aranır (ör. 'Fortinet TR' → fortinet). Aynı normalize kategorideki eşleşme şablonu gizler.
+        var _covByCat = {};
+        _tplCovBase.forEach(function(p){
+          var ck=_normCat(p.category||''); if(!ck) return;
+          (_covByCat[ck]=_covByCat[ck]||[]).push(_normBrand((p.name||'')+' '+(p.brand||'')+' '+(p.vendorName||'')));
+        });
+        _tplList = (_tpls||[]).filter(function(f){
+          if(!f.brand || !f.name || f.status==='pending') return false;
+          var core=(f.brandNorm||'').split(' ')[0]; if(core.length<4) core=f.brandNorm||'';
+          var hays=_covByCat[_normCat(f.category||'')]||[];
+          if(core && hays.some(function(h){ return h.indexOf(core)>=0; })) return false;   // gerçek ürünle kapsanıyor
+          if(search && ((f.brand+' '+f.name+' '+(f.category||'')).toLowerCase().indexOf(search)<0)) return false;
+          if(_selCat.length && _selCat.map(_normCat).indexOf(_normCat(f.category||''))<0) return false;
+          if(_selBrand.length && _selBrand.map(function(x){ return _normBrand(x); }).indexOf(f.brandNorm)<0) return false;
+          return true;
+        }).slice(0,48);
+        _tplList.sort(function(a,b){ return (a.brand+a.name).localeCompare(b.brand+b.name,'tr'); });
+      }
+    } catch(e){ _tplList=[]; }
+    function _tplCard(f){
+      return '<div class="card brand-tpl-card" data-bn="'+escHtml(f.brandNorm)+'" style="display:flex;flex-direction:column;padding:0;overflow:hidden;cursor:pointer;background:#fff">'
+        +'<div style="position:relative;height:52px;background:linear-gradient(135deg,#64748b,#334155);overflow:hidden">'
+        +'<span class="bdg" style="position:absolute;top:10px;left:11px;background:rgba(255,255,255,.92);color:#334155;font-weight:700;font-size:10px">🏷 '+_L('Brand catalog','Marka Kataloğu')+'</span>'
+        +(f.category?'<span class="bdg" style="position:absolute;top:10px;right:11px;background:rgba(255,255,255,.92);color:#1e293b;font-weight:700">'+escHtml(f.category)+'</span>':'')
+        +'</div>'
+        +'<div style="padding:13px 14px;display:flex;flex-direction:column;flex:1">'
+        +'<div style="display:flex;gap:11px;align-items:flex-start;margin-bottom:9px">'
+        +'<div style="width:44px;height:44px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,#64748b,#334155);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">'+escHtml((f.brand||'?').slice(0,2).toUpperCase())+'</div>'
+        +'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:13.5px;line-height:1.3">'+escHtml(f.name)+'</div>'
+        +'<div style="font-size:11.5px;color:#2563eb;font-weight:700;margin-top:2px">'+escHtml(f.brand)+' →</div></div></div>'
+        +'<div style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-bottom:10px">'+_L('No seller listed yet — your PoC request is routed to vendors representing this brand.','Henüz satıcısı listelenmemiş — PoC talebin markayı temsil eden vendor\'lara yönlenir.')+'</div>'
+        +'<button class="btn-g bt-poc" data-name="'+escHtml(f.name)+'" data-brand="'+escHtml(f.brand)+'" data-cat="'+escHtml(f.category||'')+'" style="margin-top:auto;font-size:12px;border-color:#2563eb;color:#2563eb">'+_L('Request PoC','PoC Talebi Oluştur')+' →</button>'
+        +'</div></div>';
+    }
     var sortBy = CAT_SORT;
     prods.sort(function(a, b) {
       if (sortBy === 'evidence') {
@@ -10757,7 +10803,7 @@ async function loadCatalog() {
     // Sonuç başlığı: sayaç + sıralama + grid/liste
     var hdr = el('cat-results-hdr');
     if (hdr) {
-      hdr.innerHTML = '<div style="font-size:13px;color:var(--text-secondary)"><b style="color:var(--text);font-size:16px">'+prods.length+'</b> '+t('cat.solutions','çözüm')+'</div>'
+      hdr.innerHTML = '<div style="font-size:13px;color:var(--text-secondary)"><b style="color:var(--text);font-size:16px">'+prods.length+'</b> '+t('cat.solutions','çözüm')+(_tplList.length?(' <span style="color:var(--text-muted)">· '+_tplList.length+' '+_L('brand catalog','marka kataloğu')+'</span>'):'')+'</div>'
         + '<div style="display:flex;align-items:center;gap:8px">'
         + '<select class="inp" id="cat-sort-sel" style="width:auto;font-size:12.5px;padding:5px 8px">'
         +   ['evidence:🛡 Kanıt Skoru','rating:En Yüksek Puan','rating_count:En Çok Değerlendirilen','newest:En Yeni','name:A-Z','tr:🇹🇷 Yerli Önce'].map(function(o){ var kv=o.split(':'); return '<option value="'+kv[0]+'"'+(CAT_SORT===kv[0]?' selected':'')+'>'+t('cat.sort_'+kv[0],kv[1])+'</option>'; }).join('')
@@ -10773,7 +10819,7 @@ async function loadCatalog() {
       hdr.querySelector('#cat-view-quad').addEventListener('click', function(){ if(CAT_VIEW!=='quadrant'){CAT_VIEW='quadrant'; loadCatalog();} });
     }
 
-    if (!prods.length) {
+    if (!prods.length && !_tplList.length) {
       var hasFilter = !!(search || anyCatFacet());
       gridEl.innerHTML = '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:36px 20px;text-align:center">'
         + '<div style="font-size:36px;margin-bottom:10px">'+(hasFilter?'🔍':'📦')+'</div>'
@@ -10791,9 +10837,22 @@ async function loadCatalog() {
     if (CAT_VIEW==='quadrant') { renderQuadrant(prods, gridEl); }
     else {
       var _promo = (!window._quadPromoDismissed && prods.some(function(p){return computeEvidenceScore(p);})) ? quadPromoHtml() : '';
+      var _tplHtml = _tplList.map(_tplCard).join('');   // v8.99.1: ayni grid, tutarli kart, gercek urunlerden SONRA
       gridEl.innerHTML = _promo + (CAT_VIEW==='list'
-        ? '<div style="display:flex;flex-direction:column;gap:10px">'+prods.map(catListRow).join('')+'</div>'
-        : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">'+prods.map(catGridCard).join('')+'</div>');
+        ? '<div style="display:flex;flex-direction:column;gap:10px">'+prods.map(catListRow).join('')+'</div>'+(_tplHtml?('<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:10px">'+_tplHtml+'</div>'):'')
+        : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">'+prods.map(catGridCard).join('')+_tplHtml+'</div>');
+      gridEl.querySelectorAll('.brand-tpl-card').forEach(function(card){
+        card.addEventListener('click', function(e){
+          if(e.target.closest('.bt-poc')) return;
+          location.hash = '#b/'+encodeURIComponent(card.dataset.bn);
+        });
+      });
+      gridEl.querySelectorAll('.bt-poc').forEach(function(b){ b.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(!CUR_USER){ openAuthModal('customer',''); return; }
+        if(CUR_PROFILE?.role==='vendor'){ showToast(_L('PoC requests are created with a customer account.','PoC talebi müşteri hesabıyla oluşturulur.'),'err'); return; }
+        openCustomPoCModal({ name:this.dataset.name, brand:this.dataset.brand, category:this.dataset.cat });
+      }); });
       var _qpo=gridEl.querySelector('#cat-quad-open'); if(_qpo) _qpo.addEventListener('click', function(){ CAT_VIEW='quadrant'; loadCatalog(); });
       var _qpd=gridEl.querySelector('#cat-quad-dismiss'); if(_qpd) _qpd.addEventListener('click', function(){ window._quadPromoDismissed=true; var b=gridEl.querySelector('#cat-quad-promo'); if(b) b.remove(); });
     }
@@ -10817,47 +10876,6 @@ async function loadCatalog() {
       if (CUR_PROFILE?.role === 'vendor') { showToast(_L("PoC requests are created with a customer account.","PoC talebi müşteri hesabıyla oluşturulur."),'err'); return; }
       openMultiVendorPocModal(b.dataset.id);
     }); });
-
-    // ── v8.99: MARKA KATALOĞU — gerçek ürünle kapsanmayan aile şablonları (talep vendor'lara yönlenir)
-    try {
-      var _otherFacetOn = allFacets().some(function(f){ return f.key!=='category' && f.key!=='brand' && (CAT_FILTERS[f.key]||[]).length; });
-      if (CAT_VIEW!=='quadrant' && !_otherFacetOn) {
-        var _tpls = await getBrandProducts();
-        var _covT = {};
-        allBase.forEach(function(p){ var nb=_normBrand(p.brand||''); if(nb) _covT[nb+'|'+_normCat(p.category||'')]=1; });
-        var _q99 = (el('cat-search')?.value||'').toLowerCase();
-        var _selCat = CAT_FILTERS.category||[], _selBrand = CAT_FILTERS.brand||[];
-        var _list = (_tpls||[]).filter(function(f){
-          if(!f.brand || !f.name) return false;
-          if(_covT[f.brandNorm+'|'+_normCat(f.category||'')]) return false;
-          if(_q99 && ((f.brand+' '+f.name+' '+(f.category||'')).toLowerCase().indexOf(_q99)<0)) return false;
-          if(_selCat.length && _selCat.map(_normCat).indexOf(_normCat(f.category||''))<0) return false;
-          if(_selBrand.length && _selBrand.map(function(x){return _normBrand(x);}).indexOf(f.brandNorm)<0) return false;
-          return true;
-        });
-        // yalniz arama/kategori/marka niyeti varken goster (bos katalogda 700 sablon basmayalim)
-        if((_q99 || _selCat.length || _selBrand.length) && _list.length){
-          var _sec=document.createElement('div');
-          _sec.style.marginTop='22px';
-          _sec.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><h3 style="font-size:14px;font-weight:800">🏷 '+_L('Brand catalog','Marka Kataloğu')+' <span style="font-weight:400;font-size:11.5px;color:var(--text-muted)">'+_L('— no seller listed yet; your PoC request is routed to vendors representing the brand','— henüz satıcısı listelenmemiş; PoC talebin markayı temsil eden vendor\'lara yönlenir')+'</span></h3></div>'
-            +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">'
-            +_list.slice(0,60).map(function(f){
-              return '<div style="background:var(--bg-surface);border:1px dashed var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px">'
-                +'<div><a href="#b/'+encodeURIComponent(f.brandNorm)+'" style="font-size:11px;color:#2563eb;text-decoration:none;font-weight:700">'+escHtml(f.brand)+' →</a>'
-                +'<div style="font-weight:700;font-size:13px;margin-top:2px">'+escHtml(f.name)+'</div>'
-                +'<div style="font-size:11px;color:var(--text-muted)">'+escHtml(f.category||'')+'</div></div>'
-                +'<button class="btn-g btn-sm bt-poc" data-name="'+escHtml(f.name)+'" data-brand="'+escHtml(f.brand)+'" data-cat="'+escHtml(f.category||'')+'" style="font-size:11px;margin-top:auto">'+_L('Request PoC','PoC Talep Et')+'</button></div>';
-            }).join('')+'</div>'
-            +(_list.length>60?('<div style="font-size:11px;color:#94a3b8;margin-top:6px">'+_L('First 60 shown — narrow your search.','İlk 60 gösteriliyor — aramayı daralt.')+'</div>'):'');
-          gridEl.appendChild(_sec);
-          _sec.querySelectorAll('.bt-poc').forEach(function(b){ b.addEventListener('click', function(){
-            if(!CUR_USER){ openAuthModal('customer',''); return; }
-            if(CUR_PROFILE?.role==='vendor'){ showToast(_L('PoC requests are created with a customer account.','PoC talebi müşteri hesabıyla oluşturulur.'),'err'); return; }
-            openCustomPoCModal({ name:this.dataset.name, brand:this.dataset.brand, category:this.dataset.cat });
-          }); });
-        }
-      }
-    } catch(e){}
   } catch(e) {
     gridEl.innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
   }
