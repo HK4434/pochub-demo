@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.33.1 | pochub.co -->
+<!-- PoCHub v9.33.2 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.33.1';
+const VERSION = 'v9.33.2';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.33.2': ['UI FIX — Veri Sagligi ekraninda katalog indeksi yayinlandiktan sonra eski kirmizi panel ekranda kaliyor, yeni yesil panel altina ekleniyordu. admDataHealth() yeniden cizim icin ic konteyner referansiyla cagriliyordu; dis konteyner referansi (_host) tutulup onunla cagrilacak sekilde duzeltildi. Islevsel etki yok, yalniz gorsel. DOGRULAMA (canli): indeks yayinlandi — 7.526 marka + 16.188 sablon = 14 dokuman. Katalog/marka sayfasi okuma maliyeti ~23.661 -> 14. node --check MODULE SYNTAX OK.'],
   'v9.33.1': ['HOTFIX v9.33 — katalog indeksi yayinlanamiyordu: setDoc() called with invalid data. Nested arrays are not supported (pochub_config/cidx_b0). Kompakt satir formati dizi-icinde-dizi uretiyordu; Firestore bunu kabul etmez. Parcalar artik tek bir JSON METNI alaninda saklaniyor (alan j), okurken JSON.parse ediliyor; eski dizi formati (alan d) geriye donuk destekleniyor. Parca boyutu 3000 -> 2000 kayda dusuruldu (JSON metni tek alanda tutuldugu icin 1 MiB dokuman sinirina daha genis pay). sessionStorage anahtari v1 -> v2 (eski onbellek gecersiz). NOT: v9.33 geri dusus mekanizmasi calisti — yayinlama basarisiz olsa da site tam tarama ile calismaya devam etti ve hata sessizce yutulmak yerine kullaniciya gosterildi. node --check MODULE SYNTAX OK.'],
   'v9.33': ['MALIYET KRITIK — Firestore okuma sayisi ~2300x dusuruldu. (1) KATALOG INDEKSI: getBrandProducts() 16.134 dokumanlik brand_products, getBrands() 7.527 dokumanlik brands koleksiyonunu LIMITSIZ tariyordu; katalog VEYA marka sayfasi tek acilista ~23.661 okuma uretiyor ve Spark plani gunluk 50.000 kotasini IKI sayfa goruntulemesinde bitiriyordu. Artik pochub_config altinda parcali ozet dokumanlar (cidx_meta + cidx_bN + cidx_tN, 3000 kayit/parca) okunuyor: ~10 dokuman. sessionStorage katmani sayesinde ayni sekmede tekrar gezinme 0 okuma. Indeks yoksa eski tam tarama geri dusus olarak calisir (site bozulmaz) ve Admin > Veri Sagligi ekraninda kirmizi uyari + Yayinla butonu cikar. RULES DEGISIKLIGI GEREKMEZ (pochub_config public-read / admin-write). (2) PAYLASILAN URUN CACHE: products where status==active sorgusu anasayfa render surecinde BES ayri yerde tekrarlaniyordu (renderHome iki kez tetiklendigi icin pratikte on kez); getActiveProducts() 60sn TTL bellek cache ile tek okumaya indi, 16 urun yazma noktasinda invalidate ediliyor. (3) Admin > Veri Sagligi: katalog indeksi durum paneli (kayit sayisi, yayin tarihi, 7 gun sonra eskimis uyarisi) + Yayinla / Yeniden Yayinla butonu. node --check MODULE SYNTAX OK.'],
   'v9.32.45': ['FIX renderHomeEventList: evPeriod ReferenceError giderildi (satir ~7883). Degisken 9907 satirindaki BASKA bir fonksiyonun yerel kapsamindaydi; anasayfa Etkinlikler bolumu bos-durum render ederken patliyor ve bolum hic gorunmuyordu. CUR_EV_PERIOD||upcoming ile degistirildi. Rules v1.9.1 ile ayni gun. node --check MODULE SYNTAX OK.'],
@@ -29513,22 +29514,25 @@ async function _cidxStatusHtml(){
 }
 
 async function admDataHealth(m) {
+  var _host = m;   // v9.33.2: DIS konteyner referansi — yeniden yayinlama bunu temizler
   m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('adh.loading','Veri sağlığı analiz ediliyor...')+'</div>';
   // v9.33: katalog indeksi paneli — analiz beklemeden once gosterilir
   try {
     var _cidxBox = document.createElement('div');
     _cidxBox.innerHTML = await _cidxStatusHtml();
-    m.innerHTML = ''; m.appendChild(_cidxBox);
+    _host.innerHTML = ''; _host.appendChild(_cidxBox);
     var _pb = _cidxBox.querySelector('#cidx-pub');
     if(_pb) _pb.addEventListener('click', async function(){
       var ok = await admPublishCatalogIndex(_pb);
-      if(ok) admDataHealth(m);
+      // v9.33.2: DIS konteynerle yeniden ciz — aksi halde eski panel ekranda kalip
+      // yenisi altina ekleniyordu (iki panel ust uste gorunuyordu).
+      if(ok) admDataHealth(_host);
     });
     var _rest = document.createElement('div');
     _rest.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('adh.loading','Veri sağlığı analiz ediliyor...')+'</div>';
-    m.appendChild(_rest);
+    _host.appendChild(_rest);
     m = _rest;
-  } catch(e){ m.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('adh.loading','Veri sağlığı analiz ediliyor...')+'</div>'; }
+  } catch(e){ _host.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('adh.loading','Veri sağlığı analiz ediliyor...')+'</div>'; m = _host; }
   try {
     const [
       productsSnap, pocsSnap, offersSnap,
