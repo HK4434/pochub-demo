@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.33 | pochub.co -->
+<!-- PoCHub v9.33.1 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -747,7 +747,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.33';
+const VERSION = 'v9.33.1';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1221,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.33.1': ['HOTFIX v9.33 — katalog indeksi yayinlanamiyordu: setDoc() called with invalid data. Nested arrays are not supported (pochub_config/cidx_b0). Kompakt satir formati dizi-icinde-dizi uretiyordu; Firestore bunu kabul etmez. Parcalar artik tek bir JSON METNI alaninda saklaniyor (alan j), okurken JSON.parse ediliyor; eski dizi formati (alan d) geriye donuk destekleniyor. Parca boyutu 3000 -> 2000 kayda dusuruldu (JSON metni tek alanda tutuldugu icin 1 MiB dokuman sinirina daha genis pay). sessionStorage anahtari v1 -> v2 (eski onbellek gecersiz). NOT: v9.33 geri dusus mekanizmasi calisti — yayinlama basarisiz olsa da site tam tarama ile calismaya devam etti ve hata sessizce yutulmak yerine kullaniciya gosterildi. node --check MODULE SYNTAX OK.'],
   'v9.33': ['MALIYET KRITIK — Firestore okuma sayisi ~2300x dusuruldu. (1) KATALOG INDEKSI: getBrandProducts() 16.134 dokumanlik brand_products, getBrands() 7.527 dokumanlik brands koleksiyonunu LIMITSIZ tariyordu; katalog VEYA marka sayfasi tek acilista ~23.661 okuma uretiyor ve Spark plani gunluk 50.000 kotasini IKI sayfa goruntulemesinde bitiriyordu. Artik pochub_config altinda parcali ozet dokumanlar (cidx_meta + cidx_bN + cidx_tN, 3000 kayit/parca) okunuyor: ~10 dokuman. sessionStorage katmani sayesinde ayni sekmede tekrar gezinme 0 okuma. Indeks yoksa eski tam tarama geri dusus olarak calisir (site bozulmaz) ve Admin > Veri Sagligi ekraninda kirmizi uyari + Yayinla butonu cikar. RULES DEGISIKLIGI GEREKMEZ (pochub_config public-read / admin-write). (2) PAYLASILAN URUN CACHE: products where status==active sorgusu anasayfa render surecinde BES ayri yerde tekrarlaniyordu (renderHome iki kez tetiklendigi icin pratikte on kez); getActiveProducts() 60sn TTL bellek cache ile tek okumaya indi, 16 urun yazma noktasinda invalidate ediliyor. (3) Admin > Veri Sagligi: katalog indeksi durum paneli (kayit sayisi, yayin tarihi, 7 gun sonra eskimis uyarisi) + Yayinla / Yeniden Yayinla butonu. node --check MODULE SYNTAX OK.'],
   'v9.32.45': ['FIX renderHomeEventList: evPeriod ReferenceError giderildi (satir ~7883). Degisken 9907 satirindaki BASKA bir fonksiyonun yerel kapsamindaydi; anasayfa Etkinlikler bolumu bos-durum render ederken patliyor ve bolum hic gorunmuyordu. CUR_EV_PERIOD||upcoming ile degistirildi. Rules v1.9.1 ile ayni gun. node --check MODULE SYNTAX OK.'],
   'v9.32.44': ['HASAN DOCX#48 ISLENDI (Enerji/Kamu Hizmetleri dikeyi — yeni dikey) — 192 URUN + 105 YENI MARKA, 12 YENI KATEGORI (0 gizli), 0 CAKISMA. 16.000 SABLON ESIGI ASILDI. YENI KATEGORILER (gorunur): Enerji Yonetimi ve Optimizasyon (20; Schneider Electric/Siemens/Honeywell/GridPoint), Enerji Ticareti ve Risk Yonetimi ETRM (20; AspenTech/ION/Allegro/Openlink/Enverus/OATI), Sayac Veri Yonetim MDM (20; Itron/Landis+Gyr/Aclara/Sensus/Kamstrup), Kamu Hizmeti Musteri Bilgi Sistemleri CIS (20; Oracle/SAP/Gentrack/Hansen/Kraken), Mobil Is Gucu Yonetimi Utility (19), Hava Durumu Veri Cozumleri (19; AccuWeather/DTN/Tomorrow.io/Vaisala/StormGeo), Yenilenebilir Enerji Yonetimi (18; Power Factors/AlsoEnergy/Raptor Maps), Gelismis Dagitim Yonetim ADMS (15; Schneider/Siemens/GE Vernova/Hitachi Energy/ABB), Enerji-Utilities GIS (15; Esri/Hexagon/Bentley/Trimble), EV Kablosuz Sarj (10; WiTricity/HEVO/InductEV/Wallbox), Varlik Yatirim Planlama AIP (9), Gaz Emisyon Yonetimi (7). MARKA NORM: Oracle (Opower) -> Oracle, Schneider Electric (EcoStruxure) -> Schneider Electric. GLOBAL DEDUP (guvenli; 7527 marka, 0 mukerrer, 0 eksik kapsama, 0 sisme). 105 yeni marka; 91-inin websitesi bos. Havuz 16134 benzersiz sablon / 7527 marka. node 0, MODULE SYNTAX OK.'],
@@ -29445,13 +29446,14 @@ async function admPublishCatalogIndex(btn){
     // 3) Once parcalari yaz, meta'yi EN SON (yarim indeks okunmasin)
     var i;
     for(i=0;i<bChunks;i++){
+      // v9.33.1: Firestore IC ICE DIZI kabul etmiyor -> parcayi JSON METNI olarak sakla
       await setDoc(doc(db,'pochub_config','cidx_b'+i),
-        { d: bRows.slice(i*CIDX_CHUNK, (i+1)*CIDX_CHUNK), v: stamp });
+        { j: JSON.stringify(bRows.slice(i*CIDX_CHUNK, (i+1)*CIDX_CHUNK)), n: Math.min(CIDX_CHUNK, bRows.length-i*CIDX_CHUNK), v: stamp });
       if(btn) btn.textContent = '⏳ Marka ' + (i+1) + '/' + bChunks;
     }
     for(i=0;i<tChunks;i++){
       await setDoc(doc(db,'pochub_config','cidx_t'+i),
-        { d: tRows.slice(i*CIDX_CHUNK, (i+1)*CIDX_CHUNK), v: stamp });
+        { j: JSON.stringify(tRows.slice(i*CIDX_CHUNK, (i+1)*CIDX_CHUNK)), n: Math.min(CIDX_CHUNK, tRows.length-i*CIDX_CHUNK), v: stamp });
       if(btn) btn.textContent = '⏳ Şablon ' + (i+1) + '/' + tChunks;
     }
 
@@ -63231,8 +63233,8 @@ var BRAND_SEED = [
 // GERI DUSUS: indeks yoksa eski tam tarama calisir (admin ilk yayini yapana
 //   kadar site bozulmaz). Admin > Veri Sagligi ekraninda uyari gosterilir.
 // ═══════════════════════════════════════════════════════════════════════
-var CIDX_CHUNK = 3000;                 // dokuman basina kayit (1 MiB limitinin cok altinda)
-var CIDX_SS_KEY = 'pochub_cidx_v1';    // sessionStorage anahtari
+var CIDX_CHUNK = 2000;   // v9.33.1: JSON metni tek alanda tutuluyor, 1 MiB dokuman sinirina genis pay                 // dokuman basina kayit (1 MiB limitinin cok altinda)
+var CIDX_SS_KEY = 'pochub_cidx_v2';    // sessionStorage anahtari
 var CIDX_META_TTL = 10 * 60 * 1000;    // meta yeniden dogrulama araligi (ms)
 var _cidxState = null;                 // { v, brands:[], tpls:[] }
 var _cidxInflight = null;
@@ -63302,7 +63304,10 @@ async function loadCatalogIndex(force){
       for(var k=0;k<snaps.length;k++){
         if(!snaps[k].exists()) continue;
         var d = snaps[k].data()||{};
-        var rows = d.d||[];
+        // v9.33.1: parcalar JSON metni olarak saklaniyor (d.j). Eski dizi formati (d.d) da desteklenir.
+        var rows = [];
+        try { rows = d.j ? JSON.parse(d.j) : (d.d||[]); } catch(_pe){ rows = []; }
+        if(!Array.isArray(rows)) rows = [];
         if(k < (meta.bChunks||0)) { for(var x=0;x<rows.length;x++) brands.push(_cidxUnpackBrand(rows[x])); }
         else                      { for(var y=0;y<rows.length;y++) tpls.push(_cidxUnpackTpl(rows[y])); }
       }
