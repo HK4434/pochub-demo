@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.36 | pochub.co -->
+<!-- PoCHub v9.37 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -750,7 +750,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.36';
+const VERSION = 'v9.37';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1224,6 +1224,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.37': ['ANASAYFA AKIS ve TUTARLILIK DUZELTMELERI. (1) BOLUM SIRASI: Nasil Calisir 3-adim hero altina tasindi, persona secimi (Hangisi sensin, 4 kart) asagi alindi. Ziyaretci once bu ne ise yariyor sorusunun cevabini gormeli; dallandirma o cevaptan sonra gelmeli. Onceki halde ilk ekranda hero butonlari + dort persona = dokuz karar noktasi vardi. (2) ETKINLIK CELISKISI: sayac YAYINLANMIS etkinlikleri sayiyor, liste YAKLASAN olanlari gosteriyordu; canli sayfada 26 Aktif Etkinlik ile hemen altindaki etkinlik bulunamadi ayni ekranda goruruyordu. Sayac artik listeyle ayni kumeyi sayar. (3) BOS TAKVIM: anasayfada yaklasan etkinlik yoksa bolumun tamami (liste + takvim + kategori sutunu) gizlenir; etkinlik gelince geri acilir. Bos takvim ekranin onemli bir bolumunu kapliyor ve hicbir deger uretmiyordu. Etkinlikler SAYFASINDA bos durum mesaji korunur. (4) ZAYIF RAKAMI VITRINE KOYMA: istatistik kartlari esik altinda gizlenir (kullanici 100, PoC 25, urun 10, etkinlik 1). Canli sayfada 17 Toplam Kullanici yaziyordu, hemen altinda 11 vendor karti vardi — sayac pazaryerinin en zayif tarafini, alici yoklugunu ilan ediyordu. Hicbir kart esigi gecmiyorsa satirin tamami kalkar, gecenler kalan sutun sayisina gore yeniden dizilir. (5) SAYI BICIMI: _countUp locale-bilincli oldu (en-US / tr-TR) ve yuzde isareti EN de sayidan SONRA geliyor, TR de once. Onceki halde EN modunda yuzde isareti yanlis tarafta yaziyordu. NOT: EN hero metni Firestore about dokumanindan geliyor (otomatik ceviri kaynakli hatali); Admin > Biz Kimiz > INGILIZCE bolumunden duzeltilmeli. node --check MODULE SYNTAX OK.'],
   'v9.36': ['ON-LANSMAN KAPISI — UC SIZINTI KAPATILDI (Hasan tespiti). (1) TAM BYPASS: karsilama ekranindaki Giris Yapin baglantisi hidePrelaunchGate() cagiriyordu, yani kapiyi kaldirip arkasindaki TUM SITEYI ifsa ediyordu — modal kapatilsa bile site acik kaliyordu. Tek tikla tam bypass; kapi fiilen islevsizdi. Artik kapi YERINDE KALIR, auth modali kapinin UZERINDE acilir (z-index 100001 > 99999) ve kapi ancak onAuthStateChanged gercek bir kullanici bildirdiginde kalkar; kalkarken modal z-index eski haline doner. (2) SEED KORUMASIZDI: v9.34 kapisi yalniz index.html dosyasina konmustu; pochub-seed-*.html adresini bilen herkes tam test paketini aciyordu — admin bakim araclari, koleksiyon semasi ve guvenlik testlerinin ne denedigi acikta. Seed dosyasina giris zorunlulugu eklendi (Firestore okumasi YOK, senkron cizilir) + meta robots noindex,nofollow,noarchive. (3) ACILIS PARLAMASI: kapi karari auth ve config okumasini bekledigi icin anasayfa birkac yuz milisaniye GORUNUYORDU. Son bilinen durum localStorage icinde tutulup acilista senkron uygulaniyor; onbellek yoksa temkinli davranip kapi cizilir, gercek karar gelince duzeltilir. HATIRLATMA: bunlar PARAVANDIR, kilit degil — gercek koruma Firestore kurallarindadir (v1.9.3). Eski surumlu dosyalar (pochub-v9.3x.html ve pochub-seed-v9.3x.html) repodan SILINMELI; onlarda kapi yok ve yan kapi olarak acik kalirlar. node --check MODULE SYNTAX OK.'],
   'v9.35': ['ANASAYFA VITRIN DUZELTMESI — ilk izlenim guvenilirligi. SORUN: canli anasayfada kanit bandi 100.000 degerlendirme / 2 cozum / persent100 tavsiye gibi birbirini yalanlayan rakamlar gosteriyordu (kaynak: kirli ratingCount=99999 kaydi); 11 vendor kartindan 7si Test iceriyordu; ayni marka iki kez goruruyordu; 40 puanlik urun Kanitlanmis Lider diye sergileniyordu. Platformun TEK iddiasi kanit iken sayfa kendi verisiyle bu iddiayi curutuyordu. (1) VITRIN FILTRESI _isShowcaseHidden(): isTestRecord isaretli VEYA adinda bagimsiz kelime olarak test gecen kayitlar anasayfadan cikarilir (Testo GmbH / Latest Systems yanlis eslesmez). Eski test kayitlarinin cogunda isTestRecord olmadigi icin ad temelli emniyet agi gerekliydi. Admin paneli ve ic ekranlar ETKILENMEZ. Vendor barinda ayrica ayni sirket tekrari engellendi. (2) KANIT BANDI ESIGI (SHOWCASE_MIN_EVAL=25): gercek degerlendirme sayisi esigin altindaysa bant hic cizilmez. Az ama gercek sayi sisirilmisten iyidir; sifira yakin sayi ise hic gosterilmemelidir. (3) LIDER ESIGI (SHOWCASE_MIN_SCORE=70, MIN_LEADERS=2): dusuk skorlu urunle lider bolumu doldurulmaz; yeterli urun yoksa bolum gizlenir. Esikler pochub_config/system uzerinden ayarlanabilir. (4) HERO TEK BASKIN CTA: onceki halde yan yana BES esit agirlikli buton vardi (Demo/Etkinlikler/Katalog/Biz Kimiz/Vendor Katil) ve hemen altinda dort persona karti — ilk ekranda dokuz yol ayrimi. Iki tarafli pazaryerinde anasayfa KIT OLAN tarafa seslenir; burada kit olan talep tarafi. Artik tek birincil buton (PoC Talebi Ac - Ucretsiz) + soluk ikincil (Katalogu gez); vendor katilimi ikincil METIN baglantisina indi. Kaldirilan butonlarin baglamalari opsiyonel zincire cevrildi (el(...)?.addEventListener) — element yoksa hata atmaz. Yeni i18n anahtarlari TR+EN eklendi. node --check MODULE SYNTAX OK.'],
   'v9.34': ['ON-LANSMAN KAPISI (PRE-LAUNCH GATE). Site teknik olarak yayinda ama icerik/veri hazir degil; tesadufen giren ziyaretcinin ve ozellikle GOOGLEIN yarim siteyi gormesini engeller (indekslenme bir kez olursa aylarca kalir; aramada pochub.co henuz gorunmuyor, zamaninda yakalandi). (1) prelaunchMode acikken anonim ziyaretci karsilama ekrani gorur: alici odakli tek cumlelik vaat + erken erisim formu (ad/sirket/kurumsal e-posta -> demo_requests; anonim create rules v1.9.3te zaten acik ve alan beyaz listeli) + Giris Yap baglantisi. Bos duvar yerine liste kuran bir sayfa. (2) KONTROL: pochub_config/system.prelaunchMode — Admin > Sistem Ayarlari en ustte ac/kapa butonu, DEPLOY GEREKMEZ. (3) BYPASS: giris yapmis herhangi bir kullanici VEYA ?preview=<anahtar> (localStorage a yazilir; anonim akislari test edebilmek icin sart). (4) Kapi aktifken meta robots noindex,nofollow eklenir, kapaninca index,follow a doner. (5) Config okunamazsa kapi ACILMAZ (guvenli taraf). (6) Maliyet: tek getDoc. ONEMLI: BU BIR GUVENLIK KATMANI DEGILDIR — dosya statik sunuluyor, bypass anahtari kaynak kodda gorunur. Gercek koruma Firestore kurallarindadir (v1.9.3). Bu bir PARAVANDIR: kazara gelen ziyaretciyi ve arama motorunu durdurur, kararli birini durdurmaz. node --check MODULE SYNTAX OK.'],
@@ -7669,7 +7670,7 @@ function _openAboutEditor(){
 // v5.85: Canlı Kanıt Akışı — ana sayfa güven istatistikleri (public veriden)
 function _countUp(node, target, suffix){
   if(!node) return; var dur=900, t0=null, sfx=suffix||'';
-  function step(ts){ if(!t0)t0=ts; var p=Math.min(1,(ts-t0)/dur); var eased=1-Math.pow(1-p,3); var val=Math.floor(target*eased); node.textContent=val.toLocaleString('tr-TR')+sfx; if(p<1) requestAnimationFrame(step); else node.textContent=target.toLocaleString('tr-TR')+sfx; }
+  function step(ts){ if(!t0)t0=ts; var p=Math.min(1,(ts-t0)/dur); var eased=1-Math.pow(1-p,3); var val=Math.floor(target*eased); var _loc = (window.CUR_LOCALE==='en') ? 'en-US' : 'tr-TR'; node.textContent=val.toLocaleString(_loc)+sfx; if(p<1) requestAnimationFrame(step); else node.textContent=target.toLocaleString(_loc)+sfx; }
   requestAnimationFrame(step);
 }
 function renderEvidenceStats(prods){
@@ -7699,7 +7700,7 @@ function renderEvidenceStats(prods){
     + '<div style="display:flex;gap:18px;flex-wrap:wrap">'
     +   tile('stat-eval','', t('evstat.evaluations','doğrulanmış PoC değerlendirmesi'))
     +   tile('stat-prod','', t('evstat.proven','kanıtlanmış çözüm'))
-    +   (avgRec!=null ? tile('stat-rec','%', t('evstat.avg_recommend','ortalama tavsiye oranı')) : '')
+    +   (avgRec!=null ? tile('stat-rec', (window.CUR_LOCALE==='en' ? '' : '%'), t('evstat.avg_recommend','ortalama tavsiye oranı')) : '')
     +   (recent30>0 ? tile('stat-recent','', t('evstat.recent30','son 30 günde değerlendirilen ürün')) : '')
     + '</div>'
     + (hareketler ? '<div style="margin-top:16px"><div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">🔥 '+t('evstat.recent_moves','SON HAREKETLER')+'</div><div style="display:flex;gap:8px;flex-wrap:wrap">'+hareketler+'</div></div>' : '')
@@ -7707,7 +7708,8 @@ function renderEvidenceStats(prods){
     + '</div>';
   _countUp(host.querySelector('#stat-eval'), totalEval, '');
   _countUp(host.querySelector('#stat-prod'), evaluated, '');
-  if(avgRec!=null) _countUp(host.querySelector('#stat-rec'), avgRec, '');
+  // v9.37: EN'de yuzde isareti sayidan SONRA gelir (100%), TR'de once (%100).
+  if(avgRec!=null) _countUp(host.querySelector('#stat-rec'), avgRec, (window.CUR_LOCALE==='en' ? '%' : ''));
   if(recent30>0) _countUp(host.querySelector('#stat-recent'), recent30, '');
   host.querySelectorAll('.ev-recent').forEach(function(b){ b.addEventListener('click', function(){ openProductDetailModal(b.dataset.id); }); });
 }
@@ -7839,25 +7841,10 @@ async function renderHome() {
       </div>
     </div>
 
-    <div style="margin-bottom:26px">
-      <div style="text-align:center;margin-bottom:15px">
-        <div style="font-size:10.5px;font-weight:800;letter-spacing:1.2px;color:#2563eb;text-transform:uppercase;margin-bottom:5px">${t('aud.kicker','PoCHub HERKES İÇİN')}</div>
-        <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-.01em">${t('aud.title','Hangisi sensin?')}</div>
-      </div>
-      <div class="home-aud-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-        ${[
-          ['🏢',t('aud.cust_t','Müşteri'),t('aud.cust_d','İhtiyacını kanıtla karşılaştır, doğru çözümü PoC ile seç.'),t('aud.cust_c','PoC İste →'),'go','catalog','#1e3a8a','#3b82f6'],
-          ['🛠️',t('aud.vend_t','Üretici'),t('aud.vend_d','Ürününü listele, gerçek PoC kanıtıyla rakiplerinin önüne geç.'),t('aud.vend_c','Vendor Ol →'),'aud','vendor','#0f766e','#14b8a6'],
-          ['🔗',t('aud.dist_t','Distribütör'),t('aud.dist_d','Portföyünü dijital vitrine taşı, nitelikli talepleri yakala.'),t('aud.dist_c','Ağa Katıl →'),'aud','vendor','#5b21b6','#8b5cf6'],
-          ['🧩',t('aud.integ_t','Entegratör'),t('aud.integ_d','Projelerine kanıtlanmış çözümler bul, hızlı teklif topla.'),t('aud.integ_c','Çözüm Bul →'),'go','catalog','#3730a3','#6366f1']
-        ].map(function(a){ return '<div class="home-aud-card" data-act="'+a[4]+'" data-val="'+a[5]+'" style="background:#fff;border:1px solid #e7ebf0;border-radius:14px;padding:16px 15px;cursor:pointer;display:flex;flex-direction:column">'
-          +'<div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,'+a[6]+','+a[7]+');display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:11px">'+a[0]+'</div>'
-          +'<div style="font-size:14.5px;font-weight:800;color:#0f172a;margin-bottom:5px">'+a[1]+'</div>'
-          +'<div style="font-size:12px;color:#64748b;line-height:1.5;flex:1;margin-bottom:11px">'+a[2]+'</div>'
-          +'<div style="font-size:12.5px;font-weight:800;color:#2563eb">'+a[3]+'</div>'
-          +'</div>'; }).join('')}
-      </div>
-    </div>
+    <!-- v9.37: NASIL CALISIR hero altina tasindi. Ziyaretci once "bu ne ise
+         yariyor" sorusunun cevabini gormeli; persona secimi (dort yol ayrimi)
+         o cevaptan ONCE gelirse ilk ekranda dokuz karar noktasi olusuyordu. -->
+    <div id="home-how-it-works" style="margin-bottom:24px"></div>
 
     <div style="border-radius:16px;overflow:hidden;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:24px 26px;margin-bottom:24px;position:relative">
       <div style="position:absolute;right:18px;top:50%;transform:translateY(-50%);font-size:120px;line-height:1;opacity:.05;color:#fff">🛡</div>
@@ -7895,8 +7882,26 @@ async function renderHome() {
     <!-- v4.91: TOP CUSTOMER LEADERBOARD -->
     <div id="home-top-customers" style="margin-bottom:24px"></div>
 
-    <!-- v4.87: NASIL ÇALIŞIR 3-ADIM -->
-    <div id="home-how-it-works" style="margin-bottom:24px"></div>
+    <!-- v9.37: persona secimi asagi alindi (once deger anlat, sonra dallandir) -->
+    <div style="margin-bottom:26px">
+      <div style="text-align:center;margin-bottom:15px">
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:1.2px;color:#2563eb;text-transform:uppercase;margin-bottom:5px">${t('aud.kicker','PoCHub HERKES İÇİN')}</div>
+        <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-.01em">${t('aud.title','Hangisi sensin?')}</div>
+      </div>
+      <div class="home-aud-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        ${[
+          ['🏢',t('aud.cust_t','Müşteri'),t('aud.cust_d','İhtiyacını kanıtla karşılaştır, doğru çözümü PoC ile seç.'),t('aud.cust_c','PoC İste →'),'go','catalog','#1e3a8a','#3b82f6'],
+          ['🛠️',t('aud.vend_t','Üretici'),t('aud.vend_d','Ürününü listele, gerçek PoC kanıtıyla rakiplerinin önüne geç.'),t('aud.vend_c','Vendor Ol →'),'aud','vendor','#0f766e','#14b8a6'],
+          ['🔗',t('aud.dist_t','Distribütör'),t('aud.dist_d','Portföyünü dijital vitrine taşı, nitelikli talepleri yakala.'),t('aud.dist_c','Ağa Katıl →'),'aud','vendor','#5b21b6','#8b5cf6'],
+          ['🧩',t('aud.integ_t','Entegratör'),t('aud.integ_d','Projelerine kanıtlanmış çözümler bul, hızlı teklif topla.'),t('aud.integ_c','Çözüm Bul →'),'go','catalog','#3730a3','#6366f1']
+        ].map(function(a){ return '<div class="home-aud-card" data-act="'+a[4]+'" data-val="'+a[5]+'" style="background:#fff;border:1px solid #e7ebf0;border-radius:14px;padding:16px 15px;cursor:pointer;display:flex;flex-direction:column">'
+          +'<div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,'+a[6]+','+a[7]+');display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:11px">'+a[0]+'</div>'
+          +'<div style="font-size:14.5px;font-weight:800;color:#0f172a;margin-bottom:5px">'+a[1]+'</div>'
+          +'<div style="font-size:12px;color:#64748b;line-height:1.5;flex:1;margin-bottom:11px">'+a[2]+'</div>'
+          +'<div style="font-size:12.5px;font-weight:800;color:#2563eb">'+a[3]+'</div>'
+          +'</div>'; }).join('')}
+      </div>
+    </div>
 
     <div style="display:grid;grid-template-columns:1fr 290px;gap:16px;align-items:start">
 
@@ -8003,6 +8008,19 @@ async function renderHome() {
       catch(_e){ console.debug('[stats] self-heal skip:', _e && _e.message); }
     }
     var vals = [evCount, userCount, pocCount, prodCount];
+    // ── v9.37: ZAYIF RAKAMI VITRINE KOYMA ──────────────────────────────
+    // Canli sayfada "17 Toplam Kullanici" yaziyordu; hemen altinda 11 vendor
+    // karti vardi. Yani sayac, pazaryerinin EN ZAYIF tarafini (alici yoklugu)
+    // ilan ediyordu. Erken asamada mutlak sayi guven vermez. Esigin altindaki
+    // kartlar gizlenir; hicbiri esigi gecmiyorsa satirin tamami kalkar.
+    var STAT_MIN = [1, 100, 25, 10];   // etkinlik, kullanici, PoC, urun
+    var _shown = 0;
+    el('home-stats')?.querySelectorAll('.stat-card').forEach(function(card, i){
+      if ((vals[i] || 0) < STAT_MIN[i]) { card.style.display = 'none'; return; }
+      _shown++;
+    });
+    if (!_shown) { var _sr = el('home-stats'); if (_sr) _sr.style.display = 'none'; }
+    else { var _sr2 = el('home-stats'); if (_sr2) _sr2.style.gridTemplateColumns = 'repeat(' + _shown + ',1fr)'; }
     el('home-stats')?.querySelectorAll('.stat-num').forEach((x,i)=>{
       x.textContent = vals[i];
       x.classList.remove('skel', 'skel-line', 'w50');
@@ -8138,10 +8156,23 @@ async function renderHome() {
         this_year:t('ev.p_this_year','bu yıl gerçekleşmiş etkinlik'),
         all:t('ev.p_all','etkinlik')
       };
+      // v9.37: ANASAYFADA etkinlik yoksa bolumun tamami (liste + bos takvim)
+      // gizlenir. Bos bir takvim ekranin onemli bir bolumunu kapliyor ve hicbir
+      // deger uretmiyordu; ustelik "Aktif Etkinlik" sayaciyla celisiyordu.
+      // Etkinlikler SAYFASINDA bos durum mesaji korunur (orada baglami var).
+      if (CUR_SCREEN === 'home') {
+        var _evGrid = listEl.closest('div[style*="1fr 290px"]');
+        if (_evGrid) { _evGrid.style.display = 'none'; return; }
+      }
       listEl.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>' +
         t('ev.no_in_filter_a','Bu filtrede ') + (periodLabels[CUR_EV_PERIOD||'upcoming']||t('ev.p_all','etkinlik')) + t('ev.no_in_filter_b',' bulunamadı.')+'<br>' +
         '<small style="color:#64748b">'+t('ev.try_other','Farklı bir dönem veya filtre seçin.')+'</small></div>';
       return;
+    }
+    // v9.37: onceki render bolumu gizlemis olabilir — etkinlik varsa geri ac
+    if (CUR_SCREEN === 'home') {
+      var _evGridOn = listEl.closest('div[style*="1fr 290px"]');
+      if (_evGridOn && _evGridOn.style.display === 'none') _evGridOn.style.display = '';
     }
     listEl.innerHTML = events.map(e => {
       const date = e.eventDate?.toDate ? e.eventDate.toDate().toLocaleDateString(LDATE(),{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '—';
