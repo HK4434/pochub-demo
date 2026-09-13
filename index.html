@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.43 | pochub.co -->
+<!-- PoCHub v9.44 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.43';
+const VERSION = 'v9.44';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.44': ['BIRINCIL CTA HATASI (Hasan tespiti: PoC Talebi Ac ve Katalogu gez ayni yeri aciyor). v9.35 te hero yu tek baskin CTA ya indirirken, giris yapmis kullanicida her iki buton da go(catalog) cagiriyordu. Iki butondan biri — ustelik BIRINCIL olani — gereksizdi ve ziyaretci talep acmak yerine gezinmeye gonderiliyordu. (1) PoC Talebi Ac artik openCustomPoCModal() aciyor: katalog gezmeden, ihtiyacini yazarak talep acma akisi. Katalogdan urun secerek acmak isteyen zaten Katalogu gez ile gidip openMultiVendorPocModal akisini kullanir — iki buton artik iki farkli ise karsilik geliyor. (2) Anonim ziyaretcide niyet sessionStorage a yazilir; kayit/giris tamamlaninca kullanici dogrudan PoC formuna dusurulur, elle tekrar aramasi gerekmez. (3) Vendor/admin PoC talebi acamaz (rules v1.9.3: create yalniz isCustomer); sessizce kataloga atmak yerine sebebi bir bildirimle soyleniyor. node --check MODULE SYNTAX OK.'],
   'v9.43': ['ROZET SAYISI — SECILEN ile GORUNEN ESITLENDI (Hasan tespiti: havuzda secili sayi ile anasayfada gosterilen neden ayni degil). v9.42 de havuz ile gosterim sayisini ayirmistim; sonucta admin 20 kategori seciyor ama anasayfada 10 tanesi cikiyordu. Bu, sectigim esittir gorunen beklentisini kiriyor ve secim hissini yok ediyordu — gereksiz bir soyutlamaydi. (1) MANUEL MODDA secilenin TAMAMI gosteriliyor (40 a kadar); Adet alani manuel modda GIZLENIYOR. (2) Adet ayari artik yalnizca Otomatik ve Rastgele modlarda anlamli — orada kuratorluk yok, sinir gerekiyor; ust sinir 16 dan 24 e, varsayilan 10 dan 12 ye cikti. (3) Panelde moda gore degisen aciklama satiri eklendi; doldurma dugmeleri de yalniz manuel modda gorunuyor. node --check MODULE SYNTAX OK.'],
   'v9.42': ['ROZET HAVUZU — SINIRLAR AYRILDI ve DOLDURMA YARDIMCILARI (Hasan sorusu: max bu mu, AI onerisi veya en cok tercih edilenler olabilir mi). (1) HAVUZ ile GOSTERIM SAYISI AYRILDI: list = adminin kuratorlugunu yaptigi HAVUZ (40a kadar), count = ayni anda ekranda gorunecek adet (4-16, varsayilan 10). Hero da 24 rozet 3-4 satir demek ve tam da kucultmeye calistigimiz hero yu tekrar sisirir. Dogru model genis havuz, dar vitrin. (2) KARISTIR ARTIK HAVUZ ICINDE: manuel havuz varsa ziyaretci 1.003 kategori arasindan rastgele degil, adminin sectigi havuzdan baska yuzler gorur. (3) GERCEK TALEPTEN DOLDUR: poc_requests.category dagilimina gore siralama. Bu koleksiyonu yalniz admin okuyabilir (rules v1.9.3), o yuzden hesap admin panelinde yapilip sonuc havuza yaziliyor; anasayfa poc_requests e HIC dokunmuyor. Test kayitlari haric tutulur. (4) DENGELI KARISIM: gercek urunu olan kategoriler once, ayni kelime kokunden arka arkaya cikmamasi icin cesitlilik gecisi (sekiz Yapay Zeka kategorisi yan yana gelmesin). (5) TEMIZLE dugmesi. NOT: buna AI onerisi DEMIYORUZ — uygulama bir dil modeline erisemiyor; bunlar seffaf ve tekrarlanabilir kurallar, ne cikacagini onceden bilirsin. node --check MODULE SYNTAX OK.'],
   'v9.41': ['ANASAYFA ROZET SECICISI — KULLANILABILIR HALE GETIRILDI (Hasan tespiti: bunu nasil yazabilirim). v9.40 manuel modda adminden 1.003 kategori arasindan adlari BIREBIR elle yazmasini istiyordu; bos bir metin kutusu ve eslesme zorunlulugu. Kullanilabilir bir tasarim degildi. Artik gercek secici: solda ARANABILIR kategori listesi (sablon sayilariyla, en zenginler ustte, tikla ekle), sagda SECILENLER (yukari/asagi ok ile sirala, carpi ile cikar), ust sinir 24 ve asilinca uyari, manuel modda bos liste ile kayit engelli. Kategori listesi ve sablon sayilari KATALOG INDEKSINDEN geliyor — ek Firestore okumasi YOK. Ad yazmak tamamen kalkti. node --check MODULE SYNTAX OK.'],
@@ -5352,6 +5353,15 @@ async function evaluatePrelaunchGate(user){
 onAuthStateChanged(auth, async user => {
   window._authResolved = true;
   try { await evaluatePrelaunchGate(user); } catch(e){}   // v9.34: on-lansman kapisi (CUR_USER asagida atanir)
+  // v9.44: anasayfadan "PoC Talebi Ac" ile gelip kayit olan kullanici,
+  // giris tamamlaninca dogrudan talep formuna dusurulur.
+  if (user) setTimeout(function(){
+    try {
+      if (sessionStorage.getItem('pochub_intent') !== 'poc') return;
+      sessionStorage.removeItem('pochub_intent');
+      if (((CUR_PROFILE && CUR_PROFILE.role) || '') === 'customer') openCustomPoCModal();
+    } catch(e){}
+  }, 900);
   try { ensureTaxonomy(); ensureProductFields(); } catch(e){} // v5.62: taksonomiyi erken yükle (edit formu senkron)
   CUR_USER = user;
   if (user) {
@@ -8183,11 +8193,25 @@ async function renderHome() {
   el('home-about-btn')?.addEventListener('click', () => go('about'));
   el('home-demo-btn')?.addEventListener('click', () => { window.location.hash = '#demo'; });
 
-  // v9.35: BIRINCIL CTA — PoC talebi ac.
-  // Anonim ziyaretci: musteri kaydi modali (asil darbogaz talep tarafi).
-  // Giris yapmis: kataloga gider, urunleri secip cok-vendorlu PoC acar.
+  // ── v9.44: BIRINCIL CTA ARTIK GERCEKTEN PoC TALEBI ACIYOR ──────────
+  // HATA (v9.35): "PoC Talebi Ac" ve "Katalogu gez" giris yapmis kullanicida
+  // AYNI yere gidiyordu — ikisi de kataloga. Iki butondan biri, ustelik
+  // BIRINCIL olani, gereksizdi; ziyaretci talep acmak yerine gezinmeye
+  // gonderiliyordu.
+  // Dogrusu: openCustomPoCModal() — katalog gezmeden, ihtiyacini yazarak
+  // talep acma akisi. Katalogdan urun secerek acmak isteyen zaten
+  // "Katalogu gez" ile gidip openMultiVendorPocModal akisini kullanir.
   el('home-poc-btn')?.addEventListener('click', () => {
-    if (!CUR_USER) { AUTH_MODE = 'register'; openAuthModal('customer'); return; }
+    if (!CUR_USER) {
+      try { sessionStorage.setItem('pochub_intent', 'poc'); } catch(e){}
+      AUTH_MODE = 'register';
+      openAuthModal('customer');
+      return;
+    }
+    var role = (CUR_PROFILE && CUR_PROFILE.role) || '';
+    if (role === 'customer') { openCustomPoCModal(); return; }
+    showToast(_L('PoC requests are opened with a customer account.',
+                 'PoC talebi müşteri hesabıyla açılır.'), 'info');
     go('catalog');
   });
 
