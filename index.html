@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.35 | pochub.co -->
+<!-- PoCHub v9.36 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -750,7 +750,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.35';
+const VERSION = 'v9.36';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1224,6 +1224,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.36': ['ON-LANSMAN KAPISI — UC SIZINTI KAPATILDI (Hasan tespiti). (1) TAM BYPASS: karsilama ekranindaki Giris Yapin baglantisi hidePrelaunchGate() cagiriyordu, yani kapiyi kaldirip arkasindaki TUM SITEYI ifsa ediyordu — modal kapatilsa bile site acik kaliyordu. Tek tikla tam bypass; kapi fiilen islevsizdi. Artik kapi YERINDE KALIR, auth modali kapinin UZERINDE acilir (z-index 100001 > 99999) ve kapi ancak onAuthStateChanged gercek bir kullanici bildirdiginde kalkar; kalkarken modal z-index eski haline doner. (2) SEED KORUMASIZDI: v9.34 kapisi yalniz index.html dosyasina konmustu; pochub-seed-*.html adresini bilen herkes tam test paketini aciyordu — admin bakim araclari, koleksiyon semasi ve guvenlik testlerinin ne denedigi acikta. Seed dosyasina giris zorunlulugu eklendi (Firestore okumasi YOK, senkron cizilir) + meta robots noindex,nofollow,noarchive. (3) ACILIS PARLAMASI: kapi karari auth ve config okumasini bekledigi icin anasayfa birkac yuz milisaniye GORUNUYORDU. Son bilinen durum localStorage icinde tutulup acilista senkron uygulaniyor; onbellek yoksa temkinli davranip kapi cizilir, gercek karar gelince duzeltilir. HATIRLATMA: bunlar PARAVANDIR, kilit degil — gercek koruma Firestore kurallarindadir (v1.9.3). Eski surumlu dosyalar (pochub-v9.3x.html ve pochub-seed-v9.3x.html) repodan SILINMELI; onlarda kapi yok ve yan kapi olarak acik kalirlar. node --check MODULE SYNTAX OK.'],
   'v9.35': ['ANASAYFA VITRIN DUZELTMESI — ilk izlenim guvenilirligi. SORUN: canli anasayfada kanit bandi 100.000 degerlendirme / 2 cozum / persent100 tavsiye gibi birbirini yalanlayan rakamlar gosteriyordu (kaynak: kirli ratingCount=99999 kaydi); 11 vendor kartindan 7si Test iceriyordu; ayni marka iki kez goruruyordu; 40 puanlik urun Kanitlanmis Lider diye sergileniyordu. Platformun TEK iddiasi kanit iken sayfa kendi verisiyle bu iddiayi curutuyordu. (1) VITRIN FILTRESI _isShowcaseHidden(): isTestRecord isaretli VEYA adinda bagimsiz kelime olarak test gecen kayitlar anasayfadan cikarilir (Testo GmbH / Latest Systems yanlis eslesmez). Eski test kayitlarinin cogunda isTestRecord olmadigi icin ad temelli emniyet agi gerekliydi. Admin paneli ve ic ekranlar ETKILENMEZ. Vendor barinda ayrica ayni sirket tekrari engellendi. (2) KANIT BANDI ESIGI (SHOWCASE_MIN_EVAL=25): gercek degerlendirme sayisi esigin altindaysa bant hic cizilmez. Az ama gercek sayi sisirilmisten iyidir; sifira yakin sayi ise hic gosterilmemelidir. (3) LIDER ESIGI (SHOWCASE_MIN_SCORE=70, MIN_LEADERS=2): dusuk skorlu urunle lider bolumu doldurulmaz; yeterli urun yoksa bolum gizlenir. Esikler pochub_config/system uzerinden ayarlanabilir. (4) HERO TEK BASKIN CTA: onceki halde yan yana BES esit agirlikli buton vardi (Demo/Etkinlikler/Katalog/Biz Kimiz/Vendor Katil) ve hemen altinda dort persona karti — ilk ekranda dokuz yol ayrimi. Iki tarafli pazaryerinde anasayfa KIT OLAN tarafa seslenir; burada kit olan talep tarafi. Artik tek birincil buton (PoC Talebi Ac - Ucretsiz) + soluk ikincil (Katalogu gez); vendor katilimi ikincil METIN baglantisina indi. Kaldirilan butonlarin baglamalari opsiyonel zincire cevrildi (el(...)?.addEventListener) — element yoksa hata atmaz. Yeni i18n anahtarlari TR+EN eklendi. node --check MODULE SYNTAX OK.'],
   'v9.34': ['ON-LANSMAN KAPISI (PRE-LAUNCH GATE). Site teknik olarak yayinda ama icerik/veri hazir degil; tesadufen giren ziyaretcinin ve ozellikle GOOGLEIN yarim siteyi gormesini engeller (indekslenme bir kez olursa aylarca kalir; aramada pochub.co henuz gorunmuyor, zamaninda yakalandi). (1) prelaunchMode acikken anonim ziyaretci karsilama ekrani gorur: alici odakli tek cumlelik vaat + erken erisim formu (ad/sirket/kurumsal e-posta -> demo_requests; anonim create rules v1.9.3te zaten acik ve alan beyaz listeli) + Giris Yap baglantisi. Bos duvar yerine liste kuran bir sayfa. (2) KONTROL: pochub_config/system.prelaunchMode — Admin > Sistem Ayarlari en ustte ac/kapa butonu, DEPLOY GEREKMEZ. (3) BYPASS: giris yapmis herhangi bir kullanici VEYA ?preview=<anahtar> (localStorage a yazilir; anonim akislari test edebilmek icin sart). (4) Kapi aktifken meta robots noindex,nofollow eklenir, kapaninca index,follow a doner. (5) Config okunamazsa kapi ACILMAZ (guvenli taraf). (6) Maliyet: tek getDoc. ONEMLI: BU BIR GUVENLIK KATMANI DEGILDIR — dosya statik sunuluyor, bypass anahtari kaynak kodda gorunur. Gercek koruma Firestore kurallarindadir (v1.9.3). Bu bir PARAVANDIR: kazara gelen ziyaretciyi ve arama motorunu durdurur, kararli birini durdurmaz. node --check MODULE SYNTAX OK.'],
   'v9.33.7': ['TANI PANELI SONUCLARI — iki bulgu, iki farkli sonuc (uygulama mantiginda degisiklik YOK). (A) SEC-2 KURAL DOGRU, TEST YANLISTI: tani cycleStartedAt=02.06.2026 gosterdi, uzerinden 3+ ay gecmis, yani cycleExpired() dogru sekilde true ve sifirlama MESRU aylik dongu sifirlamasi. Test dongu durumunu hesaba katmiyordu; artik dongu dolmussa ATLIYOR ve sebebini yaziyor. (B) SEC-7 GERCEK ACIK (firestore.rules v1.9.3 ile kapatildi): agregat bransi isSignedIn() idi, yani herhangi bir giris yapmis kullanici BASKASININ urununun avgRatingini 0-5 araliginda istedigi yere cekebiliyordu — odeme ile degil kanitla uste cikilir ilkesini gecersiz kilan yol. Brans isCustomer()a daraltildi + ratingCount icin 2000 tavani. Tam cozum Cloud Function gerektirir. (C) KIRLI VERI: hedef urunde ratingCount=99999 / avgRating=5 bulundu. Bu, mesru yazmalari da engelliyor (gercek review geldiginde sayi AZALACAGI icin incAtMostOne reddeder, o urun degerlendirme alamaz). Admin > Veri Sagligi > Urun Kanit Agregalari Yeniden Hesapla ile temizlenmeli. Test artik bu durumu tespit edip ATLIYOR ve kullaniciyi o araca yonlendiriyor. (D) YENI TEST SEC-7b: rakip urunun avgRatingini 1.0a dusurme denemesi — v1.9.3 daraltmasinin asil hedefi. node --check MODULE SYNTAX OK.'],
@@ -5188,6 +5189,7 @@ let CUR_ADM_TAB = 'dashboard';
    ════════════════════════════════════════════════════════════════════ */
 var PRELAUNCH_KEY = 'gits2026';
 var PRELAUNCH_LS  = 'pochub_preview_ok';
+var PRELAUNCH_CACHE_LS = 'pochub_prelaunch_last';   // v9.36: son bilinen durum
 var PRELAUNCH_ON  = false;
 
 function _preIsBypassed(){
@@ -5215,6 +5217,8 @@ function hidePrelaunchGate(){
   var g = document.getElementById('prelaunch-gate');
   if (g) { g.style.display = 'none'; g.innerHTML = ''; }
   document.body.style.overflow = '';
+  try { var am = document.getElementById('auth-modal'); if (am) am.style.zIndex = ''; } catch(e){}
+  try { localStorage.setItem(PRELAUNCH_CACHE_LS, '0'); } catch(e){}
   _preNoIndex(false);
 }
 
@@ -5282,10 +5286,18 @@ function renderPrelaunchGate(){
     }
   });
 
+  // v9.36 GUVENLIK DUZELTMESI: bu baglanti onceden hidePrelaunchGate()
+  // cagiriyordu — yani kapiyi kaldirip arkasindaki tum siteyi ifsa ediyordu.
+  // Tek tikla TAM BYPASS demekti ve kapiyi islevsiz kiliyordu.
+  // Artik kapi YERINDE KALIR; auth modali kapinin UZERINDE acilir.
+  // Kapi ancak onAuthStateChanged gercek bir kullanici bildirdiginde kalkar.
   g.querySelector('#pre-login').addEventListener('click', function(ev){
     ev.preventDefault();
-    hidePrelaunchGate();
-    try { openAuthModal('login'); } catch(e){ location.hash = '#home'; }
+    try {
+      var am = document.getElementById('auth-modal');
+      if (am) am.style.zIndex = '100001';   // kapinin (99999) uzerine
+      openAuthModal('login');
+    } catch(e){}
   });
 }
 
@@ -5297,12 +5309,27 @@ async function evaluatePrelaunchGate(user){
     if (_preIsBypassed()) { hidePrelaunchGate(); return; }
     var snap = await getDoc(doc(db,'pochub_config','system'));
     PRELAUNCH_ON = !!(snap.exists() && snap.data().prelaunchMode === true);
+    try { localStorage.setItem(PRELAUNCH_CACHE_LS, PRELAUNCH_ON ? '1' : '0'); } catch(e){}
     if (PRELAUNCH_ON) renderPrelaunchGate(); else hidePrelaunchGate();
   } catch(e){
     // Config okunamazsa kapiyi ACMA (guvenli taraf: yarim site gorunmesin)
     hidePrelaunchGate();
   }
 }
+
+// v9.36: ACILIS PARLAMASI ONLEME.
+// Kapi kararini onAuthStateChanged + config okumasi belirliyor; bu birkac yuz
+// milisaniye suruyor ve o aralikta anasayfa GORUNUYORDU. Son bilinen durum
+// onbellekte tutulup senkron olarak hemen uygulanir, sonra gercek karar gelince
+// duzeltilir. Onbellek yoksa ve bypass da yoksa temkinli davranip kapiyi cizer.
+(function _preBootGuard(){
+  try {
+    if (_preIsBypassed()) return;
+    var last = localStorage.getItem(PRELAUNCH_CACHE_LS);
+    if (last === '0') return;            // en son yayindaydi -> bekle
+    if (document.getElementById('prelaunch-gate')) renderPrelaunchGate();
+  } catch(e){}
+})();
 
 /* ══════════════════════════════════════
    AUTH
