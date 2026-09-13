@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.33.7 | pochub.co -->
+<!-- PoCHub v9.34 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -605,6 +605,9 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 </head>
 <body>
 
+<!-- v9.34: ON-LANSMAN KAPISI — prelaunchMode acikken tum sayfayi ortar -->
+<div id="prelaunch-gate" style="display:none"></div>
+
 <!-- NAV -->
 <nav>
   <div class="logo" id="logo-btn">Poc<b>Hub</b>.co</div>
@@ -747,7 +750,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.33.7';
+const VERSION = 'v9.34';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1221,6 +1224,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.34': ['ON-LANSMAN KAPISI (PRE-LAUNCH GATE). Site teknik olarak yayinda ama icerik/veri hazir degil; tesadufen giren ziyaretcinin ve ozellikle GOOGLEIN yarim siteyi gormesini engeller (indekslenme bir kez olursa aylarca kalir; aramada pochub.co henuz gorunmuyor, zamaninda yakalandi). (1) prelaunchMode acikken anonim ziyaretci karsilama ekrani gorur: alici odakli tek cumlelik vaat + erken erisim formu (ad/sirket/kurumsal e-posta -> demo_requests; anonim create rules v1.9.3te zaten acik ve alan beyaz listeli) + Giris Yap baglantisi. Bos duvar yerine liste kuran bir sayfa. (2) KONTROL: pochub_config/system.prelaunchMode — Admin > Sistem Ayarlari en ustte ac/kapa butonu, DEPLOY GEREKMEZ. (3) BYPASS: giris yapmis herhangi bir kullanici VEYA ?preview=<anahtar> (localStorage a yazilir; anonim akislari test edebilmek icin sart). (4) Kapi aktifken meta robots noindex,nofollow eklenir, kapaninca index,follow a doner. (5) Config okunamazsa kapi ACILMAZ (guvenli taraf). (6) Maliyet: tek getDoc. ONEMLI: BU BIR GUVENLIK KATMANI DEGILDIR — dosya statik sunuluyor, bypass anahtari kaynak kodda gorunur. Gercek koruma Firestore kurallarindadir (v1.9.3). Bu bir PARAVANDIR: kazara gelen ziyaretciyi ve arama motorunu durdurur, kararli birini durdurmaz. node --check MODULE SYNTAX OK.'],
   'v9.33.7': ['TANI PANELI SONUCLARI — iki bulgu, iki farkli sonuc (uygulama mantiginda degisiklik YOK). (A) SEC-2 KURAL DOGRU, TEST YANLISTI: tani cycleStartedAt=02.06.2026 gosterdi, uzerinden 3+ ay gecmis, yani cycleExpired() dogru sekilde true ve sifirlama MESRU aylik dongu sifirlamasi. Test dongu durumunu hesaba katmiyordu; artik dongu dolmussa ATLIYOR ve sebebini yaziyor. (B) SEC-7 GERCEK ACIK (firestore.rules v1.9.3 ile kapatildi): agregat bransi isSignedIn() idi, yani herhangi bir giris yapmis kullanici BASKASININ urununun avgRatingini 0-5 araliginda istedigi yere cekebiliyordu — odeme ile degil kanitla uste cikilir ilkesini gecersiz kilan yol. Brans isCustomer()a daraltildi + ratingCount icin 2000 tavani. Tam cozum Cloud Function gerektirir. (C) KIRLI VERI: hedef urunde ratingCount=99999 / avgRating=5 bulundu. Bu, mesru yazmalari da engelliyor (gercek review geldiginde sayi AZALACAGI icin incAtMostOne reddeder, o urun degerlendirme alamaz). Admin > Veri Sagligi > Urun Kanit Agregalari Yeniden Hesapla ile temizlenmeli. Test artik bu durumu tespit edip ATLIYOR ve kullaniciyi o araca yonlendiriyor. (D) YENI TEST SEC-7b: rakip urunun avgRatingini 1.0a dusurme denemesi — v1.9.3 daraltmasinin asil hedefi. node --check MODULE SYNTAX OK.'],
   'v9.33.6': ['SEED TANI ALTYAPISI (uygulama mantiginda degisiklik YOK). Onceki surumlerde testler bir KARAR veriyor ama karari yorumlamak icin gereken DURUM BILGISINI vermiyordu; IZIN VERILDI ciktiginda bunun kural acigi mi test kusuru mu oldugu ekran goruntusunden tahmin ediliyordu. Duzeltildi. (1) TANI PANELI (Once Tani: Ortami Goster): calisan uid/e-posta/rol, vendor_subscriptions dokumaninin pocUsedThisCycle / inviteUsedThisCycle / cycleStartedAt / currentTier / status alanlari, vendor_billing alanlari, ve SEC-7 hedef urun secimi (taranan urun sayisi, bu vendora ait kac tane, baskasina ait kac tane, vendorId alani bos kac tane, secilen hedefin sahibi). Testten ONCE calistirilir, sonuclar boylece yorumlanabilir olur. (2) SEC-7 hedef secimi duzeltildi: onceki surumde vendorId alani BOS olan urunler de baskasinin sayiliyordu; artik vendorId DOLU ve farkli olmali, degilse test ATLANIR. v9.33.5te raporlanan SEC-7 acigi buyuk olasilikla bu secim kusurundan kaynaklandi — vendor kendi urununde zaten yetkilidir. (3) Basarisiz testler artik KANIT raporluyor: SEC-2 sayacin onceki degerini ve cycleStartedAt var/yok bilgisini, SEC-7 hedefin sahibini ve onceki ratingCount degerini yaziyor. node --check MODULE SYNTAX OK.'],
   'v9.33.5': ['SEED RAPORLAMA DUZELTMELERI + RULES v1.9.2 NOTU (uygulama mantiginda degisiklik YOK). (1) Seed yuzde hesabi: ATLANAN testler artik paydaya girmiyor — 17 gecti + 1 atlandi + 0 basarisiz sonucu onceki surumde 94 persent ve Acik tespit edildi olarak gorunuyordu, yaniltiyordu. (2) Bolum 9 basligi duzeldi: v9.33.4te bir replace sessizce eslesmemis, indeks dogrulama panelinde Tum guvenlik testleri gecti yaziyordu. (3) Bolum basligi Rules v1.9.1 -> v1.9.2. KRITIK BULGU (firestore.rules v1.9.2, ayri dosya): seed Bolum 8 canli ortamda gercek bir kural acigi yakaladi. cycleReady() helperi cycleStartedAt alani YOKSA true donuyordu; kayit aninda olusturulan free aboneliklerde bu alan bulunmadigindan vendor pocUsedThisCycle sayacini ISTEDIGI ZAMAN sifirlayabiliyordu — SEC-2nin kapatmayi amacladigi kota kacagi, ilk-kurulum istisnasinin icinden geri gelmisti. cycleExpired() (alan var + null degil + 30 gun gecmis) ve cycleUnused() (mevcut sayac zaten 0) olarak ikiye ayrildi; brans (b) kosulu (cycleExpired() || cycleUnused()). Kullanim artisi brans (a)dan gectigi icin PoC kabul akisi etkilenmez. SURUM NOTU: v9.33.5 ilk teslimde hatali paketlendi — seed scriptindeki bir assert hatasi app blogunu durdurdu ve dosya v9.33.4un birebir kopyasi olarak cikti; bu surumde duzeltildi. node --check MODULE SYNTAX OK.'],
@@ -5161,11 +5165,150 @@ const STALE_THRESHOLD = 5 * 60 * 1000;
 let CUR_EV_PERIOD = 'upcoming'; // Etkinlikler dönem filtresi
 let CUR_ADM_TAB = 'dashboard';
 
+
+/* ════════════════════════════════════════════════════════════════════
+   v9.34 — ON-LANSMAN KAPISI (PRE-LAUNCH GATE)
+   ────────────────────────────────────────────────────────────────────
+   AMAC: Site teknik olarak yayinda ama icerik/veri henuz hazir degil.
+   Tesadufen giren ziyaretcinin ve ozellikle GOOGLE'IN yarim siteyi
+   gormesini engeller. Indekslenme bir kez olursa aylarca kalir.
+
+   BU BIR GUVENLIK KATMANI DEGILDIR. Dosya statik olarak sunuluyor,
+   bypass anahtari kaynak kodda gorunur. Gercek koruma Firestore
+   kurallarindadir (v1.9.3). Bu katman bir PARAVANDIR: kazara gelen
+   ziyaretciyi ve arama motorunu durdurur, kararli birini durdurmaz.
+
+   KONTROL: pochub_config/system.prelaunchMode (admin ac/kapa, deploy yok)
+   BYPASS : (a) giris yapmis herhangi bir kullanici
+            (b) ?preview=<PRELAUNCH_KEY> ile gelen — localStorage'a yazilir
+                (anonim akislari test edebilmek icin sart)
+   EK     : kapi aktifken <meta name="robots" content="noindex,nofollow">
+   MALIYET: kapi Firestore'a TEK okuma yapar (system config), sonra durur.
+   ════════════════════════════════════════════════════════════════════ */
+var PRELAUNCH_KEY = 'gits2026';
+var PRELAUNCH_LS  = 'pochub_preview_ok';
+var PRELAUNCH_ON  = false;
+
+function _preIsBypassed(){
+  try {
+    var q = new URLSearchParams(location.search);
+    if (q.get('preview') === PRELAUNCH_KEY) { localStorage.setItem(PRELAUNCH_LS, '1'); return true; }
+    if (localStorage.getItem(PRELAUNCH_LS) === '1') return true;
+  } catch(e){}
+  return false;
+}
+
+function _preNoIndex(on){
+  try {
+    var m = document.querySelector('meta[name="robots"]');
+    if (on) {
+      if (!m) { m = document.createElement('meta'); m.name = 'robots'; document.head.appendChild(m); }
+      m.content = 'noindex,nofollow';
+    } else if (m && m.content.indexOf('noindex') >= 0) {
+      m.content = 'index,follow';
+    }
+  } catch(e){}
+}
+
+function hidePrelaunchGate(){
+  var g = document.getElementById('prelaunch-gate');
+  if (g) { g.style.display = 'none'; g.innerHTML = ''; }
+  document.body.style.overflow = '';
+  _preNoIndex(false);
+}
+
+function renderPrelaunchGate(){
+  var g = document.getElementById('prelaunch-gate');
+  if (!g) return;
+  _preNoIndex(true);
+  document.body.style.overflow = 'hidden';
+  g.style.cssText = 'position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0b1220 0%,#111c33 55%,#0b1220 100%);overflow-y:auto;display:block';
+
+  var L = (window.CUR_LOCALE === 'en');
+  g.innerHTML =
+    '<div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:40px 20px">'
+    + '<div style="width:100%;max-width:560px;text-align:center;color:#e6edf7;font-family:\'Segoe UI\',system-ui,sans-serif">'
+    +   '<div style="font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:28px">Poc<span style="color:#3b82f6">Hub</span><span style="opacity:.55">.co</span></div>'
+    +   '<div style="display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:#7dd3fc;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.28);border-radius:20px;padding:6px 14px;margin-bottom:22px">'
+    +     (L ? 'Launching soon' : 'Çok yakında') + '</div>'
+    +   '<h1 style="font-size:30px;line-height:1.28;font-weight:800;margin:0 0 18px;letter-spacing:-.6px">'
+    +     (L ? 'Choose between three products.<br>Look at the test, not the pitch.'
+              : 'Üç ürün arasında seçim yapacaksın.<br>Sunumlara değil, teste bak.') + '</h1>'
+    +   '<p style="font-size:14.5px;line-height:1.65;color:rgba(230,237,247,.62);margin:0 0 30px">'
+    +     (L ? 'Open your PoC request once; vendors line up in a ranked queue, you test them against the same criteria, and you walk out with a single report you can put in front of management.'
+              : 'PoC talebini bir kez açarsın; üreticiler sıraya girer, aynı kriterlerle test edersin, sonuçları yönetime sunulabilir tek bir raporla çıkarırsın.') + '</p>'
+    +   '<div style="background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:22px 20px;text-align:left">'
+    +     '<div style="font-size:13px;font-weight:700;margin-bottom:4px">' + (L ? 'Get early access' : 'Erken erişim alın') + '</div>'
+    +     '<div style="font-size:12px;color:rgba(230,237,247,.5);margin-bottom:14px">' + (L ? 'We will email you when we open. No spam.' : 'Açıldığımızda size e-posta göndeririz. Spam yok.') + '</div>'
+    +     '<div id="pre-form">'
+    +       '<input id="pre-name" placeholder="' + (L?'Full name':'Ad soyad') + '" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:11px 13px;color:#e6edf7;font-size:13.5px;margin-bottom:9px;outline:none">'
+    +       '<input id="pre-company" placeholder="' + (L?'Company':'Şirket') + '" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:11px 13px;color:#e6edf7;font-size:13.5px;margin-bottom:9px;outline:none">'
+    +       '<input id="pre-email" type="email" placeholder="' + (L?'Work email':'Kurumsal e-posta') + '" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:11px 13px;color:#e6edf7;font-size:13.5px;margin-bottom:12px;outline:none">'
+    +       '<button id="pre-send" style="width:100%;background:#2563eb;border:0;border-radius:9px;padding:12px;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer">' + (L?'Notify me':'Haber ver') + '</button>'
+    +       '<div id="pre-msg" style="font-size:12px;margin-top:10px;min-height:16px"></div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="margin-top:24px;font-size:12.5px;color:rgba(230,237,247,.42)">'
+    +     (L ? 'Already have an account? ' : 'Hesabınız var mı? ')
+    +     '<a href="#" id="pre-login" style="color:#7dd3fc;text-decoration:none;font-weight:600">' + (L?'Sign in':'Giriş yapın') + '</a>'
+    +   '</div>'
+    +   '<div style="margin-top:30px;font-size:11px;color:rgba(230,237,247,.26)">© 2026 PoCHub.co</div>'
+    + '</div></div>';
+
+  var btn = g.querySelector('#pre-send');
+  btn.addEventListener('click', async function(){
+    var msg  = g.querySelector('#pre-msg');
+    var name = (g.querySelector('#pre-name').value||'').trim();
+    var comp = (g.querySelector('#pre-company').value||'').trim();
+    var mail = (g.querySelector('#pre-email').value||'').trim();
+    if (!mail || mail.indexOf('@') < 0) { msg.style.color='#f87171'; msg.textContent = L?'Please enter a valid email.':'Geçerli bir e-posta girin.'; return; }
+    btn.disabled = true; btn.textContent = L?'Sending...':'Gönderiliyor...';
+    try {
+      // demo_requests: anonim create'e acik, alan beyaz listesi rules v1.9.3'te tanimli
+      await addDoc(collection(db,'demo_requests'), {
+        name: name.substring(0,200), email: mail.substring(0,320), company: comp.substring(0,300),
+        phone: '', message: 'prelaunch early-access', role: '',
+        source: 'prelaunch_gate', createdAt: serverTimestamp()
+      });
+      g.querySelector('#pre-form').innerHTML =
+        '<div style="text-align:center;padding:12px 0"><div style="font-size:30px;margin-bottom:8px">✓</div>'
+        + '<div style="font-size:13.5px;font-weight:700;margin-bottom:4px">' + (L?'You are on the list.':'Listeye eklendiniz.') + '</div>'
+        + '<div style="font-size:12px;color:rgba(230,237,247,.5)">' + (L?'We will be in touch.':'Açıldığımızda haber vereceğiz.') + '</div></div>';
+    } catch(e){
+      msg.style.color='#f87171';
+      msg.textContent = (L?'Could not send: ':'Gönderilemedi: ') + ((e&&e.message)||'').substring(0,70);
+      btn.disabled = false; btn.textContent = L?'Notify me':'Haber ver';
+    }
+  });
+
+  g.querySelector('#pre-login').addEventListener('click', function(ev){
+    ev.preventDefault();
+    hidePrelaunchGate();
+    try { openAuthModal('login'); } catch(e){ location.hash = '#home'; }
+  });
+}
+
+// Kapi karari. Giris yapmis kullanici VEYA preview anahtari -> gecer.
+async function evaluatePrelaunchGate(user){
+  try {
+    // user parametresi onAuthStateChanged'den gelir; CUR_USER henuz atanmamis olabilir
+    if (user || CUR_USER) { hidePrelaunchGate(); return; }
+    if (_preIsBypassed()) { hidePrelaunchGate(); return; }
+    var snap = await getDoc(doc(db,'pochub_config','system'));
+    PRELAUNCH_ON = !!(snap.exists() && snap.data().prelaunchMode === true);
+    if (PRELAUNCH_ON) renderPrelaunchGate(); else hidePrelaunchGate();
+  } catch(e){
+    // Config okunamazsa kapiyi ACMA (guvenli taraf: yarim site gorunmesin)
+    hidePrelaunchGate();
+  }
+}
+
 /* ══════════════════════════════════════
    AUTH
 ══════════════════════════════════════ */
 onAuthStateChanged(auth, async user => {
   window._authResolved = true;
+  try { await evaluatePrelaunchGate(user); } catch(e){}   // v9.34: on-lansman kapisi (CUR_USER asagida atanir)
   try { ensureTaxonomy(); ensureProductFields(); } catch(e){} // v5.62: taksonomiyi erken yükle (edit formu senkron)
   CUR_USER = user;
   if (user) {
@@ -40217,6 +40360,51 @@ async function admSettings(m) {
       + '<button class="btn-p btn-sm" id="cfg-save">'+t('aset.save_btn','💾 Tüm Ayarları Kaydet')+'</button>'
       + '</div>';
     m.appendChild(hdr);
+
+    // ── v9.34: ON-LANSMAN MODU ANAHTARI ──────────────────────────────
+    // prelaunchMode true iken anonim ziyaretci karsilama ekrani gorur ve
+    // sayfaya <meta robots noindex> eklenir. Giris yapmis kullanicilar ve
+    // ?preview=<anahtar> ile gelenler etkilenmez. Deploy GEREKMEZ.
+    (function(){
+      var on = cfg.prelaunchMode === true;
+      var box = document.createElement('div');
+      box.style.cssText = 'border:1px solid ' + (on ? 'rgba(217,119,6,.35)' : 'rgba(22,163,74,.3)')
+        + ';background:' + (on ? 'rgba(217,119,6,.07)' : 'rgba(22,163,74,.06)')
+        + ';border-radius:10px;padding:14px 16px;margin-bottom:16px';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">'
+        + '<div style="flex:1;min-width:240px">'
+        +   '<div style="font-size:13.5px;font-weight:800;color:' + (on ? '#d97706' : '#16a34a') + '">'
+        +     (on ? '\uD83D\uDEA7 ' + _L('Pre-launch mode: ON','On-lansman modu: ACIK')
+                  : '\uD83C\uDF10 ' + _L('Site is LIVE','Site YAYINDA')) + '</div>'
+        +   '<div style="font-size:12px;color:var(--text-muted);margin-top:5px;line-height:1.55">'
+        +     (on ? _L('Anonymous visitors see the coming-soon page and the site is marked noindex. Signed-in users and ?preview= visitors see the real site.',
+                       'Anonim ziyaretciler karsilama ekranini gorur ve site noindex olarak isaretlenir. Giris yapmis kullanicilar ve ?preview= ile gelenler gercek siteyi gorur.')
+                  : _L('Everyone sees the real site and search engines can index it.',
+                       'Herkes gercek siteyi gorur ve arama motorlari indeksleyebilir.'))
+        +   '</div>'
+        +   '<div style="font-size:11.5px;color:var(--text-muted);margin-top:7px">'
+        +     _L('Preview link: ','Onizleme baglantisi: ')
+        +     '<code style="background:var(--bg-surface);padding:2px 6px;border-radius:4px">pochub.co/?preview=' + PRELAUNCH_KEY + '</code>'
+        +   '</div>'
+        + '</div>'
+        + '<button class="' + (on ? 'btn-p' : 'btn-g') + ' btn-sm" id="cfg-prelaunch">'
+        +   (on ? _L('Go live','Yayina Al') : _L('Enable pre-launch','On-lansmani Ac')) + '</button>'
+        + '</div>';
+      m.appendChild(box);
+      box.querySelector('#cfg-prelaunch').addEventListener('click', async function(){
+        var next = !on;
+        if (next && !confirm(_L('Enable pre-launch mode? Anonymous visitors will see the coming-soon page.',
+                                'On-lansman modu acilsin mi? Anonim ziyaretciler karsilama ekranini gorecek.'))) return;
+        if (!next && !confirm(_L('Go live? The site will be publicly visible and indexable.',
+                                 'Yayina alinsin mi? Site herkese gorunur ve indekslenebilir olacak.'))) return;
+        try {
+          await setDoc(doc(db,'pochub_config','system'), { prelaunchMode: next }, { merge:true });
+          showToast(next ? _L('Pre-launch mode ON','On-lansman modu ACIK') : _L('Site is now LIVE','Site YAYINDA'), 'ok');
+          admSettings(m);
+        } catch(e){ showToast(t('common.error_prefix','Hata: ') + ((e&&e.message)||''), 'err'); }
+      });
+    })();
 
     if (seeded) {
       var info = document.createElement('div');
