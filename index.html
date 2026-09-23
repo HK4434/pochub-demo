@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.67 | pochub.co -->
+<!-- PoCHub v9.68 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.67';
+const VERSION = 'v9.68';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.68': ['NOT-1 KAPANDI — users.read DARALTILDI (rules v1.9.7). Bu, v9.64 te baslayan isin kapanisi. Firestore ta alan bazli okuma kurali olmadigi icin role == vendor kosulu, vendor kullanici dokumaninin TAMAMINI anonim erisime aciyordu: vergi kimligi (taxNo, invoice alanlari), KVKK onay kaydi (consents, ipAtConsent, userAgentAtConsent — IP adresi dahil), ic moderasyon notlari (suspiciousSignup, rejectionReason) ve ticari durum. Artik bir kullanici dokumanini YALNIZ sahibi ve admin okuyabiliyor. Kural kapatilmadan once kalan TUM anonim okuma yollari tarandi (hem koleksiyon sorgulari hem TEK DOKUMAN okumalari) ve tasindi: (1) preloadVendorBadges — anasayfadan anonim cagriliyordu ve her uretici icin users dokumanini tek tek aciyordu; kural daraltildiginda ilk kirilacak yer burasiydi. (2) handleAuth referans slug cozumu — kayit akisi anonim. (3) vendReferrals liderlik listesi. (4) renderVendorPublic yedegi KORUMASIZ awaitti; daraltma sonrasi anonimde sayfayi tamamen patlatirdi, try icine alindi. ROZET NOTU: hasActiveSubscription aynaya BILEREK alinmadi — bir ureticinin para odeyip odemedigi herkese acik bilgi degil. Rozet icin gereken tier zaten aynada ve ucretsiz olmayan tier aktif abonelik demek; hasActive tier den turetiliyor. SEED: uc yeni test — baska bir vendor kullanici dokumanini okuma REDDEDILMELI, vendor_public aynasi okunabilmeli (pozitif kontrol; ayna kapaliysa anonim ziyaretci hicbir uretici goremez), aynaya email/taxNo gibi hassas alan yazma REDDEDILMELI. GERI ALMA: anonim ziyaretcide uretici gorunmuyorsa once Admin > Veri Sagligi > Aynayi Olustur / Yenile calistirilmali; kural satiri gerekirse gecici olarak geri alinabilir (rules icinde not dusuldu). node --check MODULE SYNTAX OK.'],
   'v9.67': ['SAHIPSIZ KAYIT TEMIZLIGI (Hasan: test kayitlarini sil). v9.66 raporu 17 vendorId ve 115 kayit buldu. Kimlikler iki gruba ayriliyor: TEST_V_LOGO, TEST_V_HPE, vendor_fortinet gibi SEED tarafindan uydurulmus kimlikler (hic gercek hesaplari olmamis) ve yPqhhiGE9 ile baslayan uzun gercek Firebase UID leri (silinmis test hesaplari). (1) RAPOR DUZELTILDI: eskiden getActiveProducts() kullaniyordu, yani YALNIZ aktif urunleri sayiyordu; taslak ve pasif sahipsiz kayitlar gorunmuyordu. Temizlik yapilacaksa tam sayim sart — artik products ve public_events koleksiyonlari tam okunuyor. (2) TEMIZLIK ARACI: her satirda Sil dugmesi (o vendorId nin tum urun ve etkinlikleri) ve ustte Tumunu sil. Toplu silme YAZILI ONAY istiyor (SIL yazilmadan calismaz) — yanlislikla tiklanmasi 115 kaydi goturur. Tek tek silmede normal onay. Silme sirasinda ilerleme sayaci gosteriliyor, bir kayit hata verse bile digerleri siliniyor ve basarisiz sayisi raporlaniyor. Sonunda urun onbellegi ve gunluk vitrin onbellegi tazeleniyor. (3) Akis sahte Firestore ile prova edildi: 3 basarili + 1 izin hatasi senaryosunda sayaclar, ilerleme gostergesi ve onbellek tazeleme dogru calisti. OTOMATIK SILME YOK ve OLMAYACAK — silme kalicidir, geri alinamaz. node --check MODULE SYNTAX OK.'],
   'v9.66': ['SAHIPSIZ KAYIT TARAMASI (v9.65 panelinin ortaya cikardigi durum). Panel yalniz BIR vendor kullanici oldugunu gosterdi (GITS TEKNOLOJI) — oysa katalogda Fortinet TR, HPE Turkiye, NetArmor ve Veeam TR urunleri duruyor ve onceki surumlerde bunlar vendor olarak listeleniyordu. Kod tarandi: users.role alanina vendor tipi yazan bir yer YOK (role alanina vendorType yazan tek eslesme brand_relations koleksiyonunda, farkli bir sey). Yani bu bir kod hatasi degil VERI durumu — hesaplar silinmis ya da Admin > Rol Yonetimi uzerinden rolleri degistirilmis olmali. SONUCLARI: urunler katalogda ama sahibi yok; vendor profil baglantilari kirik, PoC talepleri yonlendirilemiyor, one cikan hesabi o ureticileri hic gormuyor, ayna da dogal olarak bos kaliyor. Veri Sagligi na SAHIPSIZ KAYITLAR raporu eklendi: hangi vendorId degerleri urun/etkinlikte geciyor ama karsiliginda role=vendor kullanici yok, kayitlardaki uretici adi ve kac urun/etkinlik etkilendigi ile birlikte. Otomatik duzeltme YOK — silinen hesabi geri getirmek mi, urunu baska vendor a devretmek mi, admin karari. node --check MODULE SYNTAX OK.'],
   'v9.65': ['AYNA PANELI TESHIS EDILEBILIR HALE GETIRILDI (Hasan ekran goruntusu: 1 uretici aynada). SORUN: panel tek cumle basiyordu ve iki sayidan yalnizca birini gosteriyordu; 1 uretici aynada yazinca vendor kullanici sayisinin mi yoksa ayna sayisinin mi 1 oldugu AYIRT EDILEMIYORDU. Onceki ekranlarda logo barinda bes uretici gorulmustu, yani iki kaynak celisiyordu ve panel hangisinin dogru oldugunu soylemiyordu. (1) Artik UC sayi ayri gosteriliyor: vendor kullanici, aynada, eksik. (2) Eksikler ve aynada olup kullanicisi olmayan YETIM satirlar ADIYLA listeleniyor. (3) Hic vendor kullanici bulunamazsa panel bunu bir basari degil UYARI olarak gosteriyor ve vendor hesaplarinin farkli bir role degeriyle kayitli olabilecegini, panele guvenmeden once Admin > Kullanicilar ekranina bakilmasi gerektigini soyluyor — eski panel bu durumda sessizce yesil gorunebiliyordu. Panel uc senaryoda (bos, 1-1, 5-1) sahte veriyle calistirilip HTML denge kontrolu yapildi. node --check MODULE SYNTAX OK.'],
@@ -7126,10 +7127,11 @@ async function handleAuth() {
       var referredBySlug = null;
       if (referralData && referralData.slug) {
         try {
-          var rq = query(collection(db,'users'), where('slug','==',referralData.slug), where('role','==','vendor'), limit(1));
-          var rSnap = await getDocs(rq);
-          if (!rSnap.empty) {
-            referredByUid = rSnap.docs[0].id;
+          // v9.68: referans slug'i AYNADAN cozuluyor (kayit akisi anonim)
+          var _refHit = (await getVendorsPublic()).find(function(v){ return v.slug === referralData.slug; });
+          var rSnap = _refHit ? null : await getDocs(query(collection(db,'users'), where('slug','==',referralData.slug), where('role','==','vendor'), limit(1)));
+          if (_refHit || (rSnap && !rSnap.empty)) {
+            referredByUid = _refHit ? _refHit.id : rSnap.docs[0].id;
             referredBySlug = referralData.slug;
           }
         } catch(e) {}
@@ -24516,9 +24518,9 @@ async function vendReferrals(m) {
     var myRank = null;
     var topAhead = []; // benden üstte olanlar (max 3)
     try {
-      var allVSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor'), limit(100)));
-      var allVendors = allVSnap.docs
-        .map(function(d){ return { ...d.data(), uid:d.id }; })
+      // v9.68: ayna (vendorReferralCount ayna alan listesinde)
+      var allVendors = (await getVendorsPublic())
+        .map(function(v){ return { ...v, uid:v.id }; })
         .filter(function(v){ return (v.vendorReferralCount || 0) > 0; })
         .sort(function(a, b){ return (b.vendorReferralCount || 0) - (a.vendorReferralCount || 0); });
 
@@ -33530,12 +33532,28 @@ async function preloadVendorBadges(vendorIds) {
 
   // v5.35: Sadece users dokumanindan tier oku (vendor_subscriptions private).
   // users.subscriptionTier ve users.hasActiveSubscription zaten signup'ta set.
+  // v9.68: rozetler artik AYNADAN okunuyor. Bu fonksiyon anasayfadan
+  // ANONIM ziyaretci icin cagriliyordu ve her vendor icin users dokumanini
+  // tek tek aciyordu — users.read daraltildiginda ilk kirilacak yer burasi.
+  // Ayna tier, hasActiveSubscription karsiligi ve vendorStatus tasiyor.
+  var _vpAll68 = [];
+  try { _vpAll68 = await getVendorsPublic(); } catch(e){}
+  var _vpById68 = {}; _vpAll68.forEach(function(v){ _vpById68[v.id] = v; });
+
   await Promise.all(toFetch.map(async function(id){
     try {
-      var userSnap = await getDoc(doc(db, 'users', id));
-      var user = userSnap.exists() ? userSnap.data() : null;
+      var user = _vpById68[id] || null;
+      if (!user) {
+        // Aynada yoksa eski yola dus (admin veya gecis donemi). Anonimde
+        // reddedilirse catch yakalar ve rozet varsayilanina duser.
+        var userSnap = await getDoc(doc(db, 'users', id));
+        user = userSnap.exists() ? userSnap.data() : null;
+      }
       var tier = user?.subscriptionTier || 'free';
-      var hasActive = user?.hasActiveSubscription === true;
+      // v9.68: hasActiveSubscription aynaya BILEREK alinmadi — bir ureticinin
+      // para odeyip odemedigi herkese acik bilgi degil. Rozet icin gereken
+      // sey zaten tier; ucretsiz olmayan tier aktif abonelik demektir.
+      var hasActive = (user?.hasActiveSubscription === true) || (!!tier && tier !== 'free');
       window._vendorBadgeCache[id] = {
         tier: tier,
         status: hasActive ? 'active' : 'no_subscription',
@@ -69726,7 +69744,13 @@ async function renderVendorPublic(slug) {
     // Slug ile vendor'ı bul
     // v9.64: once ayna, bulunamazsa users (gecis donemi)
     var _vpHit = (await getVendorsPublic()).find(function(v){ return v.slug === slug; });
-    var snap = _vpHit ? null : await getDocs(query(collection(db,'users'), where('slug','==',slug), where('role','==','vendor'), limit(1)));
+    // v9.68: users.read daraltildiginda bu yedek anonimde REDDEDILIR;
+    // korumasiz birakilirsa sayfa tamamen patlar. Ayna zaten kapsiyor.
+    var snap = null;
+    if (!_vpHit) {
+      try { snap = await getDocs(query(collection(db,'users'), where('slug','==',slug), where('role','==','vendor'), limit(1))); }
+      catch(e){ snap = null; }
+    }
     if (!_vpHit && (!snap || snap.empty)) {
       scr.innerHTML =
         '<div style="max-width:600px;margin:60px auto;padding:40px;text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:14px">'
