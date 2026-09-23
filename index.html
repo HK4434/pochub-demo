@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.68 | pochub.co -->
+<!-- PoCHub v9.69 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.68';
+const VERSION = 'v9.69';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.69': ['TEMSILCISIZ TALEP — MUSTERI TARAFI KAPANDI. v9.51 de bu riski kendim yazmistim ve gecmistim: temsilcisi olmayan bir markaya talep acan musteri bekliyor ve ne olacagini bilmiyor. Panelde durum yalnizca Bekliyor diyordu — temsilcisi OLAN bir markayi bekleyen taleple AYNI gorunuyordu. Sessizlik talep-once modelinin en kirilgan yeri: bir kez cevapsiz kalan musteri geri gelmiyor. (1) IZ KAYIT ANINDA: unmatchedBrand alani talep olusturulurken yaziliyor. Guncelleme ile degil, cunku musteri poc_requests i GUNCELLEYEMEZ (kural: update yalniz admin); ayrica talebin acildigi andaki durum tarihsel olarak saklanmali. (2) MUSTERI KARTI: temsilcisiz bekleyen talepte aciklayici blok — markanin temsilcisi olmadigi, talebin markaya iletildigi, sonucun garanti olmadigi ve her durumda bilgi verilecegi yaziyor. SURE TAAHHUDU YOK; veremeyecegimiz soz guveni tersine cevirir. (3) YANILTICI MESAJLAR KALDIRILDI: aksiyon listesi bu taleplerde 3+ gundur yanitsiz — vendor i hatirlat! diyordu, oysa hatirlatilacak vendor YOK. Kirmizi gun bekliyor rozeti de cevap vermeyen bir vendor varmis izlenimi veriyordu; ikisi de temsilcisiz talepte devre disi. (4) ADMIN HALKASI: Temsilcisiz marka talebi raporuna Ulasildi isaretle dugmesi. O markanin BEKLEYEN tum taleplerini isaretliyor ve her musteriye bildirim gonderiyor; musteri kartinda durum Markaya ulasildi — yanit bekleniyor olarak degisiyor. Boylece admin in telefon acmasi musteri tarafinda gorunur hale geliyor. node --check MODULE SYNTAX OK.'],
   'v9.68': ['NOT-1 KAPANDI — users.read DARALTILDI (rules v1.9.7). Bu, v9.64 te baslayan isin kapanisi. Firestore ta alan bazli okuma kurali olmadigi icin role == vendor kosulu, vendor kullanici dokumaninin TAMAMINI anonim erisime aciyordu: vergi kimligi (taxNo, invoice alanlari), KVKK onay kaydi (consents, ipAtConsent, userAgentAtConsent — IP adresi dahil), ic moderasyon notlari (suspiciousSignup, rejectionReason) ve ticari durum. Artik bir kullanici dokumanini YALNIZ sahibi ve admin okuyabiliyor. Kural kapatilmadan once kalan TUM anonim okuma yollari tarandi (hem koleksiyon sorgulari hem TEK DOKUMAN okumalari) ve tasindi: (1) preloadVendorBadges — anasayfadan anonim cagriliyordu ve her uretici icin users dokumanini tek tek aciyordu; kural daraltildiginda ilk kirilacak yer burasiydi. (2) handleAuth referans slug cozumu — kayit akisi anonim. (3) vendReferrals liderlik listesi. (4) renderVendorPublic yedegi KORUMASIZ awaitti; daraltma sonrasi anonimde sayfayi tamamen patlatirdi, try icine alindi. ROZET NOTU: hasActiveSubscription aynaya BILEREK alinmadi — bir ureticinin para odeyip odemedigi herkese acik bilgi degil. Rozet icin gereken tier zaten aynada ve ucretsiz olmayan tier aktif abonelik demek; hasActive tier den turetiliyor. SEED: uc yeni test — baska bir vendor kullanici dokumanini okuma REDDEDILMELI, vendor_public aynasi okunabilmeli (pozitif kontrol; ayna kapaliysa anonim ziyaretci hicbir uretici goremez), aynaya email/taxNo gibi hassas alan yazma REDDEDILMELI. GERI ALMA: anonim ziyaretcide uretici gorunmuyorsa once Admin > Veri Sagligi > Aynayi Olustur / Yenile calistirilmali; kural satiri gerekirse gecici olarak geri alinabilir (rules icinde not dusuldu). node --check MODULE SYNTAX OK.'],
   'v9.67': ['SAHIPSIZ KAYIT TEMIZLIGI (Hasan: test kayitlarini sil). v9.66 raporu 17 vendorId ve 115 kayit buldu. Kimlikler iki gruba ayriliyor: TEST_V_LOGO, TEST_V_HPE, vendor_fortinet gibi SEED tarafindan uydurulmus kimlikler (hic gercek hesaplari olmamis) ve yPqhhiGE9 ile baslayan uzun gercek Firebase UID leri (silinmis test hesaplari). (1) RAPOR DUZELTILDI: eskiden getActiveProducts() kullaniyordu, yani YALNIZ aktif urunleri sayiyordu; taslak ve pasif sahipsiz kayitlar gorunmuyordu. Temizlik yapilacaksa tam sayim sart — artik products ve public_events koleksiyonlari tam okunuyor. (2) TEMIZLIK ARACI: her satirda Sil dugmesi (o vendorId nin tum urun ve etkinlikleri) ve ustte Tumunu sil. Toplu silme YAZILI ONAY istiyor (SIL yazilmadan calismaz) — yanlislikla tiklanmasi 115 kaydi goturur. Tek tek silmede normal onay. Silme sirasinda ilerleme sayaci gosteriliyor, bir kayit hata verse bile digerleri siliniyor ve basarisiz sayisi raporlaniyor. Sonunda urun onbellegi ve gunluk vitrin onbellegi tazeleniyor. (3) Akis sahte Firestore ile prova edildi: 3 basarili + 1 izin hatasi senaryosunda sayaclar, ilerleme gostergesi ve onbellek tazeleme dogru calisti. OTOMATIK SILME YOK ve OLMAYACAK — silme kalicidir, geri alinamaz. node --check MODULE SYNTAX OK.'],
   'v9.66': ['SAHIPSIZ KAYIT TARAMASI (v9.65 panelinin ortaya cikardigi durum). Panel yalniz BIR vendor kullanici oldugunu gosterdi (GITS TEKNOLOJI) — oysa katalogda Fortinet TR, HPE Turkiye, NetArmor ve Veeam TR urunleri duruyor ve onceki surumlerde bunlar vendor olarak listeleniyordu. Kod tarandi: users.role alanina vendor tipi yazan bir yer YOK (role alanina vendorType yazan tek eslesme brand_relations koleksiyonunda, farkli bir sey). Yani bu bir kod hatasi degil VERI durumu — hesaplar silinmis ya da Admin > Rol Yonetimi uzerinden rolleri degistirilmis olmali. SONUCLARI: urunler katalogda ama sahibi yok; vendor profil baglantilari kirik, PoC talepleri yonlendirilemiyor, one cikan hesabi o ureticileri hic gormuyor, ayna da dogal olarak bos kaliyor. Veri Sagligi na SAHIPSIZ KAYITLAR raporu eklendi: hangi vendorId degerleri urun/etkinlikte geciyor ama karsiliginda role=vendor kullanici yok, kayitlardaki uretici adi ve kac urun/etkinlik etkilendigi ile birlikte. Otomatik duzeltme YOK — silinen hesabi geri getirmek mi, urunu baska vendor a devretmek mi, admin karari. node --check MODULE SYNTAX OK.'],
@@ -13060,6 +13061,11 @@ function openCustomPoCModal(prefill) {   // v8.99: {name, brand, category} ön-d
     var btn = modal.querySelector('#cpoc-submit');
     btn.disabled = true; btn.textContent = t('poc.sending','Gönderiliyor...');
     try {
+      // v9.69: marka temsilcilik durumu KAYITTAN ONCE hesaplanir
+      var _bn69 = (typeof _normBrand==='function' ? _normBrand(vendorName||'') : '');
+      var _noRep69 = false;
+      try { await getBrandRepMap(); _noRep69 = !!(_bn69 && !_brandHasRep(_bn69)); } catch(_r69){}
+
       await addDoc(collection(db,'poc_requests'), {
         customerId:      CUR_USER.uid,
         customerEmail:   CUR_USER.email,
@@ -13074,7 +13080,14 @@ function openCustomPoCModal(prefill) {   // v8.99: {name, brand, category} ön-d
         location:        location,
         status:          'pending',
         isCustomProduct: true,
-        brandNorm:       (typeof _normBrand==='function' ? _normBrand(vendorName||'') : ''),   // v8.99: marka yönlendirme izi
+        brandNorm:       _bn69,                                                    // v8.99: marka yönlendirme izi
+        // v9.69: TEMSILCISIZ IZI. Musteri panelinde durum "Bekliyor" olarak
+        // goruruyordu ve temsilcisi OLAN bir markayi bekleyen taleple AYNI
+        // gorunuyordu — musteri arada fark oldugunu bilmiyordu. Iz kayit
+        // aninda birakiliyor cunku musteri poc_requests'i GUNCELLEYEMEZ
+        // (kural: update yalniz admin) ve talebin acildigi andaki durum
+        // tarihsel olarak saklanmali.
+        unmatchedBrand:  _noRep69,
         createdAt:       serverTimestamp(),
       });
 
@@ -13087,9 +13100,8 @@ function openCustomPoCModal(prefill) {   // v8.99: {name, brand, category} ön-d
       // Bildirim basarisiz olsa bile PoC talebi gecerli kalir (sessiz yutma
       // degil — asil kayit zaten yazildi, bu ek bir is akisi tetikleyicisi).
       try {
-        var _bn51 = (typeof _normBrand==='function' ? _normBrand(vendorName||'') : '');
-        await getBrandRepMap();
-        if (_bn51 && !_brandHasRep(_bn51)) {
+        var _bn51 = _bn69;   // v9.69: yukarida hesaplandi
+        if (_noRep69) {
           await addDoc(collection(db,'admin_inbox'), {
             type: 'unmatched_poc',
             title: '🔔 Temsilcisiz marka talebi: ' + String(vendorName||'—').substring(0,120),
@@ -14652,7 +14664,16 @@ async function loadCustTab() {
     reqs.forEach(function(r){
       if (r.status === 'pending') {
         var ageHr = r.createdAt?.seconds ? (nowMsRq - r.createdAt.seconds*1000)/3600000 : 0;
-        if (ageHr >= 72) {
+        // v9.69: temsilcisiz markada HATIRLATILACAK VENDOR YOK. Eski mesaj
+        // ("vendor'i hatirlat!") musteriye var olmayan bir muhatap gosteriyordu.
+        if (r.unmatchedBrand === true) {
+          if (ageHr >= 24) {
+            actionReqs.push({ r:r, priority:2,
+              reason: r.brandOutreachAt
+                ? t('cust.act_brand_reached','Markaya ulaşıldı — yanıt bekleniyor')
+                : t('cust.act_brand_pending','Bu markanın platformda temsilcisi yok; talebiniz markaya iletiliyor') });
+          }
+        } else if (ageHr >= 72) {
           actionReqs.push({r:r, reason:t('cust.act_unanswered_3d',"3+ gündür yanıtsız — vendor'ı hatırlat!"), priority:1});
         } else if (ageHr >= 24) {
           actionReqs.push({r:r, reason:Math.round(ageHr)+' '+t('cust.hours_unanswered','saattir yanıtsız'), priority:2});
@@ -14924,6 +14945,29 @@ async function loadCustTab() {
         var sl = rStL[r.status] || r.status;
         var ds = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString(LDATE()) : '--';
 
+        // ══ v9.69: TEMSILCISIZ MARKA — MUSTERIYE NE OLDUGUNU SOYLE ═════
+        // Eskiden bu talep de sadece "Bekliyor" yaziyordu; musteri, mevcut
+        // bir vendor'i bekleyen taleple arasindaki farki goremiyordu.
+        // Sessizlik, talep-once modelinin en kirilgan yeri: bir kez cevapsiz
+        // kalan musteri geri gelmiyor.
+        // SURE TAAHHUDU VERILMIYOR — veremeyecegimiz soz guveni tersine cevirir.
+        var unmatchedNote = '';
+        if (r.unmatchedBrand === true && r.status === 'pending') {
+          var reached = !!r.brandOutreachAt;
+          unmatchedNote =
+            '<div style="margin-top:9px;padding:9px 11px;border-radius:8px;line-height:1.55;'
+            + 'background:' + (reached ? 'rgba(37,99,235,.06)' : 'rgba(180,83,9,.06)') + ';'
+            + 'border:1px solid ' + (reached ? 'rgba(37,99,235,.2)' : 'rgba(180,83,9,.2)') + '">'
+            + '<div style="font-size:12px;font-weight:700;color:' + (reached ? '#2563eb' : '#b45309') + '">'
+            +   (reached ? '📨 ' + t('creq.um_reached_t','Markaya ulaşıldı')
+                         : '🔎 ' + t('creq.um_pending_t','Bu markanın platformda temsilcisi yok'))
+            + '</div>'
+            + '<div style="font-size:11.5px;color:var(--text-secondary);margin-top:3px">'
+            +   (reached ? t('creq.um_reached_d','Talebiniz markaya iletildi ve yanıt bekleniyor. Marka bir temsilci atadığında PoC süreci başlar.')
+                         : t('creq.um_pending_d','Talebinizi markayı temsil edebilecek üreticilere iletiyoruz. Bu süreç birkaç gün sürebilir; sonuç garanti değildir ve her durumda size bilgi verilir.'))
+            + '</div></div>';
+        }
+
         // ── v4.58: Bekleme süresi + performans rozeti + vendor güvenilirlik ──
         var perfBadgeRq = '';
         var waitBadge = '';
@@ -14932,7 +14976,12 @@ async function loadCustTab() {
         // Pending'de bekleme süresi
         if (r.status === 'pending' && r.createdAt?.seconds) {
           var ageHr3 = (nowMsRq - r.createdAt.seconds*1000)/3600000;
-          if (ageHr3 >= 72) {
+          // v9.69: temsilcisiz talepte kirmizi "gun bekliyor" rozeti,
+          // cevap vermeyen bir vendor varmis izlenimi veriyor. Aciklama
+          // blogu zaten durumu anlatiyor.
+          if (r.unmatchedBrand === true) {
+            waitBadge = '';
+          } else if (ageHr3 >= 72) {
             waitBadge = '<div class="tier-badge bg-red-pad-mt4">⏰ '+Math.round(ageHr3/24)+' '+t('cust.days_waiting','gün bekliyor')+'</div>';
             perfBadgeRq = ' <span class="stat-badge-sm" style="background:rgba(15,23,42,.04);color:var(--text-muted)" title="'+t('creq.no_response_title','Vendor yanıt vermedi')+'">💤 '+t('cf.unanswered','Yanıtsız')+'</span>';
           } else if (ageHr3 >= 24) {
@@ -15005,6 +15054,7 @@ async function loadCustTab() {
           +     '<div class="txt-muted-12-mt2">'+(r.vendorName?'<strong>'+r.vendorName+'</strong>':'—')+sentAgoR+'</div>'
           +     waitBadge
           +     vendorTrustHint
+          +     unmatchedNote          /* v9.69 */
           +   '</div>'
           + '</div>'
           + '<span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;color:'+sc+';background:'+sc+'18;flex-shrink:0">'+sl+'</span>'
@@ -31347,6 +31397,7 @@ async function _unmatchedDemandHtml(){
       +   '<th style="padding:6px 8px">' + _L('Distinct customers','Farklı müşteri') + '</th>'
       +   '<th style="padding:6px 8px">' + _L('Categories','Kategoriler') + '</th>'
       +   '<th style="padding:6px 8px">' + _L('Last','Son') + '</th>'
+      +   '<th style="padding:6px 8px"></th>'
       + '</tr></thead><tbody>';
     rows.slice(0,40).forEach(function(r){
       var cats = Object.keys(r.cats).sort(function(a,b){ return r.cats[b]-r.cats[a]; }).slice(0,3).join(', ');
@@ -31356,6 +31407,7 @@ async function _unmatchedDemandHtml(){
         + '<td style="padding:7px 8px">' + r.uniq + '</td>'
         + '<td style="padding:7px 8px;color:var(--text-muted)">' + escHtml(cats) + '</td>'
         + '<td style="padding:7px 8px;color:var(--text-muted);white-space:nowrap">' + (r.last ? r.last.toLocaleDateString('tr-TR') : '—') + '</td>'
+        + '<td style="padding:7px 8px"><button class="btn-g btn-sm dem-reach" data-bn="' + escHtml(r.key) + '" data-nm="' + escHtml(r.brand) + '" style="font-size:11px;white-space:nowrap">' + _L('Mark as contacted','Ulaşıldı işaretle') + '</button></td>'
         + '</tr>';
     });
     return h + '</tbody></table></div></div>';
@@ -31769,6 +31821,45 @@ async function admDataHealth(m) {
                        + (await _dailyFeaturedPanelHtml())
                        + (await _unmatchedDemandHtml()) + (await _tagScanHtml())
                        + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.64
+    // ══ v9.69: MARKAYA ULASILDI ISARETI ═════════════════════════════
+    // Musteri panelinde temsilcisiz talep "markaya iletiliyor" diyordu ama
+    // o durum hic degismiyordu — admin ureticiyi arasa bile musteri bunu
+    // goremiyordu. Bu dugme o markanin BEKLEYEN tum taleplerini isaretler
+    // ve her musteriye bildirim gonderir. Sure taahhudu YOK, yalniz durum.
+    _cidxBox.querySelectorAll('.dem-reach').forEach(function(b){
+      b.addEventListener('click', async function(){
+        var bn = b.dataset.bn, nm = b.dataset.nm || bn;
+        if(!confirm(_L('Mark all pending requests for this brand as contacted?\n\n','Bu markanın bekleyen tüm talepleri "markaya ulaşıldı" olarak işaretlensin mi?\n\n') + nm)) return;
+        b.disabled = true; var o = b.textContent;
+        try {
+          var snap = await getDocs(query(collection(db,'poc_requests'), where('brandNorm','==',bn), limit(500)));
+          var n = 0;
+          for (const d of snap.docs) {
+            var r = d.data() || {};
+            if (r.status !== 'pending' || r.brandOutreachAt) continue;
+            b.textContent = _L('Updating ','Güncelleniyor ') + (n+1);
+            try {
+              await updateDoc(doc(db,'poc_requests', d.id), { brandOutreachAt: serverTimestamp(), brandOutreachBy: CUR_USER.uid });
+              if (r.customerId) {
+                await addDoc(collection(db,'notifications'), {
+                  userId: r.customerId, type: 'poc_brand_outreach',
+                  title: _L('Your request has been passed to the brand','Talebiniz markaya iletildi'),
+                  message: String(nm).substring(0,120) + ' — ' + String(r.productName || r.title || '').substring(0,160),
+                  relatedId: d.id, read: false, createdAt: serverTimestamp()
+                });
+              }
+              n++;
+            } catch(e){ console.warn('[v9.69] talep isaretlenemedi', d.id, e && e.message); }
+          }
+          showToast(n + ' ' + _L('request marked','talep işaretlendi'), 'ok');
+          admDataHealth(m);
+        } catch(e){
+          b.disabled = false; b.textContent = o;
+          showToast(t('common.error_prefix','Hata: ') + ((e&&e.message)||''), 'err');
+        }
+      });
+    });
+
     // v9.67: sahipsiz kayit temizligi — tek satir veya tumu
     _cidxBox.querySelectorAll('.orph-del').forEach(function(b){
       b.addEventListener('click', async function(){
@@ -36945,6 +37036,12 @@ const I18N_DICT = {
     'aev.approved': 'Etkinlik yayınlandı.',
     'aev.reject_confirm': 'Etkinlik reddedilsin mi?',
     'aev.rejected': 'Etkinlik reddedildi.',
+    'creq.um_pending_t':   'Bu markanın platformda temsilcisi yok',
+    'creq.um_pending_d':   'Talebinizi markayı temsil edebilecek üreticilere iletiyoruz. Bu süreç birkaç gün sürebilir; sonuç garanti değildir ve her durumda size bilgi verilir.',
+    'creq.um_reached_t':   'Markaya ulaşıldı',
+    'creq.um_reached_d':   'Talebiniz markaya iletildi ve yanıt bekleniyor. Marka bir temsilci atadığında PoC süreci başlar.',
+    'cust.act_brand_pending': 'Bu markanın platformda temsilcisi yok; talebiniz markaya iletiliyor',
+    'cust.act_brand_reached': 'Markaya ulaşıldı — yanıt bekleniyor',
     'ev.tab_tba':          '🗓️ Tarihi Belirsiz',
     'ev.add_cal':          'Takvime ekle',
     'ev.join_link':        'Katılım bağlantısı',
@@ -39834,6 +39931,12 @@ const I18N_DICT = {
     'aev.approved': 'Event published.',
     'aev.reject_confirm': 'Reject this event?',
     'aev.rejected': 'Event rejected.',
+    'creq.um_pending_t':   'This brand has no representative on the platform',
+    'creq.um_pending_d':   'We are passing your request to vendors who could represent this brand. It may take a few days; the outcome is not guaranteed and we will let you know either way.',
+    'creq.um_reached_t':   'The brand has been contacted',
+    'creq.um_reached_d':   'Your request has been passed to the brand and we are awaiting their reply. Once they appoint a representative the PoC process starts.',
+    'cust.act_brand_pending': 'This brand has no representative yet; your request is being passed to them',
+    'cust.act_brand_reached': 'Brand contacted — awaiting reply',
     'ev.tab_tba':          '🗓️ Date TBA',
     'ev.add_cal':          'Add to calendar',
     'ev.join_link':        'Join link',
