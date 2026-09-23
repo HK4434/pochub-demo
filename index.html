@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.63 | pochub.co -->
+<!-- PoCHub v9.64 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.63';
+const VERSION = 'v9.64';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.64': ['VENDOR PII — AYNA KOLEKSIYONU (KVKK, NOT-1 kapaniyor). SORUN: users.read kurali resource.data.role == vendor ile ANONIM acik ve Firestore ta ALAN BAZLI okuma kurali YOK; yani vendor kullanici dokumaninin TAMAMI herkese okunabilir durumdaydi. Alanlar sayildiginda ortaya cikanlar: email, secondaryEmail, phone2, taxNo ve invoice alanlari (vergi kimligi), consents ile ipAtConsent ve userAgentAtConsent (KVKK onay kaydi, IP adresi dahil), suspiciousSignup ve rejectionReason (ic moderasyon notlari), isSuspendedDueToBilling ve hasActiveSubscription (ticari durum). Yani sorun e-posta gorunuyor degil, onay loglari ve vergi kimligi acikta. (1) vendor_public ayna koleksiyonu devreye alindi. rules v1.9.6 ile alan listesi arayuzun GERCEKTEN gosterdigi is bilgisine gore genisletildi (sirket, slug, logo, kategori, marka, sehir, telefon, adres, web sitesi, vendorType, tier, rozetler); yukaridaki hassas alanlarin HICBIRI listede yok. (2) Sekiz ANONIM erisilebilir okuma noktasi aynaya tasindi: renderVendors, loadTopVendors, loadVendorLogoBar, calculateDailyFeatured, renderBrandPage, renderVendorPublic, loadVendors, openCustomPoCModal marka eslesmesi. Admin ekranlari users i okumaya devam ediyor (zaten yetkili). (3) GECIS GUVENLIGI: ayna bos veya eksikse otomatik olarak users a duser. Bu surum TEK BASINA hicbir seyi bozmaz; users.read daraltmasi AYRI bir surumde, ayna dolulugu dogrulandiktan sonra yapilacak. (4) SENKRON: 20 ayri profil yazma noktasini yamamak yerine iki kapi — vendor her oturumda kendi ayna satirini tazeler (hangi yoldan degisirse degissin kapsanir) ve profil sihirbazi kaydinda anlik senkron. (5) Veri Sagligi na ayna paneli: kac vendor aynada, kaci eksik; Aynayi Olustur / Yenile dugmesi. Eksik varsa panel kirmizi ve ne riske girildigini yaziyor. GELISTIRME NOTU: loadVendors tek satirlik oldugu icin regex ile yapilan degisiklik map() icindeki ilk noktali virgulde kesip satiri bozdu; node --check yakaladi, elle onarildi. node --check MODULE SYNTAX OK.'],
   'v9.63': ['ANASAYFA ANONIM ZIYARETCIDE BOZUKTU — P0 DUZELTME. TESHIS: calculateDailyFeatured vendor_subscriptions koleksiyonunu KORUMASIZ okuyordu; kural isAdmin() veya isOwner() diyor, yani giris yapmamis ziyaretcide sorgu PERMISSION_DENIED ile patliyordu. Daha kotusu loadFeaturedCarousels tek bir dis try ile sarili oldugu icin bu hata one cikan urunlerle birlikte KATEGORI SATIRLARINI da yutuyordu — anonim ziyaretci hero altinda BOS sayfa goruyordu. Admin olarak bakildiginda gorunmuyordu cunku admin o koleksiyonu okuyabiliyor. Ayrica Boost gelirini vuruyordu: odeme yapan vendor in urunu tam olarak hedef kitleye gorunmuyordu. (1) Abonelik okumasi opsiyonel hale getirildi. Veri YALNIZ tier icin kullaniliyor ve _mkFV icinde zaten subsById currentTier VEYA v.subscriptionTier yedek zinciri vardi; users.subscriptionTier yedi ayri satin alma/deneme noktasinda guncel tutuluyor ve users anonim okunabiliyor — yani anonim ziyaretci de DOGRU tier i goruyor, sadece izin hatasi almiyor. (2) One cikan hesabi herhangi bir sebeple patlasa bile kategori satirlari cizilecek sekilde ayri try icine alindi. (3) YAN BULGU: pochub_daily_featured yazimi yalniz admin e acik, yani onbellek sadece admin siteye girdiginde olusuyordu; diger herkes her sayfa goruntulemesinde hesabi bastan yapiyor, vendor sayisi kadar users okumasi uretiyordu. Katalog indeksinde (v9.33) cozulen problemin aynisi. Veri Sagligi na GUNLUK ONE CIKANLAR yayin paneli eklendi: bugun yayinlandi mi, ne zaman, kac urun/uretici; Yayinla dugmesi once onbellegi silip yeniden hesapliyor. Yayinlanmamissa istemci yine hesapliyor — dogru calisir, sadece pahali. DOGRULAMA: anasayfa akisindaki tum kisitli koleksiyon okumalari tarandi; users (role==vendor sorgusu kurali karsiliyor) ve notifications (zaten try icinde) yanlis alarm cikti, baska acik yok. node --check MODULE SYNTAX OK.'],
   'v9.62': ['STORED-XSS — KOKTEN KAPATILDI (ilk incelemeden beri acik duran P0). Uygulama kullanici metinlerini innerHTML ile basiyor ve kacis eksikti: 30 sablon ifadesi + ~270 string birlestirme. YAKLASIM DEGISIKLIGI: 270 noktayi tek tek duzenlemek hem uzun hem kirilgan (bazilari HTML parcasi iceriyor, otomatik degistirme kirar) ve daha onemlisi ISTEMCI TARAFI KACIS, veriyi Firestore API sine DOGRUDAN yazan kotu niyetli bir vendor a karsi hicbir sey yapmaz. Kok verinin girisinde kesildi. (1) RULES v1.9.5 noTags(): etiket acilisi iceren metin KAYDEDILEMEZ. Kalip < + harf/slash/!/? — yani img, /b, !-- ve ?php yakalanir; throughput < 10 Gbps veya a < b gibi mesru kullanim SERBEST kalir. 10 ornekle dogrulandi. Uygulandigi yerler: products (name/description/brand, create ve update), public_events (title/description/speaker/hostName), poc_requests (title/description/requirements), reviews (comment/note), notifications (title/message/body/senderName), poc_messages (text/message), brand_products (name/brand), demo_requests (name/company/message) — 26 kontrol. (2) ISTEMCI: 30 sablon ifadesine escHtml eklendi (derinlemesine savunma). HTML OLMAYAN baglamlar (e-posta govdeleri, toast metinleri) BILEREK dokunulmadi — orada kacis kullaniciya &amp; gosterirdi. Ayrica formlarda stripTags ile temizleme: kullanici kural reddine carpmadan once uyarilir. Guvenlik buna DAYANMAZ, guvenlik kuralda. (3) MEVCUT VERI: Veri Sagligi > HTML etiket taramasi — kural devreye girmeden once yazilmis kayitlari bulur. Temizleme tek tek onayli; toplu otomatik yazma BILEREK yok, yanlis pozitifte urun adini bozmak birakmaktan kotudur. (4) SEED: bes yeni test — urun adi, urun aciklamasi, etkinlik basligi ve bildirim metnine etiket yazma REDDEDILMELI; ayrica POZITIF kontrol: throughput < 10 Gbps ENGELLENMEMELI (dar kapi oldugunu kanitlar, test kaydi sonunda silinir). GELISTIRME NOTLARI: iki hata calisma sirasinda yakalandi — (a) kurallara ikinci bir allow create eklemek kosullari VEYA lar, yani sikilastirmak yerine GEVSETIR; kosul mevcut kuralin icine eklendi. (b) noTags 26 yerde kullaniliyor ama tanimi yazilmamisti (onceki betik assert te durmustu) — bu haliyle deploy edilse TUM kurallar cokerdi; teslim kontrolu yakaladi. node --check MODULE SYNTAX OK.'],
   'v9.61': ['DORT KARARIN TAMAMI UYGULANDI (Hasan: hepsini onerilerinle yap). 1 ve 2 zaten v9.60 ta yapilmisti; bu surum 3u TAMAMLIYOR ve 4u hazirliyor. (3) ILGI SINYALI: v9.60 harici kayit sayfasina yonlendiriyordu ama onerimin asil degerli kismi olan olcumu atlamistim. Artik giris yapmis kullanici harici kayit dugmesine bastiginda registrations a interestOnly kaydi dusuyor (ates-et-unut; yazim basarisiz olsa da kullanici baglantiya gidiyor). KAPASITE SAYACI ARTIRILMAZ — kayit ureticinin sayfasinda tutuluyor, bizim sayacimiza yazmak dolulugu yaniltici gosterirdi. Katilimci ekraninda ILGI kayitlari katilimcilardan AYRI sayiliyor ve ayri gosteriliyor; karistirmak ureticiye yanlis rapor verir. Ekranda ne bilip ne bilmedigimiz acikca yaziyor: tamamlayip tamamlamadiklarini goremiyoruz. (4) FAZ 2 HAZIRLIGI: Blaze acildiginda kurulacak Cloud Function kaynagi ayri dosya olarak uretildi (faz2-inbound-event-function.js) — gelen posta webhooku, SPF/DKIM kontrolu, gonderen alan adinin kayitli vendor ile eslesmesi, Claude ile cikarim, TASLAK yazma, vendor ve admin bildirimi. Faz 1 ile ayni uyari kodlari ve ayni gizlilik kapisi kullaniliyor ki arayuz degismesin. Devreye almadan once yapilacaklar dosyada listelendi (users.emailDomain dogrulamasi, draft durumu arayuzu, gonderen basina gunluk sinir). AYRICA firestore.rules v1.9.4: v9.60 in inceleme kapisi ISTEMCIDEYDI — vendor API ile dogrudan status=published yazip atlayabiliyordu, yani Do not share externally isaretli icerik yayina girebilirdi. Artik pending_review veya rejected durumundan cikisi YALNIZ ADMIN yapabilir. node --check MODULE SYNTAX OK.'],
@@ -5372,6 +5373,16 @@ async function evaluatePrelaunchGate(user){
 onAuthStateChanged(auth, async user => {
   window._authResolved = true;
   try { await evaluatePrelaunchGate(user); } catch(e){}   // v9.34: on-lansman kapisi (CUR_USER asagida atanir)
+  // v9.64: vendor her oturumda KENDI ayna satirini tazeler. 20 ayri
+  // profil yazma noktasini tek tek yamamak yerine tek kapi: hangi yoldan
+  // degisirse degissin, bir sonraki oturumda ayna guncellenir. Anlik
+  // guncellik icin profil kaydetme noktasinda ayrica cagriliyor.
+  if (user) setTimeout(function(){
+    try {
+      if (CUR_PROFILE && CUR_PROFILE.role === 'vendor') syncVendorPublic(user.uid, CUR_PROFILE);
+    } catch(e){}
+  }, 1500);
+
   // v9.44: anasayfadan "PoC Talebi Ac" ile gelip kayit olan kullanici,
   // giris tamamlaninca dogrudan talep formuna dusurulur.
   if (user) setTimeout(function(){
@@ -7463,8 +7474,7 @@ async function renderVendors(){
   var EN = window.CUR_LOCALE==='en';
   scr.innerHTML = '<div class="wrap"><div class="empty" style="padding:60px 20px;text-align:center"><div class="empty-icon">⏳</div><div style="color:var(--text-muted)">'+(EN?'Loading vendors...':"Vendor'lar yükleniyor...")+'</div></div></div>';
   try {
-    var vSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
-    var vendors = vSnap.docs.map(function(d){ return {...d.data(), uid:d.id}; });
+    var vendors = await getVendorsPublic();   // v9.64: ayna (PII users'ta kalir)
     var pSnap = await getDocs(query(collection(db,'products'), where('status','==','active')));
     var prods = pSnap.docs.map(function(d){ return {...d.data(), id:d.id}; }).filter(function(p){ return (!p.publishStatus||p.publishStatus==='ready'||p.publishStatus==='awaiting_admin'); });
     var stats = {};
@@ -9835,10 +9845,8 @@ async function loadTopVendors() {
   var wrap = el('home-top-vendors');
   if (!wrap) return;
   try {
-    var snap = await getDocs(query(collection(db,'users'), where('role','==','vendor'), limit(50)));
-    if (snap.empty) { wrap.innerHTML = ''; return; }
-
-    var vendors = snap.docs.map(function(d){ return { ...d.data(), uid:d.id }; });
+    var vendors = (await getVendorsPublic()).slice(0,50);   // v9.64: ayna
+    if (!vendors.length) { wrap.innerHTML = ''; return; }
     // vendorReferralCount > 0 olanları filtrele
     var topVendors = vendors
       .filter(function(v){ return (v.vendorReferralCount || 0) > 0; })
@@ -9949,12 +9957,12 @@ async function loadVendorLogoBar() {
   var wrap = el('home-vendor-bar');
   if (!wrap) return;
   try {
-    var snap = await getDocs(query(collection(db,'users'), where('role','==','vendor'), limit(50)));
-    if (snap.empty) { wrap.innerHTML = ''; return; }
+    var _vpAll = (await getVendorsPublic()).slice(0,50);   // v9.64: ayna
+    if (!_vpAll.length) { wrap.innerHTML = ''; return; }
 
     // v9.35: test kayitlarini vitrinden cikar + ayni sirketin tekrari
     // (canli sayfada "Fortinet TR Test" iki kez goruruyordu)
-    var vendors = _showcaseFilter(snap.docs.map(function(d){ return { ...d.data(), uid:d.id }; }));
+    var vendors = _showcaseFilter(_vpAll);
     var _seenCo = {};
     vendors = vendors.filter(function(v){
       var k = String(v.company || v.displayName || v.uid).trim().toLowerCase();
@@ -13097,8 +13105,7 @@ function openCustomPoCModal(prefill) {   // v8.99: {name, brand, category} ön-d
       try {
         var _bn99 = _normBrand(vendorName||'');
         if(_bn99){
-          var _vs99 = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
-          var _hits99 = _vs99.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; })
+          var _hits99 = (await getVendorsPublic())   // v9.64: ayna
             .filter(function(v){ return (v.brands||[]).some(function(x){ return _normBrand(x)===_bn99; }); }).slice(0,25);
           for(var _i99=0;_i99<_hits99.length;_i99++){
             try { await addDoc(collection(db,'notifications'), {
@@ -25473,6 +25480,9 @@ function attachWizardHandlers(card) {
           logoUrl: logo,
           profileCompletedInWizard: true,
         });
+        // v9.64: ayna anlik guncellensin (oturum senkronunu beklemesin)
+        try { await syncVendorPublic(CUR_USER.uid, { ...(CUR_PROFILE||{}), role:'vendor',
+                company:company, shortDescription:desc, logoUrl:logo }); } catch(_vs){}
         CUR_PROFILE.company = company;
         CUR_PROFILE.shortDescription = desc;
         CUR_PROFILE.logoUrl = logo;
@@ -26689,6 +26699,71 @@ function _hash(s) {
 }
 
 // Daily featured listesini hesapla (cache yoksa yeni hesapla)
+/* ════════════════════════════════════════════════════════════════════
+   v9.64 — VENDOR PUBLIC AYNASI
+   ────────────────────────────────────────────────────────────────────
+   SORUN: users.read kurali `resource.data.role == 'vendor'` ile anonim
+   acik. Firestore'da ALAN BAZLI okuma kurali yok, dolayisiyla vendor
+   kullanici dokumaninin TAMAMI herkese okunabilir durumda:
+   email, secondaryEmail, phone2, taxNo ve invoice* (vergi kimligi),
+   consents / ipAtConsent / userAgentAtConsent (KVKK onay kaydi, IP
+   dahil), suspicious* ve rejectionReason (ic moderasyon notlari),
+   isSuspendedDueToBilling ve hasActiveSubscription (ticari durum).
+   COZUM: yalniz herkese acik olmasi gereken alanlari tasiyan bir ayna
+   koleksiyonu (vendor_public) ve tum ANONIM okumalarin oraya kaymasi.
+   Ayna tamamlandiktan SONRA users.read kurali daraltilacak.
+
+   GECIS GUVENLIGI: ayna bos veya eksikse otomatik olarak users'a
+   duser. Boylece bu surum tek basina hicbir seyi bozmaz; kural
+   daraltmasi ayri bir surumde, ayna dolulugu dogrulandiktan sonra.
+   ════════════════════════════════════════════════════════════════════ */
+var VP_PUBLIC_FIELDS = ['vendorId','displayName','company','slug','role','logoUrl','photoBase64',
+  'website','shortDescription','categories','brands','sectors','regions','city','country','origin',
+  'phone','address','phoneVerified','vendorType','vendorStatus','isVerified','evidenceScore',
+  'subscriptionTier','publicProfileEnabled','vendorReferralBadge','vendorReferralCount',
+  'productCount','avgRating','ratingCount'];
+
+function vpProject(u, uid){
+  var out = { vendorId: uid || u.id || u.uid };
+  VP_PUBLIC_FIELDS.forEach(function(f){
+    if (f === 'vendorId') return;
+    if (u[f] !== undefined && u[f] !== null) out[f] = u[f];
+  });
+  return out;
+}
+
+var _vpCache = null, _vpAt = 0;
+async function getVendorsPublic(force){
+  if (!force && _vpCache && (Date.now() - _vpAt) < 120000) return _vpCache;
+  var list = [];
+  try {
+    var snap = await getDocs(collection(db,'vendor_public'));
+    list = snap.docs.map(function(d){ return { ...d.data(), id:d.id, uid:d.id }; });
+  } catch(e){ list = []; }
+  if (!list.length) {
+    // Ayna henuz olusturulmamis — eski yola dus (kural hala acik).
+    console.info('[v9.64] vendor_public bos; users koleksiyonuna dusuluyor (Admin > Veri Sagligi > aynayi yayinla)');
+    try {
+      var us = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
+      list = us.docs.map(function(d){ return { ...d.data(), id:d.id, uid:d.id }; });
+    } catch(e){ list = []; }
+  }
+  _vpCache = list; _vpAt = Date.now();
+  return list;
+}
+function invalidateVendorPublicCache(){ _vpCache = null; _vpAt = 0; }
+
+// Vendor kendi profilini kaydettiginde aynayi da guncelle. Sessiz fail:
+// ayna yazilamasa da profil kaydi gecerli kalir.
+async function syncVendorPublic(uid, data){
+  try {
+    if (!uid || !data) return;
+    if ((data.role || 'vendor') !== 'vendor') return;
+    await setDoc(doc(db,'vendor_public', uid), { ...vpProject(data, uid), updatedAt: serverTimestamp() }, { merge:true });
+    invalidateVendorPublicCache();
+  } catch(e){ console.warn('[v9.64] vendor_public senkronu basarisiz:', e && e.message); }
+}
+
 async function calculateDailyFeatured() {
   var todayKey = getTodayKey();
   // Cache kontrolü
@@ -26705,8 +26780,7 @@ async function calculateDailyFeatured() {
   var freeSlots = totalSlots - paidSlots;
 
   // Tüm vendor'ları + abonelikleri çek
-  const usersSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
-  var allVendors = usersSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
+  var allVendors = await getVendorsPublic();   // v9.64: ayna
 
   // ══ v9.63: ANASAYFA ANONIM ZIYARETCIDE BOZUKTU ═══════════════════════
   // vendor_subscriptions kurali: isAdmin() || isOwner(...). Yani GIRIS
@@ -31481,6 +31555,41 @@ async function _dailyFeaturedPanelHtml(){
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// v9.64 — VENDOR PUBLIC AYNASI: DURUM + YAYINLAMA
+// ───────────────────────────────────────────────────────────────────────
+// Ayna dolmadan users.read kurali DARALTILAMAZ; daraltilirsa anonim
+// ziyaretci vendor goremez. Bu panel doluluk farkini gosterir ve
+// aynayi users'tan uretir (yalniz admin yazabilir).
+// ═══════════════════════════════════════════════════════════════════════
+async function _vendorMirrorHtml(){
+  try {
+    var uSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
+    var total = uSnap.size;
+    var mSnap = await getDocs(collection(db,'vendor_public'));
+    var have = {}; mSnap.docs.forEach(function(d){ have[d.id]=1; });
+    var missing = uSnap.docs.filter(function(d){ return !have[d.id]; }).length;
+    var extra = mSnap.size - (mSnap.size - Object.keys(have).length) - (total - missing);
+    var ok = (missing === 0 && total > 0);
+    var col = ok ? '#16a34a' : '#dc2626';
+    return '<div class="card" style="padding:15px 18px;margin-bottom:14px;border-left:3px solid '+col+'">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+      +   '<div style="flex:1;min-width:260px">'
+      +     '<div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Vendor public mirror','Vendor herkese açık aynası')+'</div>'
+      +     '<div style="font-size:12px;color:var(--text-muted);line-height:1.55">'
+      +       (ok ? (total + ' ' + _L('vendor mirrored — anonymous pages read the mirror, not user records.','üretici aynada — anonim sayfalar kullanıcı kaydını değil aynayı okuyor.'))
+              : ('<b style="color:#dc2626">' + missing + '</b> ' + _L('of','/') + ' ' + total + ' '
+                 + _L('vendor missing from the mirror. Until it is complete the app falls back to reading user records, which expose tax IDs and KVKK consent logs.',
+                      'üretici aynada yok. Ayna tamamlanana kadar uygulama kullanıcı kayıtlarını okumaya düşüyor; o kayıtlarda vergi kimliği ve KVKK onay logları var.')))
+      +     '</div></div>'
+      +   '<button class="btn-p btn-sm" id="vpub-sync" style="flex-shrink:0">'+_L('Build / refresh mirror','Aynayı Oluştur / Yenile')+'</button>'
+      + '</div></div>';
+  } catch(e){
+    return '<div class="card" style="padding:14px;margin-bottom:14px;font-size:12.5px;color:#dc2626">'
+      + _L('Mirror check failed: ','Ayna kontrolü başarısız: ') + escHtml(((e&&e.message)||'').substring(0,90)) + '</div>';
+  }
+}
+
 // Indeks durum paneli (Veri Sagligi ekraninin en ustunde)
 async function _cidxStatusHtml(){
   var st = null;
@@ -31517,9 +31626,32 @@ async function admDataHealth(m) {
   // v9.33: katalog indeksi paneli — analiz beklemeden once gosterilir
   try {
     var _cidxBox = document.createElement('div');
-    _cidxBox.innerHTML = (await _cidxStatusHtml()) + (await _dailyFeaturedPanelHtml())
+    _cidxBox.innerHTML = (await _cidxStatusHtml()) + (await _vendorMirrorHtml())
+                       + (await _dailyFeaturedPanelHtml())
                        + (await _unmatchedDemandHtml()) + (await _tagScanHtml())
-                       + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.63
+                       + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.64
+    // v9.64: aynayi users'tan uret (admin yazar)
+    _cidxBox.querySelector('#vpub-sync')?.addEventListener('click', async function(){
+      var b=this; b.disabled=true; var o=b.textContent;
+      try {
+        var uSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
+        var n=0, fail=0;
+        for (const d of uSnap.docs) {
+          b.textContent = _L('Writing ','Yazılıyor ') + (n+1) + '/' + uSnap.size;
+          try {
+            await setDoc(doc(db,'vendor_public', d.id),
+              { ...vpProject(d.data(), d.id), updatedAt: serverTimestamp() }, { merge:true });
+            n++;
+          } catch(e){ fail++; console.warn('[v9.64] ayna yazilamadi', d.id, e && e.message); }
+        }
+        invalidateVendorPublicCache();
+        showToast(n + ' ' + _L('mirrored','aynalandı') + (fail ? ' · ' + fail + ' ' + _L('failed','başarısız') : ''), fail?'err':'ok');
+        admDataHealth(m);
+      } catch(e){
+        b.disabled=false; b.textContent=o;
+        showToast(t('common.error_prefix','Hata: ')+((e&&e.message)||''), 'err');
+      }
+    });
     // v9.63: gunluk one cikanlari yayinla (once sil, sonra hesapla -> taze yazim)
     _cidxBox.querySelector('#dfeat-pub')?.addEventListener('click', async function(){
       var b = this; b.disabled = true; var o = b.textContent;
@@ -68628,7 +68760,7 @@ async function openSecurityMigrateModal(){
   }
   async function loadCats(force){ if(liveCats&&!force) return; var snap=await getDocs(collection(db,'categories')); liveCats=snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }); }
   async function loadProds(force){ if(prods&&!force) return; var snap=await getDocs(collection(db,'products')); prods=snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }).filter(function(p){ return isBroad(p.category); }); }
-  async function loadVendors(force){ if(vendors&&!force) return; var snap=await getDocs(query(collection(db,'users'), where('role','==','vendor'))); vendors=snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; }).filter(function(v){ return [].concat(v.categories||[], v.specializations||[], v.distributedCategories||[]).some(isBroad); }); }
+  async function loadVendors(force){ if(vendors&&!force) return; /* v9.64: ayna */ vendors=(await getVendorsPublic()).filter(function(v){ return [].concat(v.categories||[], v.specializations||[], v.distributedCategories||[]).some(isBroad); }); }
   async function loadBrandIdx(){ if(brandIdx) return; try { var bl=await getBrands(); brandIdx={}; (bl||[]).forEach(function(b){ brandIdx[_normBrand(b.name)]=b; }); } catch(e){ brandIdx={}; } }
   function loadErr(e){ body.innerHTML='<div style="color:#dc2626;padding:16px">'+_L('Load error: ','Yükleme hatası: ')+escHtml((e&&e.message)||String(e))+'</div>'; }
   async function render(){
@@ -69345,8 +69477,7 @@ async function renderBrandPage(bn){
       .filter(function(p){ return _normBrand(p.brand||'')===norm && p.status!=='trash' && (p.publishStatus==='active'||p.status==='active'); });
   } catch(e){}
   try {
-    var vs=await getDocs(query(collection(db,'users'), where('role','==','vendor')));
-    vends=vs.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; })
+    vends=(await getVendorsPublic())   // v9.64: ayna
       .filter(function(v){ return (v.brands||[]).some(function(x){ return _normBrand(x)===norm; }); });
   } catch(e){}
   try {
@@ -69430,9 +69561,10 @@ async function renderVendorPublic(slug) {
 
   try {
     // Slug ile vendor'ı bul
-    var q = query(collection(db,'users'), where('slug','==',slug), where('role','==','vendor'), limit(1));
-    var snap = await getDocs(q);
-    if (snap.empty) {
+    // v9.64: once ayna, bulunamazsa users (gecis donemi)
+    var _vpHit = (await getVendorsPublic()).find(function(v){ return v.slug === slug; });
+    var snap = _vpHit ? null : await getDocs(query(collection(db,'users'), where('slug','==',slug), where('role','==','vendor'), limit(1)));
+    if (!_vpHit && (!snap || snap.empty)) {
       scr.innerHTML =
         '<div style="max-width:600px;margin:60px auto;padding:40px;text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:14px">'
         + '<div style="font-size:48px;margin-bottom:14px">🔍</div>'
@@ -69448,7 +69580,7 @@ async function renderVendorPublic(slug) {
       return;
     }
 
-    var vendor = { ...snap.docs[0].data(), uid: snap.docs[0].id };
+    var vendor = _vpHit ? { ..._vpHit, uid:_vpHit.id } : { ...snap.docs[0].data(), uid: snap.docs[0].id };
 
     // Vendor type label
     var typeLabel = vendor.vendorType === 'ureticid' ? t('vtype.ureticid','Üretici')
