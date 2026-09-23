@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.69 | pochub.co -->
+<!-- PoCHub v9.70 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.69';
+const VERSION = 'v9.70';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.70': ['SESSIZ YUTULAN HATA (Hasan ekran goruntusu: 0 urun yeniden hesaplandi, 1 basarisiz). Kanit agregasi yeniden hesaplamasinda hata yakalama satiri catch(e){ fail++; } seklindeydi — sebep ne konsola ne ekrana yaziliyordu. Panel sadece 1 basarisiz diyor, NEDEN oldugunu soylemiyordu. TESHIS: v9.67 de sahipsiz urunler silindi, onlara ait review kayitlari kaldi; updateDoc var olmayan bir dokumana yazamaz ve hata firlatir. (1) SESSIZ YUTMA KALDIRILDI: her basarisizlik icin hata kodu/mesaji konsola yaziliyor ve ilk bes tanesi ekranda urun kimligi ile gosteriliyor. (2) ON KONTROL: hesaplamadan once urun varligi kontrol ediliyor; silinmis urune ait review lar ayri sayiliyor ve Bu review lar silinmis bir urune ait — bu yuzden hesaplanamiyor diye raporlaniyor. Boylece hatasiz calisiyor ve durum aciklaniyor. (3) TEMIZLEME: o review lari silen dugme (admin, onayli, ilerleme sayacli). rules reviews delete yalniz admin — uygun. DERS: bu oturumda yakalanan ucuncu sessiz hata sinifi. node --check ve silme kazasi dedektoru sozdizimi ve kayip tanim yakaliyor ama YUTULAN CALISMA ANI HATASINI yakalayamaz; tek savunma bos catch blogu birakmamak. node --check MODULE SYNTAX OK.'],
   'v9.69': ['TEMSILCISIZ TALEP — MUSTERI TARAFI KAPANDI. v9.51 de bu riski kendim yazmistim ve gecmistim: temsilcisi olmayan bir markaya talep acan musteri bekliyor ve ne olacagini bilmiyor. Panelde durum yalnizca Bekliyor diyordu — temsilcisi OLAN bir markayi bekleyen taleple AYNI gorunuyordu. Sessizlik talep-once modelinin en kirilgan yeri: bir kez cevapsiz kalan musteri geri gelmiyor. (1) IZ KAYIT ANINDA: unmatchedBrand alani talep olusturulurken yaziliyor. Guncelleme ile degil, cunku musteri poc_requests i GUNCELLEYEMEZ (kural: update yalniz admin); ayrica talebin acildigi andaki durum tarihsel olarak saklanmali. (2) MUSTERI KARTI: temsilcisiz bekleyen talepte aciklayici blok — markanin temsilcisi olmadigi, talebin markaya iletildigi, sonucun garanti olmadigi ve her durumda bilgi verilecegi yaziyor. SURE TAAHHUDU YOK; veremeyecegimiz soz guveni tersine cevirir. (3) YANILTICI MESAJLAR KALDIRILDI: aksiyon listesi bu taleplerde 3+ gundur yanitsiz — vendor i hatirlat! diyordu, oysa hatirlatilacak vendor YOK. Kirmizi gun bekliyor rozeti de cevap vermeyen bir vendor varmis izlenimi veriyordu; ikisi de temsilcisiz talepte devre disi. (4) ADMIN HALKASI: Temsilcisiz marka talebi raporuna Ulasildi isaretle dugmesi. O markanin BEKLEYEN tum taleplerini isaretliyor ve her musteriye bildirim gonderiyor; musteri kartinda durum Markaya ulasildi — yanit bekleniyor olarak degisiyor. Boylece admin in telefon acmasi musteri tarafinda gorunur hale geliyor. node --check MODULE SYNTAX OK.'],
   'v9.68': ['NOT-1 KAPANDI — users.read DARALTILDI (rules v1.9.7). Bu, v9.64 te baslayan isin kapanisi. Firestore ta alan bazli okuma kurali olmadigi icin role == vendor kosulu, vendor kullanici dokumaninin TAMAMINI anonim erisime aciyordu: vergi kimligi (taxNo, invoice alanlari), KVKK onay kaydi (consents, ipAtConsent, userAgentAtConsent — IP adresi dahil), ic moderasyon notlari (suspiciousSignup, rejectionReason) ve ticari durum. Artik bir kullanici dokumanini YALNIZ sahibi ve admin okuyabiliyor. Kural kapatilmadan once kalan TUM anonim okuma yollari tarandi (hem koleksiyon sorgulari hem TEK DOKUMAN okumalari) ve tasindi: (1) preloadVendorBadges — anasayfadan anonim cagriliyordu ve her uretici icin users dokumanini tek tek aciyordu; kural daraltildiginda ilk kirilacak yer burasiydi. (2) handleAuth referans slug cozumu — kayit akisi anonim. (3) vendReferrals liderlik listesi. (4) renderVendorPublic yedegi KORUMASIZ awaitti; daraltma sonrasi anonimde sayfayi tamamen patlatirdi, try icine alindi. ROZET NOTU: hasActiveSubscription aynaya BILEREK alinmadi — bir ureticinin para odeyip odemedigi herkese acik bilgi degil. Rozet icin gereken tier zaten aynada ve ucretsiz olmayan tier aktif abonelik demek; hasActive tier den turetiliyor. SEED: uc yeni test — baska bir vendor kullanici dokumanini okuma REDDEDILMELI, vendor_public aynasi okunabilmeli (pozitif kontrol; ayna kapaliysa anonim ziyaretci hicbir uretici goremez), aynaya email/taxNo gibi hassas alan yazma REDDEDILMELI. GERI ALMA: anonim ziyaretcide uretici gorunmuyorsa once Admin > Veri Sagligi > Aynayi Olustur / Yenile calistirilmali; kural satiri gerekirse gecici olarak geri alinabilir (rules icinde not dusuldu). node --check MODULE SYNTAX OK.'],
   'v9.67': ['SAHIPSIZ KAYIT TEMIZLIGI (Hasan: test kayitlarini sil). v9.66 raporu 17 vendorId ve 115 kayit buldu. Kimlikler iki gruba ayriliyor: TEST_V_LOGO, TEST_V_HPE, vendor_fortinet gibi SEED tarafindan uydurulmus kimlikler (hic gercek hesaplari olmamis) ve yPqhhiGE9 ile baslayan uzun gercek Firebase UID leri (silinmis test hesaplari). (1) RAPOR DUZELTILDI: eskiden getActiveProducts() kullaniyordu, yani YALNIZ aktif urunleri sayiyordu; taslak ve pasif sahipsiz kayitlar gorunmuyordu. Temizlik yapilacaksa tam sayim sart — artik products ve public_events koleksiyonlari tam okunuyor. (2) TEMIZLIK ARACI: her satirda Sil dugmesi (o vendorId nin tum urun ve etkinlikleri) ve ustte Tumunu sil. Toplu silme YAZILI ONAY istiyor (SIL yazilmadan calismaz) — yanlislikla tiklanmasi 115 kaydi goturur. Tek tek silmede normal onay. Silme sirasinda ilerleme sayaci gosteriliyor, bir kayit hata verse bile digerleri siliniyor ve basarisiz sayisi raporlaniyor. Sonunda urun onbellegi ve gunluk vitrin onbellegi tazeleniyor. (3) Akis sahte Firestore ile prova edildi: 3 basarili + 1 izin hatasi senaryosunda sayaclar, ilerleme gostergesi ve onbellek tazeleme dogru calisti. OTOMATIK SILME YOK ve OLMAYACAK — silme kalicidir, geri alinamaz. node --check MODULE SYNTAX OK.'],
@@ -32324,13 +32325,61 @@ async function admDataHealth(m) {
         await ensureTaxonomy(); await ensureProductFields();
         var rs = await getDocs(collection(db,'reviews'));
         var byp={}; rs.docs.forEach(function(d){ var r=d.data(); if(!r.productId) return; (byp[r.productId]=byp[r.productId]||[]).push(r); });
-        var pids=Object.keys(byp); var ok=0, fail=0;
-        if(!pids.length){ peResult.innerHTML='<div style="color:var(--text-muted)">'+t('adhx.pe_none','Hesaplanacak review bulunamadı.')+'</div>'; peRun.disabled=false; peRun.textContent=t('adhx.pe_btn','🔄 Yeniden Hesapla'); return; }
+        // ══ v9.70: URUNU SILINMIS REVIEW'LAR ═══════════════════════════
+        // v9.67'de sahipsiz urunler silindi; onlara ait review'lar kaldi.
+        // updateDoc var olmayan dokumana yazamaz ve hata firlatir — eski kod
+        // bunu sessizce yutup "1 basarisiz" diyordu, sebebini SOYLEMIYORDU.
+        // Artik once urun varligi kontrol ediliyor, yoklar ayri raporlaniyor.
+        var _existing = {};
+        try {
+          (await getDocs(collection(db,'products'))).docs.forEach(function(d){ _existing[d.id]=1; });
+        } catch(e){ console.warn('[v9.70] urun listesi okunamadi:', e && e.message); }
+
+        var pidsAll = Object.keys(byp);
+        var pids = pidsAll.filter(function(id){ return _existing[id]; });
+        var orphanRev = pidsAll.filter(function(id){ return !_existing[id]; });
+        // Silme dugmesi icin review doküman id'lerini de tut
+        var orphanRevDocs = [];
+        rs.docs.forEach(function(d){ var r=d.data()||{}; if(r.productId && !_existing[r.productId]) orphanRevDocs.push(d.id); });
+        window._orphanRevDocs = orphanRevDocs;
+        var ok=0, fail=0, failMsgs=[];
+        if(!pids.length){
+          peResult.innerHTML='<div style="color:var(--text-muted)">'+t('adhx.pe_none','Hesaplanacak review bulunamadı.')+'</div>'
+            + (orphanRev.length ? '<div style="margin-top:7px;color:#b45309;font-size:12.5px">⚠ '+orphanRev.length+' '+t('adhx.pe_orphan','review, silinmiş bir ürüne ait — bu yüzden hesaplanamıyor.')
+              + ' <button class="btn-g btn-sm" id="pe-orph-del" style="font-size:11px;margin-left:6px;color:#dc2626">'+t('adhx.pe_orph_del','Bu review\'ları sil')+'</button></div>' : '');
+          peRun.disabled=false; peRun.textContent=t('adhx.pe_btn','🔄 Yeniden Hesapla'); return;
+        }
         for (var i=0;i<pids.length;i++){
-          try { invalidateActiveProducts(); await updateDoc(doc(db,'products',pids[i]), _peAgg(byp[pids[i]])); ok++; } catch(e){ fail++; }
+          try { invalidateActiveProducts(); await updateDoc(doc(db,'products',pids[i]), _peAgg(byp[pids[i]])); ok++; }
+          catch(e){
+            fail++;
+            // v9.70: sessiz yutma YOK — sebep hem konsola hem ekrana
+            var _m = (e && (e.code || e.message)) || 'bilinmeyen hata';
+            console.warn('[v9.70] agregat yazilamadi', pids[i], _m);
+            if (failMsgs.length < 5) failMsgs.push(pids[i].substring(0,14) + ': ' + String(_m).substring(0,70));
+          }
           if((ok+fail)%10===0 || (ok+fail)===pids.length){ peResult.innerHTML='<div>'+t('adhx.bf_writing','Yazılıyor...')+' '+(ok+fail)+'/'+pids.length+' (✓'+ok+(fail?' ✗'+fail:'')+')</div>'; }
         }
-        peResult.innerHTML='<div style="color:'+(fail?'#d97706':'#16a34a')+';font-weight:700">✓ '+ok+' '+t('adhx.pe_done','ürün yeniden hesaplandı')+(fail?' · '+fail+' '+t('adhx.pe_failed','başarısız'):'')+'</div><div style="margin-top:4px;color:var(--text-muted)">'+t('adhx.pe_success','Kanıt Skoru, Win/Loss, Liderler ve Son Hareketler artık güncel ve tutarlı.')+'</div>';
+        peResult.innerHTML='<div style="color:'+(fail?'#d97706':'#16a34a')+';font-weight:700">✓ '+ok+' '+t('adhx.pe_done','ürün yeniden hesaplandı')+(fail?' · '+fail+' '+t('adhx.pe_failed','başarısız'):'')+'</div>'
+          + (orphanRev.length ? '<div style="margin-top:7px;color:#b45309;font-size:12.5px">⚠ '+orphanRev.length+' '+t('adhx.pe_orphan','review, silinmiş bir ürüne ait — bu yüzden hesaplanamıyor.')
+              + ' <button class="btn-g btn-sm" id="pe-orph-del" style="font-size:11px;margin-left:6px;color:#dc2626">'+t('adhx.pe_orph_del','Bu review\'ları sil')+'</button></div>' : '')
+          + (failMsgs.length ? '<div style="margin-top:6px;color:#dc2626;font-size:11.5px;font-family:monospace;line-height:1.7">'+failMsgs.map(escHtml).join('<br>')+'</div>' : '')
+          + '<div style="margin-top:4px;color:var(--text-muted)">'+t('adhx.pe_success','Kanıt Skoru, Win/Loss, Liderler ve Son Hareketler artık güncel ve tutarlı.')+'</div>';
+        // v9.70: silinmis urune ait review'lari temizle (admin, onayli)
+        peResult.querySelector('#pe-orph-del')?.addEventListener('click', async function(){
+          var ids = window._orphanRevDocs || [];
+          if(!ids.length) return;
+          if(!confirm(t('adhx.pe_orph_confirm','Silinmiş ürünlere ait ')+ids.length+t('adhx.pe_orph_confirm2',' review kalıcı olarak silinecek. Devam edilsin mi?'))) return;
+          this.disabled = true;
+          var dn=0, df=0;
+          for (const id of ids) {
+            try { await deleteDoc(doc(db,'reviews', id)); dn++; }
+            catch(e){ df++; console.warn('[v9.70] review silinemedi', id, e && e.message); }
+            this.textContent = (dn+df)+'/'+ids.length;
+          }
+          showToast(dn+' '+t('adhx.pe_orph_done','review silindi')+(df?' · '+df+' '+t('adhx.pe_failed','başarısız'):''), df?'err':'ok');
+        });
+
         showToast(ok+' ürün yeniden hesaplandı'+(fail?', '+fail+' hata':''), fail?'err':'ok');
       } catch(e){ peResult.innerHTML='<div style="color:#dc2626">Hata: '+((e&&e.message)||e)+'</div>'; }
       peRun.disabled=false; peRun.textContent=t('adhx.pe_btn','🔄 Yeniden Hesapla');
@@ -37036,6 +37085,11 @@ const I18N_DICT = {
     'aev.approved': 'Etkinlik yayınlandı.',
     'aev.reject_confirm': 'Etkinlik reddedilsin mi?',
     'aev.rejected': 'Etkinlik reddedildi.',
+    'adhx.pe_orphan':      'review, silinmiş bir ürüne ait — bu yüzden hesaplanamıyor.',
+    'adhx.pe_orph_del':    'Bu review\'ları sil',
+    'adhx.pe_orph_confirm':  'Silinmiş ürünlere ait ',
+    'adhx.pe_orph_confirm2': ' review kalıcı olarak silinecek. Devam edilsin mi?',
+    'adhx.pe_orph_done':   'review silindi',
     'creq.um_pending_t':   'Bu markanın platformda temsilcisi yok',
     'creq.um_pending_d':   'Talebinizi markayı temsil edebilecek üreticilere iletiyoruz. Bu süreç birkaç gün sürebilir; sonuç garanti değildir ve her durumda size bilgi verilir.',
     'creq.um_reached_t':   'Markaya ulaşıldı',
@@ -39931,6 +39985,11 @@ const I18N_DICT = {
     'aev.approved': 'Event published.',
     'aev.reject_confirm': 'Reject this event?',
     'aev.rejected': 'Event rejected.',
+    'adhx.pe_orphan':      'review(s) belong to a deleted product and cannot be recalculated.',
+    'adhx.pe_orph_del':    'Delete these reviews',
+    'adhx.pe_orph_confirm':  'This will permanently delete ',
+    'adhx.pe_orph_confirm2': ' review(s) belonging to deleted products. Continue?',
+    'adhx.pe_orph_done':   'review(s) deleted',
     'creq.um_pending_t':   'This brand has no representative on the platform',
     'creq.um_pending_d':   'We are passing your request to vendors who could represent this brand. It may take a few days; the outcome is not guaranteed and we will let you know either way.',
     'creq.um_reached_t':   'The brand has been contacted',
