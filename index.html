@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.66 | pochub.co -->
+<!-- PoCHub v9.67 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.66';
+const VERSION = 'v9.67';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.67': ['SAHIPSIZ KAYIT TEMIZLIGI (Hasan: test kayitlarini sil). v9.66 raporu 17 vendorId ve 115 kayit buldu. Kimlikler iki gruba ayriliyor: TEST_V_LOGO, TEST_V_HPE, vendor_fortinet gibi SEED tarafindan uydurulmus kimlikler (hic gercek hesaplari olmamis) ve yPqhhiGE9 ile baslayan uzun gercek Firebase UID leri (silinmis test hesaplari). (1) RAPOR DUZELTILDI: eskiden getActiveProducts() kullaniyordu, yani YALNIZ aktif urunleri sayiyordu; taslak ve pasif sahipsiz kayitlar gorunmuyordu. Temizlik yapilacaksa tam sayim sart — artik products ve public_events koleksiyonlari tam okunuyor. (2) TEMIZLIK ARACI: her satirda Sil dugmesi (o vendorId nin tum urun ve etkinlikleri) ve ustte Tumunu sil. Toplu silme YAZILI ONAY istiyor (SIL yazilmadan calismaz) — yanlislikla tiklanmasi 115 kaydi goturur. Tek tek silmede normal onay. Silme sirasinda ilerleme sayaci gosteriliyor, bir kayit hata verse bile digerleri siliniyor ve basarisiz sayisi raporlaniyor. Sonunda urun onbellegi ve gunluk vitrin onbellegi tazeleniyor. (3) Akis sahte Firestore ile prova edildi: 3 basarili + 1 izin hatasi senaryosunda sayaclar, ilerleme gostergesi ve onbellek tazeleme dogru calisti. OTOMATIK SILME YOK ve OLMAYACAK — silme kalicidir, geri alinamaz. node --check MODULE SYNTAX OK.'],
   'v9.66': ['SAHIPSIZ KAYIT TARAMASI (v9.65 panelinin ortaya cikardigi durum). Panel yalniz BIR vendor kullanici oldugunu gosterdi (GITS TEKNOLOJI) — oysa katalogda Fortinet TR, HPE Turkiye, NetArmor ve Veeam TR urunleri duruyor ve onceki surumlerde bunlar vendor olarak listeleniyordu. Kod tarandi: users.role alanina vendor tipi yazan bir yer YOK (role alanina vendorType yazan tek eslesme brand_relations koleksiyonunda, farkli bir sey). Yani bu bir kod hatasi degil VERI durumu — hesaplar silinmis ya da Admin > Rol Yonetimi uzerinden rolleri degistirilmis olmali. SONUCLARI: urunler katalogda ama sahibi yok; vendor profil baglantilari kirik, PoC talepleri yonlendirilemiyor, one cikan hesabi o ureticileri hic gormuyor, ayna da dogal olarak bos kaliyor. Veri Sagligi na SAHIPSIZ KAYITLAR raporu eklendi: hangi vendorId degerleri urun/etkinlikte geciyor ama karsiliginda role=vendor kullanici yok, kayitlardaki uretici adi ve kac urun/etkinlik etkilendigi ile birlikte. Otomatik duzeltme YOK — silinen hesabi geri getirmek mi, urunu baska vendor a devretmek mi, admin karari. node --check MODULE SYNTAX OK.'],
   'v9.65': ['AYNA PANELI TESHIS EDILEBILIR HALE GETIRILDI (Hasan ekran goruntusu: 1 uretici aynada). SORUN: panel tek cumle basiyordu ve iki sayidan yalnizca birini gosteriyordu; 1 uretici aynada yazinca vendor kullanici sayisinin mi yoksa ayna sayisinin mi 1 oldugu AYIRT EDILEMIYORDU. Onceki ekranlarda logo barinda bes uretici gorulmustu, yani iki kaynak celisiyordu ve panel hangisinin dogru oldugunu soylemiyordu. (1) Artik UC sayi ayri gosteriliyor: vendor kullanici, aynada, eksik. (2) Eksikler ve aynada olup kullanicisi olmayan YETIM satirlar ADIYLA listeleniyor. (3) Hic vendor kullanici bulunamazsa panel bunu bir basari degil UYARI olarak gosteriyor ve vendor hesaplarinin farkli bir role degeriyle kayitli olabilecegini, panele guvenmeden once Admin > Kullanicilar ekranina bakilmasi gerektigini soyluyor — eski panel bu durumda sessizce yesil gorunebiliyordu. Panel uc senaryoda (bos, 1-1, 5-1) sahte veriyle calistirilip HTML denge kontrolu yapildi. node --check MODULE SYNTAX OK.'],
   'v9.64': ['VENDOR PII — AYNA KOLEKSIYONU (KVKK, NOT-1 kapaniyor). SORUN: users.read kurali resource.data.role == vendor ile ANONIM acik ve Firestore ta ALAN BAZLI okuma kurali YOK; yani vendor kullanici dokumaninin TAMAMI herkese okunabilir durumdaydi. Alanlar sayildiginda ortaya cikanlar: email, secondaryEmail, phone2, taxNo ve invoice alanlari (vergi kimligi), consents ile ipAtConsent ve userAgentAtConsent (KVKK onay kaydi, IP adresi dahil), suspiciousSignup ve rejectionReason (ic moderasyon notlari), isSuspendedDueToBilling ve hasActiveSubscription (ticari durum). Yani sorun e-posta gorunuyor degil, onay loglari ve vergi kimligi acikta. (1) vendor_public ayna koleksiyonu devreye alindi. rules v1.9.6 ile alan listesi arayuzun GERCEKTEN gosterdigi is bilgisine gore genisletildi (sirket, slug, logo, kategori, marka, sehir, telefon, adres, web sitesi, vendorType, tier, rozetler); yukaridaki hassas alanlarin HICBIRI listede yok. (2) Sekiz ANONIM erisilebilir okuma noktasi aynaya tasindi: renderVendors, loadTopVendors, loadVendorLogoBar, calculateDailyFeatured, renderBrandPage, renderVendorPublic, loadVendors, openCustomPoCModal marka eslesmesi. Admin ekranlari users i okumaya devam ediyor (zaten yetkili). (3) GECIS GUVENLIGI: ayna bos veya eksikse otomatik olarak users a duser. Bu surum TEK BASINA hicbir seyi bozmaz; users.read daraltmasi AYRI bir surumde, ayna dolulugu dogrulandiktan sonra yapilacak. (4) SENKRON: 20 ayri profil yazma noktasini yamamak yerine iki kapi — vendor her oturumda kendi ayna satirini tazeler (hangi yoldan degisirse degissin kapsanir) ve profil sihirbazi kaydinda anlik senkron. (5) Veri Sagligi na ayna paneli: kac vendor aynada, kaci eksik; Aynayi Olustur / Yenile dugmesi. Eksik varsa panel kirmizi ve ne riske girildigini yaziyor. GELISTIRME NOTU: loadVendors tek satirlik oldugu icin regex ile yapilan degisiklik map() icindeki ilk noktali virgulde kesip satiri bozdu; node --check yakaladi, elle onarildi. node --check MODULE SYNTAX OK.'],
@@ -31643,47 +31644,58 @@ async function _orphanOwnerHtml(){
     var uSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
     var known = {}; uSnap.docs.forEach(function(d){ known[d.id]=1; });
 
+    // v9.67: rapor eskiden getActiveProducts() kullaniyordu, yani YALNIZ
+    // aktif urunleri sayiyordu; taslak/pasif sahipsiz kayitlar gorunmuyordu.
+    // Temizlik yapacaksak tam sayim sart — tum koleksiyon okunuyor.
     var byVid = {};
-    function note(vid, nm, kind){
+    function note(vid, nm, kind, docId){
       if(!vid || known[vid]) return;
-      var e = byVid[vid] || (byVid[vid] = { vid:vid, name:nm||'—', products:0, events:0 });
+      var e = byVid[vid] || (byVid[vid] = { vid:vid, name:nm||'—', products:[], events:[] });
       if(nm && e.name === '—') e.name = nm;
-      e[kind]++;
+      e[kind].push(docId);
     }
-    (await getActiveProducts()).forEach(function(p){ note(p.vendorId, p.vendorName, 'products'); });
+    var pSnap = await getDocs(collection(db,'products'));
+    pSnap.docs.forEach(function(d){ var o=d.data()||{}; note(o.vendorId, o.vendorName, 'products', d.id); });
     try {
-      var ev = await getDocs(query(collection(db,'public_events'), limit(400)));
-      ev.docs.forEach(function(d){ var e=d.data()||{}; note(e.vendorId, e.vendorName, 'events'); });
+      var ev = await getDocs(collection(db,'public_events'));
+      ev.docs.forEach(function(d){ var o=d.data()||{}; note(o.vendorId, o.vendorName, 'events', d.id); });
     } catch(e){}
 
     var rows = Object.keys(byVid).map(function(k){ return byVid[k]; })
-                 .sort(function(a,b){ return (b.products+b.events)-(a.products+a.events); });
+                 .sort(function(a,b){ return (b.products.length+b.events.length)-(a.products.length+a.events.length); });
+    window._orphanRows = rows;   // silme dugmeleri icin
+
     if (!rows.length) {
       return '<div class="card" style="padding:15px 18px;margin-bottom:14px">'
         + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Ownerless records','Sahipsiz kayıtlar')+'</div>'
         + '<div style="font-size:12.5px;color:#16a34a">✓ '+_L('Every product and event has a matching vendor account.','Her ürün ve etkinliğin karşılığı olan bir vendor hesabı var.')+'</div></div>';
     }
-    var tot = rows.reduce(function(a,r){ return a + r.products + r.events; }, 0);
+    var tot = rows.reduce(function(a,r){ return a + r.products.length + r.events.length; }, 0);
     var h = '<div class="card" style="padding:16px;margin-bottom:14px;border-left:3px solid #dc2626">'
       + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Ownerless records','Sahipsiz kayıtlar')+'</div>'
       + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:11px;line-height:1.55">'
-      +   _L('These vendorIds appear on products or events but no user account with role=vendor exists for them — the account was probably deleted or its role changed. Vendor profile links break, PoC requests cannot be routed, and featured calculations skip them.',
-             'Bu vendorId değerleri ürünlerde veya etkinliklerde geçiyor ama karşılığında role=vendor olan bir kullanıcı hesabı yok — hesap silinmiş ya da rolü değiştirilmiş olabilir. Vendor profil bağlantıları kırılır, PoC talepleri yönlendirilemez, öne çıkan hesabı bu üreticileri hiç görmez.')
+      +   _L('These vendorIds appear on products or events but no user account with role=vendor exists. Most are seed-generated IDs (TEST_V_*, vendor_*) that never had a real account; the long ones are deleted accounts. Deleting is permanent — there is no undo.',
+             'Bu vendorId değerleri ürünlerde veya etkinliklerde geçiyor ama karşılığında role=vendor kullanıcı yok. Çoğu seed tarafından üretilmiş kimlikler (TEST_V_*, vendor_*) — hiç gerçek hesapları olmamış; uzun olanlar silinmiş hesaplar. Silme KALICIDIR, geri alınamaz.')
       + '</div>'
-      + '<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:9px">⚠ ' + rows.length + ' ' + _L('vendorId · ','vendorId · ') + tot + ' ' + _L('record affected','kayıt etkileniyor') + '</div>'
+      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'
+      +   '<span style="font-size:12px;font-weight:700;color:#dc2626">⚠ ' + rows.length + ' vendorId · ' + tot + ' ' + _L('record','kayıt') + '</span>'
+      +   '<button class="btn-red btn-sm" id="orph-all" style="font-size:11.5px">'+_L('Delete all','Tümünü sil')+'</button>'
+      + '</div>'
       + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
       + '<thead><tr style="text-align:left;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">'
       +   '<th style="padding:6px 8px">'+_L('Vendor name on records','Kayıtlardaki üretici adı')+'</th>'
       +   '<th style="padding:6px 8px">'+_L('Products','Ürün')+'</th>'
       +   '<th style="padding:6px 8px">'+_L('Events','Etkinlik')+'</th>'
       +   '<th style="padding:6px 8px">vendorId</th>'
+      +   '<th style="padding:6px 8px"></th>'
       + '</tr></thead><tbody>';
-    rows.slice(0,40).forEach(function(r){
-      h += '<tr style="border-top:1px solid var(--border)">'
+    rows.forEach(function(r, idx){
+      h += '<tr style="border-top:1px solid var(--border)" data-orow="'+idx+'">'
         + '<td style="padding:7px 8px;font-weight:700">'+escHtml(r.name)+'</td>'
-        + '<td style="padding:7px 8px">'+r.products+'</td>'
-        + '<td style="padding:7px 8px">'+r.events+'</td>'
+        + '<td style="padding:7px 8px">'+r.products.length+'</td>'
+        + '<td style="padding:7px 8px">'+r.events.length+'</td>'
         + '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:var(--text-muted)">'+escHtml(r.vid)+'</td>'
+        + '<td style="padding:7px 8px"><button class="btn-g btn-sm orph-del" data-idx="'+idx+'" style="font-size:11px;color:#dc2626">'+_L('Delete','Sil')+'</button></td>'
         + '</tr>';
     });
     return h + '</tbody></table></div></div>';
@@ -31691,6 +31703,27 @@ async function _orphanOwnerHtml(){
     return '<div class="card" style="padding:14px;margin-bottom:14px;font-size:12.5px;color:#dc2626">'
       + _L('Ownerless scan failed: ','Sahipsiz kayıt taraması başarısız: ') + escHtml(((e&&e.message)||'').substring(0,90)) + '</div>';
   }
+}
+
+// v9.67: bir vendorId'nin tum sahipsiz kayitlarini siler.
+// Otomatik CAGRILMAZ — her zaman admin onayiyla.
+async function _orphanDelete(rows, statusEl){
+  var done = 0, fail = 0, total = rows.reduce(function(a,r){ return a + r.products.length + r.events.length; }, 0);
+  for (const r of rows) {
+    for (const id of r.products) {
+      try { await deleteDoc(doc(db,'products', id)); done++; }
+      catch(e){ fail++; console.warn('[v9.67] urun silinemedi', id, e && e.message); }
+      if (statusEl) statusEl.textContent = (done+fail) + '/' + total;
+    }
+    for (const id of r.events) {
+      try { await deleteDoc(doc(db,'public_events', id)); done++; }
+      catch(e){ fail++; console.warn('[v9.67] etkinlik silinemedi', id, e && e.message); }
+      if (statusEl) statusEl.textContent = (done+fail) + '/' + total;
+    }
+  }
+  try { if (typeof invalidateProductCache === 'function') invalidateProductCache(); } catch(e){}
+  try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(e){}   // vitrin tazelensin
+  return { done: done, fail: fail };
 }
 
 // Indeks durum paneli (Veri Sagligi ekraninin en ustunde)
@@ -31734,6 +31767,32 @@ async function admDataHealth(m) {
                        + (await _dailyFeaturedPanelHtml())
                        + (await _unmatchedDemandHtml()) + (await _tagScanHtml())
                        + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.64
+    // v9.67: sahipsiz kayit temizligi — tek satir veya tumu
+    _cidxBox.querySelectorAll('.orph-del').forEach(function(b){
+      b.addEventListener('click', async function(){
+        var r = (window._orphanRows||[])[+b.dataset.idx];
+        if(!r) return;
+        var n = r.products.length + r.events.length;
+        if(!confirm(_L('Permanently delete ','Kalıcı olarak silinecek: ') + n + ' ' + _L('record of ','kayıt · ') + r.name + '\n\n' + _L('This cannot be undone.','Bu işlem geri alınamaz.'))) return;
+        b.disabled = true;
+        var res = await _orphanDelete([r], b);
+        showToast(res.done + ' ' + _L('deleted','silindi') + (res.fail ? ' · ' + res.fail + ' ' + _L('failed','başarısız') : ''), res.fail?'err':'ok');
+        admDataHealth(m);
+      });
+    });
+    _cidxBox.querySelector('#orph-all')?.addEventListener('click', async function(){
+      var rows = window._orphanRows || [];
+      if(!rows.length) return;
+      var n = rows.reduce(function(a,r){ return a + r.products.length + r.events.length; }, 0);
+      // Toplu silmede yazili onay — yanlislikla tiklanmasin
+      var typed = prompt(_L('Type DELETE to permanently remove ','Kalıcı silme için SIL yazın — ') + n + ' ' + _L('records from ','kayıt · ') + rows.length + ' vendorId');
+      if (String(typed||'').trim().toUpperCase() !== 'SIL' && String(typed||'').trim().toUpperCase() !== 'DELETE') return;
+      this.disabled = true;
+      var res = await _orphanDelete(rows, this);
+      showToast(res.done + ' ' + _L('deleted','silindi') + (res.fail ? ' · ' + res.fail + ' ' + _L('failed','başarısız') : ''), res.fail?'err':'ok');
+      admDataHealth(m);
+    });
+
     // v9.64: aynayi users'tan uret (admin yazar)
     _cidxBox.querySelector('#vpub-sync')?.addEventListener('click', async function(){
       var b=this; b.disabled=true; var o=b.textContent;
