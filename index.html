@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.62 | pochub.co -->
+<!-- PoCHub v9.63 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.62';
+const VERSION = 'v9.63';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.63': ['ANASAYFA ANONIM ZIYARETCIDE BOZUKTU — P0 DUZELTME. TESHIS: calculateDailyFeatured vendor_subscriptions koleksiyonunu KORUMASIZ okuyordu; kural isAdmin() veya isOwner() diyor, yani giris yapmamis ziyaretcide sorgu PERMISSION_DENIED ile patliyordu. Daha kotusu loadFeaturedCarousels tek bir dis try ile sarili oldugu icin bu hata one cikan urunlerle birlikte KATEGORI SATIRLARINI da yutuyordu — anonim ziyaretci hero altinda BOS sayfa goruyordu. Admin olarak bakildiginda gorunmuyordu cunku admin o koleksiyonu okuyabiliyor. Ayrica Boost gelirini vuruyordu: odeme yapan vendor in urunu tam olarak hedef kitleye gorunmuyordu. (1) Abonelik okumasi opsiyonel hale getirildi. Veri YALNIZ tier icin kullaniliyor ve _mkFV icinde zaten subsById currentTier VEYA v.subscriptionTier yedek zinciri vardi; users.subscriptionTier yedi ayri satin alma/deneme noktasinda guncel tutuluyor ve users anonim okunabiliyor — yani anonim ziyaretci de DOGRU tier i goruyor, sadece izin hatasi almiyor. (2) One cikan hesabi herhangi bir sebeple patlasa bile kategori satirlari cizilecek sekilde ayri try icine alindi. (3) YAN BULGU: pochub_daily_featured yazimi yalniz admin e acik, yani onbellek sadece admin siteye girdiginde olusuyordu; diger herkes her sayfa goruntulemesinde hesabi bastan yapiyor, vendor sayisi kadar users okumasi uretiyordu. Katalog indeksinde (v9.33) cozulen problemin aynisi. Veri Sagligi na GUNLUK ONE CIKANLAR yayin paneli eklendi: bugun yayinlandi mi, ne zaman, kac urun/uretici; Yayinla dugmesi once onbellegi silip yeniden hesapliyor. Yayinlanmamissa istemci yine hesapliyor — dogru calisir, sadece pahali. DOGRULAMA: anasayfa akisindaki tum kisitli koleksiyon okumalari tarandi; users (role==vendor sorgusu kurali karsiliyor) ve notifications (zaten try icinde) yanlis alarm cikti, baska acik yok. node --check MODULE SYNTAX OK.'],
   'v9.62': ['STORED-XSS — KOKTEN KAPATILDI (ilk incelemeden beri acik duran P0). Uygulama kullanici metinlerini innerHTML ile basiyor ve kacis eksikti: 30 sablon ifadesi + ~270 string birlestirme. YAKLASIM DEGISIKLIGI: 270 noktayi tek tek duzenlemek hem uzun hem kirilgan (bazilari HTML parcasi iceriyor, otomatik degistirme kirar) ve daha onemlisi ISTEMCI TARAFI KACIS, veriyi Firestore API sine DOGRUDAN yazan kotu niyetli bir vendor a karsi hicbir sey yapmaz. Kok verinin girisinde kesildi. (1) RULES v1.9.5 noTags(): etiket acilisi iceren metin KAYDEDILEMEZ. Kalip < + harf/slash/!/? — yani img, /b, !-- ve ?php yakalanir; throughput < 10 Gbps veya a < b gibi mesru kullanim SERBEST kalir. 10 ornekle dogrulandi. Uygulandigi yerler: products (name/description/brand, create ve update), public_events (title/description/speaker/hostName), poc_requests (title/description/requirements), reviews (comment/note), notifications (title/message/body/senderName), poc_messages (text/message), brand_products (name/brand), demo_requests (name/company/message) — 26 kontrol. (2) ISTEMCI: 30 sablon ifadesine escHtml eklendi (derinlemesine savunma). HTML OLMAYAN baglamlar (e-posta govdeleri, toast metinleri) BILEREK dokunulmadi — orada kacis kullaniciya &amp; gosterirdi. Ayrica formlarda stripTags ile temizleme: kullanici kural reddine carpmadan once uyarilir. Guvenlik buna DAYANMAZ, guvenlik kuralda. (3) MEVCUT VERI: Veri Sagligi > HTML etiket taramasi — kural devreye girmeden once yazilmis kayitlari bulur. Temizleme tek tek onayli; toplu otomatik yazma BILEREK yok, yanlis pozitifte urun adini bozmak birakmaktan kotudur. (4) SEED: bes yeni test — urun adi, urun aciklamasi, etkinlik basligi ve bildirim metnine etiket yazma REDDEDILMELI; ayrica POZITIF kontrol: throughput < 10 Gbps ENGELLENMEMELI (dar kapi oldugunu kanitlar, test kaydi sonunda silinir). GELISTIRME NOTLARI: iki hata calisma sirasinda yakalandi — (a) kurallara ikinci bir allow create eklemek kosullari VEYA lar, yani sikilastirmak yerine GEVSETIR; kosul mevcut kuralin icine eklendi. (b) noTags 26 yerde kullaniliyor ama tanimi yazilmamisti (onceki betik assert te durmustu) — bu haliyle deploy edilse TUM kurallar cokerdi; teslim kontrolu yakaladi. node --check MODULE SYNTAX OK.'],
   'v9.61': ['DORT KARARIN TAMAMI UYGULANDI (Hasan: hepsini onerilerinle yap). 1 ve 2 zaten v9.60 ta yapilmisti; bu surum 3u TAMAMLIYOR ve 4u hazirliyor. (3) ILGI SINYALI: v9.60 harici kayit sayfasina yonlendiriyordu ama onerimin asil degerli kismi olan olcumu atlamistim. Artik giris yapmis kullanici harici kayit dugmesine bastiginda registrations a interestOnly kaydi dusuyor (ates-et-unut; yazim basarisiz olsa da kullanici baglantiya gidiyor). KAPASITE SAYACI ARTIRILMAZ — kayit ureticinin sayfasinda tutuluyor, bizim sayacimiza yazmak dolulugu yaniltici gosterirdi. Katilimci ekraninda ILGI kayitlari katilimcilardan AYRI sayiliyor ve ayri gosteriliyor; karistirmak ureticiye yanlis rapor verir. Ekranda ne bilip ne bilmedigimiz acikca yaziyor: tamamlayip tamamlamadiklarini goremiyoruz. (4) FAZ 2 HAZIRLIGI: Blaze acildiginda kurulacak Cloud Function kaynagi ayri dosya olarak uretildi (faz2-inbound-event-function.js) — gelen posta webhooku, SPF/DKIM kontrolu, gonderen alan adinin kayitli vendor ile eslesmesi, Claude ile cikarim, TASLAK yazma, vendor ve admin bildirimi. Faz 1 ile ayni uyari kodlari ve ayni gizlilik kapisi kullaniliyor ki arayuz degismesin. Devreye almadan once yapilacaklar dosyada listelendi (users.emailDomain dogrulamasi, draft durumu arayuzu, gonderen basina gunluk sinir). AYRICA firestore.rules v1.9.4: v9.60 in inceleme kapisi ISTEMCIDEYDI — vendor API ile dogrudan status=published yazip atlayabiliyordu, yani Do not share externally isaretli icerik yayina girebilirdi. Artik pending_review veya rejected durumundan cikisi YALNIZ ADMIN yapabilir. node --check MODULE SYNTAX OK.'],
   'v9.60': ['E-POSTADAN ETKINLIK — FAZ 1 (Hasan: uretici e-postayla etkinlik iletebilmeli, icerik/saat/konusmaci/adres tekrar tekrar girilmesin). Dokuz gercek uretici e-postasi incelendi: hicbirinde takvim eki (.ics) yok, altisi partner kanali, ikisi gizli isaretli, ikisi bulten, biri kendi icinde celiskili (24 Persembe Sali), birinde eski sablon satiri kalmis (May 14), gonderen her zaman marka degil (HPE webinarini CozumPark gonderiyor). (1) AYRISTIRICI: etkinlik formuna E-postadan ice aktar paneli. Baslik, tarih, saat, saat dilimi, sure, konusmacilar (unvanlariyla), ajanda, format, dil, kayit baglantisi ve kitle cikarilir. ASLA sessizce tahmin etmez: bulunan alanlari ve her belirsizligi ayri uyari olarak raporlar. Gercek e-postalar uzerinde Node ile test edildi; bes hata bulunup duzeltildi — tam Ingilizce ay adlari taninmiyordu, Eylul 2026 icinden gun=20 cekiliyordu, yilsiz eski satir gelecege tasiniyordu, nda Turkce bulunma ekini (yayininda) NDA saniyordu, JS \\b Turkce karakterde (Sali) sinir tanimiyordu. Sonuc: dokuz e-postanin dokuzu dogru siniflandi. (2) SAAT DILIMI: eskiden saat formu dolduranin TARAYICI saat dilimine gore yorumlaniyordu; Londra dan giren ureticinin 10:00 BST si TSI de 12:00 olmaliydi. Artik etkinligin saat dilimi saklaniyor, an UTC kaydediliyor, izleyiciye kendi saatinde, farkliysa kaynak saatle birlikte gosteriliyor. Kutuphane yok, Intl yeterli; yaz saati siniri dahil yedi durum dogrulandi. Uretici CET yazsa da Eylul de CEST uygulanir cunku etiket degil bolge kullaniliyor. (3) YENI ALANLAR: tz, speakers[] (ad+unvan), agenda[], hostName (markadan ayri ev sahibi), audience (public/partners), registrationMode + externalUrl (ureticinin kendi kayit sayfasi — dokuz e-postanin dokuzunda kayit orada), source + sourceMeta. Harici kayitta online link zorunlu degil. (4) GIZLILIK KAPISI: Do not share externally gibi isaret bulunursa etkinlik YAYINLANMAZ, pending_review durumunda admin incelemesine duser, admin_inbox a bildirim gider; Admin > Etkinlikler de Onayla/Reddet. (5) KITLE: yalniz is ortaklari etkinlikleri musteri ve anonim ziyaretciye gorunmez. (6) SEED: 12 sentetik regresyon testi — gercek e-postalar KULLANILMADI, cunku gizli isaretli uretici icerigini kod tabanina koymak engellenmeye calisilan seyin ta kendisi olurdu. SINIRLAR (Faz 2 isi): kural tabanli ayristirma — dil modeli degil; kitle filtresi ve gizlilik kapisi ARAYUZ duzeyinde, kural duzeyinde degil (vendor API ile status=published yazabilir); coklu oturum ilk gune indirgeniyor. node --check MODULE SYNTAX OK.'],
@@ -26707,13 +26708,32 @@ async function calculateDailyFeatured() {
   const usersSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
   var allVendors = usersSnap.docs.map(function(d){ return {...d.data(), id:d.id}; });
 
-  // Aktif aboneliklerini çek
-  const subsSnap = await getDocs(query(collection(db,'vendor_subscriptions'), where('status','==','active')));
+  // ══ v9.63: ANASAYFA ANONIM ZIYARETCIDE BOZUKTU ═══════════════════════
+  // vendor_subscriptions kurali: isAdmin() || isOwner(...). Yani GIRIS
+  // YAPMAMIS ziyaretcide bu sorgu PERMISSION_DENIED ile patliyor,
+  // calculateDailyFeatured throw ediyor ve loadFeaturedCarousels'in tek
+  // dis try'i her seyi yutuyordu — one cikan urunler VE kategori
+  // satirlari dahil, anasayfanin hero altindaki tamami bos kaliyordu.
+  // Admin olarak bakildiginda gorunmuyordu cunku admin okuyabiliyor.
+  // Bu ayni zamanda Boost gelirini vuruyordu: odeme yapan vendor'in
+  // urunu tam olarak hedef kitleye gorunmuyordu.
+  //
+  // COZUM: okuma opsiyonel. Abonelik verisi YALNIZ tier icin kullaniliyor
+  // (_mkFV) ve orada zaten "subsById[...]?.currentTier || v.subscriptionTier"
+  // yedek zinciri var. users.subscriptionTier yedi ayri satin alma/deneme
+  // noktasinda guncel tutuluyor ve users anonim okunabiliyor — yani
+  // anonim ziyaretci de dogru tier'i goruyor.
   var subsById = {};
-  subsSnap.docs.forEach(function(d){
-    var data = d.data();
-    subsById[data.vendorId] = data;
-  });
+  try {
+    const subsSnap = await getDocs(query(collection(db,'vendor_subscriptions'), where('status','==','active')));
+    subsSnap.docs.forEach(function(d){
+      var data = d.data();
+      subsById[data.vendorId] = data;
+    });
+  } catch(e) {
+    // Anonim ziyaretci icin BEKLENEN durum — hata degil.
+    console.info('[v9.63] abonelik okunamadi (anonim ziyaretci); tier users.subscriptionTier alanindan alinacak');
+  }
 
   // v8.02: Öne çıkan vendorlar — ADMIN-PIN + KANIT SKORU (tier DEĞİL; ilke: ödeme ile üste çıkılmaz)
   var featuredVendors = [];
@@ -26942,7 +26962,12 @@ async function loadFeaturedCarousels() {
   const section = el('featured-carousel-section');
   if (!section) return;
   try {
-    var data = await calculateDailyFeatured() || {};
+    // v9.63: one cikan hesabi HERHANGI bir sebeple patlarsa (izin, bayat
+    // sema, agri veri) kategori satirlari yine de cizilmeli. Eskiden tek
+    // dis try her seyi yutuyor ve sayfa bos kaliyordu.
+    var data = {};
+    try { data = await calculateDailyFeatured() || {}; }
+    catch(_fe){ console.warn('[v9.63] one cikan hesabi basarisiz, kategori satirlari ile devam:', _fe && _fe.message); }
     // v7.97: kategori satirlari aktif urunlerden bagimsiz uretiliyor — erken cikis YOK (en sonda bos ise section bos kalir)
 
     // v5.10: Featured vendor/product'lardaki vendor'ları preload
@@ -31419,6 +31444,43 @@ async function _tagScanHtml(){
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// v9.63 — GUNLUK ONE CIKANLAR: YAYIN PANELI
+// ───────────────────────────────────────────────────────────────────────
+// pochub_daily_featured yazimi YALNIZ admin'e acik (rules). Yani onbellek
+// sadece admin siteye girdiginde olusuyordu; diger herkes — anonim
+// ziyaretci dahil — her sayfa goruntulemesinde hesabi BASTAN yapiyordu:
+// vendor sayisi kadar users okumasi, ziyaretci basina.
+// Katalog indeksinde (v9.33) cozdugumuz problemin aynisi. Ayni desen:
+// admin yayinlar, herkes onbellekten okur.
+// Yayinlanmamissa istemci yine hesaplar (dogru calisir, sadece pahali).
+// ═══════════════════════════════════════════════════════════════════════
+async function _dailyFeaturedPanelHtml(){
+  try {
+    var key = getTodayKey();
+    var snap = await getDoc(doc(db,'pochub_daily_featured', key));
+    var ok = snap.exists() && snap.data().featuredSchema === 2;
+    var d = ok ? snap.data() : null;
+    var gen = (d && d.generatedAt && d.generatedAt.toDate) ? d.generatedAt.toDate() : null;
+    var col = ok ? '#16a34a' : '#dc2626';
+    return '<div class="card" style="padding:15px 18px;margin-bottom:14px;border-left:3px solid '+col+'">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+      +   '<div><div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Daily featured cache','Günlük öne çıkanlar önbelleği')+'</div>'
+      +     '<div style="font-size:12px;color:var(--text-muted);line-height:1.55">'
+      +       (ok
+          ? (_L('Published for today','Bugün için yayınlandı') + (gen ? ' · ' + gen.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '')
+             + ' · ' + ((d.featuredProducts||[]).length) + ' ' + _L('product','ürün') + ', ' + ((d.featuredVendors||[]).length) + ' ' + _L('vendor','üretici'))
+          : _L('NOT published today — every visitor recomputes it, which costs one read per vendor per page view.',
+               'Bugün YAYINLANMADI — her ziyaretçi baştan hesaplıyor, bu da sayfa başına üretici sayısı kadar okuma demek.'))
+      +     '</div></div>'
+      +   '<button class="btn-p btn-sm" id="dfeat-pub" style="flex-shrink:0">'+(ok?_L('Republish','Yeniden Yayınla'):_L('Publish now','Şimdi Yayınla'))+'</button>'
+      + '</div></div>';
+  } catch(e){
+    return '<div class="card" style="padding:14px;margin-bottom:14px;font-size:12.5px;color:#dc2626">'
+      + _L('Featured cache check failed: ','Öne çıkanlar önbelleği kontrolü başarısız: ') + escHtml(((e&&e.message)||'').substring(0,90)) + '</div>';
+  }
+}
+
 // Indeks durum paneli (Veri Sagligi ekraninin en ustunde)
 async function _cidxStatusHtml(){
   var st = null;
@@ -31455,9 +31517,23 @@ async function admDataHealth(m) {
   // v9.33: katalog indeksi paneli — analiz beklemeden once gosterilir
   try {
     var _cidxBox = document.createElement('div');
-    _cidxBox.innerHTML = (await _cidxStatusHtml()) + (await _unmatchedDemandHtml())
-                       + (await _tagScanHtml())
-                       + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.62
+    _cidxBox.innerHTML = (await _cidxStatusHtml()) + (await _dailyFeaturedPanelHtml())
+                       + (await _unmatchedDemandHtml()) + (await _tagScanHtml())
+                       + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.63
+    // v9.63: gunluk one cikanlari yayinla (once sil, sonra hesapla -> taze yazim)
+    _cidxBox.querySelector('#dfeat-pub')?.addEventListener('click', async function(){
+      var b = this; b.disabled = true; var o = b.textContent;
+      b.textContent = _L('Publishing...','Yayınlanıyor...');
+      try {
+        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_d){}
+        await calculateDailyFeatured();
+        showToast(_L('Published.','Yayınlandı.'), 'ok');
+        admDataHealth(m);
+      } catch(e){
+        b.disabled = false; b.textContent = o;
+        showToast(t('common.error_prefix','Hata: ')+((e&&e.message)||''), 'err');
+      }
+    });
     // v9.62: etiket temizleme — her biri ayri onay
     _cidxBox.querySelectorAll('.tag-fix').forEach(function(b){
       b.addEventListener('click', async function(){
