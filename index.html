@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.61 | pochub.co -->
+<!-- PoCHub v9.62 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.61';
+const VERSION = 'v9.62';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.62': ['STORED-XSS — KOKTEN KAPATILDI (ilk incelemeden beri acik duran P0). Uygulama kullanici metinlerini innerHTML ile basiyor ve kacis eksikti: 30 sablon ifadesi + ~270 string birlestirme. YAKLASIM DEGISIKLIGI: 270 noktayi tek tek duzenlemek hem uzun hem kirilgan (bazilari HTML parcasi iceriyor, otomatik degistirme kirar) ve daha onemlisi ISTEMCI TARAFI KACIS, veriyi Firestore API sine DOGRUDAN yazan kotu niyetli bir vendor a karsi hicbir sey yapmaz. Kok verinin girisinde kesildi. (1) RULES v1.9.5 noTags(): etiket acilisi iceren metin KAYDEDILEMEZ. Kalip < + harf/slash/!/? — yani img, /b, !-- ve ?php yakalanir; throughput < 10 Gbps veya a < b gibi mesru kullanim SERBEST kalir. 10 ornekle dogrulandi. Uygulandigi yerler: products (name/description/brand, create ve update), public_events (title/description/speaker/hostName), poc_requests (title/description/requirements), reviews (comment/note), notifications (title/message/body/senderName), poc_messages (text/message), brand_products (name/brand), demo_requests (name/company/message) — 26 kontrol. (2) ISTEMCI: 30 sablon ifadesine escHtml eklendi (derinlemesine savunma). HTML OLMAYAN baglamlar (e-posta govdeleri, toast metinleri) BILEREK dokunulmadi — orada kacis kullaniciya &amp; gosterirdi. Ayrica formlarda stripTags ile temizleme: kullanici kural reddine carpmadan once uyarilir. Guvenlik buna DAYANMAZ, guvenlik kuralda. (3) MEVCUT VERI: Veri Sagligi > HTML etiket taramasi — kural devreye girmeden once yazilmis kayitlari bulur. Temizleme tek tek onayli; toplu otomatik yazma BILEREK yok, yanlis pozitifte urun adini bozmak birakmaktan kotudur. (4) SEED: bes yeni test — urun adi, urun aciklamasi, etkinlik basligi ve bildirim metnine etiket yazma REDDEDILMELI; ayrica POZITIF kontrol: throughput < 10 Gbps ENGELLENMEMELI (dar kapi oldugunu kanitlar, test kaydi sonunda silinir). GELISTIRME NOTLARI: iki hata calisma sirasinda yakalandi — (a) kurallara ikinci bir allow create eklemek kosullari VEYA lar, yani sikilastirmak yerine GEVSETIR; kosul mevcut kuralin icine eklendi. (b) noTags 26 yerde kullaniliyor ama tanimi yazilmamisti (onceki betik assert te durmustu) — bu haliyle deploy edilse TUM kurallar cokerdi; teslim kontrolu yakaladi. node --check MODULE SYNTAX OK.'],
   'v9.61': ['DORT KARARIN TAMAMI UYGULANDI (Hasan: hepsini onerilerinle yap). 1 ve 2 zaten v9.60 ta yapilmisti; bu surum 3u TAMAMLIYOR ve 4u hazirliyor. (3) ILGI SINYALI: v9.60 harici kayit sayfasina yonlendiriyordu ama onerimin asil degerli kismi olan olcumu atlamistim. Artik giris yapmis kullanici harici kayit dugmesine bastiginda registrations a interestOnly kaydi dusuyor (ates-et-unut; yazim basarisiz olsa da kullanici baglantiya gidiyor). KAPASITE SAYACI ARTIRILMAZ — kayit ureticinin sayfasinda tutuluyor, bizim sayacimiza yazmak dolulugu yaniltici gosterirdi. Katilimci ekraninda ILGI kayitlari katilimcilardan AYRI sayiliyor ve ayri gosteriliyor; karistirmak ureticiye yanlis rapor verir. Ekranda ne bilip ne bilmedigimiz acikca yaziyor: tamamlayip tamamlamadiklarini goremiyoruz. (4) FAZ 2 HAZIRLIGI: Blaze acildiginda kurulacak Cloud Function kaynagi ayri dosya olarak uretildi (faz2-inbound-event-function.js) — gelen posta webhooku, SPF/DKIM kontrolu, gonderen alan adinin kayitli vendor ile eslesmesi, Claude ile cikarim, TASLAK yazma, vendor ve admin bildirimi. Faz 1 ile ayni uyari kodlari ve ayni gizlilik kapisi kullaniliyor ki arayuz degismesin. Devreye almadan once yapilacaklar dosyada listelendi (users.emailDomain dogrulamasi, draft durumu arayuzu, gonderen basina gunluk sinir). AYRICA firestore.rules v1.9.4: v9.60 in inceleme kapisi ISTEMCIDEYDI — vendor API ile dogrudan status=published yazip atlayabiliyordu, yani Do not share externally isaretli icerik yayina girebilirdi. Artik pending_review veya rejected durumundan cikisi YALNIZ ADMIN yapabilir. node --check MODULE SYNTAX OK.'],
   'v9.60': ['E-POSTADAN ETKINLIK — FAZ 1 (Hasan: uretici e-postayla etkinlik iletebilmeli, icerik/saat/konusmaci/adres tekrar tekrar girilmesin). Dokuz gercek uretici e-postasi incelendi: hicbirinde takvim eki (.ics) yok, altisi partner kanali, ikisi gizli isaretli, ikisi bulten, biri kendi icinde celiskili (24 Persembe Sali), birinde eski sablon satiri kalmis (May 14), gonderen her zaman marka degil (HPE webinarini CozumPark gonderiyor). (1) AYRISTIRICI: etkinlik formuna E-postadan ice aktar paneli. Baslik, tarih, saat, saat dilimi, sure, konusmacilar (unvanlariyla), ajanda, format, dil, kayit baglantisi ve kitle cikarilir. ASLA sessizce tahmin etmez: bulunan alanlari ve her belirsizligi ayri uyari olarak raporlar. Gercek e-postalar uzerinde Node ile test edildi; bes hata bulunup duzeltildi — tam Ingilizce ay adlari taninmiyordu, Eylul 2026 icinden gun=20 cekiliyordu, yilsiz eski satir gelecege tasiniyordu, nda Turkce bulunma ekini (yayininda) NDA saniyordu, JS \\b Turkce karakterde (Sali) sinir tanimiyordu. Sonuc: dokuz e-postanin dokuzu dogru siniflandi. (2) SAAT DILIMI: eskiden saat formu dolduranin TARAYICI saat dilimine gore yorumlaniyordu; Londra dan giren ureticinin 10:00 BST si TSI de 12:00 olmaliydi. Artik etkinligin saat dilimi saklaniyor, an UTC kaydediliyor, izleyiciye kendi saatinde, farkliysa kaynak saatle birlikte gosteriliyor. Kutuphane yok, Intl yeterli; yaz saati siniri dahil yedi durum dogrulandi. Uretici CET yazsa da Eylul de CEST uygulanir cunku etiket degil bolge kullaniliyor. (3) YENI ALANLAR: tz, speakers[] (ad+unvan), agenda[], hostName (markadan ayri ev sahibi), audience (public/partners), registrationMode + externalUrl (ureticinin kendi kayit sayfasi — dokuz e-postanin dokuzunda kayit orada), source + sourceMeta. Harici kayitta online link zorunlu degil. (4) GIZLILIK KAPISI: Do not share externally gibi isaret bulunursa etkinlik YAYINLANMAZ, pending_review durumunda admin incelemesine duser, admin_inbox a bildirim gider; Admin > Etkinlikler de Onayla/Reddet. (5) KITLE: yalniz is ortaklari etkinlikleri musteri ve anonim ziyaretciye gorunmez. (6) SEED: 12 sentetik regresyon testi — gercek e-postalar KULLANILMADI, cunku gizli isaretli uretici icerigini kod tabanina koymak engellenmeye calisilan seyin ta kendisi olurdu. SINIRLAR (Faz 2 isi): kural tabanli ayristirma — dil modeli degil; kitle filtresi ve gizlilik kapisi ARAYUZ duzeyinde, kural duzeyinde degil (vendor API ile status=published yazabilir); coklu oturum ilk gune indirgeniyor. node --check MODULE SYNTAX OK.'],
   'v9.59': ['ETKINLIKLER — DORT ROL GOZUYLE DEGERLENDIRME ve DUZELTMELER. MUSTERI: (1) MANTIK HATASI — tarihsiz etkinlikler HER filtrede goruruyordu (if(!ed) return true); Yaklasan sekmesinde 22 etkinlik yaziyor ama 20 si tarihsizdi, filtre kendi adini yalanliyordu. Tarihsizler artik yalniz yeni Tarihi Belirsiz sekmesinde ve Tumu de. (2) TAKVIME EKLE: tarihi olan etkinlik icin ICS indirme eklendi (sure alanindan DTEND hesaplanir, varsayilan 90 dk); kurumsal alici tarihi elle not etmek zorunda kalmiyor. Tamamen istemci tarafi, ek okuma yok. (3) SURE, SEVIYE, KONUSMACI alanlari eklendi — katilmadan once sorulan uc sey. (4) Fiziksel adres artik harita baglantisi. URETICI: sayfa yalniz aliciya konusuyordu; rol farkindali serit eklendi, katilimci listesi ve oturum sonrasi PoC talepleri icin Vendor Paneline yonlendiriyor. DISTRIBUTOR: temsil ettigi markalar icin oturum acabilecegi ve kendi musterilerini davet edebilecegi, katilimcilarin actigi PoC taleplerinin kendisine dusecegi acikca yaziliyor. ENTEGRATOR: oturumlardan PoC talebi dogdugu ve saha tarafini ustlenmek icin markalarini isaretlemesi gerektigi soyleniyor. TESPIT: etkinlik olusturma formu tarihi ZATEN zorunlu tutuyor — 20 tarihsiz kayit seed verisi, form hatasi degil. node --check MODULE SYNTAX OK.'],
@@ -4047,12 +4048,12 @@ function renderEvProdList(prods, modal) {
   }
   list.style.display = 'block';
   list.innerHTML = prods.map(p =>
-    `<div class="ev-prod-opt" data-id="${p.id}" data-name="${(p.name||'').replace(/"/g,'')}" data-cat="${p.category||''}"
+    `<div class="ev-prod-opt" data-id="${p.id}" data-name="${escHtml((p.name||'').replace(/"/g,''))}" data-cat="${p.category||''}"
       style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px"
       onmouseover="this.style.background='rgba(37,99,235,.1)'"
       onmouseout="this.style.background=''">
       <div class="flx1">
-        <div class="fs13-fw6">${p.name}</div>
+        <div class="fs13-fw6">${escHtml(p.name)}</div>
         <div style="font-size:11.5px;color:#64748b">${catLabelEN(p.category)||'—'} · ${p.country||''}</div>
       </div>
       <span style="font-size:10px;background:rgba(22,163,74,.1);color:#16a34a;padding:2px 7px;border-radius:4px;font-weight:700">${_L("Approved","Onaylı")}</span>
@@ -4705,12 +4706,12 @@ async function loadMessagesTab(m, role) {
           <div style="width:40px;height:40px;border-radius:50%;background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💬</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-              <div style="font-size:13.5px;font-weight:${msgInfo.unread > 0 ? '700' : '600'};color:var(--text-primary);display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>${otherName}</span>${role === 'customer' ? getVendorBadgeRow(poc.vendorId) : ''}</div>
+              <div style="font-size:13.5px;font-weight:${msgInfo.unread > 0 ? '700' : '600'};color:var(--text-primary);display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>${escHtml(otherName)}</span>${role === 'customer' ? getVendorBadgeRow(poc.vendorId) : ''}</div>
               <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:8px">${lastTime}</div>
             </div>
             <div style="font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${lastText}</div>
             <div style="display:flex;align-items:center;gap:6px">
-              <span class="fs11-muted">${poc.productName||poc.title||'PoC'}</span>
+              <span class="fs11-muted">${escHtml(poc.productName||poc.title||'PoC')}</span>
               <span style="font-size:10px;color:${statusColor};background:${statusColor}18;padding:1px 7px;border-radius:10px;font-weight:600">${statusLabel}</span>
               <span class="fs10-muted">${msgInfo.total} mesaj</span>
             </div>
@@ -4838,7 +4839,7 @@ async function loadMessagesTab(m, role) {
       m.appendChild(list);
 
     } catch(e) {
-      m.innerHTML = `<div class="alert alert-err">${t('cmsg.load_failed','Yüklenemedi:')} ${e.message}</div>`;
+      m.innerHTML = `<div class="alert alert-err">${t('cmsg.load_failed','Yüklenemedi:')} ${escHtml(e.message)}</div>`;
     }
   }
 
@@ -6040,6 +6041,31 @@ function attachLocaleSwitcherHandlers() {
       setLocale(b.dataset.loc);
     });
   });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   v9.62 — ETIKET TEMIZLEME (istemci tarafi nezaket katmani)
+   ────────────────────────────────────────────────────────────────────
+   Asil koruma firestore.rules v1.9.5'teki noTags() kuralidir: etiket
+   iceren metin KAYDEDILEMEZ, API'den yazilsa bile. Bu fonksiyon o kurali
+   TEKRARLAMAZ, yalnizca kullanicinin kural reddine carpmadan once uyarilmasini
+   saglar — form gonderiminde metni temizler ve ne yapildigini soyler.
+   Guvenlik buna DAYANMAZ; guvenlik kuralda.
+   ════════════════════════════════════════════════════════════════════ */
+function stripTags(v){
+  if (typeof v !== 'string') return v;
+  return v.replace(/<(?=[a-zA-Z\/!?])/g, '‹');   // etiket acilisini zararsiz karaktere cevir
+}
+function hasTags(v){ return typeof v === 'string' && /<[a-zA-Z\/!?]/.test(v); }
+// Bir formdaki metin alanlarini temizler; degisen alan olduysa true doner.
+function sanitizeFields(root, ids){
+  var changed = false;
+  ids.forEach(function(id){
+    var el = root.querySelector(id);
+    if (!el || typeof el.value !== 'string') return;
+    if (hasTags(el.value)) { el.value = stripTags(el.value); changed = true; }
+  });
+  return changed;
 }
 
 function escHtml(s) {
@@ -7276,7 +7302,7 @@ async function handleAuth() {
       'auth/invalid-email': 'Geçersiz e-posta adresi.',
       'auth/invalid-credential': 'E-posta veya şifre hatalı.',
     };
-    errDiv.innerHTML = `<div class="alert alert-err">${msgs[e.code]||e.message}</div>`;
+    errDiv.innerHTML = `<div class="alert alert-err">${escHtml(msgs[e.code]||e.message)}</div>`;
     btn.disabled = false;
     btn.textContent = AUTH_MODE==='login'?t('auth.login_btn','Giriş Yap'):t('auth.register_btn','Kayıt Ol');
   }
@@ -8577,13 +8603,13 @@ async function renderHome() {
             <span class="bdg" style="background:${feeBg};color:${feeCol}">${feeLabel}</span>
           </div>
           <div style="font-size:14px;font-weight:700;margin-bottom:4px">${escHtml(cleanTitle(e.title))}</div>
-          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:3px">${e.vendorName||'—'} · ${e.productName||'—'}</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:3px">${escHtml(e.vendorName||'—')} · ${escHtml(e.productName||'—')}</div>
           <div style="font-size:12px;color:#64748b">📅 ${date}${e.location?' · 📍 '+e.location:''}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:12px;color:${spots<=0?'#dc2626':spots<=5?'#d97706':'#16a34a'};margin-bottom:8px;font-weight:600">${spots<=0?t('ev.full','Dolu'):spots+' '+t('ev.seats','yer')}</div>
           <button class="btn-p btn-sm ev-detail-btn" data-id="${e.id}" style="margin-bottom:6px;white-space:nowrap">${t('ev.detail','Detay →')}</button><br>
-          <button class="btn-g btn-sm ev-reg-home" data-id="${e.id}" data-title="${(e.title||'').replace(/"/g,'')}" data-vendor-email="${e.vendorEmail||''}" data-vendor-name="${(e.vendorName||'').replace(/"/g,'')}">
+          <button class="btn-g btn-sm ev-reg-home" data-id="${e.id}" data-title="${escHtml((e.title||'').replace(/"/g,''))}" data-vendor-email="${e.vendorEmail||''}" data-vendor-name="${escHtml((e.vendorName||'').replace(/"/g,''))}">
             ${CUR_USER?t('ev.register','Kayıt Ol'):t('ev.login_register','Giriş Yap & Kayıt')}
           </button>
         </div>
@@ -10985,11 +11011,11 @@ async function openEventDetail(eventId) {
           <div style="font-size:12.5px;font-weight:600">${v}</div>
         </div>`).join('')}
       </div>
-      ${e.description?`<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:13px;margin-bottom:16px;font-size:13px;color:#64748b;line-height:1.7">${e.description}</div>`:''}
+      ${e.description?`<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:13px;margin-bottom:16px;font-size:13px;color:#64748b;line-height:1.7">${escHtml(e.description)}</div>`:''}
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:#f8fafc;border:1px solid rgba(15,23,42,.08);border-radius:8px;margin-bottom:14px">
         <div>
           <div style="font-size:12px;color:#64748b">${_L("Organizer","Düzenleyen")}</div>
-          <div class="fs13-fw7">${e.vendorName||'—'}</div>
+          <div class="fs13-fw7">${escHtml(e.vendorName||'—')}</div>
         </div>
         <div class="t-rgt">
           <div style="font-size:${spots<=0?12:18}px;font-weight:700;color:${spots<=0?'#dc2626':spots<=5?'#d97706':'#16a34a'}">${spots<=0?'Dolu':spots+' yer kaldı'}</div>
@@ -11147,7 +11173,7 @@ async function loadEventsList() {
       });
     });
   } catch(e) {
-    listEl.innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
+    listEl.innerHTML = `<div class="empty">Yükleme hatası: ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -12162,7 +12188,7 @@ async function loadCatalog() {
       openMultiVendorPocModal(b.dataset.id);
     }); });
   } catch(e) {
-    gridEl.innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
+    gridEl.innerHTML = `<div class="empty">Yükleme hatası: ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -12594,7 +12620,7 @@ async function vendDistributorProducts(m) {
       });
     });
   } catch(e) {
-    m.innerHTML = `<div class="alert alert-err">${t('cmsg.load_failed','Yüklenemedi:')} ${e.message}</div>`;
+    m.innerHTML = `<div class="alert alert-err">${t('cmsg.load_failed','Yüklenemedi:')} ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -13243,7 +13269,7 @@ function openEditPocModal(pocId, title, requirements, preferredDates, location) 
       showToast(t('tst.request_updated','Talep güncellendi!'));
       loadCustTab();
     } catch(e) {
-      modal.querySelector('#edit-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      modal.querySelector('#edit-err').innerHTML=`<div class="alert alert-err">${escHtml(e.message)}</div>`;
       btn.disabled=false; btn.textContent=t('credit.update','Güncelle');
     }
   });
@@ -14298,7 +14324,7 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       }
     }
   } catch(e) {
-    modal.querySelector('#poc-cats').innerHTML = `<div class="empty">Yükleme hatası: ${e.message}</div>`;
+    modal.querySelector('#poc-cats').innerHTML = `<div class="empty">Yükleme hatası: ${escHtml(e.message)}</div>`;
   }
 
   function showProductStep(products) {
@@ -14309,14 +14335,14 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
 
     prodsEl.innerHTML = products.map(p => `
       <label style="display:flex;align-items:center;gap:12px;padding:13px 14px;background:#ffffff;border:1px solid rgba(15,23,42,.10);border-radius:9px;cursor:pointer;transition:.1s" class="prod-label">
-        <input type="checkbox" class="prod-cb" data-pid="${p.id}" data-pname="${(p.name||'').replace(/"/g,'')}" data-vid="${p.vendorId}" data-vname="${(p.vendorName||'').replace(/"/g,'')}" data-vemail="${p.vendorEmail||''}" data-vtype="${p.vendorType||''}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
+        <input type="checkbox" class="prod-cb" data-pid="${p.id}" data-pname="${escHtml((p.name||'').replace(/"/g,''))}" data-vid="${p.vendorId}" data-vname="${escHtml((p.vendorName||'').replace(/"/g,''))}" data-vemail="${p.vendorEmail||''}" data-vtype="${p.vendorType||''}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
         <div class="flx1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <span style="font-size:13px;font-weight:700;color:#0f172a">${p.name}</span>
+            <span style="font-size:13px;font-weight:700;color:#0f172a">${escHtml(p.name)}</span>
             <span class="bdg" style="background:${vtypeBg[p.vendorType]||'rgba(15,23,42,.05)'};color:${vtypeCol[p.vendorType]||'#64748b'};font-weight:600">${vtypeLabels[p.vendorType]||'Vendor'}</span>
           </div>
-          <div style="font-size:12px;color:#64748b">${p.vendorName||'—'}${p.country?' · '+p.country:''}</div>
-          ${p.description?`<div style="font-size:11.5px;color:#64748b;margin-top:3px;line-height:1.5">${p.description.substring(0,80)}...</div>`:''}
+          <div style="font-size:12px;color:#64748b">${escHtml(p.vendorName||'—')}${p.country?' · '+p.country:''}</div>
+          ${p.description?`<div style="font-size:11.5px;color:#64748b;margin-top:3px;line-height:1.5">${escHtml(p.description.substring(0,80))}...</div>`:''}
         </div>
         ${p.specs?`<div style="flex-shrink:0;text-align:right">${Object.entries(p.specs).slice(0,2).map(([k,v])=>`<div style="font-size:11px;color:#94a3b8">${k}: <b style="color:#475569">${v}</b></div>`).join('')}</div>`:''}
       </label>`).join('');
@@ -14364,8 +14390,8 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
     sumEl.innerHTML = `<div style="font-size:11.5px;color:#475569;margin-bottom:8px">Seçilen ${selectedVendors.length} vendor'a talep gönderilecek:</div>`
       + selectedVendors.map(v=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
           <div style="width:6px;height:6px;border-radius:50%;background:#2563eb;flex-shrink:0"></div>
-          <span class="fw6">${v.productName}</span>
-          <span style="color:#475569;font-size:11.5px">— ${v.vendorName}</span>
+          <span class="fw6">${escHtml(v.productName)}</span>
+          <span style="color:#475569;font-size:11.5px">— ${escHtml(v.vendorName)}</span>
           <span class="bdg" style="background:rgba(37,99,235,.1);color:#2563eb;margin-left:auto">${vtypeLabels[v.vendorType]||''}</span>
         </div>`).join('');
     modal.querySelector('#poc-step2').style.display='none';
@@ -14488,7 +14514,7 @@ async function openMultiVendorPocModal(preSelectProductId, preSelectedIds) {
       if (CUR_SCREEN === 'customer') { CUR_CUST_TAB='requests'; renderCustomer(); }
 
     } catch(e) {
-      modal.querySelector('#poc-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      modal.querySelector('#poc-err').innerHTML=`<div class="alert alert-err">${escHtml(e.message)}</div>`;
       btn.disabled=false; btn.textContent=t('poc.submit','Talebi Gönder →');
     }
   });
@@ -29254,6 +29280,12 @@ async function openNewEventModal() {
     var urlVal=(modal.querySelector('#cem-url')?.value||'').trim();
     var addrVal=(modal.querySelector('#cem-addr')?.value||'').trim();
     var errDiv=modal.querySelector('#cem-err');
+    // v9.62: kullanici kural reddine carpmadan once temizle ve soyle
+    if (sanitizeFields(modal, ['#cem-title','#cem-desc','#cem-speaker','#cem-agenda','#cem-host'])) {
+      showToast(t('common.tags_stripped','Metinlerdeki HTML etiketleri temizlendi.'), 'info');
+      title=modal.querySelector('#cem-title').value.trim();
+      desc=modal.querySelector('#cem-desc').value.trim();
+    }
     var errors=[];
     if(!title)errors.push(t('vev.f_title','Başlık'));
     if(!desc)errors.push(t('vev.f_desc','Açıklama'));
@@ -31328,6 +31360,65 @@ async function _dupTemplatesHtml(){
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// v9.62 — ETIKET TARAMASI (mevcut veri)
+// ───────────────────────────────────────────────────────────────────────
+// rules v1.9.5 YENI yazmalari engelliyor; kural devreye girmeden ONCE
+// kaydedilmis metinler duruyor olabilir. Bu rapor onlari bulur.
+// Temizleme admin tarafindan tek tek onaylanir — toplu otomatik yazma YOK:
+// yanlis pozitifte urun adini bozmak, birakmaktan kotudur.
+// ═══════════════════════════════════════════════════════════════════════
+async function _tagScanHtml(){
+  try {
+    var hits = [];
+    function check(coll, id, field, val){
+      if (hasTags(val)) hits.push({ coll:coll, id:id, field:field, val:String(val).substring(0,140) });
+    }
+    (await getActiveProducts()).forEach(function(p){
+      check('products', p.id, 'name', p.name);
+      check('products', p.id, 'description', p.description);
+      check('products', p.id, 'brand', p.brand);
+    });
+    try {
+      (await getBrandProducts()).forEach(function(tp){
+        check('brand_products', tp.id, 'name', tp.name);
+        check('brand_products', tp.id, 'brand', tp.brand);
+      });
+    } catch(e){}
+    try {
+      var evSnap = await getDocs(query(collection(db,'public_events'), limit(400)));
+      evSnap.docs.forEach(function(d){ var e=d.data()||{};
+        check('public_events', d.id, 'title', e.title);
+        check('public_events', d.id, 'description', e.description);
+      });
+    } catch(e){}
+
+    if (!hits.length) {
+      return '<div class="card" style="padding:15px 18px;margin-bottom:14px">'
+        + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">' + _L('HTML tag scan','HTML etiket taraması') + '</div>'
+        + '<div style="font-size:12.5px;color:#16a34a">✓ ' + _L('No stored text contains HTML tags.','Kayıtlı metinlerde HTML etiketi yok.') + '</div></div>';
+    }
+    var h = '<div class="card" style="padding:16px;margin-bottom:14px">'
+      + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">' + _L('HTML tag scan','HTML etiket taraması') + '</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.55">'
+      +   _L('Rules now block new writes containing tags. These records were saved before that. Review each one — automatic bulk rewriting is not done on purpose.',
+             'Kurallar artık etiket içeren yeni yazmaları engelliyor. Bu kayıtlar o kuraldan önce yazılmış. Tek tek inceleyin — bilerek toplu otomatik düzeltme yapılmıyor.')
+      + '</div>'
+      + '<div style="font-size:12px;color:#b45309;font-weight:700;margin-bottom:9px">⚠ ' + hits.length + ' ' + _L('record','kayıt') + '</div>';
+    hits.slice(0,60).forEach(function(x){
+      h += '<div style="display:flex;gap:9px;align-items:center;border-top:1px solid var(--border);padding:7px 0;font-size:12.5px">'
+        + '<span style="font-size:10.5px;color:var(--text-muted);min-width:118px">' + escHtml(x.coll) + ' · ' + escHtml(x.field) + '</span>'
+        + '<code style="flex:1;font-size:11.5px;color:#dc2626;word-break:break-all">' + escHtml(x.val) + '</code>'
+        + '<button class="btn-g btn-sm tag-fix" data-coll="' + escHtml(x.coll) + '" data-id="' + escHtml(x.id) + '" data-field="' + escHtml(x.field) + '" style="font-size:11px;flex-shrink:0">' + _L('Clean','Temizle') + '</button>'
+        + '</div>';
+    });
+    return h + '</div>';
+  } catch(e){
+    return '<div class="card" style="padding:14px;margin-bottom:14px;font-size:12.5px;color:#dc2626">'
+      + _L('Tag scan failed: ','Etiket taraması başarısız: ') + escHtml(((e&&e.message)||'').substring(0,90)) + '</div>';
+  }
+}
+
 // Indeks durum paneli (Veri Sagligi ekraninin en ustunde)
 async function _cidxStatusHtml(){
   var st = null;
@@ -31365,7 +31456,26 @@ async function admDataHealth(m) {
   try {
     var _cidxBox = document.createElement('div');
     _cidxBox.innerHTML = (await _cidxStatusHtml()) + (await _unmatchedDemandHtml())
-                       + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.56
+                       + (await _tagScanHtml())
+                       + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.62
+    // v9.62: etiket temizleme — her biri ayri onay
+    _cidxBox.querySelectorAll('.tag-fix').forEach(function(b){
+      b.addEventListener('click', async function(){
+        b.disabled = true;
+        try {
+          var ref = doc(db, b.dataset.coll, b.dataset.id);
+          var snap = await getDoc(ref);
+          if(!snap.exists()){ showToast(_L('Record not found.','Kayıt bulunamadı.'),'err'); b.disabled=false; return; }
+          var cur = snap.data()[b.dataset.field];
+          var upd = {}; upd[b.dataset.field] = stripTags(String(cur||''));
+          await updateDoc(ref, upd);
+          if(b.dataset.coll==='products' && typeof invalidateProductCache==='function') invalidateProductCache();
+          if(b.dataset.coll==='brand_products' && typeof invalidateBrandProductCache==='function') invalidateBrandProductCache();
+          b.textContent = '✓'; b.closest('div').style.opacity = '.4';
+          showToast(_L('Cleaned.','Temizlendi.'),'ok');
+        } catch(e){ b.disabled=false; showToast(t('common.error_prefix','Hata: ')+((e&&e.message)||''),'err'); }
+      });
+    });
     // v9.56: mukerrer raporundaki silme dugmeleri
     _cidxBox.querySelectorAll('.dup-del').forEach(function(b){
       b.addEventListener('click', async function(){
@@ -36436,6 +36546,7 @@ const I18N_DICT = {
     'vev.w_conf': 'GİZLİLİK İŞARETİ bulundu. Etkinlik yayınlanmaz, admin incelemesine gider.',
     'eam.interest_count': 'kişi PoCHub üzerinden kayıt sayfanıza gitti',
     'eam.interest_note': 'Kayıt sizin sayfanızda tutulduğu için tamamlayıp tamamlamadıklarını göremiyoruz. Aşağıdaki liste yalnız ilgi sinyalidir.',
+    'common.tags_stripped': 'Metinlerdeki HTML etiketleri temizlendi.',
     'ev.reg_external': 'Kayıt ol',
     'ev.partners_only': 'İş ortaklarına özel',
     'aev.approve': 'Onayla',
@@ -39324,6 +39435,7 @@ const I18N_DICT = {
     'vev.w_conf': 'CONFIDENTIALITY MARKER found. The event will not be published; it goes to admin review.',
     'eam.interest_count': 'people went to your registration page via PoCHub',
     'eam.interest_note': 'Registration is held on your own page, so we cannot see whether they completed it. The list below is an interest signal only.',
+    'common.tags_stripped': 'HTML tags were removed from the text.',
     'ev.reg_external': 'Register',
     'ev.partners_only': 'Partners only',
     'aev.approve': 'Approve',
@@ -68642,15 +68754,15 @@ function openCatModal(existing) {
       <button class="btn-close-x" id="close-cat-modal">×</button>
     </div>
     <label class="lbl">${t('acat.f_name','Kategori Adı *')}</label>
-    <input class="inp" id="cat-name" value="${existing?.name||''}" placeholder="${t('acat.ph_name','Örn: Firewall')}">
+    <input class="inp" id="cat-name" value="${escHtml(existing?.name||'')}" placeholder="${t('acat.ph_name','Örn: Firewall')}">
     <label class="lbl">🌐 Category Name (EN)</label>
-    <input class="inp" id="cat-name-en" value="${existing?.name_en||''}" placeholder="e.g. Firewall">
+    <input class="inp" id="cat-name-en" value="${escHtml(existing?.name_en||'')}" placeholder="e.g. Firewall">
     <label class="lbl">${t('acat.f_order','Sıra (küçük = önce gösterilir)')}</label>
     <input class="inp" id="cat-order" type="number" value="${existing?.order||0}">
     <label class="lbl">${t('acat.f_desc','Açıklama')}</label>
-    <input class="inp" id="cat-desc" value="${existing?.description||''}" placeholder="${t('acat.ph_desc','Kısa açıklama (opsiyonel)')}">
+    <input class="inp" id="cat-desc" value="${escHtml(existing?.description||'')}" placeholder="${t('acat.ph_desc','Kısa açıklama (opsiyonel)')}">
     <label class="lbl">🌐 Description (EN)</label>
-    <input class="inp" id="cat-desc-en" value="${existing?.description_en||''}" placeholder="(optional)">
+    <input class="inp" id="cat-desc-en" value="${escHtml(existing?.description_en||'')}" placeholder="(optional)">
     <div style="border-top:1px solid rgba(0,0,0,.1);margin:14px 0 10px;padding-top:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${t('acat.tech_fields','Teknik Özellik Alanları')}</span>
@@ -68761,7 +68873,7 @@ function openCatModal(existing) {
       invalidateCatCache();
       modal.remove(); loadAdmTab();
     } catch(e) {
-      modal.querySelector('#cat-err').innerHTML=`<div class="alert alert-err">${e.message}</div>`;
+      modal.querySelector('#cat-err').innerHTML=`<div class="alert alert-err">${escHtml(e.message)}</div>`;
       btn.disabled=false; btn.textContent=isEdit?t('acat.update','Güncelle'):t('acat.add','Ekle');
     }
   });
