@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.65 | pochub.co -->
+<!-- PoCHub v9.66 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.65';
+const VERSION = 'v9.66';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.66': ['SAHIPSIZ KAYIT TARAMASI (v9.65 panelinin ortaya cikardigi durum). Panel yalniz BIR vendor kullanici oldugunu gosterdi (GITS TEKNOLOJI) — oysa katalogda Fortinet TR, HPE Turkiye, NetArmor ve Veeam TR urunleri duruyor ve onceki surumlerde bunlar vendor olarak listeleniyordu. Kod tarandi: users.role alanina vendor tipi yazan bir yer YOK (role alanina vendorType yazan tek eslesme brand_relations koleksiyonunda, farkli bir sey). Yani bu bir kod hatasi degil VERI durumu — hesaplar silinmis ya da Admin > Rol Yonetimi uzerinden rolleri degistirilmis olmali. SONUCLARI: urunler katalogda ama sahibi yok; vendor profil baglantilari kirik, PoC talepleri yonlendirilemiyor, one cikan hesabi o ureticileri hic gormuyor, ayna da dogal olarak bos kaliyor. Veri Sagligi na SAHIPSIZ KAYITLAR raporu eklendi: hangi vendorId degerleri urun/etkinlikte geciyor ama karsiliginda role=vendor kullanici yok, kayitlardaki uretici adi ve kac urun/etkinlik etkilendigi ile birlikte. Otomatik duzeltme YOK — silinen hesabi geri getirmek mi, urunu baska vendor a devretmek mi, admin karari. node --check MODULE SYNTAX OK.'],
   'v9.65': ['AYNA PANELI TESHIS EDILEBILIR HALE GETIRILDI (Hasan ekran goruntusu: 1 uretici aynada). SORUN: panel tek cumle basiyordu ve iki sayidan yalnizca birini gosteriyordu; 1 uretici aynada yazinca vendor kullanici sayisinin mi yoksa ayna sayisinin mi 1 oldugu AYIRT EDILEMIYORDU. Onceki ekranlarda logo barinda bes uretici gorulmustu, yani iki kaynak celisiyordu ve panel hangisinin dogru oldugunu soylemiyordu. (1) Artik UC sayi ayri gosteriliyor: vendor kullanici, aynada, eksik. (2) Eksikler ve aynada olup kullanicisi olmayan YETIM satirlar ADIYLA listeleniyor. (3) Hic vendor kullanici bulunamazsa panel bunu bir basari degil UYARI olarak gosteriyor ve vendor hesaplarinin farkli bir role degeriyle kayitli olabilecegini, panele guvenmeden once Admin > Kullanicilar ekranina bakilmasi gerektigini soyluyor — eski panel bu durumda sessizce yesil gorunebiliyordu. Panel uc senaryoda (bos, 1-1, 5-1) sahte veriyle calistirilip HTML denge kontrolu yapildi. node --check MODULE SYNTAX OK.'],
   'v9.64': ['VENDOR PII — AYNA KOLEKSIYONU (KVKK, NOT-1 kapaniyor). SORUN: users.read kurali resource.data.role == vendor ile ANONIM acik ve Firestore ta ALAN BAZLI okuma kurali YOK; yani vendor kullanici dokumaninin TAMAMI herkese okunabilir durumdaydi. Alanlar sayildiginda ortaya cikanlar: email, secondaryEmail, phone2, taxNo ve invoice alanlari (vergi kimligi), consents ile ipAtConsent ve userAgentAtConsent (KVKK onay kaydi, IP adresi dahil), suspiciousSignup ve rejectionReason (ic moderasyon notlari), isSuspendedDueToBilling ve hasActiveSubscription (ticari durum). Yani sorun e-posta gorunuyor degil, onay loglari ve vergi kimligi acikta. (1) vendor_public ayna koleksiyonu devreye alindi. rules v1.9.6 ile alan listesi arayuzun GERCEKTEN gosterdigi is bilgisine gore genisletildi (sirket, slug, logo, kategori, marka, sehir, telefon, adres, web sitesi, vendorType, tier, rozetler); yukaridaki hassas alanlarin HICBIRI listede yok. (2) Sekiz ANONIM erisilebilir okuma noktasi aynaya tasindi: renderVendors, loadTopVendors, loadVendorLogoBar, calculateDailyFeatured, renderBrandPage, renderVendorPublic, loadVendors, openCustomPoCModal marka eslesmesi. Admin ekranlari users i okumaya devam ediyor (zaten yetkili). (3) GECIS GUVENLIGI: ayna bos veya eksikse otomatik olarak users a duser. Bu surum TEK BASINA hicbir seyi bozmaz; users.read daraltmasi AYRI bir surumde, ayna dolulugu dogrulandiktan sonra yapilacak. (4) SENKRON: 20 ayri profil yazma noktasini yamamak yerine iki kapi — vendor her oturumda kendi ayna satirini tazeler (hangi yoldan degisirse degissin kapsanir) ve profil sihirbazi kaydinda anlik senkron. (5) Veri Sagligi na ayna paneli: kac vendor aynada, kaci eksik; Aynayi Olustur / Yenile dugmesi. Eksik varsa panel kirmizi ve ne riske girildigini yaziyor. GELISTIRME NOTU: loadVendors tek satirlik oldugu icin regex ile yapilan degisiklik map() icindeki ilk noktali virgulde kesip satiri bozdu; node --check yakaladi, elle onarildi. node --check MODULE SYNTAX OK.'],
   'v9.63': ['ANASAYFA ANONIM ZIYARETCIDE BOZUKTU — P0 DUZELTME. TESHIS: calculateDailyFeatured vendor_subscriptions koleksiyonunu KORUMASIZ okuyordu; kural isAdmin() veya isOwner() diyor, yani giris yapmamis ziyaretcide sorgu PERMISSION_DENIED ile patliyordu. Daha kotusu loadFeaturedCarousels tek bir dis try ile sarili oldugu icin bu hata one cikan urunlerle birlikte KATEGORI SATIRLARINI da yutuyordu — anonim ziyaretci hero altinda BOS sayfa goruyordu. Admin olarak bakildiginda gorunmuyordu cunku admin o koleksiyonu okuyabiliyor. Ayrica Boost gelirini vuruyordu: odeme yapan vendor in urunu tam olarak hedef kitleye gorunmuyordu. (1) Abonelik okumasi opsiyonel hale getirildi. Veri YALNIZ tier icin kullaniliyor ve _mkFV icinde zaten subsById currentTier VEYA v.subscriptionTier yedek zinciri vardi; users.subscriptionTier yedi ayri satin alma/deneme noktasinda guncel tutuluyor ve users anonim okunabiliyor — yani anonim ziyaretci de DOGRU tier i goruyor, sadece izin hatasi almiyor. (2) One cikan hesabi herhangi bir sebeple patlasa bile kategori satirlari cizilecek sekilde ayri try icine alindi. (3) YAN BULGU: pochub_daily_featured yazimi yalniz admin e acik, yani onbellek sadece admin siteye girdiginde olusuyordu; diger herkes her sayfa goruntulemesinde hesabi bastan yapiyor, vendor sayisi kadar users okumasi uretiyordu. Katalog indeksinde (v9.33) cozulen problemin aynisi. Veri Sagligi na GUNLUK ONE CIKANLAR yayin paneli eklendi: bugun yayinlandi mi, ne zaman, kac urun/uretici; Yayinla dugmesi once onbellegi silip yeniden hesapliyor. Yayinlanmamissa istemci yine hesapliyor — dogru calisir, sadece pahali. DOGRULAMA: anasayfa akisindaki tum kisitli koleksiyon okumalari tarandi; users (role==vendor sorgusu kurali karsiliyor) ve notifications (zaten try icinde) yanlis alarm cikti, baska acik yok. node --check MODULE SYNTAX OK.'],
@@ -31625,6 +31626,73 @@ async function _vendorMirrorHtml(){
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// v9.66 — SAHIPSIZ URUN / ETKINLIK TARAMASI
+// ───────────────────────────────────────────────────────────────────────
+// v9.65 paneli yalniz BIR vendor kullanici oldugunu gosterdi; oysa
+// katalogda birden fazla ureticinin urunu duruyor. Demek ki bazi vendor
+// hesaplari silinmis ya da rolu degistirilmis ve urunleri sahipsiz kalmis.
+// Sonuclari: vendor profil baglantilari kirik, PoC talebi kimseye
+// yonlenemiyor, one cikan hesaplamasi o ureticileri hic gormuyor.
+// Bu rapor hangi vendorId'lerin karsiliksiz oldugunu ve kac kayit
+// etkilendigini soyler. Otomatik duzeltme YOK — silinen hesabi geri
+// getirmek veya urunu baska vendor'a devretmek admin karari.
+// ═══════════════════════════════════════════════════════════════════════
+async function _orphanOwnerHtml(){
+  try {
+    var uSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
+    var known = {}; uSnap.docs.forEach(function(d){ known[d.id]=1; });
+
+    var byVid = {};
+    function note(vid, nm, kind){
+      if(!vid || known[vid]) return;
+      var e = byVid[vid] || (byVid[vid] = { vid:vid, name:nm||'—', products:0, events:0 });
+      if(nm && e.name === '—') e.name = nm;
+      e[kind]++;
+    }
+    (await getActiveProducts()).forEach(function(p){ note(p.vendorId, p.vendorName, 'products'); });
+    try {
+      var ev = await getDocs(query(collection(db,'public_events'), limit(400)));
+      ev.docs.forEach(function(d){ var e=d.data()||{}; note(e.vendorId, e.vendorName, 'events'); });
+    } catch(e){}
+
+    var rows = Object.keys(byVid).map(function(k){ return byVid[k]; })
+                 .sort(function(a,b){ return (b.products+b.events)-(a.products+a.events); });
+    if (!rows.length) {
+      return '<div class="card" style="padding:15px 18px;margin-bottom:14px">'
+        + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Ownerless records','Sahipsiz kayıtlar')+'</div>'
+        + '<div style="font-size:12.5px;color:#16a34a">✓ '+_L('Every product and event has a matching vendor account.','Her ürün ve etkinliğin karşılığı olan bir vendor hesabı var.')+'</div></div>';
+    }
+    var tot = rows.reduce(function(a,r){ return a + r.products + r.events; }, 0);
+    var h = '<div class="card" style="padding:16px;margin-bottom:14px;border-left:3px solid #dc2626">'
+      + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Ownerless records','Sahipsiz kayıtlar')+'</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:11px;line-height:1.55">'
+      +   _L('These vendorIds appear on products or events but no user account with role=vendor exists for them — the account was probably deleted or its role changed. Vendor profile links break, PoC requests cannot be routed, and featured calculations skip them.',
+             'Bu vendorId değerleri ürünlerde veya etkinliklerde geçiyor ama karşılığında role=vendor olan bir kullanıcı hesabı yok — hesap silinmiş ya da rolü değiştirilmiş olabilir. Vendor profil bağlantıları kırılır, PoC talepleri yönlendirilemez, öne çıkan hesabı bu üreticileri hiç görmez.')
+      + '</div>'
+      + '<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:9px">⚠ ' + rows.length + ' ' + _L('vendorId · ','vendorId · ') + tot + ' ' + _L('record affected','kayıt etkileniyor') + '</div>'
+      + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+      + '<thead><tr style="text-align:left;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">'
+      +   '<th style="padding:6px 8px">'+_L('Vendor name on records','Kayıtlardaki üretici adı')+'</th>'
+      +   '<th style="padding:6px 8px">'+_L('Products','Ürün')+'</th>'
+      +   '<th style="padding:6px 8px">'+_L('Events','Etkinlik')+'</th>'
+      +   '<th style="padding:6px 8px">vendorId</th>'
+      + '</tr></thead><tbody>';
+    rows.slice(0,40).forEach(function(r){
+      h += '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:7px 8px;font-weight:700">'+escHtml(r.name)+'</td>'
+        + '<td style="padding:7px 8px">'+r.products+'</td>'
+        + '<td style="padding:7px 8px">'+r.events+'</td>'
+        + '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:var(--text-muted)">'+escHtml(r.vid)+'</td>'
+        + '</tr>';
+    });
+    return h + '</tbody></table></div></div>';
+  } catch(e){
+    return '<div class="card" style="padding:14px;margin-bottom:14px;font-size:12.5px;color:#dc2626">'
+      + _L('Ownerless scan failed: ','Sahipsiz kayıt taraması başarısız: ') + escHtml(((e&&e.message)||'').substring(0,90)) + '</div>';
+  }
+}
+
 // Indeks durum paneli (Veri Sagligi ekraninin en ustunde)
 async function _cidxStatusHtml(){
   var st = null;
@@ -31662,6 +31730,7 @@ async function admDataHealth(m) {
   try {
     var _cidxBox = document.createElement('div');
     _cidxBox.innerHTML = (await _cidxStatusHtml()) + (await _vendorMirrorHtml())
+                       + (await _orphanOwnerHtml())   // v9.66
                        + (await _dailyFeaturedPanelHtml())
                        + (await _unmatchedDemandHtml()) + (await _tagScanHtml())
                        + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.64
