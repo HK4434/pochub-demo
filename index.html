@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.64 | pochub.co -->
+<!-- PoCHub v9.65 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.64';
+const VERSION = 'v9.65';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.65': ['AYNA PANELI TESHIS EDILEBILIR HALE GETIRILDI (Hasan ekran goruntusu: 1 uretici aynada). SORUN: panel tek cumle basiyordu ve iki sayidan yalnizca birini gosteriyordu; 1 uretici aynada yazinca vendor kullanici sayisinin mi yoksa ayna sayisinin mi 1 oldugu AYIRT EDILEMIYORDU. Onceki ekranlarda logo barinda bes uretici gorulmustu, yani iki kaynak celisiyordu ve panel hangisinin dogru oldugunu soylemiyordu. (1) Artik UC sayi ayri gosteriliyor: vendor kullanici, aynada, eksik. (2) Eksikler ve aynada olup kullanicisi olmayan YETIM satirlar ADIYLA listeleniyor. (3) Hic vendor kullanici bulunamazsa panel bunu bir basari degil UYARI olarak gosteriyor ve vendor hesaplarinin farkli bir role degeriyle kayitli olabilecegini, panele guvenmeden once Admin > Kullanicilar ekranina bakilmasi gerektigini soyluyor — eski panel bu durumda sessizce yesil gorunebiliyordu. Panel uc senaryoda (bos, 1-1, 5-1) sahte veriyle calistirilip HTML denge kontrolu yapildi. node --check MODULE SYNTAX OK.'],
   'v9.64': ['VENDOR PII — AYNA KOLEKSIYONU (KVKK, NOT-1 kapaniyor). SORUN: users.read kurali resource.data.role == vendor ile ANONIM acik ve Firestore ta ALAN BAZLI okuma kurali YOK; yani vendor kullanici dokumaninin TAMAMI herkese okunabilir durumdaydi. Alanlar sayildiginda ortaya cikanlar: email, secondaryEmail, phone2, taxNo ve invoice alanlari (vergi kimligi), consents ile ipAtConsent ve userAgentAtConsent (KVKK onay kaydi, IP adresi dahil), suspiciousSignup ve rejectionReason (ic moderasyon notlari), isSuspendedDueToBilling ve hasActiveSubscription (ticari durum). Yani sorun e-posta gorunuyor degil, onay loglari ve vergi kimligi acikta. (1) vendor_public ayna koleksiyonu devreye alindi. rules v1.9.6 ile alan listesi arayuzun GERCEKTEN gosterdigi is bilgisine gore genisletildi (sirket, slug, logo, kategori, marka, sehir, telefon, adres, web sitesi, vendorType, tier, rozetler); yukaridaki hassas alanlarin HICBIRI listede yok. (2) Sekiz ANONIM erisilebilir okuma noktasi aynaya tasindi: renderVendors, loadTopVendors, loadVendorLogoBar, calculateDailyFeatured, renderBrandPage, renderVendorPublic, loadVendors, openCustomPoCModal marka eslesmesi. Admin ekranlari users i okumaya devam ediyor (zaten yetkili). (3) GECIS GUVENLIGI: ayna bos veya eksikse otomatik olarak users a duser. Bu surum TEK BASINA hicbir seyi bozmaz; users.read daraltmasi AYRI bir surumde, ayna dolulugu dogrulandiktan sonra yapilacak. (4) SENKRON: 20 ayri profil yazma noktasini yamamak yerine iki kapi — vendor her oturumda kendi ayna satirini tazeler (hangi yoldan degisirse degissin kapsanir) ve profil sihirbazi kaydinda anlik senkron. (5) Veri Sagligi na ayna paneli: kac vendor aynada, kaci eksik; Aynayi Olustur / Yenile dugmesi. Eksik varsa panel kirmizi ve ne riske girildigini yaziyor. GELISTIRME NOTU: loadVendors tek satirlik oldugu icin regex ile yapilan degisiklik map() icindeki ilk noktali virgulde kesip satiri bozdu; node --check yakaladi, elle onarildi. node --check MODULE SYNTAX OK.'],
   'v9.63': ['ANASAYFA ANONIM ZIYARETCIDE BOZUKTU — P0 DUZELTME. TESHIS: calculateDailyFeatured vendor_subscriptions koleksiyonunu KORUMASIZ okuyordu; kural isAdmin() veya isOwner() diyor, yani giris yapmamis ziyaretcide sorgu PERMISSION_DENIED ile patliyordu. Daha kotusu loadFeaturedCarousels tek bir dis try ile sarili oldugu icin bu hata one cikan urunlerle birlikte KATEGORI SATIRLARINI da yutuyordu — anonim ziyaretci hero altinda BOS sayfa goruyordu. Admin olarak bakildiginda gorunmuyordu cunku admin o koleksiyonu okuyabiliyor. Ayrica Boost gelirini vuruyordu: odeme yapan vendor in urunu tam olarak hedef kitleye gorunmuyordu. (1) Abonelik okumasi opsiyonel hale getirildi. Veri YALNIZ tier icin kullaniliyor ve _mkFV icinde zaten subsById currentTier VEYA v.subscriptionTier yedek zinciri vardi; users.subscriptionTier yedi ayri satin alma/deneme noktasinda guncel tutuluyor ve users anonim okunabiliyor — yani anonim ziyaretci de DOGRU tier i goruyor, sadece izin hatasi almiyor. (2) One cikan hesabi herhangi bir sebeple patlasa bile kategori satirlari cizilecek sekilde ayri try icine alindi. (3) YAN BULGU: pochub_daily_featured yazimi yalniz admin e acik, yani onbellek sadece admin siteye girdiginde olusuyordu; diger herkes her sayfa goruntulemesinde hesabi bastan yapiyor, vendor sayisi kadar users okumasi uretiyordu. Katalog indeksinde (v9.33) cozulen problemin aynisi. Veri Sagligi na GUNLUK ONE CIKANLAR yayin paneli eklendi: bugun yayinlandi mi, ne zaman, kac urun/uretici; Yayinla dugmesi once onbellegi silip yeniden hesapliyor. Yayinlanmamissa istemci yine hesapliyor — dogru calisir, sadece pahali. DOGRULAMA: anasayfa akisindaki tum kisitli koleksiyon okumalari tarandi; users (role==vendor sorgusu kurali karsiliyor) ve notifications (zaten try icinde) yanlis alarm cikti, baska acik yok. node --check MODULE SYNTAX OK.'],
   'v9.62': ['STORED-XSS — KOKTEN KAPATILDI (ilk incelemeden beri acik duran P0). Uygulama kullanici metinlerini innerHTML ile basiyor ve kacis eksikti: 30 sablon ifadesi + ~270 string birlestirme. YAKLASIM DEGISIKLIGI: 270 noktayi tek tek duzenlemek hem uzun hem kirilgan (bazilari HTML parcasi iceriyor, otomatik degistirme kirar) ve daha onemlisi ISTEMCI TARAFI KACIS, veriyi Firestore API sine DOGRUDAN yazan kotu niyetli bir vendor a karsi hicbir sey yapmaz. Kok verinin girisinde kesildi. (1) RULES v1.9.5 noTags(): etiket acilisi iceren metin KAYDEDILEMEZ. Kalip < + harf/slash/!/? — yani img, /b, !-- ve ?php yakalanir; throughput < 10 Gbps veya a < b gibi mesru kullanim SERBEST kalir. 10 ornekle dogrulandi. Uygulandigi yerler: products (name/description/brand, create ve update), public_events (title/description/speaker/hostName), poc_requests (title/description/requirements), reviews (comment/note), notifications (title/message/body/senderName), poc_messages (text/message), brand_products (name/brand), demo_requests (name/company/message) — 26 kontrol. (2) ISTEMCI: 30 sablon ifadesine escHtml eklendi (derinlemesine savunma). HTML OLMAYAN baglamlar (e-posta govdeleri, toast metinleri) BILEREK dokunulmadi — orada kacis kullaniciya &amp; gosterirdi. Ayrica formlarda stripTags ile temizleme: kullanici kural reddine carpmadan once uyarilir. Guvenlik buna DAYANMAZ, guvenlik kuralda. (3) MEVCUT VERI: Veri Sagligi > HTML etiket taramasi — kural devreye girmeden once yazilmis kayitlari bulur. Temizleme tek tek onayli; toplu otomatik yazma BILEREK yok, yanlis pozitifte urun adini bozmak birakmaktan kotudur. (4) SEED: bes yeni test — urun adi, urun aciklamasi, etkinlik basligi ve bildirim metnine etiket yazma REDDEDILMELI; ayrica POZITIF kontrol: throughput < 10 Gbps ENGELLENMEMELI (dar kapi oldugunu kanitlar, test kaydi sonunda silinir). GELISTIRME NOTLARI: iki hata calisma sirasinda yakalandi — (a) kurallara ikinci bir allow create eklemek kosullari VEYA lar, yani sikilastirmak yerine GEVSETIR; kosul mevcut kuralin icine eklendi. (b) noTags 26 yerde kullaniliyor ama tanimi yazilmamisti (onceki betik assert te durmustu) — bu haliyle deploy edilse TUM kurallar cokerdi; teslim kontrolu yakaladi. node --check MODULE SYNTAX OK.'],
@@ -31564,24 +31565,58 @@ async function _dailyFeaturedPanelHtml(){
 // ═══════════════════════════════════════════════════════════════════════
 async function _vendorMirrorHtml(){
   try {
+    // v9.65: panel tek cumle basiyordu ve "1 uretici aynada" cikinca
+    // hangi tarafin yanlis oldugu ayirt edilemiyordu. Artik iki sayi da
+    // ayri gosteriliyor, eksikler ve fazlalar ADIYLA listeleniyor.
     var uSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
-    var total = uSnap.size;
+    var users = uSnap.docs.map(function(d){ var o=d.data()||{}; return { id:d.id, nm:(o.company||o.displayName||o.email||d.id) }; });
     var mSnap = await getDocs(collection(db,'vendor_public'));
-    var have = {}; mSnap.docs.forEach(function(d){ have[d.id]=1; });
-    var missing = uSnap.docs.filter(function(d){ return !have[d.id]; }).length;
-    var extra = mSnap.size - (mSnap.size - Object.keys(have).length) - (total - missing);
-    var ok = (missing === 0 && total > 0);
-    var col = ok ? '#16a34a' : '#dc2626';
-    return '<div class="card" style="padding:15px 18px;margin-bottom:14px;border-left:3px solid '+col+'">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
-      +   '<div style="flex:1;min-width:260px">'
-      +     '<div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Vendor public mirror','Vendor herkese açık aynası')+'</div>'
-      +     '<div style="font-size:12px;color:var(--text-muted);line-height:1.55">'
-      +       (ok ? (total + ' ' + _L('vendor mirrored — anonymous pages read the mirror, not user records.','üretici aynada — anonim sayfalar kullanıcı kaydını değil aynayı okuyor.'))
-              : ('<b style="color:#dc2626">' + missing + '</b> ' + _L('of','/') + ' ' + total + ' '
-                 + _L('vendor missing from the mirror. Until it is complete the app falls back to reading user records, which expose tax IDs and KVKK consent logs.',
-                      'üretici aynada yok. Ayna tamamlanana kadar uygulama kullanıcı kayıtlarını okumaya düşüyor; o kayıtlarda vergi kimliği ve KVKK onay logları var.')))
-      +     '</div></div>'
+    var mirror = mSnap.docs.map(function(d){ var o=d.data()||{}; return { id:d.id, nm:(o.company||o.displayName||d.id) }; });
+
+    var have = {}; mirror.forEach(function(x){ have[x.id]=1; });
+    var uHave = {}; users.forEach(function(x){ uHave[x.id]=1; });
+    var missing = users.filter(function(x){ return !have[x.id]; });
+    var orphan  = mirror.filter(function(x){ return !uHave[x.id]; });   // aynada var, kullanici yok
+    var ok = (missing.length === 0 && users.length > 0);
+    var col = ok ? '#16a34a' : (users.length === 0 ? '#b45309' : '#dc2626');
+
+    function chips(list, c){
+      if(!list.length) return '';
+      return '<div style="margin-top:6px;font-size:11.5px;color:'+c+';line-height:1.9">'
+        + list.slice(0,30).map(function(x){ return '<span style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:2px 9px;margin-right:5px">'+escHtml(x.nm)+'</span>'; }).join('')
+        + (list.length>30 ? ' …' : '') + '</div>';
+    }
+    var h = '<div class="card" style="padding:15px 18px;margin-bottom:14px;border-left:3px solid '+col+'">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'
+      +   '<div style="flex:1;min-width:280px">'
+      +     '<div style="font-size:14px;font-weight:800;margin-bottom:6px">'+_L('Vendor public mirror','Vendor herkese açık aynası')+'</div>'
+      +     '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:4px">'
+      +       '<div><span style="font-size:18px;font-weight:800">'+users.length+'</span> <span style="font-size:11.5px;color:var(--text-muted)">'+_L('vendor user','vendor kullanıcı')+'</span></div>'
+      +       '<div><span style="font-size:18px;font-weight:800">'+mirror.length+'</span> <span style="font-size:11.5px;color:var(--text-muted)">'+_L('in mirror','aynada')+'</span></div>'
+      +       '<div><span style="font-size:18px;font-weight:800;color:'+(missing.length?'#dc2626':'#16a34a')+'">'+missing.length+'</span> <span style="font-size:11.5px;color:var(--text-muted)">'+_L('missing','eksik')+'</span></div>'
+      +     '</div>';
+    if (users.length === 0) {
+      h += '<div style="font-size:12px;color:#b45309;line-height:1.55">⚠ '
+        + _L('No user with role=vendor was found. Either there really are none, or vendor accounts are stored with a different role value — check Admin > Users before trusting this panel.',
+             'role=vendor olan hiç kullanıcı bulunamadı. Ya gerçekten yok, ya da vendor hesapları farklı bir role değeriyle kayıtlı — bu panele güvenmeden önce Admin > Kullanıcılar ekranını kontrol edin.')
+        + '</div>';
+    } else if (missing.length) {
+      h += '<div style="font-size:12px;color:#dc2626;line-height:1.55">'
+        + _L('Missing from the mirror — until these are added the app falls back to reading user records, which expose tax IDs and KVKK consent logs:',
+             'Aynada olmayanlar — bunlar eklenene kadar uygulama kullanıcı kayıtlarını okumaya düşüyor; o kayıtlarda vergi kimliği ve KVKK onay logları var:')
+        + '</div>' + chips(missing, '#dc2626');
+    } else {
+      h += '<div style="font-size:12px;color:#16a34a;line-height:1.55">✓ '
+        + _L('All vendor users are mirrored — anonymous pages read the mirror.','Tüm vendor kullanıcıları aynada — anonim sayfalar aynayı okuyor.')
+        + '</div>' + chips(mirror, 'var(--text-muted)');
+    }
+    if (orphan.length) {
+      h += '<div style="font-size:12px;color:#b45309;margin-top:8px;line-height:1.55">⚠ '
+        + orphan.length + ' ' + _L('mirror row has no matching user (deleted account?) — safe to ignore, or clean up later:',
+                                   'ayna satırının karşılığı olan kullanıcı yok (silinmiş hesap?) — sorun değil, sonra temizlenebilir:')
+        + '</div>' + chips(orphan, '#b45309');
+    }
+    return h + '</div>'
       +   '<button class="btn-p btn-sm" id="vpub-sync" style="flex-shrink:0">'+_L('Build / refresh mirror','Aynayı Oluştur / Yenile')+'</button>'
       + '</div></div>';
   } catch(e){
