@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.74 | pochub.co -->
+<!-- PoCHub v9.75 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -445,10 +445,16 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
   /* Card padding kısalt */
   .card{padding:14px 12px !important;}
 
-  /* Tablo - yatay scroll */
+  /* ══ v9.75: MOBILDE TABLO TASMASI ═══════════════════════════════
+     Eski kural .table-wrap sinifina baglıydi ama o sinif isaretlemede
+     HIC KULLANILMIYOR — yani kural olu, tablolar mobilde tasiyordu.
+     (Olu CSS taramasi 39 boyle sinif buldu; islevsel etkisi olan buydu.)
+     Sarmalayici eklemek yuzlerce yeri degistirmek demek; bunun yerine
+     tablonun kendisi kaydirilabilir hale getiriliyor. */
   table{font-size:12px;}
-  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .table-wrap table{min-width:600px;}
+  .card table, .scr table{display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%;}
+  .card table thead, .card table tbody, .scr table thead, .scr table tbody{display:table; width:100%; min-width:520px;}
+  /* .table-wrap kurallari KALDIRILDI — o sinif isaretlemede hic yoktu. */
 
   /* Admin panel main content içindeki tüm tablolar otomatik yatay scroll */
   #adm-main table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;max-width:100%;}
@@ -791,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.74';
+const VERSION = 'v9.75';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1265,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.75': ['DIL ETIKETI + MOBILDE TABLO TASMASI + OLU CSS TARAMASI. (1) DIL ETIKETI: ekranda TR TR goruruyordu. Sebep bayrak emojisi — Windows ta bayraklar BAYRAK olarak cizilmiyor, bolgesel gosterge harflerine dusuyor, yani TR TR. Ayrica bayrak esittir dil kabulu zaten yanlis (TR bayragi Turkce demek degil). Duz koda gecildi. (2) MOBILDE TABLO TASMASI: tablolari yatay kaydiran kural .table-wrap sinifina bagliydi ama o sinif isaretlemede HIC KULLANILMIYOR — kural oluydu ve admin tablolari mobilde tasiyordu. Sarmalayici eklemek yuzlerce yeri degistirmek demek; tablonun kendisi kaydirilabilir hale getirildi. Olu kural kaldirildi. (3) OLU CSS TARAMASI araca eklendi (D kontrolu). Bu oturumda ayni hata UC kez yapildi: topnav nav-tabs (v9.73 te bulundu), locale-switch (v9.73 te YENI yazildi, v9.74 te bulundu), table-wrap (simdi bulundu). Tarama 38 olu sinif buldu; islevsel etkisi olan table-wrap idi, gerisi cogunlukla artik kullanilmayan yardimci siniflar. ARAC NOTU: ilk yazdigim D kontrolu CSS YORUMLARINI da tariyordu ve kaldirilan kurali anlatan yorum yuzunden sayiyi dusurmedi; yorumlari atlayacak sekilde duzeltildi (39 dan 38 e dogru dustu). node --check MODULE SYNTAX OK.'],
   'v9.74': ['MOBIL UST MENU — TASMA ve IKI MENU KARISIKLIGI (Hasan ekran goruntusu 400px). v9.73 sekmeleri dogru gizledi ama iki sorun kaldi. (1) SAG TARAF TASIYORDU: dil secici TR TR seklinde iki satira sariyor, Cikis yazisi kesiliyordu. v9.73 te bunun icin yazdigim .locale-switch kurali OLUYDU — o sinif kodda yok, gercek kimlik locale-switch-btn. Artik dogru kimlikler hedefleniyor: dil kodu tek satir ve kucuk, Cikis mobilde guc ikonuna iniyor, profil adi 400px altinda tamamen gizlenip yalnizca avatar kaliyor. (2) IKI MENU DUGMESI yan yana duruyordu ve ikisi de Menu diyordu; hangisinin ne actigi belirsizdi. Ustteki SITE menusu (Ana Sayfa, Katalog, Etkinlikler), mor olan PANEL menusu (Dashboard, Kullanicilar). Ikincisi artik Panel menusu yaziyor. NOT: v9.73 te olu CSS kuralini duzeltirken YENI bir olu kural yazmisim (.locale-switch). Ayni hata iki surum ust uste: sinif adini kodda dogrulamadan CSS yazmak. node --check MODULE SYNTAX OK.'],
   'v9.73': ['MOBIL UST MENU BOZUKTU + SAHIPSIZ BILDIRIMLER (Hasan ekran goruntusu: 400px, konsol). (1) MOBIL MENU: CSS .topnav .nav-tabs hedefliyordu ama gercek isaretleme nav ve .ntabs — kural HIC uygulanmiyordu. 400px genislikte sekmeler sariyor, hamburger dugmesiyle ust uste biniyor ve panel kartlarinin uzerine tasiyordu. Sekmeleri yalnizca gizlemek de yetmezdi: hamburger sadece panel ekranlarinda var, herkese acik sayfalarda menu HIC kalmazdi. Cozum: sekmeler mobilde acilir panele donuyor, nav icinde kendi dugmesi var (aria-expanded ile), sekme secilince ve disari tiklayinca kapaniyor. Dinleyici bir kez baglaniyor cunku buildNav her dil ve rol degisiminde cagriliyor. (2) SAHIPSIZ BILDIRIMLER: admin panelinde 201 okunmamis bildirim goruldu, sahipleri silinmis vendor lardi (vendor_fortinet, vendor_hpe, vendor_netarmor, vendor_veeam). Okuyani olmayan bildirim hicbir ise yaramiyor ama sayaclari sisiriyor ve yuksek okunmamis uyarisi uretiyor. Sahipsiz kayit raporu artik bildirimleri de kapsiyor ve temizlik onlari da siliyor. Musteri bildirimlerini yanlislikla sahipsiz saymamak icin TUM kullanicilar kumesi kullaniliyor, yalnizca vendor lar degil. (3) Kullanimdan kalkmis apple-mobile-web-app-capable meta etiketinin yanina mobile-web-app-capable eklendi. (4) favicon-192.png 404 veriyordu (manifest ve apple-touch-icon ona isaret ediyor); 192 ve 512 boyutlarinda uretilip teslim edildi — repo kokune konmasi gerekiyor. node --check MODULE SYNTAX OK.'],
   'v9.72': ['SESSIZ YAZMA HATALARI KAPATILDI + TESLIM KONTROL ARACI. Bu oturumda DORT ayri hata sinifi yasandi ve ikisini yalnizca Hasan fark etti (yutulan calisma ani hatasi, baglanmamis olay dinleyicisi). Ikisinin de ortak yani: kod sozdizimsel olarak DOGRU ama davranissal olarak OLU. (1) TARAMA: kod bolgesinde 511 bos catch blogu var; bunlarin 52 si addDoc/setDoc/updateDoc/deleteDoc saran try lara ait. Yalnizca o 52 si degistirildi — geri kalan 459 u cogunlukla localStorage veya istege bagli islem, dokunulmadi. Her birine hangi fonksiyonda oldugunu ve hangi islemin basarisiz oldugunu soyleyen console.warn eklendi. Kullaniciya gorunur toast EKLENMEDI: her biri ayri karar, toplu eklemek beklenmedik UX degisikligi olurdu. (2) TESLIM KONTROL ARACI (teslim-kontrol.py) ayri dosya olarak verildi. Uc kontrol iceriyor: B) yazma saran bos catch — MUTLAK kontrol, beklenen 0 (v9.72 de 52 den 0 a indi). C) kaybolan/azalan tanim — FARK kontrolu; v9.54 teki catCfgRow silme kazasini yakalayan kontrol. A) ciz-return-bagla — YALNIZ FARK kontrolu. Mutlak sayisi gurultulu (57 bulgunun cogu yanlis alarm) ama v9.69 dan v9.70 e gecis test edildiginde TAM OLARAK gercek hatayi (_peAgg icindeki pe-orph-del) gosterdi, baska hicbir sey gostermedi. (3) DURUSTLUK NOTU: ilk yazdigim A kontrolu ise yaramiyordu — id kodda birden fazla gectigi icin bagli sanildi ve v9.70 hatasini KACIRDI. Test edilip yeniden yazildi; araca da ne yakalayip ne yakalamadigi acikca yazildi. node --check MODULE SYNTAX OK.'],
@@ -6091,7 +6098,11 @@ function getLocaleSwitcherHtml() {
   if (!cfg.availableLocales || cfg.availableLocales.length < 2) return '';
 
   var cur = window.CUR_LOCALE || 'tr';
-  var labels = { tr: '🇹🇷 TR', en: '🇬🇧 EN' };
+  // v9.75: bayrak emojisi Windows'ta BAYRAK olarak cizilmiyor; bolgesel
+  // gosterge harflerine dusuyor ve "🇹🇷 TR" ekranda "TR TR" gibi goruruyor.
+  // Ayrica bayrak = dil esitligi zaten yanlis (TR bayragi Turkce demek degil).
+  // Duz kod kullaniliyor.
+  var labels = { tr: 'TR', en: 'EN' };
   var curLabel = labels[cur] || cur.toUpperCase();
 
   return '<div style="position:relative;display:inline-block">'
