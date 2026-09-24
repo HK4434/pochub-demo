@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.73 | pochub.co -->
+<!-- PoCHub v9.74 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -428,8 +428,19 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
   .ntabs.open{display:flex;}
   .ntabs .nt{width:100%; text-align:left; padding:11px 14px; font-size:14px; border-radius:8px;}
   #nav-burger{display:inline-flex !important;}
-  .navr{gap:4px;}
-  .navr .locale-switch span{display:none;}   /* bayrak yeter, metin sigmiyor */
+  /* v9.74: 400px'te sag taraf tasiyordu — dil kodu iki satira sariyor,
+     Cikis yazisi kesiliyordu. Butonlar daraltildi, Cikis ikona indi.
+     (v9.73'te yazdigim .locale-switch kurali OLUYDU: o sinif yok.) */
+  .navr{gap:3px; flex-shrink:0;}
+  .navr #locale-switch-btn{padding:5px 7px !important; font-size:11px !important; white-space:nowrap;}
+  .navr #logout-btn{font-size:0 !important; padding:6px 9px !important;}
+  .navr #logout-btn::after{content:'⏻'; font-size:15px;}
+  .navr #nav-profile-btn span{max-width:64px !important;}
+  nav{gap:4px;}
+}
+@media (max-width:400px){
+  /* v9.74: en dar cihazlarda profil adi da sigmiyor — avatar yeter */
+  .navr #nav-profile-btn span{display:none !important;}
 
   /* Card padding kısalt */
   .card{padding:14px 12px !important;}
@@ -780,7 +791,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.73';
+const VERSION = 'v9.74';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1254,6 +1265,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.74': ['MOBIL UST MENU — TASMA ve IKI MENU KARISIKLIGI (Hasan ekran goruntusu 400px). v9.73 sekmeleri dogru gizledi ama iki sorun kaldi. (1) SAG TARAF TASIYORDU: dil secici TR TR seklinde iki satira sariyor, Cikis yazisi kesiliyordu. v9.73 te bunun icin yazdigim .locale-switch kurali OLUYDU — o sinif kodda yok, gercek kimlik locale-switch-btn. Artik dogru kimlikler hedefleniyor: dil kodu tek satir ve kucuk, Cikis mobilde guc ikonuna iniyor, profil adi 400px altinda tamamen gizlenip yalnizca avatar kaliyor. (2) IKI MENU DUGMESI yan yana duruyordu ve ikisi de Menu diyordu; hangisinin ne actigi belirsizdi. Ustteki SITE menusu (Ana Sayfa, Katalog, Etkinlikler), mor olan PANEL menusu (Dashboard, Kullanicilar). Ikincisi artik Panel menusu yaziyor. NOT: v9.73 te olu CSS kuralini duzeltirken YENI bir olu kural yazmisim (.locale-switch). Ayni hata iki surum ust uste: sinif adini kodda dogrulamadan CSS yazmak. node --check MODULE SYNTAX OK.'],
   'v9.73': ['MOBIL UST MENU BOZUKTU + SAHIPSIZ BILDIRIMLER (Hasan ekran goruntusu: 400px, konsol). (1) MOBIL MENU: CSS .topnav .nav-tabs hedefliyordu ama gercek isaretleme nav ve .ntabs — kural HIC uygulanmiyordu. 400px genislikte sekmeler sariyor, hamburger dugmesiyle ust uste biniyor ve panel kartlarinin uzerine tasiyordu. Sekmeleri yalnizca gizlemek de yetmezdi: hamburger sadece panel ekranlarinda var, herkese acik sayfalarda menu HIC kalmazdi. Cozum: sekmeler mobilde acilir panele donuyor, nav icinde kendi dugmesi var (aria-expanded ile), sekme secilince ve disari tiklayinca kapaniyor. Dinleyici bir kez baglaniyor cunku buildNav her dil ve rol degisiminde cagriliyor. (2) SAHIPSIZ BILDIRIMLER: admin panelinde 201 okunmamis bildirim goruldu, sahipleri silinmis vendor lardi (vendor_fortinet, vendor_hpe, vendor_netarmor, vendor_veeam). Okuyani olmayan bildirim hicbir ise yaramiyor ama sayaclari sisiriyor ve yuksek okunmamis uyarisi uretiyor. Sahipsiz kayit raporu artik bildirimleri de kapsiyor ve temizlik onlari da siliyor. Musteri bildirimlerini yanlislikla sahipsiz saymamak icin TUM kullanicilar kumesi kullaniliyor, yalnizca vendor lar degil. (3) Kullanimdan kalkmis apple-mobile-web-app-capable meta etiketinin yanina mobile-web-app-capable eklendi. (4) favicon-192.png 404 veriyordu (manifest ve apple-touch-icon ona isaret ediyor); 192 ve 512 boyutlarinda uretilip teslim edildi — repo kokune konmasi gerekiyor. node --check MODULE SYNTAX OK.'],
   'v9.72': ['SESSIZ YAZMA HATALARI KAPATILDI + TESLIM KONTROL ARACI. Bu oturumda DORT ayri hata sinifi yasandi ve ikisini yalnizca Hasan fark etti (yutulan calisma ani hatasi, baglanmamis olay dinleyicisi). Ikisinin de ortak yani: kod sozdizimsel olarak DOGRU ama davranissal olarak OLU. (1) TARAMA: kod bolgesinde 511 bos catch blogu var; bunlarin 52 si addDoc/setDoc/updateDoc/deleteDoc saran try lara ait. Yalnizca o 52 si degistirildi — geri kalan 459 u cogunlukla localStorage veya istege bagli islem, dokunulmadi. Her birine hangi fonksiyonda oldugunu ve hangi islemin basarisiz oldugunu soyleyen console.warn eklendi. Kullaniciya gorunur toast EKLENMEDI: her biri ayri karar, toplu eklemek beklenmedik UX degisikligi olurdu. (2) TESLIM KONTROL ARACI (teslim-kontrol.py) ayri dosya olarak verildi. Uc kontrol iceriyor: B) yazma saran bos catch — MUTLAK kontrol, beklenen 0 (v9.72 de 52 den 0 a indi). C) kaybolan/azalan tanim — FARK kontrolu; v9.54 teki catCfgRow silme kazasini yakalayan kontrol. A) ciz-return-bagla — YALNIZ FARK kontrolu. Mutlak sayisi gurultulu (57 bulgunun cogu yanlis alarm) ama v9.69 dan v9.70 e gecis test edildiginde TAM OLARAK gercek hatayi (_peAgg icindeki pe-orph-del) gosterdi, baska hicbir sey gostermedi. (3) DURUSTLUK NOTU: ilk yazdigim A kontrolu ise yaramiyordu — id kodda birden fazla gectigi icin bagli sanildi ve v9.70 hatasini KACIRDI. Test edilip yeniden yazildi; araca da ne yakalayip ne yakalamadigi acikca yazildi. node --check MODULE SYNTAX OK.'],
   'v9.71': ['SILME DUGMESI CALISMIYORDU (Hasan: buton calismiyor). Dugme IKI dalda da ciziliyordu ama olay baglamasi yalnizca asagida, dolu dalin sonundaydi. Bos dal — Hesaplanacak review bulunamadi — return ile cikiyor ve baglamaya HIC ULASMIYORDU; dugme goruruyor, tiklaniyor, hicbir sey olmuyordu. Hasan in gordugu ekran tam o daldi. (1) Baglama _bindOrphanRevDel fonksiyonuna alindi ve IKI dalda da cagriliyor. (2) Silme sirasinda ilerleme sayaci; basarisizlarda hata kodu konsola ve ilk ucu ekrana yaziliyor (v9.70 dersi: sessiz yutma yok). Liste silme sonrasi sifirlaniyor, tekrar basilirsa uyari veriyor. (3) Akis sahte DOM ve sahte Firestore ile prova edildi: uc kayittan ikisi silindi, biri izin hatasi verdi; dinleyici baglandi, ilerleme gosterildi, hata mesaji ekrana dusuruldu, toast dogru sayiyi soyledi. DERS: erken return olan bir dalda UI cizip baglamayi asagida birakmak, node --check in ve silme kazasi dedektorunun GORMEDIGI bir hata sinifi — bu oturumda yakalanan dorduncusu. node --check MODULE SYNTAX OK.'],
@@ -37085,6 +37097,7 @@ const I18N_DICT = {
     'nav.login':          'Giriş Yap',
     'nav.signup':         'Kayıt Ol',
     'nav.logout':         'Çıkış',
+    'nav.panel_menu':     'Panel menüsü',
 
     // Demo sayfası
     'demo.title':         'PoCHub\'la Tanışalım',
@@ -39989,6 +40002,7 @@ const I18N_DICT = {
     'nav.login':          'Sign In',
     'nav.signup':         'Sign Up',
     'nav.logout':         'Logout',
+    'nav.panel_menu':     'Panel menu',
 
     // Demo page
     'demo.title':         'Meet PoCHub',
@@ -41066,8 +41080,12 @@ function setupMobileSidebar(panelSelector) {
   // Toggle butonu
   var toggle = document.createElement('button');
   toggle.className = 'mobile-sidebar-toggle';
-  toggle.innerHTML = '☰ Menü';
-  toggle.setAttribute('aria-label', 'Menüyü Aç');
+  // v9.74: mobilde IKI menu dugmesi yan yana duruyordu ve ikisi de
+  // "Menü" diyordu — hangisinin ne actigi belirsizdi. Ustteki SITE
+  // menusu (Ana Sayfa, Katalog...), bu ise PANEL menusu (Dashboard,
+  // Kullanicilar...). Adlar ayrildi.
+  toggle.innerHTML = '☰ ' + t('nav.panel_menu','Panel menüsü');
+  toggle.setAttribute('aria-label', t('nav.panel_menu','Panel menüsü'));
 
   // Overlay
   var overlay = document.createElement('div');
