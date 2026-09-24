@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.72 | pochub.co -->
+<!-- PoCHub v9.73 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -19,7 +19,8 @@
 <link rel="manifest" href='data:application/manifest+json,{"name":"PoCHub","short_name":"PoCHub","description":"Türkiye%27nin IT PoC Pazaryeri","start_url":"/","display":"standalone","background_color":"%23faf9f7","theme_color":"%2322d078","orientation":"portrait-primary","icons":[{"src":"https://pochub.co/favicon-192.png","sizes":"192x192","type":"image/png"},{"src":"https://pochub.co/favicon-512.png","sizes":"512x512","type":"image/png"}],"categories":["business","productivity"],"lang":"tr-TR"}'>
 
 <!-- iOS PWA Support -->
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">   <!-- v9.73: apple- oneki kullanimdan kalkti; ikisi birlikte -->
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="PoCHub">
 <meta name="format-detection" content="telephone=no">
@@ -123,6 +124,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 20px
 .logo{font-size:15px;font-weight:700;color:#0f172a;flex-shrink:0;cursor:pointer}
 .logo b{color:#2563eb}
 .ntabs{display:flex;gap:2px;flex-wrap:wrap}
+#nav-burger{display:none;background:none;border:none;font-size:20px;line-height:1;padding:4px 8px;cursor:pointer;color:#0f172a;flex-shrink:0}
 .nt{background:none;border:none;color:#64748b;font:inherit;font-size:12.5px;padding:5px 10px;border-radius:6px;cursor:pointer;transition:.15s;font-weight:500}
 .nt:hover,.nt.on{background:rgba(37,99,235,.08);color:#2563eb;font-weight:600}
 /* v5.25: Navr action button hover (light nav) */
@@ -406,9 +408,28 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
   .hero-title{font-size:24px;line-height:1.2;}
   .wrap{padding:12px;}
 
-  /* Header - sıkışmasın */
-  .topnav{padding:8px 12px !important;}
-  .topnav .nav-tabs{display:none !important;}  /* Tabs gizli mobilde - hamburger var */
+  /* ══ v9.73: MOBIL UST MENU — eski kural OLUYDU ═══════════════════
+     Eski satirlar .topnav ve .nav-tabs hedefliyordu; gercek isaretleme
+     <nav> ve .ntabs. Yani kural HIC uygulanmiyordu: 400px genislikte
+     sekmeler sariyor, hamburger dugmesiyle ust uste biniyor ve panel
+     kartlarinin uzerine tasiyordu.
+     Sekmeleri sadece gizlemek de yetmez — hamburger yalniz panel
+     ekranlarinda var, herkese acik sayfalarda menu HIC kalmazdi.
+     Cozum: sekmeler acilir panele donusuyor, nav icinde kendi dugmesi var. */
+  nav{flex-wrap:nowrap;position:sticky;}
+  .ntabs{
+    display:none;
+    position:absolute; top:48px; left:0; right:0;
+    flex-direction:column; gap:0;
+    background:#fff; border-bottom:1px solid rgba(15,23,42,.10);
+    box-shadow:0 8px 20px rgba(15,23,42,.10);
+    padding:6px; z-index:99; max-height:70vh; overflow-y:auto;
+  }
+  .ntabs.open{display:flex;}
+  .ntabs .nt{width:100%; text-align:left; padding:11px 14px; font-size:14px; border-radius:8px;}
+  #nav-burger{display:inline-flex !important;}
+  .navr{gap:4px;}
+  .navr .locale-switch span{display:none;}   /* bayrak yeter, metin sigmiyor */
 
   /* Card padding kısalt */
   .card{padding:14px 12px !important;}
@@ -619,6 +640,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <!-- NAV -->
 <nav>
   <div class="logo" id="logo-btn">Poc<b>Hub</b>.co</div>
+  <button id="nav-burger" aria-label="Menü" aria-expanded="false">☰</button>
   <div class="ntabs" id="ntabs"></div>
   <div class="navr" id="navr"></div>
 </nav>
@@ -758,7 +780,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.72';
+const VERSION = 'v9.73';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1254,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.73': ['MOBIL UST MENU BOZUKTU + SAHIPSIZ BILDIRIMLER (Hasan ekran goruntusu: 400px, konsol). (1) MOBIL MENU: CSS .topnav .nav-tabs hedefliyordu ama gercek isaretleme nav ve .ntabs — kural HIC uygulanmiyordu. 400px genislikte sekmeler sariyor, hamburger dugmesiyle ust uste biniyor ve panel kartlarinin uzerine tasiyordu. Sekmeleri yalnizca gizlemek de yetmezdi: hamburger sadece panel ekranlarinda var, herkese acik sayfalarda menu HIC kalmazdi. Cozum: sekmeler mobilde acilir panele donuyor, nav icinde kendi dugmesi var (aria-expanded ile), sekme secilince ve disari tiklayinca kapaniyor. Dinleyici bir kez baglaniyor cunku buildNav her dil ve rol degisiminde cagriliyor. (2) SAHIPSIZ BILDIRIMLER: admin panelinde 201 okunmamis bildirim goruldu, sahipleri silinmis vendor lardi (vendor_fortinet, vendor_hpe, vendor_netarmor, vendor_veeam). Okuyani olmayan bildirim hicbir ise yaramiyor ama sayaclari sisiriyor ve yuksek okunmamis uyarisi uretiyor. Sahipsiz kayit raporu artik bildirimleri de kapsiyor ve temizlik onlari da siliyor. Musteri bildirimlerini yanlislikla sahipsiz saymamak icin TUM kullanicilar kumesi kullaniliyor, yalnizca vendor lar degil. (3) Kullanimdan kalkmis apple-mobile-web-app-capable meta etiketinin yanina mobile-web-app-capable eklendi. (4) favicon-192.png 404 veriyordu (manifest ve apple-touch-icon ona isaret ediyor); 192 ve 512 boyutlarinda uretilip teslim edildi — repo kokune konmasi gerekiyor. node --check MODULE SYNTAX OK.'],
   'v9.72': ['SESSIZ YAZMA HATALARI KAPATILDI + TESLIM KONTROL ARACI. Bu oturumda DORT ayri hata sinifi yasandi ve ikisini yalnizca Hasan fark etti (yutulan calisma ani hatasi, baglanmamis olay dinleyicisi). Ikisinin de ortak yani: kod sozdizimsel olarak DOGRU ama davranissal olarak OLU. (1) TARAMA: kod bolgesinde 511 bos catch blogu var; bunlarin 52 si addDoc/setDoc/updateDoc/deleteDoc saran try lara ait. Yalnizca o 52 si degistirildi — geri kalan 459 u cogunlukla localStorage veya istege bagli islem, dokunulmadi. Her birine hangi fonksiyonda oldugunu ve hangi islemin basarisiz oldugunu soyleyen console.warn eklendi. Kullaniciya gorunur toast EKLENMEDI: her biri ayri karar, toplu eklemek beklenmedik UX degisikligi olurdu. (2) TESLIM KONTROL ARACI (teslim-kontrol.py) ayri dosya olarak verildi. Uc kontrol iceriyor: B) yazma saran bos catch — MUTLAK kontrol, beklenen 0 (v9.72 de 52 den 0 a indi). C) kaybolan/azalan tanim — FARK kontrolu; v9.54 teki catCfgRow silme kazasini yakalayan kontrol. A) ciz-return-bagla — YALNIZ FARK kontrolu. Mutlak sayisi gurultulu (57 bulgunun cogu yanlis alarm) ama v9.69 dan v9.70 e gecis test edildiginde TAM OLARAK gercek hatayi (_peAgg icindeki pe-orph-del) gosterdi, baska hicbir sey gostermedi. (3) DURUSTLUK NOTU: ilk yazdigim A kontrolu ise yaramiyordu — id kodda birden fazla gectigi icin bagli sanildi ve v9.70 hatasini KACIRDI. Test edilip yeniden yazildi; araca da ne yakalayip ne yakalamadigi acikca yazildi. node --check MODULE SYNTAX OK.'],
   'v9.71': ['SILME DUGMESI CALISMIYORDU (Hasan: buton calismiyor). Dugme IKI dalda da ciziliyordu ama olay baglamasi yalnizca asagida, dolu dalin sonundaydi. Bos dal — Hesaplanacak review bulunamadi — return ile cikiyor ve baglamaya HIC ULASMIYORDU; dugme goruruyor, tiklaniyor, hicbir sey olmuyordu. Hasan in gordugu ekran tam o daldi. (1) Baglama _bindOrphanRevDel fonksiyonuna alindi ve IKI dalda da cagriliyor. (2) Silme sirasinda ilerleme sayaci; basarisizlarda hata kodu konsola ve ilk ucu ekrana yaziliyor (v9.70 dersi: sessiz yutma yok). Liste silme sonrasi sifirlaniyor, tekrar basilirsa uyari veriyor. (3) Akis sahte DOM ve sahte Firestore ile prova edildi: uc kayittan ikisi silindi, biri izin hatasi verdi; dinleyici baglandi, ilerleme gosterildi, hata mesaji ekrana dusuruldu, toast dogru sayiyi soyledi. DERS: erken return olan bir dalda UI cizip baglamayi asagida birakmak, node --check in ve silme kazasi dedektorunun GORMEDIGI bir hata sinifi — bu oturumda yakalanan dorduncusu. node --check MODULE SYNTAX OK.'],
   'v9.70': ['SESSIZ YUTULAN HATA (Hasan ekran goruntusu: 0 urun yeniden hesaplandi, 1 basarisiz). Kanit agregasi yeniden hesaplamasinda hata yakalama satiri catch(e){ fail++; } seklindeydi — sebep ne konsola ne ekrana yaziliyordu. Panel sadece 1 basarisiz diyor, NEDEN oldugunu soylemiyordu. TESHIS: v9.67 de sahipsiz urunler silindi, onlara ait review kayitlari kaldi; updateDoc var olmayan bir dokumana yazamaz ve hata firlatir. (1) SESSIZ YUTMA KALDIRILDI: her basarisizlik icin hata kodu/mesaji konsola yaziliyor ve ilk bes tanesi ekranda urun kimligi ile gosteriliyor. (2) ON KONTROL: hesaplamadan once urun varligi kontrol ediliyor; silinmis urune ait review lar ayri sayiliyor ve Bu review lar silinmis bir urune ait — bu yuzden hesaplanamiyor diye raporlaniyor. Boylece hatasiz calisiyor ve durum aciklaniyor. (3) TEMIZLEME: o review lari silen dugme (admin, onayli, ilerleme sayacli). rules reviews delete yalniz admin — uygun. DERS: bu oturumda yakalanan ucuncu sessiz hata sinifi. node --check ve silme kazasi dedektoru sozdizimi ve kayip tanim yakaliyor ama YUTULAN CALISMA ANI HATASINI yakalayamaz; tek savunma bos catch blogu birakmamak. node --check MODULE SYNTAX OK.'],
@@ -5862,6 +5885,27 @@ async function updateNotifBadge() {
   }
 }
 
+// v9.73: mobil menu dugmesi — bir kez baglanir (buildNav her dil/rol
+// degisiminde cagriliyor, her seferinde yeni dinleyici eklenmesin).
+function wireNavBurger(){
+  var b = el('nav-burger'), tabs = el('ntabs');
+  if (!b || !tabs || b._wired) return;
+  b._wired = true;
+  b.addEventListener('click', function(ev){
+    ev.stopPropagation();
+    var open = tabs.classList.toggle('open');
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    b.textContent = open ? '✕' : '☰';
+  });
+  document.addEventListener('click', function(ev){
+    if (!tabs.classList.contains('open')) return;
+    if (tabs.contains(ev.target) || b.contains(ev.target)) return;
+    tabs.classList.remove('open');
+    b.setAttribute('aria-expanded','false');
+    b.textContent = '☰';
+  });
+}
+
 function buildNav() {
   const tabs = el('ntabs');
   const navr = el('navr');
@@ -5879,10 +5923,16 @@ function buildNav() {
   if (CUR_PROFILE?.role === 'vendor') tabItems.push(['vendor', t('nav.vendor_panel', 'Vendor Paneli')]);
   if (isAdminLike(CUR_PROFILE?.role)) tabItems.push(['admin', t('nav.admin', 'Admin')]);
 
+  wireNavBurger();   // v9.73
   tabs.innerHTML = tabItems.map(([s,l]) =>
     `<button class="nt${CUR_SCREEN===s?' on':''}" data-s="${s}">${l}</button>`
   ).join('');
-  tabs.querySelectorAll('.nt').forEach(b => b.addEventListener('click', () => go(b.dataset.s)));
+  // v9.73: mobilde sekme secilince menu kapansin
+  tabs.querySelectorAll('.nt').forEach(b => b.addEventListener('click', () => {
+    tabs.classList.remove('open');
+    var _bg = el('nav-burger'); if(_bg) _bg.setAttribute('aria-expanded','false');
+    go(b.dataset.s);
+  }));
 
   // Nav right
   if (CUR_USER && CUR_PROFILE) {
@@ -31700,6 +31750,10 @@ async function _orphanOwnerHtml(){
   try {
     var uSnap = await getDocs(query(collection(db,'users'), where('role','==','vendor')));
     var known = {}; uSnap.docs.forEach(function(d){ known[d.id]=1; });
+    // v9.73: bildirim sahipleri musteri de olabilir — TUM kullanicilar
+    var allUsers = {};
+    try { (await getDocs(collection(db,'users'))).docs.forEach(function(d){ allUsers[d.id]=1; }); }
+    catch(e){ allUsers = known; console.warn('[v9.73] tum kullanicilar okunamadi:', e && e.message); }
 
     // v9.67: rapor eskiden getActiveProducts() kullaniyordu, yani YALNIZ
     // aktif urunleri sayiyordu; taslak/pasif sahipsiz kayitlar gorunmuyordu.
@@ -31707,19 +31761,38 @@ async function _orphanOwnerHtml(){
     var byVid = {};
     function note(vid, nm, kind, docId){
       if(!vid || known[vid]) return;
-      var e = byVid[vid] || (byVid[vid] = { vid:vid, name:nm||'—', products:[], events:[] });
+      var e = byVid[vid] || (byVid[vid] = { vid:vid, name:nm||'—', products:[], events:[], notifs:[] });
       if(nm && e.name === '—') e.name = nm;
       e[kind].push(docId);
     }
     var pSnap = await getDocs(collection(db,'products'));
     pSnap.docs.forEach(function(d){ var o=d.data()||{}; note(o.vendorId, o.vendorName, 'products', d.id); });
+
+    // v9.73: BILDIRIMLER de sahipsiz kalabiliyor. Admin panelinde "201
+    // okunmamis bildirim" goruldu ve sahipleri silinmis vendor'lardi
+    // (vendor_fortinet, vendor_hpe, vendor_netarmor, vendor_veeam).
+    // Okuyani olmayan bildirim hicbir ise yaramiyor ama sayaclari
+    // sisiriyor ve "yuksek okunmamis" uyarisi uretiyor.
+    try {
+      var nSnap = await getDocs(collection(db,'notifications'));
+      nSnap.docs.forEach(function(d){
+        var o = d.data() || {};
+        // Bildirimin sahibi userId; kullanici silinmisse sahipsizdir.
+        // known yalniz VENDOR kullanicilarini tutuyor, o yuzden musteri
+        // bildirimlerini yanlislikla sahipsiz saymamak icin ayri kume.
+        if (o.userId && !allUsers[o.userId]) {
+          var e = byVid[o.userId] || (byVid[o.userId] = { vid:o.userId, name:o.senderName || o.userId, products:[], events:[], notifs:[] });
+          (e.notifs = e.notifs || []).push(d.id);
+        }
+      });
+    } catch(e){ console.warn('[v9.73] bildirimler taranamadi:', e && e.message); }
     try {
       var ev = await getDocs(collection(db,'public_events'));
       ev.docs.forEach(function(d){ var o=d.data()||{}; note(o.vendorId, o.vendorName, 'events', d.id); });
     } catch(e){}
 
     var rows = Object.keys(byVid).map(function(k){ return byVid[k]; })
-                 .sort(function(a,b){ return (b.products.length+b.events.length)-(a.products.length+a.events.length); });
+                 .sort(function(a,b){ return (b.products.length+b.events.length+(b.notifs||[]).length)-(a.products.length+a.events.length+(a.notifs||[]).length); });
     window._orphanRows = rows;   // silme dugmeleri icin
 
     if (!rows.length) {
@@ -31727,7 +31800,7 @@ async function _orphanOwnerHtml(){
         + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Ownerless records','Sahipsiz kayıtlar')+'</div>'
         + '<div style="font-size:12.5px;color:#16a34a">✓ '+_L('Every product and event has a matching vendor account.','Her ürün ve etkinliğin karşılığı olan bir vendor hesabı var.')+'</div></div>';
     }
-    var tot = rows.reduce(function(a,r){ return a + r.products.length + r.events.length; }, 0);
+    var tot = rows.reduce(function(a,r){ return a + r.products.length + r.events.length + (r.notifs||[]).length; }, 0);
     var h = '<div class="card" style="padding:16px;margin-bottom:14px;border-left:3px solid #dc2626">'
       + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">'+_L('Ownerless records','Sahipsiz kayıtlar')+'</div>'
       + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:11px;line-height:1.55">'
@@ -31743,6 +31816,7 @@ async function _orphanOwnerHtml(){
       +   '<th style="padding:6px 8px">'+_L('Vendor name on records','Kayıtlardaki üretici adı')+'</th>'
       +   '<th style="padding:6px 8px">'+_L('Products','Ürün')+'</th>'
       +   '<th style="padding:6px 8px">'+_L('Events','Etkinlik')+'</th>'
+      +   '<th style="padding:6px 8px">'+_L('Notifs','Bildirim')+'</th>'
       +   '<th style="padding:6px 8px">vendorId</th>'
       +   '<th style="padding:6px 8px"></th>'
       + '</tr></thead><tbody>';
@@ -31751,6 +31825,7 @@ async function _orphanOwnerHtml(){
         + '<td style="padding:7px 8px;font-weight:700">'+escHtml(r.name)+'</td>'
         + '<td style="padding:7px 8px">'+r.products.length+'</td>'
         + '<td style="padding:7px 8px">'+r.events.length+'</td>'
+        + '<td style="padding:7px 8px">'+((r.notifs||[]).length)+'</td>'
         + '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:var(--text-muted)">'+escHtml(r.vid)+'</td>'
         + '<td style="padding:7px 8px"><button class="btn-g btn-sm orph-del" data-idx="'+idx+'" style="font-size:11px;color:#dc2626">'+_L('Delete','Sil')+'</button></td>'
         + '</tr>';
@@ -31765,7 +31840,7 @@ async function _orphanOwnerHtml(){
 // v9.67: bir vendorId'nin tum sahipsiz kayitlarini siler.
 // Otomatik CAGRILMAZ — her zaman admin onayiyla.
 async function _orphanDelete(rows, statusEl){
-  var done = 0, fail = 0, total = rows.reduce(function(a,r){ return a + r.products.length + r.events.length; }, 0);
+  var done = 0, fail = 0, total = rows.reduce(function(a,r){ return a + r.products.length + r.events.length + (r.notifs||[]).length; }, 0);
   for (const r of rows) {
     for (const id of r.products) {
       try { await deleteDoc(doc(db,'products', id)); done++; }
@@ -31775,6 +31850,11 @@ async function _orphanDelete(rows, statusEl){
     for (const id of r.events) {
       try { await deleteDoc(doc(db,'public_events', id)); done++; }
       catch(e){ fail++; console.warn('[v9.67] etkinlik silinemedi', id, e && e.message); }
+      if (statusEl) statusEl.textContent = (done+fail) + '/' + total;
+    }
+    for (const id of (r.notifs || [])) {                      // v9.73
+      try { await deleteDoc(doc(db,'notifications', id)); done++; }
+      catch(e){ fail++; console.warn('[v9.73] bildirim silinemedi', id, e && e.message); }
       if (statusEl) statusEl.textContent = (done+fail) + '/' + total;
     }
   }
@@ -31868,7 +31948,7 @@ async function admDataHealth(m) {
       b.addEventListener('click', async function(){
         var r = (window._orphanRows||[])[+b.dataset.idx];
         if(!r) return;
-        var n = r.products.length + r.events.length;
+        var n = r.products.length + r.events.length + (r.notifs||[]).length;
         if(!confirm(_L('Permanently delete ','Kalıcı olarak silinecek: ') + n + ' ' + _L('record of ','kayıt · ') + r.name + '\n\n' + _L('This cannot be undone.','Bu işlem geri alınamaz.'))) return;
         b.disabled = true;
         var res = await _orphanDelete([r], b);
@@ -31879,7 +31959,7 @@ async function admDataHealth(m) {
     _cidxBox.querySelector('#orph-all')?.addEventListener('click', async function(){
       var rows = window._orphanRows || [];
       if(!rows.length) return;
-      var n = rows.reduce(function(a,r){ return a + r.products.length + r.events.length; }, 0);
+      var n = rows.reduce(function(a,r){ return a + r.products.length + r.events.length + (r.notifs||[]).length; }, 0);
       // Toplu silmede yazili onay — yanlislikla tiklanmasin
       var typed = prompt(_L('Type DELETE to permanently remove ','Kalıcı silme için SIL yazın — ') + n + ' ' + _L('records from ','kayıt · ') + rows.length + ' vendorId');
       if (String(typed||'').trim().toUpperCase() !== 'SIL' && String(typed||'').trim().toUpperCase() !== 'DELETE') return;
