@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.71 | pochub.co -->
+<!-- PoCHub v9.72 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -758,7 +758,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.71';
+const VERSION = 'v9.72';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1232,6 +1232,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.72': ['SESSIZ YAZMA HATALARI KAPATILDI + TESLIM KONTROL ARACI. Bu oturumda DORT ayri hata sinifi yasandi ve ikisini yalnizca Hasan fark etti (yutulan calisma ani hatasi, baglanmamis olay dinleyicisi). Ikisinin de ortak yani: kod sozdizimsel olarak DOGRU ama davranissal olarak OLU. (1) TARAMA: kod bolgesinde 511 bos catch blogu var; bunlarin 52 si addDoc/setDoc/updateDoc/deleteDoc saran try lara ait. Yalnizca o 52 si degistirildi — geri kalan 459 u cogunlukla localStorage veya istege bagli islem, dokunulmadi. Her birine hangi fonksiyonda oldugunu ve hangi islemin basarisiz oldugunu soyleyen console.warn eklendi. Kullaniciya gorunur toast EKLENMEDI: her biri ayri karar, toplu eklemek beklenmedik UX degisikligi olurdu. (2) TESLIM KONTROL ARACI (teslim-kontrol.py) ayri dosya olarak verildi. Uc kontrol iceriyor: B) yazma saran bos catch — MUTLAK kontrol, beklenen 0 (v9.72 de 52 den 0 a indi). C) kaybolan/azalan tanim — FARK kontrolu; v9.54 teki catCfgRow silme kazasini yakalayan kontrol. A) ciz-return-bagla — YALNIZ FARK kontrolu. Mutlak sayisi gurultulu (57 bulgunun cogu yanlis alarm) ama v9.69 dan v9.70 e gecis test edildiginde TAM OLARAK gercek hatayi (_peAgg icindeki pe-orph-del) gosterdi, baska hicbir sey gostermedi. (3) DURUSTLUK NOTU: ilk yazdigim A kontrolu ise yaramiyordu — id kodda birden fazla gectigi icin bagli sanildi ve v9.70 hatasini KACIRDI. Test edilip yeniden yazildi; araca da ne yakalayip ne yakalamadigi acikca yazildi. node --check MODULE SYNTAX OK.'],
   'v9.71': ['SILME DUGMESI CALISMIYORDU (Hasan: buton calismiyor). Dugme IKI dalda da ciziliyordu ama olay baglamasi yalnizca asagida, dolu dalin sonundaydi. Bos dal — Hesaplanacak review bulunamadi — return ile cikiyor ve baglamaya HIC ULASMIYORDU; dugme goruruyor, tiklaniyor, hicbir sey olmuyordu. Hasan in gordugu ekran tam o daldi. (1) Baglama _bindOrphanRevDel fonksiyonuna alindi ve IKI dalda da cagriliyor. (2) Silme sirasinda ilerleme sayaci; basarisizlarda hata kodu konsola ve ilk ucu ekrana yaziliyor (v9.70 dersi: sessiz yutma yok). Liste silme sonrasi sifirlaniyor, tekrar basilirsa uyari veriyor. (3) Akis sahte DOM ve sahte Firestore ile prova edildi: uc kayittan ikisi silindi, biri izin hatasi verdi; dinleyici baglandi, ilerleme gosterildi, hata mesaji ekrana dusuruldu, toast dogru sayiyi soyledi. DERS: erken return olan bir dalda UI cizip baglamayi asagida birakmak, node --check in ve silme kazasi dedektorunun GORMEDIGI bir hata sinifi — bu oturumda yakalanan dorduncusu. node --check MODULE SYNTAX OK.'],
   'v9.70': ['SESSIZ YUTULAN HATA (Hasan ekran goruntusu: 0 urun yeniden hesaplandi, 1 basarisiz). Kanit agregasi yeniden hesaplamasinda hata yakalama satiri catch(e){ fail++; } seklindeydi — sebep ne konsola ne ekrana yaziliyordu. Panel sadece 1 basarisiz diyor, NEDEN oldugunu soylemiyordu. TESHIS: v9.67 de sahipsiz urunler silindi, onlara ait review kayitlari kaldi; updateDoc var olmayan bir dokumana yazamaz ve hata firlatir. (1) SESSIZ YUTMA KALDIRILDI: her basarisizlik icin hata kodu/mesaji konsola yaziliyor ve ilk bes tanesi ekranda urun kimligi ile gosteriliyor. (2) ON KONTROL: hesaplamadan once urun varligi kontrol ediliyor; silinmis urune ait review lar ayri sayiliyor ve Bu review lar silinmis bir urune ait — bu yuzden hesaplanamiyor diye raporlaniyor. Boylece hatasiz calisiyor ve durum aciklaniyor. (3) TEMIZLEME: o review lari silen dugme (admin, onayli, ilerleme sayacli). rules reviews delete yalniz admin — uygun. DERS: bu oturumda yakalanan ucuncu sessiz hata sinifi. node --check ve silme kazasi dedektoru sozdizimi ve kayip tanim yakaliyor ama YUTULAN CALISMA ANI HATASINI yakalayamaz; tek savunma bos catch blogu birakmamak. node --check MODULE SYNTAX OK.'],
   'v9.69': ['TEMSILCISIZ TALEP — MUSTERI TARAFI KAPANDI. v9.51 de bu riski kendim yazmistim ve gecmistim: temsilcisi olmayan bir markaya talep acan musteri bekliyor ve ne olacagini bilmiyor. Panelde durum yalnizca Bekliyor diyordu — temsilcisi OLAN bir markayi bekleyen taleple AYNI gorunuyordu. Sessizlik talep-once modelinin en kirilgan yeri: bir kez cevapsiz kalan musteri geri gelmiyor. (1) IZ KAYIT ANINDA: unmatchedBrand alani talep olusturulurken yaziliyor. Guncelleme ile degil, cunku musteri poc_requests i GUNCELLEYEMEZ (kural: update yalniz admin); ayrica talebin acildigi andaki durum tarihsel olarak saklanmali. (2) MUSTERI KARTI: temsilcisiz bekleyen talepte aciklayici blok — markanin temsilcisi olmadigi, talebin markaya iletildigi, sonucun garanti olmadigi ve her durumda bilgi verilecegi yaziyor. SURE TAAHHUDU YOK; veremeyecegimiz soz guveni tersine cevirir. (3) YANILTICI MESAJLAR KALDIRILDI: aksiyon listesi bu taleplerde 3+ gundur yanitsiz — vendor i hatirlat! diyordu, oysa hatirlatilacak vendor YOK. Kirmizi gun bekliyor rozeti de cevap vermeyen bir vendor varmis izlenimi veriyordu; ikisi de temsilcisiz talepte devre disi. (4) ADMIN HALKASI: Temsilcisiz marka talebi raporuna Ulasildi isaretle dugmesi. O markanin BEKLEYEN tum taleplerini isaretliyor ve her musteriye bildirim gonderiyor; musteri kartinda durum Markaya ulasildi — yanit bekleniyor olarak degisiyor. Boylece admin in telefon acmasi musteri tarafinda gorunur hale geliyor. node --check MODULE SYNTAX OK.'],
@@ -4164,7 +4165,7 @@ async function loadMessagesTab(m, role) {
   async function setConvMeta(pocId, data) {
     try {
       await setDoc(doc(db,'poc_conversations', pocId), data, {merge:true});
-    } catch(e) {}
+    } catch(e){ console.warn('[sessiz-yazma] setConvMeta · setDoc:', (e && (e.code||e.message)) || e); }
   }
 
   // ── 30 gün geçmiş silinen konuşmaları temizle ──────────────────────
@@ -4184,7 +4185,7 @@ async function loadMessagesTab(m, role) {
             const msgs = await getDocs(query(collection(db,'poc_messages'), where('pocId','==',poc.id)));
             for (const md of msgs.docs) { await deleteDoc(md.ref); }
             await deleteDoc(doc(db,'poc_conversations', poc.id));
-          } catch(e) {}
+          } catch(e){ console.warn('[sessiz-yazma] cleanupDeleted · deleteDoc:', (e && (e.code||e.message)) || e); }
         }
       }
     }
@@ -5416,7 +5417,7 @@ onAuthStateChanged(auth, async user => {
           CUR_PROFILE.activeMonths = _am;
           updateDoc(doc(db,'users',user.uid), { lastActiveAt: serverTimestamp(), activeMonths: _am }).catch(function(){});
         }
-      } catch(_e){}
+      } catch(_e){ console.warn('[sessiz-yazma] evaluatePrelaunchGate · updateDoc:', (_e && (_e.code||_e.message)) || _e); }
     }
 
     // v5.17: KVKK - Hesap silme talebi otomatik iptal (30 gün içinde geri girerse)
@@ -5436,7 +5437,7 @@ onAuthStateChanged(auth, async user => {
           CUR_PROFILE.status = 'active';
           await logKVKKAction('account_delete_cancelled', { method: 'login_after_request' });
           setTimeout(function(){ showToast('✓ Hesap silme talebiniz iptal edildi'); }, 1000);
-        } catch(e) {}
+        } catch(e){ console.warn('[sessiz-yazma] evaluatePrelaunchGate · updateDoc:', (e && (e.code||e.message)) || e); }
       } else {
         // 30 gün dolmuş - artık silinmeli (cron işi yapacak)
         try { await signOut(auth); } catch(e){}
@@ -5454,7 +5455,7 @@ onAuthStateChanged(auth, async user => {
           emailVerifiedAt: serverTimestamp()
         });
         CUR_PROFILE.emailVerified = true;
-      } catch(e){}
+      } catch(e){ console.warn('[sessiz-yazma] evaluatePrelaunchGate · updateDoc:', (e && (e.code||e.message)) || e); }
     }
 
     // Email doğrulama: Firebase Auth veya Firestore flag'i
@@ -5507,7 +5508,7 @@ onAuthStateChanged(auth, async user => {
               subscriptionTier: 'free',
               hasActiveSubscription: true,
             });
-          } catch(e) {}
+          } catch(e){ console.warn('[sessiz-yazma] evaluatePrelaunchGate · updateDoc:', (e && (e.code||e.message)) || e); }
         }
 
         // v4.82: vendorStatus migration
@@ -5518,7 +5519,7 @@ onAuthStateChanged(auth, async user => {
               vendorStatus: 'auto_approved',
             });
             CUR_PROFILE.vendorStatus = 'auto_approved';
-          } catch(e) {}
+          } catch(e){ console.warn('[sessiz-yazma] evaluatePrelaunchGate · updateDoc:', (e && (e.code||e.message)) || e); }
         }
 
         // v4.86: Slug migration — vendor public profil URL'i için
@@ -5532,7 +5533,7 @@ onAuthStateChanged(auth, async user => {
             });
             CUR_PROFILE.slug = newSlug;
             CUR_PROFILE.publicProfileEnabled = true;
-          } catch(e) {}
+          } catch(e){ console.warn('[sessiz-yazma] evaluatePrelaunchGate · updateDoc:', (e && (e.code||e.message)) || e); }
         }
       } catch(e) {
         console.warn('v4.81/v4.82/v4.86 vendor migration:', e.message);
@@ -7228,7 +7229,7 @@ async function handleAuth() {
                   vendorReferralBadge: newVendorBadge,
                   lastReferralAt: serverTimestamp()
                 });
-              } catch(e){}
+              } catch(e){ console.warn('[sessiz-yazma] handleAuth · updateDoc:', (e && (e.code||e.message)) || e); }
             } else if (referrerRole === 'customer' && AUTH_ROLE === 'customer') {
               // v4.91: Customer → Customer: count arttır + rozet hesapla
               var curCount = referrerSnap.data().customerReferralCount || 0;
@@ -7264,7 +7265,7 @@ async function handleAuth() {
               read: false,
               createdAt: serverTimestamp()
             });
-          } catch(e) {}
+          } catch(e){ console.warn('[sessiz-yazma] handleAuth · addDoc:', (e && (e.code||e.message)) || e); }
         } catch(e) {
           console.warn('Referral bonus error:', e.message);
         }
@@ -12780,7 +12781,7 @@ async function openProductIntModal(productId, productName) {
             fromName: CUR_PROFILE?.displayName||CUR_USER.email,
             read:false, createdAt:serverTimestamp(),
           });
-        } catch(e) {}
+        } catch(e){ console.warn('[sessiz-yazma] loadInts · addDoc:', (e && (e.code||e.message)) || e); }
       }
       // Mail
       if (email) {
@@ -12946,7 +12947,7 @@ async function openProductDistModal(productId, productName, origin) {
             fromName: CUR_PROFILE?.displayName||CUR_USER.email,
             read:false, createdAt:serverTimestamp(),
           });
-        } catch(e) {}
+        } catch(e){ console.warn('[sessiz-yazma] loadDists · addDoc:', (e && (e.code||e.message)) || e); }
       }
       // Mail bildirimi
       if (email) {
@@ -13132,17 +13133,17 @@ function openCustomPoCModal(prefill) {   // v8.99: {name, brand, category} ön-d
               title:'🏷 '+vendorName+' '+_L('PoC request','PoC talebi'),
               message:'"'+productName+'" — '+_L('a customer requested a PoC for a brand you represent. Check the request pool.','temsil ettiğin markada bir müşteri PoC talebi açtı. Talep havuzunu kontrol et.'),
               read:false, createdAt:serverTimestamp()
-            }); } catch(_e){}
+            }); } catch(_e){ console.warn('[sessiz-yazma] openCustomPoCModal · addDoc:', (_e && (_e.code||_e.message)) || _e); }
           }
         }
-      } catch(_e){}
+      } catch(_e){ console.warn('[sessiz-yazma] openCustomPoCModal · addDoc:', (_e && (_e.code||_e.message)) || _e); }
       // v5.35: Global counter
       try {
         await setDoc(doc(db, 'pochub_config', 'global_stats'), {
           pocCount: increment(1),
           lastUpdated: serverTimestamp(),
         }, { merge: true });
-      } catch(_e){}
+      } catch(_e){ console.warn('[sessiz-yazma] openCustomPoCModal · setDoc:', (_e && (_e.code||_e.message)) || _e); }
       try {
         await emailjs.send('service_k3gfuw2','template_bavhw8b',{
           to_email: CUR_USER.email,
@@ -13204,7 +13205,7 @@ async function submitCustomPoC() {
         pocCount: increment(1),
         lastUpdated: serverTimestamp(),
       }, { merge: true });
-    } catch(_e){}
+    } catch(_e){ console.warn('[sessiz-yazma] submitCustomPoC · setDoc:', (_e && (_e.code||_e.message)) || _e); }
 
     // EmailJS bildirimi
     try {
@@ -21727,7 +21728,7 @@ async function openSendInviteModal() {
               read: false, createdAt: serverTimestamp(),
             });
             notified++;
-          } catch(e2) {}
+          } catch(e2){ console.warn('[sessiz-yazma] addEmails · addDoc:', (e2 && (e2.code||e2.message)) || e2); }
         }
 
         try {
@@ -24755,7 +24756,7 @@ async function custReferrals(m) {
         custSlug = await ensureUniqueSlug(baseSlugC, CUR_USER.uid);
         await updateDoc(doc(db,'users',CUR_USER.uid), { slug: custSlug });
         CUR_PROFILE.slug = custSlug;
-      } catch(e) {}
+      } catch(e){ console.warn('[sessiz-yazma] custReferrals · updateDoc:', (e && (e.code||e.message)) || e); }
     }
     var referralUrl = window.location.origin + '/?ref=' + custSlug;
 
@@ -25266,7 +25267,7 @@ async function openCustomerWelcomeWizard() {
         welcomeWizardCompletedAt: serverTimestamp(),
       });
       if (CUR_PROFILE) CUR_PROFILE.welcomeWizardCompleted = true;
-    } catch(e){}
+    } catch(e){ console.warn('[sessiz-yazma] completeWizard · updateDoc:', (e && (e.code||e.message)) || e); }
     try { localStorage.removeItem('welcomeWizard_' + CUR_USER.uid); } catch(e){}
     overlay.remove();
     showToast(t('tst.welcome_cust','🎉 Hoş geldin! Hemen ilk PoC talebini açmaya başlayabilirsin.'));
@@ -25323,7 +25324,7 @@ async function finishWelcomeWizard() {
       welcomeWizardCompletedAt: serverTimestamp(),
     });
     if (CUR_PROFILE) CUR_PROFILE.welcomeWizardCompleted = true;
-  } catch(e){}
+  } catch(e){ console.warn('[sessiz-yazma] finishWelcomeWizard · updateDoc:', (e && (e.code||e.message)) || e); }
   closeWelcomeWizard();
   showToast('🎉 PoCHub\'a hoş geldin!');
   // Dashboard'a git
@@ -25646,8 +25647,8 @@ async function markFirstShareBonus() {
       await updateDoc(doc(db, 'vendor_subscriptions', CUR_USER.uid), {
         bonusPocs: increment(1),
       });
-    } catch(e){}
-  } catch(e){}
+    } catch(e){ console.warn('[sessiz-yazma] markFirstShareBonus · updateDoc:', (e && (e.code||e.message)) || e); }
+  } catch(e){ console.warn('[sessiz-yazma] markFirstShareBonus · updateDoc:', (e && (e.code||e.message)) || e); }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -29141,7 +29142,7 @@ async function openAddProductModal(prefillCat, prefillBrand, prefillFamilyNorm) 
                 read:      false,
                 createdAt: serverTimestamp(),
               });
-            } catch(e) {}
+            } catch(e){ console.warn('[sessiz-yazma] _bindDistDatalist · addDoc:', (e && (e.code||e.message)) || e); }
           }
           // Mail bildirimi
           if (dist.email) {
@@ -29510,7 +29511,7 @@ async function openNewEventModal() {
       if(_impFlags.confidential){
         showToast(t('vev.sent_review','Gizlilik işareti nedeniyle etkinlik admin incelemesine gönderildi.'), 'info');
         try { await addDoc(collection(db,'admin_inbox'), { type:'event_review', title:'🔒 İnceleme bekleyen etkinlik: '+String(title).substring(0,120),
-          message:'Gizlilik işareti tespit edildi. Vendor: '+String(CUR_PROFILE?.displayName||CUR_USER.email).substring(0,120), createdAt:serverTimestamp() }); } catch(_ib){}
+          message:'Gizlilik işareti tespit edildi. Vendor: '+String(CUR_PROFILE?.displayName||CUR_USER.email).substring(0,120), createdAt:serverTimestamp() }); } catch(_ib){ console.warn('[sessiz-yazma] _regToggle · addDoc:', (_ib && (_ib.code||_ib.message)) || _ib); }
       } else showToast(t('nev.published','Etkinlik yayınlandı!'));
       if(CUR_VEND_TAB==='events')loadVendTab();
     }catch(e){
@@ -30846,7 +30847,7 @@ async function admProducts(m) {
           var arr=(cs.exists()&&Array.isArray(cs.data().pinnedProducts))?cs.data().pinnedProducts.slice():[];
           if(wasPinned){ arr=arr.filter(function(x){return x!==pid;}); } else if(arr.indexOf(pid)<0){ arr.push(pid); }
           await setDoc(doc(db,'pochub_config','featured_curation'),{pinnedProducts:arr,updatedAt:serverTimestamp(),updatedBy:CUR_USER.uid},{merge:true});
-          try{ await deleteDoc(doc(db,'pochub_daily_featured',getTodayKey())); }catch(_e){}
+          try{ await deleteDoc(doc(db,'pochub_daily_featured',getTodayKey())); }catch(_e){ console.warn('[sessiz-yazma] renderTable · deleteDoc:', (_e && (_e.code||_e.message)) || _e); }
           if(wasPinned) pinnedSet.delete(pid); else pinnedSet.add(pid);
           var nowP=!wasPinned;
           b.dataset.pinned=nowP?'1':'0';
@@ -31778,7 +31779,7 @@ async function _orphanDelete(rows, statusEl){
     }
   }
   try { if (typeof invalidateProductCache === 'function') invalidateProductCache(); } catch(e){}
-  try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(e){}   // vitrin tazelensin
+  try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(e){ console.warn('[sessiz-yazma] _orphanDelete · deleteDoc:', (e && (e.code||e.message)) || e); }   // vitrin tazelensin
   return { done: done, fail: fail };
 }
 
@@ -31915,7 +31916,7 @@ async function admDataHealth(m) {
       var b = this; b.disabled = true; var o = b.textContent;
       b.textContent = _L('Publishing...','Yayınlanıyor...');
       try {
-        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_d){}
+        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_d){ console.warn('[sessiz-yazma] admDataHealth · deleteDoc:', (_d && (_d.code||_d.message)) || _d); }
         await calculateDailyFeatured();
         showToast(_L('Published.','Yayınlandı.'), 'ok');
         admDataHealth(m);
@@ -32562,7 +32563,7 @@ async function admDataHealth(m) {
           for (var di = 0; di < colInfo.snap.docs.length; di++) {
             var d2 = colInfo.snap.docs[di];
             if (d2.data().isTestRecord) {
-              try { await deleteDoc(d2.ref); deleted++; } catch(e2) {}
+              try { await deleteDoc(d2.ref); deleted++; } catch(e2){ console.warn('[sessiz-yazma] isDemo · deleteDoc:', (e2 && (e2.code||e2.message)) || e2); }
             }
           }
         }
@@ -32579,7 +32580,7 @@ async function admDataHealth(m) {
         for (var ei = 0; ei < expiredInvites.length; ei++) {
           try {
             await updateDoc(doc(db,'poc_invites',expiredInvites[ei].id), {status:'expired'});
-          } catch(e3) {}
+          } catch(e3){ console.warn('[sessiz-yazma] isDemo · updateDoc:', (e3 && (e3.code||e3.message)) || e3); }
         }
         showToast(expiredInvites.length + ' davet expired yapıldı.');
         admDataHealth(m);
@@ -32594,7 +32595,7 @@ async function admDataHealth(m) {
         for (var oi = 0; oi < orphanProducts.length; oi++) {
           try {
             invalidateActiveProducts(); await updateDoc(doc(db,'products',orphanProducts[oi].id), {status:'active'});
-          } catch(e4) {}
+          } catch(e4){ console.warn('[sessiz-yazma] isDemo · updateDoc:', (e4 && (e4.code||e4.message)) || e4); }
         }
         showToast(orphanProducts.length + ' ürün active yapıldı.');
         admDataHealth(m);
@@ -40812,11 +40813,11 @@ async function requireEmailVerified(actionKey, actionLabel) {
         try {
           await updateDoc(doc(db,'users',CUR_USER.uid), { emailVerified: true, emailVerifiedAt: serverTimestamp() });
           CUR_PROFILE.emailVerified = true;
-        } catch(e){}
+        } catch(e){ console.warn('[sessiz-yazma] requireEmailVerified · updateDoc:', (e && (e.code||e.message)) || e); }
       }
       return true;
     }
-  } catch(e){}
+  } catch(e){ console.warn('[sessiz-yazma] requireEmailVerified · updateDoc:', (e && (e.code||e.message)) || e); }
 
   // Doğrulanmamış - modal aç
   showEmailVerifyModal(actionLabel || 'bu işlem');
@@ -40898,7 +40899,7 @@ function showEmailVerifyModal(actionLabel) {
             emailVerifiedAt: serverTimestamp()
           });
           CUR_PROFILE.emailVerified = true;
-        } catch(e){}
+        } catch(e){ console.warn('[sessiz-yazma] showEmailVerifyModal · updateDoc:', (e && (e.code||e.message)) || e); }
         modal.remove();
         showToast(_L("🎉 Email verified! Try again.","🎉 E-posta doğrulandı! Tekrar deneyin."));
         // Sayfayı yenile (banner kaybolur, aksiyonlar açılır)
@@ -41168,7 +41169,7 @@ function showPhoneVerifyModal() {
           stage: 'sms_sent',
           createdAt: serverTimestamp(),
         });
-      } catch(e){}
+      } catch(e){ console.warn('[sessiz-yazma] showPhoneVerifyModal · addDoc:', (e && (e.code||e.message)) || e); }
 
     } catch(e) {
       console.error('Phone verify SMS error:', e);
@@ -41240,7 +41241,7 @@ function showPhoneVerifyModal() {
           stage: 'verified',
           createdAt: serverTimestamp(),
         });
-      } catch(e){}
+      } catch(e){ console.warn('[sessiz-yazma] showPhoneVerifyModal · addDoc:', (e && (e.code||e.message)) || e); }
 
       modal.remove();
       cleanupRecaptcha();
@@ -41424,7 +41425,7 @@ async function admVendorVerify(m) {
                 read: false,
                 createdAt: serverTimestamp(),
               });
-            } catch(e) {}
+            } catch(e){ console.warn('[sessiz-yazma] render · addDoc:', (e && (e.code||e.message)) || e); }
             var v = vendors.find(function(x){return x.id === b.dataset.id;});
             if (v) { v.isVerified = true; v.verifiedAt = {seconds: Date.now()/1000}; v.verifiedBy = CUR_PROFILE?.displayName || 'admin'; }
             showToast(t('tst.vendor_verified','✓ Vendor doğrulandı.'));
@@ -45233,7 +45234,7 @@ async function admVendorApprovals(m) {
               read: false,
               createdAt: serverTimestamp(),
             });
-          } catch(e){}
+          } catch(e){ console.warn('[sessiz-yazma] admVendorApprovals · addDoc:', (e && (e.code||e.message)) || e); }
           // Badge cache temizle
           if (window._vendorBadgeCache) delete window._vendorBadgeCache[b.dataset.uid];
           showToast(t('tst.vendor_verified2','✓ Vendor doğrulandı'));
@@ -45265,7 +45266,7 @@ async function admVendorApprovals(m) {
               read: false,
               createdAt: serverTimestamp(),
             });
-          } catch(e){}
+          } catch(e){ console.warn('[sessiz-yazma] admVendorApprovals · addDoc:', (e && (e.code||e.message)) || e); }
           if (window._vendorBadgeCache) delete window._vendorBadgeCache[b.dataset.uid];
           showToast(t('avap.toast_rejected','Vendor reddedildi'));
           admVendorApprovals(m);
@@ -45780,7 +45781,7 @@ async function renderFeaturedCuration(m) {
       vendSaveBtn.disabled=true; var _vo=vendSaveBtn.textContent; vendSaveBtn.textContent=(EN?'Saving...':'Kaydediliyor...');
       try {
         await setDoc(doc(db,'pochub_config','featured_curation'), { pinnedVendors:vendPinned, updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid }, { merge:true });
-        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_e){}
+        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_e){ console.warn('[sessiz-yazma] vendPaintList · deleteDoc:', (_e && (_e.code||_e.message)) || _e); }
         showToast(EN?'✓ Featured vendors saved':'✓ Öne çıkan vendorlar kaydedildi');
       } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
       vendSaveBtn.disabled=false; vendSaveBtn.textContent=_vo;
@@ -46056,7 +46057,7 @@ async function renderFeaturedCuration(m) {
         var _rows = Math.max(1, Math.min(8, parseInt(catCfgRow.querySelector('#fc-rows').value,10)||3));
         var _per = Math.max(1, Math.min(6, parseInt(catCfgRow.querySelector('#fc-perrow').value,10)||4));
         await setDoc(doc(db,'pochub_config','featured_curation'), { pinnedCategories:catPinned, homeRows:_rows, homePerRow:_per, updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid }, { merge:true });
-        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_e){}
+        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_e){ console.warn('[sessiz-yazma] catPaintList · deleteDoc:', (_e && (_e.code||_e.message)) || _e); }
         showToast(EN?'✓ Featured categories saved':'✓ Öne çıkan kategoriler kaydedildi');
       } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
       catSaveBtn.disabled=false; catSaveBtn.textContent=_co;
@@ -46160,7 +46161,7 @@ async function renderFeaturedCuration(m) {
       saveBtn.disabled=true; var _o=saveBtn.textContent; saveBtn.textContent=(EN?'Saving...':'Kaydediliyor...');
       try {
         await setDoc(doc(db,'pochub_config','featured_curation'), { pinnedProducts:pinned, pinnedTemplates:pinnedTpl.slice(0,40), updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid }, { merge:true });   // v9.53: sablon pinleri
-        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_e){}
+        try { await deleteDoc(doc(db,'pochub_daily_featured', getTodayKey())); } catch(_e){ console.warn('[sessiz-yazma] paintResults · deleteDoc:', (_e && (_e.code||_e.message)) || _e); }
         showToast(EN?'✓ Showcase order saved':'✓ Vitrin sıralaması kaydedildi');
       } catch(e){ showToast((EN?'Error: ':'Hata: ')+e.message,'err'); }
       saveBtn.disabled=false; saveBtn.textContent=_o;
@@ -46337,7 +46338,7 @@ async function renderFeaturedLedger(m) {
               await updateVendorBilling(o.vendorId, o.amount||0, 0);
             } catch(ce){ console.warn('featured charge:', ce.message); }
           }
-          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_approved', title:t('afa.notif_title','📢 Reklam Onaylandı'), message:'"'+(o.productName||t('afa.product','ürün'))+t('afa.notif_msg','" öne çıkan yayını onaylandı.'), read:false, createdAt:serverTimestamp() }); }catch(_e){} }
+          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_approved', title:t('afa.notif_title','📢 Reklam Onaylandı'), message:'"'+(o.productName||t('afa.product','ürün'))+t('afa.notif_msg','" öne çıkan yayını onaylandı.'), read:false, createdAt:serverTimestamp() }); }catch(_e){ console.warn('[sessiz-yazma] refresh · addDoc:', (_e && (_e.code||_e.message)) || _e); } }
           showToast(t('afa.toast_approved','Onaylandı & yayınlandı.')); refresh();
         } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); }
       }); });
@@ -46346,7 +46347,7 @@ async function renderFeaturedLedger(m) {
         var rs=prompt(t('afa.reject_prompt','Red sebebi (opsiyonel):'),''); if(rs===null)return;
         try {
           await updateDoc(doc(db,'featured_purchases',o.id), { status:'cancelled', adminNote:rs });
-          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_rejected', title:'📢 Reklam Talebi Reddedildi', message:'"'+(o.productName||'ürün')+'" öne çıkan talebi reddedildi.'+(rs?' Sebep: '+rs:''), read:false, createdAt:serverTimestamp() }); }catch(_e){} }
+          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_rejected', title:'📢 Reklam Talebi Reddedildi', message:'"'+(o.productName||'ürün')+'" öne çıkan talebi reddedildi.'+(rs?' Sebep: '+rs:''), read:false, createdAt:serverTimestamp() }); }catch(_e){ console.warn('[sessiz-yazma] refresh · addDoc:', (_e && (_e.code||_e.message)) || _e); } }
           showToast(t('afa.toast_rejected','Reddedildi.')); refresh();
         } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); }
       }); });
@@ -46355,7 +46356,7 @@ async function renderFeaturedLedger(m) {
         if(!confirm(_L("Cancel this placement? The product will be removed from featured.","Bu yerleşim iptal edilsin mi? Ürün öne çıkandan kaldırılır.")))return;
         try {
           await updateDoc(doc(db,'featured_purchases',o.id), { status:'cancelled' });
-          if (o.productId) { try{ invalidateActiveProducts(); await updateDoc(doc(db,'products',o.productId), { featured:false, featuredUntil:null }); }catch(_e){} }
+          if (o.productId) { try{ invalidateActiveProducts(); await updateDoc(doc(db,'products',o.productId), { featured:false, featuredUntil:null }); }catch(_e){ console.warn('[sessiz-yazma] refresh · updateDoc:', (_e && (_e.code||_e.message)) || _e); } }
           // v5.55: ödenmemiş borcu iptal et + bakiyeyi düş
           if (o.chargeId) { try {
             var ccs = await getDoc(doc(db,'poc_charges',o.chargeId));
@@ -46363,8 +46364,8 @@ async function renderFeaturedLedger(m) {
               await updateDoc(doc(db,'poc_charges',o.chargeId), { status:'cancelled' });
               await updateVendorBilling(o.vendorId, -(o.amount||0), 0);
             }
-          } catch(_e){} }
-          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_cancelled', title:t('ntf.ad_cancelled','📢 Reklam İptal Edildi'), message:'"'+(o.productName||'ürün')+'" öne çıkan yayını iptal edildi.', read:false, createdAt:serverTimestamp() }); }catch(_e){} }
+          } catch(_e){ console.warn('[sessiz-yazma] refresh · updateDoc:', (_e && (_e.code||_e.message)) || _e); } }
+          if (o.vendorId) { try{ await addDoc(collection(db,'notifications'),{ userId:o.vendorId, type:'featured_cancelled', title:t('ntf.ad_cancelled','📢 Reklam İptal Edildi'), message:'"'+(o.productName||'ürün')+'" öne çıkan yayını iptal edildi.', read:false, createdAt:serverTimestamp() }); }catch(_e){ console.warn('[sessiz-yazma] refresh · addDoc:', (_e && (_e.code||_e.message)) || _e); } }
           showToast(t('afa.toast_cancelled','İptal edildi.')); refresh();
         } catch(e){ showToast(t('common.error_prefix','Hata: ')+e.message,'err'); }
       }); });
@@ -68989,7 +68990,7 @@ async function openCategoryMergeModal(){
           movedP++;
           try { var vps = await getDocs(query(collection(db,'vendor_products'), where('productId','==',pid)));
             for(var v=0;v<vps.docs.length;v++){ await updateDoc(doc(db,'vendor_products',vps.docs[v].id), { productCategory: target }); }
-          } catch(_e){}
+          } catch(_e){ console.warn('[sessiz-yazma] log · updateDoc:', (_e && (_e.code||_e.message)) || _e); }
         }
         // 2) marka sablonlari (hedefte ayni marka+urun varsa mukerrer olusturma → kaynagi sil)
         var tgt = await getDocs(query(collection(db,'brand_products'), where('category','==',target)));
@@ -69003,7 +69004,7 @@ async function openCategoryMergeModal(){
           else { await updateDoc(doc(db,'brand_products',bid), { category: target }); have[key]=1; movedT++; }
         }
         // 3) kaynagi gizle (silme yok)
-        if(src.id){ try { await updateDoc(doc(db,'categories',src.id), { visible: false }); hid++; } catch(_e){} }
+        if(src.id){ try { await updateDoc(doc(db,'categories',src.id), { visible: false }); hid++; } catch(_e){ console.warn('[sessiz-yazma] log · updateDoc:', (_e && (_e.code||_e.message)) || _e); } }
         log('&nbsp;&nbsp;✓ '+_L('done','tamam'));
       }
       invalidateCatCache();
@@ -69215,7 +69216,7 @@ async function openSecurityMigrateModal(){
         try {
           invalidateActiveProducts(); await updateDoc(doc(db,'products',_id), { category:_cat }); ok++;
           try { var _vps=await getDocs(query(collection(db,'vendor_products'), where('productId','==',_id)));
-            for(var k=0;k<_vps.docs.length;k++){ await updateDoc(doc(db,'vendor_products',_vps.docs[k].id), { productCategory:_cat }); } } catch(_e){}
+            for(var k=0;k<_vps.docs.length;k++){ await updateDoc(doc(db,'vendor_products',_vps.docs[k].id), { productCategory:_cat }); } } catch(_e){ console.warn('[sessiz-yazma] step2 · updateDoc:', (_e && (_e.code||_e.message)) || _e); }
         } catch(e){ firstErr=e; break; }
       }
       invalidateCatCache();
@@ -69707,7 +69708,7 @@ function openSendOfferModal(pocId, customerId, customerEmail, customerName, prod
             status: 'offer_sent',
             offerSentAt: serverTimestamp(),
           });
-        } catch(e2) {}
+        } catch(e2){ console.warn('[sessiz-yazma] refreshVatSummary · updateDoc:', (e2 && (e2.code||e2.message)) || e2); }
       }
 
       modal.remove();
@@ -70519,7 +70520,7 @@ async function renderDemoRequest() {
     demoReqDocId = demoRef.id;
     // localStorage'a son demo request id'yi koy (anonymous booking için)
     try { localStorage.setItem('lastDemoRequestId', demoReqDocId); } catch(e){}
-  } catch(e) {}
+  } catch(e){ console.warn('[sessiz-yazma] renderDemoRequest · addDoc:', (e && (e.code||e.message)) || e); }
 
   // ════════════════════════════════════════════════════════════════════
   // v4.90: CALENDLY postMessage LISTENER
@@ -71442,7 +71443,7 @@ function saveCookieConsent(prefs) {
           setDoc(doc(db, 'users', CUR_USER.uid), { cookieConsent: record }, { merge: true });
         }
       }).catch(function(){});
-    } catch(e){}
+    } catch(e){ console.warn('[sessiz-yazma] saveCookieConsent · setDoc:', (e && (e.code||e.message)) || e); }
   }
 }
 
