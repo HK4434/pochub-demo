@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.79 | pochub.co -->
+<!-- PoCHub v9.80 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.79';
+const VERSION = 'v9.80';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.80': ['FIRESTORE KOTASI TUKENDI — KOK NEDEN VE ONLEM (Hasan: vendor ile girdim ama panel gelmedi). TESHIS: sorun vendor hesabinda degildi. Firestore 429 RESOURCE_EXHAUSTED donuyordu, yani gunluk ucretsiz okuma kotasi bitmisti. Uygulama users dokumanini okuyamayinca rol ? cikiyor ve vendor paneli acilmiyor; disaridan bakinca site bozuk gibi gorunuyor. Kota her gun sifirlanir, kalici bir hasar yok. KOK NEDEN IKI TANE: (1) Katalog indeksini yeniden yayinlamak brand_products koleksiyonunun TAMAMINI okuyor — yaklasik 16.000 dokuman, Spark planindaki gunluk 50.000 okumanin ucte biri. Tek tikla. Artik dugme maliyeti onceden soyluyor ve onay istiyor; yalnizca toplu ice aktarmadan sonra basilmasi gerektigini yaziyor. (2) Veri Sagligi sayfasi her acilista SEKIZ taramayi birden calistiriyordu ve dordu koleksiyonun tamamini okuyor (users, products, notifications, public_events, poc_requests). Gelistirme sirasinda bu sayfa onlarca kez aciliyor. Artik hafif paneller otomatik (indeks durumu, vendor aynasi, distributor haritasi, vitrin onbellegi), agir taramalar Tara dugmesine bagli ve her birinin neyi okudugu yazili; ayrica Tum taramalari calistir dugmesi var. GELISTIRME NOTU: agir paneller artik sonradan ciziliyor, dolayisiyla iclerindeki dugmelerin (markaya ulasildi, sahipsiz kayit sil, etiket temizle) baglamasi cizimden SONRA yapilmali. Bunu bir fonksiyona alip her cizimden sonra cagirdim — v9.71 de tam bu hatayi yasamistik (dugme goruruyor, tiklaniyor, hicbir sey olmuyordu). node --check MODULE SYNTAX OK.'],
   'v9.79': ['MUKERRER RAPORU — IKI YANLIS POZITIF DAHA (Hasan ekran goruntusu: Credo AI grubu). v9.78 sayiyi 260 gruptan 217 ye, 283 fazla kayittan 237 ye dusurdu ama ekranda hatali bir grup kaldi: AI Governance Platform ile Credo AI ayni urun sanilmisti. Iki ayri sebep cikti. (1) BOS BELIRTEC DIZISI. Adi markanin kendisi olan sablonlarda (Credo AI markasi altinda Credo AI adli sablon) marka silinince belirtec dizisi BOS kaliyor; bos kume HER kumenin alt kumesi oldugu icin o sablon markanin TUM urunleriyle esleisiyordu. Eski _isSubsetTokens bu korumayi iceriyordu (if !a.length || !b.length return false), yeni _sameProductName e tasimayi atlamisim — kendi getirdigim gerileme. (2) KISA MARKA BELIRTECLERI. v9.78 de eklenen marka oneki kurali, eklenen kelimelerin hepsi katalogda marka olarak geciyorsa ayni urun sayiyordu. Ama ai, hp, bt gibi iki harflik belirtecler neredeyse her ada uyuyor: Credo AI markasinda ai bir marka belirteci sayilinca AI Governance Platform ile Credo AI Governance Platform ayni urun sanildi. Artik bu kural en az 3 harfli belirtecler icin gecerli — hpe gecer, ai gecmez. DOGRULAMA: test kumesi 13 ten 16 ya cikarildi, uc Credo AI senaryosu eklendi — 16/16 dogru. node --check MODULE SYNTAX OK.'],
   'v9.78': ['MUKERRER RAPORU — YANLIS POZITIFLER AYIKLANDI (Hasan: raporu iyilestir). v9.77 raporu ilk kez calistirdi ve 260 grup / 283 fazla kayit gosterdi, ama listeye bakinca sayinin sisirilmis oldugu goruldu. UC AYRI HATA KAYNAGI: (1) TEK HARFLI BELIRTECLER ATILIYORDU. _tplTokens icindeki w.length>1 filtresi yuzunden NetApp AFF A-Series ile C-Series ikisi de {aff,series} oluyor ve AYNI sanilıyordu. Artik tam dizi de saklaniyor ve tek harfli belirtecler farkliysa FARKLI urun sayiliyor. (2) ALT KUME KURALI AYRIM YAPAMIYORDU. Adobe Analytics, Adobe Customer Journey Analytics in alt kumesi — ama bunlar farkli urunler. Belirleyici olan eklenen kelimelerin NE oldugu: kisaltma ise ayni urun (Experience Manager ile Experience Manager AEM), gercek kelime ise farkli urun (Customer Journey), surum isareti ise farkli SKU (ChatGPT ile ChatGPT Enterprise). Kisaltma kontrolu CIFT YONLU: ISE ile Identity Services Engine ISE de yakalaniyor. Ayrica eklenenlerin hepsi katalogda MARKA olarak geciyorsa (ClearPass ile HPE Aruba ClearPass) ayni urun sayiliyor — marka adi tutarsizligi boylece yanlis pozitif uretmeden cozuluyor. (3) COK KATEGORILI LISTELEME MUKERRER SAYILIYORDU. Ayni urun ikilisi uc kategoride gecince uc ayri grup olusuyordu. Artik ayni imzali gruplar tek satirda toplaniyor ve kategoride listeli, mukerrer degil diye isaretleniyor; ustteki sayac kacinin boyle oldugunu ayrica yaziyor. DOGRULAMA: 13 gercek ornekle test edildi (AEM, watsonx, ISE, ClearPass, A/C-Series, ChatGPT Enterprise, Analytics 360, FortiGate 60F/100F, Veeam Backup/ONE) — 13/13 dogru. node --check MODULE SYNTAX OK.'],
   'v9.77': ['PROTOTIP ANAHTAR CAKISMASI (Hasan ekran goruntusu: Mukerrer raporu alinamadi: byBrand[k].push is not a function). SEBEP: katalog metniyle anahtarlanan DUZ nesne haritalari. Kod dogru gorunuyordu — (byBrand[k] = byBrand[k] || []).push(tp) — ama k degeri constructor ise byBrand[constructor] BOS DEGIL, Object in kendi constructor i; VEYA [] devreye girmiyor ve .push bulunamiyor. Ayni tuzak toString, valueOf ve hasOwnProperty icin de gecerli. DAHA KOTUSU: bazi haritalarda dizi degil ALAN yaziliyor; orada hata FIRLAMIYOR, sayim sessizce bozuluyor. Kanit: duz nesnede byBrand[constructor].n degeri NaN cikiyor ve o markanin talepleri raporda kayboluyor. COZUM: katalog metniyle (marka adi, kategori, uretici adi) anahtarlanan 31 harita Object.create(null) ile prototipsiz yapildi. Prototipsiz nesnede constructor sadece bir anahtardir, miras alinan bir deger degil. Kullanici verisiyle anahtarlanmayan haritalara DOKUNULMADI — 143 aday vardi, yalnizca riski kanitlanabilir 31 i degistirildi. DOGRULAMA: dort prototip anahtariyla (constructor, toString, valueOf, hasOwnProperty) once/sonra karsilastirildi; duz nesnede dordu de ayni hata mesajiyla patliyor, prototipsizde dordu de calisiyor. node --check MODULE SYNTAX OK.'],
@@ -32157,13 +32158,77 @@ async function admDataHealth(m) {
   // v9.33: katalog indeksi paneli — analiz beklemeden once gosterilir
   try {
     var _cidxBox = document.createElement('div');
+    // ══ v9.80: AGIR TARAMALAR ARTIK ISTEK UZERINE ══════════════════════
+    // Bu sayfa her acilista sekiz taramayi birden calistiriyordu ve dordu
+    // koleksiyonun TAMAMINI okuyor (users, products, notifications,
+    // public_events, poc_requests). Gelistirme sirasinda sayfa onlarca kez
+    // aciliyor ve her acilis binlerce okuma demek. Kota bitince uygulama
+    // kullanici dokumanini bile okuyamiyor: rol "?" cikiyor, vendor paneli
+    // acilmiyor, site bozuk saniliyor.
+    // Hafif paneller (indeks durumu, ayna, distributor haritasi, vitrin
+    // onbellegi) otomatik kaliyor — hepsi birkac okuma.
+    // Agir olanlar dugmeye baglandi; hangisi kac okuma yapiyor yaziyor.
+    var HEAVY = [
+      { id:'hs-orphan',  fn:_orphanOwnerHtml,     ad:_L('Ownerless records','Sahipsiz kayıtlar'),
+        not:_L('reads users, products, events and notifications in full','kullanıcı, ürün, etkinlik ve bildirimlerin tamamını okur') },
+      { id:'hs-demand',  fn:_unmatchedDemandHtml, ad:_L('Unrepresented brand demand','Temsilcisiz marka talebi'),
+        not:_L('reads up to 1000 PoC requests','en fazla 1000 PoC talebi okur') },
+      { id:'hs-tags',    fn:_tagScanHtml,         ad:_L('HTML tag scan','HTML etiket taraması'),
+        not:_L('reads products and up to 400 events','ürünleri ve en fazla 400 etkinliği okur') },
+      { id:'hs-dup',     fn:_dupTemplatesHtml,    ad:_L('Duplicate brand templates','Mükerrer marka şablonları'),
+        not:_L('uses the catalog index — cheap','katalog indeksini kullanır — ucuz') },
+      { id:'hs-cat',     fn:_catHealthHtml,       ad:_L('Category–product consistency','Kategori–ürün uyumu'),
+        not:_L('reads products and categories','ürünleri ve kategorileri okur') }
+    ];
+    function _heavyPlaceholder(x){
+      return '<div class="card" style="padding:14px 16px;margin-bottom:14px" id="' + x.id + '-box">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+        +   '<div><div style="font-size:14px;font-weight:800;margin-bottom:2px">' + escHtml(x.ad) + '</div>'
+        +     '<div style="font-size:11.5px;color:var(--text-muted)">' + escHtml(x.not) + '</div></div>'
+        +   '<button class="btn-g btn-sm hs-run" data-id="' + x.id + '" style="flex-shrink:0">' + _L('Scan','Tara') + '</button>'
+        + '</div></div>';
+    }
     _cidxBox.innerHTML = (await _cidxStatusHtml()) + (await _vendorMirrorHtml())
-                       + (await _brandDistPanelHtml())   // v9.76
-                       + (await _orphanOwnerHtml())
+                       + (await _brandDistPanelHtml())
                        + (await _dailyFeaturedPanelHtml())
-                       + (await _unmatchedDemandHtml()) + (await _tagScanHtml())
-                       + (await _dupTemplatesHtml()) + (await _catHealthHtml());   // v9.64
-    // ══ v9.69: MARKAYA ULASILDI ISARETI ═════════════════════════════
+                       + '<div style="font-size:11.5px;color:var(--text-muted);margin:14px 0 8px">'
+                       +   _L('Heavy scans run on demand — each one costs reads against the daily quota.',
+                              'Ağır taramalar istek üzerine çalışır — her biri günlük kotadan okuma harcar.')
+                       + '</div>'
+                       + HEAVY.map(_heavyPlaceholder).join('')
+                       + '<div style="margin-bottom:14px"><button class="btn-g btn-sm" id="hs-run-all">'
+                       +   _L('Run all scans','Tüm taramaları çalıştır') + '</button></div>';
+
+    async function _runHeavy(x, btn){
+      if(btn){ btn.disabled = true; btn.textContent = _L('Scanning...','Taranıyor...'); }
+      var box = _cidxBox.querySelector('#' + x.id + '-box');
+      try {
+        var html = await x.fn();
+        if(box) box.outerHTML = html;
+        _bindHeavyPanelActions();   // v9.80: cizimden SONRA bagla
+      } catch(e){
+        console.warn('[v9.80] tarama basarisiz', x.id, e && (e.code || e.message));
+        if(box) box.innerHTML = '<div style="font-size:12.5px;color:#dc2626">'
+          + escHtml(x.ad) + ' — ' + escHtml(String((e && (e.code || e.message)) || '').substring(0,90)) + '</div>';
+      }
+    }
+    _cidxBox.querySelectorAll('.hs-run').forEach(function(b){
+      b.addEventListener('click', function(){
+        var x = HEAVY.filter(function(y){ return y.id === b.dataset.id; })[0];
+        if(x) _runHeavy(x, b);
+      });
+    });
+    _cidxBox.querySelector('#hs-run-all')?.addEventListener('click', async function(){
+      this.disabled = true; this.textContent = _L('Scanning...','Taranıyor...');
+      for (const x of HEAVY) { await _runHeavy(x, null); }
+      this.textContent = _L('Done','Bitti');
+    });
+    // ══ v9.80: AGIR PANEL ICI DUGMELER ═══════════════════════════════
+    // Bu paneller artik sayfa acilisinda degil, Tara dugmesiyle çiziliyor.
+    // Dolayisiyla iclerindeki dugmeler her cizimden SONRA baglanmali;
+    // yoksa cizilir ama tiklaninca hicbir sey olmaz (v9.71'de yasandi).
+    function _bindHeavyPanelActions(){
+      // v9.69: markaya ulasildi isareti
     // Musteri panelinde temsilcisiz talep "markaya iletiliyor" diyordu ama
     // o durum hic degismiyordu — admin ureticiyi arasa bile musteri bunu
     // goremiyordu. Bu dugme o markanin BEKLEYEN tum taleplerini isaretler
@@ -32256,7 +32321,7 @@ async function admDataHealth(m) {
       if(!fail) admDataHealth(m);
     });
 
-    // v9.67: sahipsiz kayit temizligi — tek satir veya tumu
+      // v9.67: sahipsiz kayit temizligi
     _cidxBox.querySelectorAll('.orph-del').forEach(function(b){
       b.addEventListener('click', async function(){
         var r = (window._orphanRows||[])[+b.dataset.idx];
@@ -32281,6 +32346,8 @@ async function admDataHealth(m) {
       showToast(res.done + ' ' + _L('deleted','silindi') + (res.fail ? ' · ' + res.fail + ' ' + _L('failed','başarısız') : ''), res.fail?'err':'ok');
       admDataHealth(m);
     });
+
+    }
 
     // v9.64: aynayi users'tan uret (admin yazar)
     _cidxBox.querySelector('#vpub-sync')?.addEventListener('click', async function(){
@@ -32356,6 +32423,19 @@ async function admDataHealth(m) {
     _host.innerHTML = ''; _host.appendChild(_cidxBox);
     var _pb = _cidxBox.querySelector('#cidx-pub');
     if(_pb) _pb.addEventListener('click', async function(){
+      // ══ v9.80: MALIYET UYARISI ════════════════════════════════════════
+      // Indeksi yeniden yayinlamak brand_products koleksiyonunun TAMAMINI
+      // okur — ~16.000 dokuman, yani Spark planindaki gunluk 50.000 okuma
+      // kotasinin ucte biri. Bir gun icinde iki-uc kez basilirsa kota biter
+      // ve uygulama kullanici dokumanlarini bile okuyamaz hale gelir:
+      // rol "?" gorunur, vendor paneli acilmaz, site bozuk sanilir.
+      // 27.09.2026'da tam olarak bu yasandi. Artik maliyeti onceden soyluyor.
+      var _n = (typeof _bpCache !== 'undefined' && _bpCache && _bpCache.length) ? _bpCache.length : 16000;
+      if(!confirm(_L('Republishing the index reads the entire brand_products collection: about ',
+                     'İndeksi yeniden yayınlamak brand_products koleksiyonunun tamamını okur: yaklaşık ')
+                  + _n.toLocaleString('tr-TR')
+                  + _L(' documents — roughly a third of the daily free quota. Only republish after a bulk import. Continue?',
+                       ' doküman — günlük ücretsiz kotanın kabaca üçte biri. Yalnızca toplu içe aktarmadan sonra yayınlayın. Devam edilsin mi?'))) return;
       var ok = await admPublishCatalogIndex(_pb);
       // v9.33.2: DIS konteynerle yeniden ciz — aksi halde eski panel ekranda kalip
       // yenisi altina ekleniyordu (iki panel ust uste gorunuyordu).
