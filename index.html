@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.86 | pochub.co -->
+<!-- PoCHub v9.87 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.86';
+const VERSION = 'v9.87';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.87': ['REHBER TEK VERI MODELINE GECTI — tasarim hatasinin duzeltilmesi (Hasan: neden duzenle butonu yok, bu sayfayi neden junior gibi yaptin). Hakliydi: bu ekrani bes surumdur yama yaparak ilerlettim ve her turda bir eksik cikti. KOK NEDEN DUGMELERDE DEGIL VERI MODELINDEYDI: distributor satirlari gercek kayit DEGILDI, brand_distributors dokumanlarindan turetiliyordu. Firma kaydi olmadigi icin adi, sehri, telefonu, notu, davet edilebilirligi yoktu — duzenlenecek bir sey yoktu. Entegratorlerin partner_companies kaydi vardi, onlarin hepsi vardi. Butun asimetri buradan geliyordu. YENI MODEL: HER firma bir partner_companies kaydidir — distributor, entegrator, bayi fark etmez. brand_distributors yalnizca marka ile firma arasindaki BAG olarak kalir (temsilcisiz talep raporu brandNorm uzerinden onu okuyor, orasi bozulmadi). Kaydi olmayan distributorler icin firma kaydi ilk acilista otomatik olusturuluyor. SONUC: tek satir tipi, tek duzenleyici, HER satirda ayni dort eylem — Duzenle, Markalar, Davet (ya da Hesabi bagla), Sil. Ayrica uyelik durumuna gore filtre eklendi: uyeler, uye olmayanlar, daveti kabul edilenler. AD DEGISIKLIGI: brand_distributors dokuman kimligi distributor slugini iceriyor; ad degisince baglar eski ada bagli kalir, markalar kaybolur ve rapor yanlis distributor yazardi. Artik ad degisiminde baglar yeni kimlige tasiniyor ve eski firma kaydi siliniyor. Senaryo sahte veriyle prova edildi: uc marka bagi tasindi, kaybolan bag 0, mukerrer firma kaydi 0. node --check MODULE SYNTAX OK.'],
   'v9.86': ['DISTRIBUTOR SATIRINDA EYLEM YOKTU + DAVET HATA MESAJI (Hasan: permission denied, ayrica bazilarinda duzenle ve sil yok). (1) IZIN HATASI: tarayicidan dogrulandi — partner_companies ve brand_distributors okunuyor ama partner_invites PERMISSION_DENIED veriyor. Yani kural dosyasi (v1.10.1) henuz yayinlanmamis, kodda sorun yok. Bu hatanin sebebini bulmak bir tur aldigi icin mesaji degistirdim: davet olustururken permission-denied gelirse artik ham kod yerine ne yapilacagi yaziyor — Firebase konsolundan firestore.rules yayinlayin. (2) DISTRIBUTOR SATIRLARINDA hicbir eylem yoktu, yalniz Markalar vardi; silme ya da ada mudahale imkansizdi. Artik Sil dugmesi var. Distributor satiri TURETILMIS bir kayit — marka basina ayri dokumanlardan olusuyor — dolayisiyla silmek o dokumanlarin hepsini silmek demek; onayda kac marka bagi silinecegi acikca yaziyor ve islem sirasinda ilerleme sayaci gosteriliyor. Firma satirlarinda Duzenle/Sil/Davet zaten vardi; distributor satirlarinda olmamasi tasarim gereciydi ama eksikti. node --check MODULE SYNTAX OK.'],
   'v9.85': ['DAVET AKISI — rehber ile uyelik bagi artik otomatik kuruluyor. v9.84 te bag ELLE kuruluyordu. Akis: admin firmaya davet olusturur, davetli baglantiyla kayit olur, istemci daveti kabul isaretler, admin rehberde tek tikla baglar. YETKI TASARIMI — en kritik karar burasi: davetli firma kaydini KENDISI guncelleyemiyor. Kural yalnizca status, acceptedBy ve acceptedAt alanlarinin degismesine izin veriyor, acceptedBy kendi uid i olmak zorunda ve yalnizca BEKLEYEN bir davette. Firma kaydina baglama yetkisi tamamen admin de. Aksi halde davet baglantisini ele geciren biri kendini istedigi firmayla eslestirebilirdi. TOKEN: dokuman kimligi 32 karakterlik rastgele token (crypto.getRandomValues, 2^128 olasilik uzayi). Okuma herkese acik cunku davetli henuz kayitli degil ve davet ekranini gormeli; icerikte kisisel veri yok. Baglanti ayristirmasi bes senaryoyla test edildi (gecerli token, kisa token, baska hash, sorgu parametreli, bos) — 5/5 dogru. ARAYUZ: uye olmayan firmalarda Davet dugmesi; baglanti kopyalanabilir ve e-posta adresi varsa posta istemcisinde acilabilir. Kabul edilmis davetler rehberde yesil Davet kabul edildi rozetiyle ve Hesabi bagla dugmesiyle gorunuyor; ustteki sayac kac tane bekledigini yaziyor. Kayit akisinda davet kabulu SESSIZ fail ediyor — davet gecersiz olsa bile kayit gecerli kalmali. rules v1.10.1. node --check MODULE SYNTAX OK.'],
   'v9.84': ['REHBER ILE UYELIK BAGI (Hasan: bu ikisinin bagimsiz olmasi normal mi?). Ayri olmalari dogru — Vendorlar herkese acik pazar yeri, rehber ise admin e kapali temas listesi; 353 firmayi pazar yerinde gostermek olmayan bir arzi varmis gibi sunmak olurdu. Ama BAGSIZ olmalari uc seyi kaybediyordu: kac hedefin uye oldugu gorulemiyor, uye olduklarinda toplanan marka ve iletisim verisi yeni hesaba tasinamiyor, ayni firma iki ayri kayit olarak kaliyor. (1) partner_companies kaydina vendorId ve linkedAt alanlari eklendi (rules v1.10.0). Bos ise firma henuz uye degil. (2) Firma duzenleyicisinde Bagli platform hesabi secimi — vendor listesi AYNADAN geliyor (ucuz okuma). (3) Listede Uye rozeti ve bagli hesabin adi; ustte kac firmanin uye oldugu sayaci. (4) OTOMATIK ESLESME ONERISI: firma adi normalize edilip (sirket ekleri, Turkce karakterler) vendor adlariyla karsilastiriliyor; tutanlar Olasi eslesme diye isaretleniyor. Otomatik BAGLANMIYOR — yanlis eslesme iki firmanin verisini birbirine karistirir, karar admin in. Normalizasyon bes gercek ad ciftiyle test edildi (GITS, Barikat, DataMarket, NGTech, Arti ve Arti) — 5/5 dogru; kismi eslesmeler bilerek oneri vermiyor. SIRADAKI: davet akisi — rehberden davet gonder, firma kayit olunca bu bag otomatik kurulsun. node --check MODULE SYNTAX OK.'],
@@ -32320,7 +32321,8 @@ async function openCompanyEditor(rec, onDone){
     var nm = (modal.querySelector('#pce-name').value || '').trim();
     var msg = modal.querySelector('#pce-msg');
     if(!nm){ msg.textContent = _L('Company name is required.','Firma adı zorunlu.'); return; }
-    var slug = isNew ? _slugOf(nm) : r.id;
+    // v9.87: ad degisince slug da degisir — kayit yeni kimlige tasinir
+    var slug = _slugOf(nm) || (r && r.id) || '';
     if(!slug){ msg.textContent = _L('Company name must contain letters or digits.','Firma adı harf ya da rakam içermeli.'); return; }
     this.disabled = true;
     var d = {
@@ -32338,9 +32340,46 @@ async function openCompanyEditor(rec, onDone){
     d.vendorId = _vid || '';
     if(_vid && _vid !== r.vendorId) d.linkedAt = serverTimestamp();
     try {
+      // ══ v9.87: AD DEGISIRSE MARKA BAGLARI DA TASINMALI ═══════════════
+      // brand_distributors dokuman kimligi {brandNorm}_{distributor-slug}
+      // ve icinde distributorName alani var. Firma adi degisince bu baglar
+      // eski ada bagli kalir; rehber yeni adi gosterir ama markalar
+      // kaybolur ve temsilcisiz talep raporu yanlis distributor yazar.
+      // O yuzden ad degisiminde baglar yeni ada yeniden yaziliyor.
+      var oldName = (r && r.name) ? String(r.name).trim() : '';
+      var moved = 0, moveFail = 0;
+      if(!isNew && oldName && oldName !== nm){
+        var oldSlug = _slugOf(oldName), newSlug = _slugOf(nm);
+        if(oldSlug && newSlug && oldSlug !== newSlug){
+          for (const br of ([].concat((r && r.linkBrands) || []))) {
+            var bnx = _normBrand(br);
+            if(!bnx) continue;
+            try {
+              var snapOld = await getDoc(doc(db,'brand_distributors', bnx + '_' + oldSlug));
+              var base = snapOld.exists() ? snapOld.data() : { brandNorm:bnx, brandName:br, role:'distributor' };
+              base.distributorName = nm.substring(0,120);
+              base.updatedAt = serverTimestamp();
+              await setDoc(doc(db,'brand_distributors', bnx + '_' + newSlug), base, { merge:true });
+              await deleteDoc(doc(db,'brand_distributors', bnx + '_' + oldSlug));
+              moved++;
+            } catch(e2){
+              moveFail++;
+              console.warn('[v9.87] marka bagi tasinamadi', br, oldName, '->', nm, e2 && (e2.code||e2.message));
+            }
+          }
+          invalidateBrandDistributors();
+        }
+      }
+
       await setDoc(doc(db,'partner_companies', slug), d, { merge:true });
+      // Yeni slug'a tasindiysa eski firma kaydini sil (mukerrer kalmasin)
+      if(!isNew && r && r.id && r.id !== slug){
+        try { await deleteDoc(doc(db,'partner_companies', r.id)); }
+        catch(e3){ console.warn('[v9.87] eski firma kaydi silinemedi', r.id, e3 && (e3.code||e3.message)); }
+      }
       _pcCache = null;
-      showToast(_L('Saved.','Kaydedildi.'),'ok');
+      showToast(_L('Saved.','Kaydedildi.') + (moved ? ' · ' + moved + ' ' + _L('brand link moved','marka bağı taşındı') : '')
+        + (moveFail ? ' · ' + moveFail + ' ' + _L('link failed','bağ başarısız') : ''), moveFail?'err':'ok');
       close(); if(onDone) onDone();
     } catch(e){
       this.disabled = false;
@@ -32453,45 +32492,73 @@ async function getPartnerCompanies(force){
   _pcCache = out; return out;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// v9.87 — REHBER: TEK VERI MODELI
+// ───────────────────────────────────────────────────────────────────────
+// ONCEKI TASARIM HATASI: distributor satirlari gercek kayit DEGILDI,
+// brand_distributors dokumanlarindan turetiliyordu. Firma kaydi olmadigi
+// icin adi, sehri, telefonu, notu yoktu; duzenlenecek bir sey yoktu.
+// Entegratorlerin partner_companies kaydi vardi, onlarin her sey vardi.
+// Butun asimetri — kiminde Duzenle var kiminde yok, kiminde Davet var
+// kiminde yok — bu modelden geliyordu. Her turda bir dugme ekleyerek
+// kapatmaya calistim; yanlisti.
+//
+// YENI MODEL: HER firma bir partner_companies kaydidir. brand_distributors
+// yalnizca marka<->firma BAGI olarak kalir (temsilcisiz talep raporu
+// brandNorm uzerinden onu okuyor, orasi bozulmamali).
+// Distributorler icin eksik firma kayitlari ilk acilista otomatik olusur.
+// Boylece tek satir tipi, tek duzenleyici, her firmada ayni eylemler.
+//
+// AD DEGISIKLIGI: brand_distributors dokuman kimligi distributor slug'ini
+// iceriyor. Ad degisince bu baglar yeniden yazilir, yoksa markalar kaybolur.
+// ═══════════════════════════════════════════════════════════════════════
 async function admPartnerDirectory(host){
   host.innerHTML = '<div class="loading"><div class="spinner"></div>' + _L('Loading directory...','Rehber yükleniyor...') + '</div>';
-  var companies = [], dists = [];
+
+  var companies = [], dists = [], vends = [], accepted = [];
   try { companies = await getPartnerCompanies(true); } catch(e){}
   try {
     var ds = await getDocs(collection(db,'brand_distributors'));
     dists = ds.docs.map(function(d){ return d.data()||{}; });
-  } catch(e){ console.warn('[v9.81] brand_distributors okunamadi:', e && (e.code||e.message)); }
-
-  var byDist = Object.create(null);
-  dists.forEach(function(r){
-    var n = r.distributorName || '';
-    if(!n) return;
-    var e = byDist[n] || (byDist[n] = { name:n, type:'distributor', brands:[], lines:Object.create(null), city:'', phone:'', web:'', tier:'' });
-    if(r.brandName && e.brands.indexOf(r.brandName) < 0) e.brands.push(r.brandName);
-    if(r.productLine) e.lines[r.brandName||''] = r.productLine;
-  });
-  var rows = Object.keys(byDist).map(function(k){ return byDist[k]; })
-               .sort(function(a,b){ return b.brands.length - a.brands.length; })
-               .concat(companies.map(function(c){
-                 return { name:c.name||'', type:c.type||'integrator', brands:[].concat(c.brands||[]),
-                          city:c.city||'', phone:c.phone||'', web:c.web||'', tier:c.tier||'',
-                          note:c.note||'', id:c.id, src:'company', vendorId:c.vendorId||'',
-                          lines:Object.create(null) };
-               }));
-  rows.forEach(function(r,i){ r._i = i; if(!r.src) r.src = 'dist'; });
-
-  var TYPE = { distributor:_L('Distributor','Distribütör'), integrator:_L('Integrator','Entegratör'),
-               reseller:_L('Reseller','Bayi'), msp:'MSP' };
-
-  // v9.84: platformdaki vendor hesaplari — uyelik rozeti ve oneri icin
-  var vends = [];
+  } catch(e){ console.warn('[v9.87] brand_distributors okunamadi:', e && (e.code||e.message)); }
   try { vends = await getVendorsPublic(); } catch(e){}
+  try {
+    var iv = await getDocs(query(collection(db,'partner_invites'), where('status','==','accepted'), limit(100)));
+    accepted = iv.docs.map(function(d){ var o=d.data()||{}; o.token=d.id; return o; });
+  } catch(e){ console.warn('[v9.87] davetler okunamadi:', e && (e.code||e.message)); }
   window._pceVendors = vends;
+
+  // Marka baglarini distributor adina gore topla
+  var brandsOf = Object.create(null), linesOf = Object.create(null);
+  dists.forEach(function(r){
+    var n = r.distributorName || ''; if(!n) return;
+    (brandsOf[n] = brandsOf[n] || []);
+    if(r.brandName && brandsOf[n].indexOf(r.brandName) < 0) brandsOf[n].push(r.brandName);
+    if(r.productLine){ (linesOf[n] = linesOf[n] || Object.create(null))[r.brandName||''] = r.productLine; }
+  });
+
+  // Firma kaydi OLMAYAN distributorler icin kayit olustur (bir kez, sessiz)
+  var byName = Object.create(null);
+  companies.forEach(function(c){ byName[String(c.name||'').trim()] = c; });
+  var missing = Object.keys(brandsOf).filter(function(n){ return !byName[n]; });
+  if(missing.length){
+    var made = 0;
+    for (const n of missing) {
+      try {
+        await setDoc(doc(db,'partner_companies', _slugOf(n)),
+          { name:n.substring(0,140), type:'distributor', brands:[], source:'distributor_site',
+            vendorId:'', updatedAt: serverTimestamp() }, { merge:true });
+        made++;
+      } catch(e){ console.warn('[v9.87] distributor firma kaydi olusturulamadi', n, e && (e.code||e.message)); }
+    }
+    if(made){ _pcCache = null; try { companies = await getPartnerCompanies(true); } catch(e){} }
+  }
+
   var vById = Object.create(null);
   vends.forEach(function(v){ vById[v.id] = v.company || v.displayName || v.id; });
+  var accById = Object.create(null);
+  accepted.forEach(function(a){ if(a.companyId) accById[a.companyId] = a; });
 
-  // Adi normalize edip esleme ONERISI uret. Oneri otomatik BAGLANMAZ —
-  // yanlis eslesme iki firmanin verisini birbirine karistirir; karar admin'in.
   function _cn(x){
     return String(x||'').toLowerCase()
       .replace(/[ıİ]/g,'i').replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ö/g,'o').replace(/ç/g,'c')
@@ -32500,71 +32567,81 @@ async function admPartnerDirectory(host){
   }
   var vByName = Object.create(null);
   vends.forEach(function(v){ var k=_cn(v.company||v.displayName); if(k) vByName[k]=v; });
-  rows.forEach(function(r){
-    if(r.src !== 'company' || r.vendorId) return;
-    var hit = vByName[_cn(r.name)];
-    if(hit) r.suggest = hit;
-  });
-  // v9.85: kabul edilmis ama henuz baglanmamis davetler
-  var accepted = [];
-  try {
-    var iv = await getDocs(query(collection(db,'partner_invites'), where('status','==','accepted'), limit(100)));
-    accepted = iv.docs.map(function(d){ var o=d.data()||{}; o.token=d.id; return o; });
-  } catch(e){ console.warn('[v9.85] davetler okunamadi:', e && (e.code||e.message)); }
-  var accById = Object.create(null);
-  accepted.forEach(function(a){ if(a.companyId) accById[a.companyId] = a; });
-  rows.forEach(function(r){ if(r.src==='company' && r.id && accById[r.id] && !r.vendorId) r.accepted = accById[r.id]; });
 
-  var linked = rows.filter(function(r){ return r.src==='company' && r.vendorId; }).length;
+  // TEK satir tipi
+  var rows = companies.map(function(c){
+    var nm = String(c.name||'').trim();
+    var linkBrands = brandsOf[nm] || [];
+    var own = [].concat(c.brands||[]);
+    var all = linkBrands.slice();
+    own.forEach(function(b){ if(all.indexOf(b) < 0) all.push(b); });
+    return { id:c.id, name:nm, type:c.type||'integrator', brands:all, ownBrands:own,
+             linkBrands:linkBrands, lines:linesOf[nm] || Object.create(null),
+             city:c.city||'', phone:c.phone||'', web:c.web||'', tier:c.tier||'',
+             note:c.note||'', vendorId:c.vendorId||'',
+             accepted: (c.id && accById[c.id] && !c.vendorId) ? accById[c.id] : null,
+             suggest: (!c.vendorId && vByName[_cn(nm)]) ? vByName[_cn(nm)] : null };
+  }).sort(function(a,b){ return b.brands.length - a.brands.length || a.name.localeCompare(b.name,'tr'); });
+  rows.forEach(function(r,i){ r._i = i; });
+
+  var TYPE = { distributor:_L('Distributor','Distribütör'), integrator:_L('Integrator','Entegratör'),
+               reseller:_L('Reseller','Bayi'), msp:'MSP' };
+  var linked = rows.filter(function(r){ return r.vendorId; }).length;
   var sugg   = rows.filter(function(r){ return r.suggest; }).length;
-  var totalCo= rows.filter(function(r){ return r.src==='company'; }).length;
+  var accCnt = rows.filter(function(r){ return r.accepted; }).length;
 
   host.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px">'
     +   '<div><h2 style="margin:0 0 4px;font-size:19px">' + _L('Partner directory','Firma Rehberi') + '</h2>'
     +     '<div style="font-size:12px;color:var(--text-muted);line-height:1.55;max-width:760px">'
-    +       _L('Companies gathered from vendor directories and distributor sites. These are NOT platform members — this is a contact list.',
-               'Üretici dizinlerinden ve distribütör sayfalarından toplanan firmalar. Bunlar platform üyesi DEĞİL — bu bir temas listesidir.')
+    +       _L('Every company — distributor, integrator or reseller — is one record here. Companies are NOT platform members until linked to an account.',
+               'Her firma — distribütör, entegratör ya da bayi — burada tek bir kayıttır. Bir hesaba bağlanmadıkları sürece platform üyesi değildirler.')
     +     '</div></div>'
     +   '<div style="display:flex;gap:8px;flex-shrink:0">'
     +     '<button class="btn-p btn-sm" id="pc-new">' + _L('New company','Yeni Firma') + '</button>'
-    +     '<button class="btn-g btn-sm" id="pc-import-toggle">' + _L('Import companies (CSV)','Firma Yükle (CSV)') + '</button>'
-    +   '</div>'
-    + '</div>'
+    +     '<button class="btn-g btn-sm" id="pc-import-toggle">' + _L('Import (CSV)','CSV Yükle') + '</button>'
+    +   '</div></div>'
     + '<div id="pc-import" style="display:none;margin-bottom:14px" class="card"><div style="padding:14px">'
     +   '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;line-height:1.6">'
-    +     _L('Expected columns: name, type, brands (semicolon separated), city, phone, web, tier, source. Header row required.',
-             'Beklenen sütunlar: name, type, brands (noktalı virgülle ayrık), city, phone, web, tier, source. Başlık satırı zorunlu.')
+    +     _L('Expected columns: name, type, brands (semicolon separated), city, phone, web, tier, source.',
+             'Beklenen sütunlar: name, type, brands (noktalı virgülle ayrık), city, phone, web, tier, source.')
     +   '</div>'
     +   '<textarea id="pc-csv" rows="7" style="width:100%;font-family:monospace;font-size:11.5px;padding:8px;border:1px solid var(--border);border-radius:8px"></textarea>'
     +   '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">'
     +     '<button class="btn-p btn-sm" id="pc-import-run">' + _L('Load','Yükle') + '</button>'
     +     '<span id="pc-import-status" style="font-size:12px;color:var(--text-muted)"></span>'
     +   '</div></div></div>'
+    + '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px">'
+    +   '<div><span style="font-size:17px;font-weight:800">' + linked + '</span>'
+    +     ' <span style="font-size:11.5px;color:var(--text-muted)">/ ' + rows.length + ' ' + _L('company is a member','firma üye') + '</span></div>'
+    +   (accCnt ? '<div style="font-size:12px;color:#16a34a;font-weight:600">✉ ' + accCnt + ' '
+            + _L('invite accepted — ready to link','davet kabul edildi, bağlanmayı bekliyor') + '</div>' : '')
+    +   (sugg ? '<div style="font-size:12px;color:#b45309">⚡ ' + sugg + ' '
+            + _L('name match found','isim eşleşmesi bulundu') + '</div>' : '')
+    + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
     +   '<input id="pc-q" placeholder="' + _L('Search company or brand...','Firma ya da marka ara...') + '" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
     +   '<select id="pc-type" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
     +     '<option value="">' + _L('All types','Tüm tipler') + '</option>'
-    +     '<option value="distributor">' + TYPE.distributor + '</option>'
-    +     '<option value="integrator">' + TYPE.integrator + '</option>'
-    +     '<option value="reseller">' + TYPE.reseller + '</option>'
+    +     Object.keys(TYPE).map(function(k){ return '<option value="' + k + '">' + TYPE[k] + '</option>'; }).join('')
+    +   '</select>'
+    +   '<select id="pc-state" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
+    +     '<option value="">' + _L('All','Tümü') + '</option>'
+    +     '<option value="member">' + _L('Members','Üyeler') + '</option>'
+    +     '<option value="notmember">' + _L('Not members','Üye olmayanlar') + '</option>'
+    +     '<option value="accepted">' + _L('Invite accepted','Davet kabul edildi') + '</option>'
     +   '</select></div>'
-    + '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px">'
-    +   '<div><span style="font-size:17px;font-weight:800">' + linked + '</span>'
-    +     ' <span style="font-size:11.5px;color:var(--text-muted)">/ ' + totalCo + ' ' + _L('company is a member','firma üye') + '</span></div>'
-    +   (sugg ? '<div style="font-size:12px;color:#b45309">⚡ ' + sugg + ' '
-            + _L('name match found — review and link','isim eşleşmesi bulundu, kontrol edip bağlayın') + '</div>' : '')
-    +   (accepted.length ? '<div style="font-size:12px;color:#16a34a;font-weight:600">✉ ' + accepted.length + ' '
-            + _L('invite accepted — ready to link','davet kabul edildi, bağlanmayı bekliyor') + '</div>' : '')
-    + '</div>'
     + '<div id="pc-count" style="font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>'
     + '<div id="pc-list"></div>';
 
   function render(){
     var q = (el('pc-q').value || '').toLowerCase().trim();
-    var ty = el('pc-type').value;
+    var ty = el('pc-type').value, st = el('pc-state').value;
     var list = rows.filter(function(r){
       if(ty && r.type !== ty) return false;
+      if(st === 'member' && !r.vendorId) return false;
+      if(st === 'notmember' && r.vendorId) return false;
+      if(st === 'accepted' && !r.accepted) return false;
       if(!q) return true;
       if(String(r.name).toLowerCase().indexOf(q) >= 0) return true;
       return r.brands.some(function(b){ return String(b).toLowerCase().indexOf(q) >= 0; });
@@ -32581,24 +32658,30 @@ async function admPartnerDirectory(host){
         return escHtml(b) + (pl ? ' <span style="color:var(--text-muted)">(' + escHtml(pl) + ')</span>' : '');
       }).join(', ') + (r.brands.length > 14 ? ' …+' + (r.brands.length - 14) : '');
       var webHost = String(r.web||'').replace(/^https?:\/\//,'').replace(/\/$/,'');
+      var state = r.vendorId
+        ? '<span style="font-size:10.5px;font-weight:600;color:#16a34a;border:1px solid #16a34a33;border-radius:10px;padding:1px 7px;margin-left:4px">✓ '
+          + _L('Member','Üye') + (vById[r.vendorId] ? ' · ' + escHtml(vById[r.vendorId]) : '') + '</span>'
+        : (r.accepted
+          ? '<span style="font-size:10.5px;font-weight:600;color:#16a34a;border:1px solid #16a34a33;border-radius:10px;padding:1px 7px;margin-left:4px">✉ '
+            + _L('Invite accepted','Davet kabul edildi') + '</span>'
+          : (r.suggest
+            ? '<span style="font-size:10.5px;font-weight:600;color:#b45309;border:1px solid #b4530933;border-radius:10px;padding:1px 7px;margin-left:4px">⚡ '
+              + _L('Possible match','Olası eşleşme') + ': ' + escHtml(r.suggest.company || r.suggest.displayName || '') + '</span>'
+            : ''));
+      // HER satirda AYNI eylemler — tipten bagimsiz
+      var acts = '<button class="btn-g btn-sm pc-edit" data-i="' + r._i + '" style="font-size:11.5px">✏ ' + _L('Edit','Düzenle') + '</button>'
+        + '<button class="btn-g btn-sm pc-brands" data-i="' + r._i + '" style="font-size:11.5px">🏷 ' + _L('Brands','Markalar') + '</button>'
+        + (r.accepted
+            ? '<button class="btn-p btn-sm pc-link" data-i="' + r._i + '" style="font-size:11.5px">' + _L('Link account','Hesabı bağla') + '</button>'
+            : (!r.vendorId ? '<button class="btn-g btn-sm pc-inv" data-i="' + r._i + '" style="font-size:11.5px">✉ ' + _L('Invite','Davet') + '</button>' : ''))
+        + '<button class="btn-g btn-sm pc-del" data-i="' + r._i + '" style="font-size:11.5px;color:#dc2626">🗑 ' + _L('Delete','Sil') + '</button>';
       return '<div class="card" style="padding:12px 14px;margin-bottom:8px">'
         + '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">'
         +   '<div style="font-size:14px;font-weight:700">' + escHtml(r.name)
         +     ' <span style="font-size:10.5px;font-weight:600;color:' + badge + ';border:1px solid ' + badge + '33;border-radius:10px;padding:1px 7px;margin-left:4px">'
         +       escHtml(TYPE[r.type] || r.type) + '</span>'
         +     (r.tier ? ' <span style="font-size:11px;color:var(--text-muted)">· ' + escHtml(r.tier) + '</span>' : '')
-        +     (r.vendorId
-            ? ' <span style="font-size:10.5px;font-weight:600;color:#16a34a;border:1px solid #16a34a33;border-radius:10px;padding:1px 7px;margin-left:4px">✓ '
-              + _L('Member','Üye') + (vById[r.vendorId] ? ' · ' + escHtml(vById[r.vendorId]) : '') + '</span>'
-            : (r.accepted
-               ? ' <span style="font-size:10.5px;font-weight:600;color:#16a34a;border:1px solid #16a34a33;border-radius:10px;padding:1px 7px;margin-left:4px">✉ '
-                 + _L('Invite accepted','Davet kabul edildi') + '</span>'
-                 + ' <button class="btn-p btn-sm pc-link" data-i="' + r._i + '" style="font-size:10.5px;margin-left:4px">'
-                 + _L('Link account','Hesabı bağla') + '</button>'
-               : (r.suggest
-                 ? ' <span style="font-size:10.5px;font-weight:600;color:#b45309;border:1px solid #b4530933;border-radius:10px;padding:1px 7px;margin-left:4px">⚡ '
-                   + _L('Possible match','Olası eşleşme') + ': ' + escHtml(r.suggest.company || r.suggest.displayName || '') + '</span>'
-                 : '')))
+        +     state
         +   '</div>'
         +   '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
         +     '<span style="font-size:11.5px;color:var(--text-muted)">'
@@ -32606,153 +32689,99 @@ async function admPartnerDirectory(host){
         +       (r.phone ? escHtml(r.phone) + ' · ' : '')
         +       (webHost ? '<a href="https://' + escHtml(webHost) + '" target="_blank" rel="noopener">' + escHtml(webHost) + '</a>' : '')
         +     '</span>'
-        // v9.82'de dugme baslik yanina, 10.5px boyutunda sikistirilmisti ve
-        // liste marka sayisina gore sirali oldugu icin en ustteki dokuz satir
-        // distributor cikiyordu — yani ilk bakista yalniz "Markalar" goruruyor,
-        // "Düzenle" hic gorunmuyordu. Artik eylemler sagda, ayri ve normal boyutta.
-        +     '<span style="display:flex;gap:6px;flex-shrink:0">'
-        +       '<button class="btn-g btn-sm pc-edit" data-i="' + r._i + '" style="font-size:11.5px">'
-        +         (r.src === 'dist' ? '🏷 ' + _L('Brands','Markalar') : '✏ ' + _L('Edit','Düzenle')) + '</button>'
-        +       (r.src === 'company' && !r.vendorId
-            ? '<button class="btn-g btn-sm pc-inv" data-i="' + r._i + '" style="font-size:11.5px">✉ ' + _L('Invite','Davet') + '</button>'
-            : '')
-        // v9.86: distributor satirlarinda hic eylem yoktu — yalniz Markalar
-        // vardi, silme ya da ada mudahale yoktu. Distributor satiri turetilmis
-        // bir kayit: marka basina ayri dokumanlardan olusuyor. Silmek demek o
-        // dokumanlarin HEPSINI silmek demek, o yuzden kac kayit silinecegi
-        // onayda acikca yaziyor.
-        +       (r.src === 'dist'
-            ? '<button class="btn-g btn-sm pc-dist-del" data-i="' + r._i + '" style="font-size:11.5px;color:#dc2626">🗑 ' + _L('Delete','Sil') + '</button>'
-            : '')
-        +       (r.src === 'company'
-            ? '<button class="btn-g btn-sm pc-del" data-i="' + r._i + '" style="font-size:11.5px;color:#dc2626">🗑 ' + _L('Delete','Sil') + '</button>'
-            : '')
-        +     '</span>'
+        +     '<span style="display:flex;gap:6px;flex-shrink:0">' + acts + '</span>'
         +   '</div></div>'
         + (r.brands.length ? '<div style="font-size:11.5px;color:var(--text-secondary);margin-top:6px;line-height:1.7"><b>'
             + r.brands.length + '</b> ' + _L('brand','marka') + ': ' + brandStr + '</div>' : '')
         + (r.note ? '<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;font-style:italic">' + escHtml(r.note) + '</div>' : '')
         + '</div>';
     }).join('') + (list.length > 300 ? '<div style="font-size:11.5px;color:var(--text-muted);padding:8px">' + _L('Showing first 300 — narrow the search.','İlk 300 gösteriliyor — aramayı daraltın.') + '</div>' : '');
+    bindActions();
   }
-  // v9.82: duzenle dugmeleri her cizimden SONRA baglanir
-  function bindEdit(){
-    // v9.86: distributor kaydini tamamen sil (tum marka baglari)
-    el('pc-list').querySelectorAll('.pc-dist-del').forEach(function(b){
-      b.addEventListener('click', async function(){
-        var r = rows[+b.dataset.i];
-        if(!r || !r.brands || !r.brands.length) return;
-        if(!confirm(_L('Delete this distributor and all its brand links?\n\n','Bu distribütör ve tüm marka bağları silinsin mi?\n\n')
-                    + r.name + '\n' + r.brands.length + ' ' + _L('brand link','marka bağı')
-                    + '\n\n' + _L('This cannot be undone.','Bu işlem geri alınamaz.'))) return;
-        b.disabled = true;
-        var done=0, fail=0, msgs=[];
-        for (const br of r.brands) {
-          try { await deleteDoc(doc(db,'brand_distributors', _normBrand(br) + '_' + _slugOf(r.name))); done++; }
-          catch(e){
-            fail++;
-            var _m=(e&&(e.code||e.message))||'';
-            console.warn('[v9.86] marka bagi silinemedi', br, r.name, _m);
-            if(msgs.length<3) msgs.push(br + ': ' + String(_m).substring(0,40));
-          }
-          b.textContent = (done+fail) + '/' + r.brands.length;
-        }
-        invalidateBrandDistributors();
-        showToast(done + ' ' + _L('link deleted','bağ silindi') + (fail ? ' · ' + fail + ' ' + _L('failed','başarısız') : '')
-          + (msgs.length ? ' — ' + msgs.join(' | ') : ''), fail?'err':'ok');
-        admPartnerDirectory(host);
-      });
-    });
 
-    // v9.85: kabul edilmis daveti firmaya bagla (yetki yalniz admin'de)
-    el('pc-list').querySelectorAll('.pc-link').forEach(function(b){
-      b.addEventListener('click', async function(){
+  function reload(){ admPartnerDirectory(host); }
+
+  function bindActions(){
+    var L = el('pc-list');
+    L.querySelectorAll('.pc-edit').forEach(function(b){
+      b.addEventListener('click', function(){ openCompanyEditor(rows[+b.dataset.i], reload); });
+    });
+    L.querySelectorAll('.pc-brands').forEach(function(b){
+      b.addEventListener('click', function(){
         var r = rows[+b.dataset.i];
-        if(!r || !r.accepted || !r.accepted.acceptedBy) return;
-        var who = vById[r.accepted.acceptedBy] || r.accepted.acceptedBy;
-        if(!confirm(_L('Link this company to the registered account?\n\n','Bu firma kayıtlı hesaba bağlansın mı?\n\n')
-                    + r.name + '  →  ' + who)) return;
-        b.disabled = true;
-        try {
-          await setDoc(doc(db,'partner_companies', r.id),
-            { vendorId: r.accepted.acceptedBy, linkedAt: serverTimestamp() }, { merge:true });
-          await updateDoc(doc(db,'partner_invites', r.accepted.token), { status:'applied' });
-          _pcCache = null;
-          showToast(_L('Linked.','Bağlandı.'),'ok');
-          admPartnerDirectory(host);
-        } catch(e){
-          b.disabled = false;
-          var _m=(e&&(e.code||e.message))||'';
-          console.warn('[v9.85] baglanamadi', r.id, _m);
-          showToast(_L('Could not link: ','Bağlanamadı: ') + String(_m).substring(0,70), 'err');
-        }
+        openDistributorEditor(r.name, r.linkBrands.slice(), r.lines, reload);
       });
     });
-    // v9.85: davet olustur ve baglantiyi goster
-    el('pc-list').querySelectorAll('.pc-inv').forEach(function(b){
+    L.querySelectorAll('.pc-inv').forEach(function(b){
       b.addEventListener('click', async function(){
-        var r = rows[+b.dataset.i];
-        if(!r || !r.id) return;
+        var r = rows[+b.dataset.i]; if(!r || !r.id) return;
         b.disabled = true;
         try { openInviteModal(r, await createPartnerInvite(r)); }
         catch(e){
           var _m=(e&&(e.code||e.message))||'';
-          console.warn('[v9.85] davet olusturulamadi', r.id, _m);
-          // v9.86: permission-denied burada neredeyse her zaman TEK bir sey
-          // demek: kural dosyasi henuz yayinlanmamis. Ham hata kodunu
-          // gostermek yerine ne yapilacagini soyluyoruz — bu hatanin
-          // sebebini bulmak bir turu aldi.
+          console.warn('[v9.87] davet olusturulamadi', r.id, _m);
           showToast(/permission-denied/i.test(_m)
-            ? _L('Invite rules are not published yet — deploy firestore.rules (v1.10.1) in the Firebase console.',
-                 'Davet kuralları henüz yayınlanmamış — Firebase konsolundan firestore.rules (v1.10.1) yayınlayın.')
+            ? _L('Invite rules are not published yet — deploy firestore.rules in the Firebase console.',
+                 'Davet kuralları henüz yayınlanmamış — Firebase konsolundan firestore.rules yayınlayın.')
             : _L('Could not create invite: ','Davet oluşturulamadı: ') + String(_m).substring(0,70), 'err');
         }
         b.disabled = false;
       });
     });
-    // v9.83: satir uzerinden dogrudan silme (onceden yalniz modal icindeydi)
-    el('pc-list').querySelectorAll('.pc-del').forEach(function(b){
+    L.querySelectorAll('.pc-link').forEach(function(b){
       b.addEventListener('click', async function(){
         var r = rows[+b.dataset.i];
-        if(!r || !r.id) return;
-        if(!confirm(_L('Delete this company permanently?\n\n','Bu firma kalıcı olarak silinsin mi?\n\n') + r.name)) return;
+        if(!r || !r.accepted || !r.accepted.acceptedBy) return;
+        var who = vById[r.accepted.acceptedBy] || r.accepted.acceptedBy;
+        if(!confirm(_L('Link this company to the registered account?\n\n','Bu firma kayıtlı hesaba bağlansın mı?\n\n') + r.name + '  →  ' + who)) return;
         b.disabled = true;
         try {
-          await deleteDoc(doc(db,'partner_companies', r.id));
-          _pcCache = null;
-          showToast(_L('Deleted.','Silindi.'),'ok');
-          admPartnerDirectory(host);
+          await setDoc(doc(db,'partner_companies', r.id), { vendorId: r.accepted.acceptedBy, linkedAt: serverTimestamp() }, { merge:true });
+          await updateDoc(doc(db,'partner_invites', r.accepted.token), { status:'applied' });
+          _pcCache = null; showToast(_L('Linked.','Bağlandı.'),'ok'); reload();
         } catch(e){
           b.disabled = false;
           var _m=(e&&(e.code||e.message))||'';
-          console.warn('[v9.83] firma silinemedi', r.id, _m);
+          console.warn('[v9.87] baglanamadi', r.id, _m);
+          showToast(_L('Could not link: ','Bağlanamadı: ') + String(_m).substring(0,70), 'err');
+        }
+      });
+    });
+    L.querySelectorAll('.pc-del').forEach(function(b){
+      b.addEventListener('click', async function(){
+        var r = rows[+b.dataset.i]; if(!r || !r.id) return;
+        var extra = r.linkBrands.length
+          ? '\n' + r.linkBrands.length + ' ' + _L('brand link will also be deleted.','marka bağı da silinecek.') : '';
+        if(!confirm(_L('Delete this company permanently?\n\n','Bu firma kalıcı olarak silinsin mi?\n\n') + r.name + extra)) return;
+        b.disabled = true;
+        var fail = 0;
+        for (const br of r.linkBrands) {
+          try { await deleteDoc(doc(db,'brand_distributors', _normBrand(br) + '_' + _slugOf(r.name))); }
+          catch(e){ fail++; console.warn('[v9.87] marka bagi silinemedi', br, e && (e.code||e.message)); }
+        }
+        try {
+          await deleteDoc(doc(db,'partner_companies', r.id));
+          _pcCache = null; invalidateBrandDistributors();
+          showToast(_L('Deleted.','Silindi.') + (fail ? ' · ' + fail + ' ' + _L('link failed','bağ başarısız') : ''), fail?'err':'ok');
+          reload();
+        } catch(e){
+          b.disabled = false;
+          var _m=(e&&(e.code||e.message))||'';
+          console.warn('[v9.87] firma silinemedi', r.id, _m);
           showToast(_L('Could not delete: ','Silinemedi: ') + String(_m).substring(0,70), 'err');
         }
       });
     });
-    el('pc-list').querySelectorAll('.pc-edit').forEach(function(b){
-      b.addEventListener('click', function(){
-        var r = rows[+b.dataset.i];
-        if(!r) return;
-        if(r.src === 'dist') openDistributorEditor(r.name, r.brands, r.lines, function(){ admPartnerDirectory(host); });
-        else openCompanyEditor(r, function(){ admPartnerDirectory(host); });
-      });
-    });
   }
-  var _render0 = render;
-  render = function(){ _render0(); bindEdit(); };
 
   el('pc-q').addEventListener('input', render);
   el('pc-type').addEventListener('change', render);
-  el('pc-new')?.addEventListener('click', function(){
-    openCompanyEditor(null, function(){ admPartnerDirectory(host); });
-  });
-  render();
-
-  el('pc-import-toggle')?.addEventListener('click', function(){
+  el('pc-state').addEventListener('change', render);
+  el('pc-new').addEventListener('click', function(){ openCompanyEditor(null, reload); });
+  el('pc-import-toggle').addEventListener('click', function(){
     var b = el('pc-import'); b.style.display = (b.style.display === 'none') ? 'block' : 'none';
   });
-  el('pc-import-run')?.addEventListener('click', async function(){
+  el('pc-import-run').addEventListener('click', async function(){
     var ta = el('pc-csv'), st = el('pc-import-status');
     var txt = (ta && ta.value || '').trim();
     if(!txt){ st.textContent = _L('Paste the CSV first.','Önce CSV yapıştırın.'); return; }
@@ -32765,12 +32794,8 @@ async function admPartnerDirectory(host){
     var ok=0, fail=0, msgs=[];
     for(var i=1;i<csv.length;i++){
       var r = csv[i];
-      var nm = String(r[ix.name]||'').trim();
-      if(!nm) continue;
-      var slug = nm.toLowerCase().replace(/[ıİ]/g,'i').replace(/ğ/g,'g').replace(/ü/g,'u')
-                   .replace(/ş/g,'s').replace(/ö/g,'o').replace(/ç/g,'c')
-                   .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').substring(0,80);
-      if(!slug) continue;
+      var nm = String(r[ix.name]||'').trim(); if(!nm) continue;
+      var slug = _slugOf(nm); if(!slug) continue;
       var d = { name: nm.substring(0,140),
                 type: String(ix.type!==undefined ? (r[ix.type]||'integrator') : 'integrator').trim().substring(0,20),
                 brands: String(ix.brands!==undefined ? (r[ix.brands]||'') : '').split(';').map(function(x){ return x.trim(); }).filter(Boolean).slice(0,60),
@@ -32784,8 +32809,8 @@ async function admPartnerDirectory(host){
       try { await setDoc(doc(db,'partner_companies', slug), d, { merge:true }); ok++; }
       catch(e){
         fail++;
-        var _m = (e && (e.code||e.message)) || 'bilinmeyen hata';
-        console.warn('[v9.81] firma yazilamadi', nm, _m);
+        var _m=(e&&(e.code||e.message))||'bilinmeyen hata';
+        console.warn('[v9.87] firma yazilamadi', nm, _m);
         if(msgs.length<3) msgs.push(nm.substring(0,24) + ': ' + String(_m).substring(0,50));
       }
     }
@@ -32793,8 +32818,10 @@ async function admPartnerDirectory(host){
     st.textContent = ok + ' ' + _L('loaded','yüklendi') + (fail ? ' · ' + fail + ' ' + _L('failed','başarısız') : '')
       + (msgs.length ? ' — ' + msgs.join(' | ') : '');
     showToast(ok + ' ' + _L('companies loaded','firma yüklendi'), fail?'err':'ok');
-    if(!fail) admPartnerDirectory(host);
+    if(!fail) reload();
   });
+
+  render();
 }
 
 // Indeks durum paneli (Veri Sagligi ekraninin en ustunde)
