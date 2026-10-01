@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.87 | pochub.co -->
+<!-- PoCHub v9.88 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.87';
+const VERSION = 'v9.88';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.88': ['DAVET AKISI TAMAMLANDI (Hasan: baglantiyi kopyalayip olmayan adresine mi gondereyim, amator isleri birakalim). Hakliydi — v9.85 te kurdugum akis asgariydi ve en temel parcasi eksikti. (1) FIRMA KAYDINDA E-POSTA ALANI YOKTU. Davet modali company.email okuyordu ama boyle bir alan hic tanimlanmamisti; dolayisiyla E-postada ac dugmesi HIC gorunmuyordu ve davet elle kopyalanip gonderiliyordu. Alan eklendi (duzenleyici + rules v1.10.2). (2) OTOMATIK GONDERIM. Uygulamada EmailJS altyapisi zaten vardi ve 30 yerde kullaniliyordu; davet akisinda kullanilmiyordu. Artik davet olusturulurken e-posta otomatik gidiyor. sendEmail geriye basari bilgisi donduruyor — onceden hatayi yutuyordu, cagiran gonderimin olup olmadigini bilemiyordu; mevcut 30 cagiran donusu yok saydigi icin davranislari degismedi. (3) SURE SINIRI: davetler 30 gun gecerli. Onceden sonsuza kadar gecerliydi. (4) ESKI DAVET IPTALI: ayni firmaya tekrar davet olusturulunca bekleyen eski davetler iptal ediliyor. Onceden her tiklama yeni bir token uretiyor, eskisi de gecerli kalmaya devam ediyordu. (5) DAVET TAKIP EKRANI (yeni Davetler sekmesi): gonderilen, yanit bekleyen, kabul edilen, baglanan, iptal ve suresi dolmus davetler; durum sayaclari, firma/e-posta aramasi, baglanti kopyalama ve iptal. E-postasi gitmeyen davetler ayrica isaretli. node --check MODULE SYNTAX OK.'],
   'v9.87': ['REHBER TEK VERI MODELINE GECTI — tasarim hatasinin duzeltilmesi (Hasan: neden duzenle butonu yok, bu sayfayi neden junior gibi yaptin). Hakliydi: bu ekrani bes surumdur yama yaparak ilerlettim ve her turda bir eksik cikti. KOK NEDEN DUGMELERDE DEGIL VERI MODELINDEYDI: distributor satirlari gercek kayit DEGILDI, brand_distributors dokumanlarindan turetiliyordu. Firma kaydi olmadigi icin adi, sehri, telefonu, notu, davet edilebilirligi yoktu — duzenlenecek bir sey yoktu. Entegratorlerin partner_companies kaydi vardi, onlarin hepsi vardi. Butun asimetri buradan geliyordu. YENI MODEL: HER firma bir partner_companies kaydidir — distributor, entegrator, bayi fark etmez. brand_distributors yalnizca marka ile firma arasindaki BAG olarak kalir (temsilcisiz talep raporu brandNorm uzerinden onu okuyor, orasi bozulmadi). Kaydi olmayan distributorler icin firma kaydi ilk acilista otomatik olusturuluyor. SONUC: tek satir tipi, tek duzenleyici, HER satirda ayni dort eylem — Duzenle, Markalar, Davet (ya da Hesabi bagla), Sil. Ayrica uyelik durumuna gore filtre eklendi: uyeler, uye olmayanlar, daveti kabul edilenler. AD DEGISIKLIGI: brand_distributors dokuman kimligi distributor slugini iceriyor; ad degisince baglar eski ada bagli kalir, markalar kaybolur ve rapor yanlis distributor yazardi. Artik ad degisiminde baglar yeni kimlige tasiniyor ve eski firma kaydi siliniyor. Senaryo sahte veriyle prova edildi: uc marka bagi tasindi, kaybolan bag 0, mukerrer firma kaydi 0. node --check MODULE SYNTAX OK.'],
   'v9.86': ['DISTRIBUTOR SATIRINDA EYLEM YOKTU + DAVET HATA MESAJI (Hasan: permission denied, ayrica bazilarinda duzenle ve sil yok). (1) IZIN HATASI: tarayicidan dogrulandi — partner_companies ve brand_distributors okunuyor ama partner_invites PERMISSION_DENIED veriyor. Yani kural dosyasi (v1.10.1) henuz yayinlanmamis, kodda sorun yok. Bu hatanin sebebini bulmak bir tur aldigi icin mesaji degistirdim: davet olustururken permission-denied gelirse artik ham kod yerine ne yapilacagi yaziyor — Firebase konsolundan firestore.rules yayinlayin. (2) DISTRIBUTOR SATIRLARINDA hicbir eylem yoktu, yalniz Markalar vardi; silme ya da ada mudahale imkansizdi. Artik Sil dugmesi var. Distributor satiri TURETILMIS bir kayit — marka basina ayri dokumanlardan olusuyor — dolayisiyla silmek o dokumanlarin hepsini silmek demek; onayda kac marka bagi silinecegi acikca yaziyor ve islem sirasinda ilerleme sayaci gosteriliyor. Firma satirlarinda Duzenle/Sil/Davet zaten vardi; distributor satirlarinda olmamasi tasarim gereciydi ama eksikti. node --check MODULE SYNTAX OK.'],
   'v9.85': ['DAVET AKISI — rehber ile uyelik bagi artik otomatik kuruluyor. v9.84 te bag ELLE kuruluyordu. Akis: admin firmaya davet olusturur, davetli baglantiyla kayit olur, istemci daveti kabul isaretler, admin rehberde tek tikla baglar. YETKI TASARIMI — en kritik karar burasi: davetli firma kaydini KENDISI guncelleyemiyor. Kural yalnizca status, acceptedBy ve acceptedAt alanlarinin degismesine izin veriyor, acceptedBy kendi uid i olmak zorunda ve yalnizca BEKLEYEN bir davette. Firma kaydina baglama yetkisi tamamen admin de. Aksi halde davet baglantisini ele geciren biri kendini istedigi firmayla eslestirebilirdi. TOKEN: dokuman kimligi 32 karakterlik rastgele token (crypto.getRandomValues, 2^128 olasilik uzayi). Okuma herkese acik cunku davetli henuz kayitli degil ve davet ekranini gormeli; icerikte kisisel veri yok. Baglanti ayristirmasi bes senaryoyla test edildi (gecerli token, kisa token, baska hash, sorgu parametreli, bos) — 5/5 dogru. ARAYUZ: uye olmayan firmalarda Davet dugmesi; baglanti kopyalanabilir ve e-posta adresi varsa posta istemcisinde acilabilir. Kabul edilmis davetler rehberde yesil Davet kabul edildi rozetiyle ve Hesabi bagla dugmesiyle gorunuyor; ustteki sayac kac tane bekledigini yaziyor. Kayit akisinda davet kabulu SESSIZ fail ediyor — davet gecersiz olsa bile kayit gecerli kalmali. rules v1.10.1. node --check MODULE SYNTAX OK.'],
@@ -5154,8 +5155,10 @@ async function sendEmail(toEmail, toName, subject, message, details='') {
       message,
       details
     });
-  } catch(e) {
-    console.warn('EmailJS:', e);
+    return true;   // v9.88: cagiranin gonderimin basarili olup olmadigini
+  } catch(e) {     // bilmesi gerekiyor (davet akisi). Mevcut 30 cagiran
+    console.warn('EmailJS:', e);   // donusu yok sayiyor, davranis degismiyor.
+    return false;
   }
 }
 
@@ -29639,7 +29642,7 @@ function renderAdmin() {
     ['events',t('atab.events','Etkinlikler')],
     ...(_rp.canViewAll?[['offers',t('atab.offers','Teklifler')]]:[]),
     ...(CUR_PROFILE?.role==='admin'?[['revenue',t('atab.revenue','📈 Gelir')],['vendorsubs',t('atab.vendorsubs','💼 Vendor Abonelikler')],['vendorapprovals',t('atab.vendorapprovals','✓ Vendor Onayları')],['demo-requests',t('atab.demo_requests','📅 Demo Talepleri')],['packages',t('atab.packages','💎 Paketler')],['analytics',t('atab.analytics','📊 Analitik')],['history',t('atab.history','📜 Değişiklik Geçmişi')],['payments',t('atab.payments','💳 Ödeme Onayları')],['overrides',t('atab.overrides','⚡ Acil Onay Talepleri')],['featured',t('atab.featured','📢 Reklam / Öne Çıkan')],['content',t('atab.content','📝 İçerik Yönetimi')],['kvkk-mgmt',t('atab.kvkk_mgmt','🛡 KVKK & Yasal Sayfalar')],['settings',t('atab.settings','🔧 Sistem Ayarları')]]:[]),
-    ...(_rp.canViewAll?[['partners',t('atab.partners','🏢 Firma Rehberi')],['health',t('atab.health','🩺 Veri Sağlığı')]]:[]),
+    ...(_rp.canViewAll?[['partners',t('atab.partners','🏢 Firma Rehberi')],['invites',t('atab.invites','✉ Davetler')],['health',t('atab.health','🩺 Veri Sağlığı')]]:[]),
     ['profile',t('atab.profile','👤 Profilim')],
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -29687,6 +29690,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'featured')   { await admFeaturedAds(m); return; }
     if (CUR_ADM_TAB === 'settings')   { await admSettings(m);   return; }
   if (CUR_ADM_TAB === 'partners')   { await admPartnerDirectory(m); return; }
+  if (CUR_ADM_TAB === 'invites')    { await admInvites(m); return; }
   if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
     if (CUR_ADM_TAB === 'profile')    { await renderUserProfile(m, 'admin');  return; }
 
@@ -32187,39 +32191,93 @@ function _inviteLink(tok){
   return location.origin + location.pathname + '#invite/' + tok;
 }
 
+// v9.88: Davet olusturma artik tam akis.
+// ONCEKI HALI: token uretiliyor, modalde gosteriliyor, admin elle
+// kopyalayip gonderiyordu. Uc eksigi vardi — firma kaydinda e-posta alani
+// yoktu, ayni firmaya ikinci kez basinca eski token gecerli kalmaya devam
+// ediyordu, ve davetin ne zaman sonlanacagi belli degildi.
+var INVITE_DAYS = 30;
 async function createPartnerInvite(company){
+  // 1) Ayni firmaya ait BEKLEYEN davetleri iptal et — ayni anda birden
+  //    fazla gecerli baglanti dolasmasin.
+  var revoked = 0;
+  try {
+    var prev = await getDocs(query(collection(db,'partner_invites'),
+      where('companyId','==', company.id || ''), where('status','==','pending'), limit(20)));
+    for (const d0 of prev.docs) {
+      try { await updateDoc(doc(db,'partner_invites', d0.id), { status:'revoked' }); revoked++; }
+      catch(e){ console.warn('[v9.88] eski davet iptal edilemedi', d0.id, e && (e.code||e.message)); }
+    }
+  } catch(e){ console.warn('[v9.88] eski davetler okunamadi:', e && (e.code||e.message)); }
+
+  // 2) Yeni davet
   var tok = _inviteToken();
+  var exp = new Date(Date.now() + INVITE_DAYS*24*60*60*1000);
   await setDoc(doc(db,'partner_invites', tok), {
     companyId: company.id || '',
     companyName: String(company.name||'').substring(0,140),
     email: String(company.email||'').substring(0,120),
     status: 'pending',
     createdBy: CUR_USER ? CUR_USER.uid : '',
-    createdAt: serverTimestamp()
+    createdAt: serverTimestamp(),
+    expiresAt: exp,
+    sent: false,
+    revokedCount: revoked
   });
-  return tok;
+
+  // 3) E-posta varsa OTOMATIK gonder
+  var sent = false;
+  if(company.email){
+    var link = _inviteLink(tok);
+    sent = await sendEmail(
+      company.email,
+      company.name || '',
+      _L('You are invited to PoCHub','PoCHub davetiniz'),
+      _L('Your company is listed on PoCHub. Register with the link below to receive PoC requests for the brands you represent.',
+         'Firmanız PoCHub listesinde yer alıyor. Aşağıdaki bağlantıyla kayıt olarak temsil ettiğiniz markalara gelen PoC taleplerini alabilirsiniz.'),
+      link
+    );
+    if(sent){
+      try { await updateDoc(doc(db,'partner_invites', tok), { sent:true, sentAt: serverTimestamp() }); }
+      catch(e){ console.warn('[v9.88] gonderim isareti yazilamadi', tok, e && (e.code||e.message)); }
+    }
+  }
+  return { token: tok, sent: sent, revoked: revoked, expiresAt: exp };
 }
 
-function openInviteModal(company, tok){
+function openInviteModal(company, res){
+  var tok = res.token || res;           // geriye uyum
+  var sent = !!res.sent, revoked = res.revoked || 0;
   var link = _inviteLink(tok);
+  var exp = res.expiresAt ? new Date(res.expiresAt) : null;
   var modal = document.createElement('div'); modal.className = 'modal-bg on';
   modal.innerHTML = '<div class="modal" style="max-width:540px">'
-    + '<div class="flx-bw-c-mb18"><h3 class="fs15-fw7">' + _L('Invite link','Davet bağlantısı') + '</h3>'
+    + '<div class="flx-bw-c-mb18"><h3 class="fs15-fw7">'
+    +   (sent ? _L('Invite sent','Davet gönderildi') : _L('Invite created','Davet oluşturuldu')) + '</h3>'
     +   '<button class="btn-g btn-sm" id="iv-close">✕</button></div>'
-    + '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:10px;line-height:1.6">'
-    +   escHtml(company.name) + _L(' can register with this link. Once they do, the account appears in the directory for you to link.',
-                                   ' bu bağlantıyla kayıt olabilir. Kayıt olduğunda hesap rehberde görünür ve bağlarsınız.')
-    + '</div>'
+    + (sent
+        ? '<div style="background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.25);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;color:#16a34a;line-height:1.55">✓ '
+          + escHtml(company.name) + ' → <b>' + escHtml(company.email) + '</b><br>'
+          + _L('The invite email has been sent.','Davet e-postası gönderildi.') + '</div>'
+        : '<div style="background:rgba(180,83,9,.08);border:1px solid rgba(180,83,9,.25);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;color:#b45309;line-height:1.55">'
+          + (company.email
+              ? _L('Email could not be sent — the link is below, send it manually.','E-posta gönderilemedi — bağlantı aşağıda, elle iletin.')
+              : _L('No email address on this company — add one in Edit to send automatically. For now use the link below.',
+                   'Bu firmada e-posta adresi yok — otomatik gönderim için Düzenle ekranından ekleyin. Şimdilik aşağıdaki bağlantıyı kullanın.'))
+          + '</div>')
+    + (revoked ? '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px">'
+        + revoked + ' ' + _L('earlier pending invite was revoked.','önceki bekleyen davet iptal edildi.') + '</div>' : '')
     + '<input id="iv-link" readonly value="' + escHtml(link) + '" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:monospace">'
     + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
-    +   '<button class="btn-p btn-sm" id="iv-copy">' + _L('Copy link','Bağlantıyı kopyala') + '</button>'
+    +   '<button class="btn-g btn-sm" id="iv-copy">' + _L('Copy link','Bağlantıyı kopyala') + '</button>'
     +   (company.email ? '<a class="btn-g btn-sm" style="text-decoration:none" href="mailto:' + encodeURIComponent(company.email)
         + '?subject=' + encodeURIComponent('PoCHub ' + _L('invitation','daveti'))
         + '&body=' + encodeURIComponent(link) + '">' + _L('Open in mail','E-postada aç') + '</a>' : '')
     + '</div>'
     + '<div style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.55">'
-    +   _L('Anyone with this link can register against this company record — share it only with the company.',
-           'Bu bağlantıya sahip olan bu firma kaydıyla kayıt olabilir — yalnızca firmayla paylaşın.')
+    +   (exp ? _L('Valid until ','Geçerlilik: ') + exp.toLocaleDateString('tr-TR') + ' · ' : '')
+    +   _L('Anyone with this link can register against this company record.',
+           'Bu bağlantıya sahip olan bu firma kaydıyla kayıt olabilir.')
     + '</div></div>';
   document.body.appendChild(modal);
   modal.querySelector('#iv-close').addEventListener('click', function(){ modal.remove(); });
@@ -32289,6 +32347,11 @@ async function openCompanyEditor(rec, onDone){
     + _pcField(_L('Brands (semicolon separated)','Markalar (noktalı virgülle)'), 'pce-brands', [].concat(r.brands||[]).join('; '), 'Fortinet; Cisco')
     + _pcField(_L('City','Şehir'), 'pce-city', r.city, '')
     + _pcField(_L('Phone','Telefon'), 'pce-phone', r.phone, '')
+    // v9.88: E-POSTA ALANI. Davet akisinin en temel parcasi eksikti —
+    // modal company.email okuyordu ama firma kaydinda boyle bir alan YOKTU,
+    // dolayisiyla E-postada ac dugmesi hic gorunmuyordu ve davet elle
+    // kopyalanip gonderiliyordu.
+    + _pcField(_L('Email (for invites)','E-posta (davet için)'), 'pce-email', r.email, 'info@firma.com.tr')
     + _pcField(_L('Website','Web sitesi'), 'pce-web', r.web, '')
     + _pcField(_L('Tier / level','Kademe'), 'pce-tier', r.tier, '')
     + _pcField(_L('Note','Not'), 'pce-note', r.note, '')
@@ -32331,6 +32394,7 @@ async function openCompanyEditor(rec, onDone){
       brands: (modal.querySelector('#pce-brands').value || '').split(';').map(function(x){ return x.trim(); }).filter(Boolean).slice(0,60),
       city: (modal.querySelector('#pce-city').value || '').trim().substring(0,60),
       phone: (modal.querySelector('#pce-phone').value || '').trim().substring(0,40),
+      email: (modal.querySelector('#pce-email').value || '').trim().substring(0,120),
       web: (modal.querySelector('#pce-web').value || '').trim().substring(0,100),
       tier: (modal.querySelector('#pce-tier').value || '').trim().substring(0,40),
       note: (modal.querySelector('#pce-note').value || '').trim().substring(0,300),
@@ -32493,6 +32557,146 @@ async function getPartnerCompanies(force){
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// v9.88 — DAVET TAKIP EKRANI
+// ───────────────────────────────────────────────────────────────────────
+// 353 firmayla calisirken kime davet gonderildigini, kacinin yanitsiz
+// kaldigini, kacinin kabul edildigini gormeden ilerlenemez. Davet
+// olusturup unutmak, ayni firmaya ucuncu kez gondermek ya da suresi
+// gecmis bir baglantiyi takip etmek zaman kaybi.
+// ═══════════════════════════════════════════════════════════════════════
+async function admInvites(host){
+  host.innerHTML = '<div class="loading"><div class="spinner"></div>' + _L('Loading invites...','Davetler yükleniyor...') + '</div>';
+  var list = [];
+  try {
+    var snap = await getDocs(query(collection(db,'partner_invites'), limit(500)));
+    list = snap.docs.map(function(d){ var o=d.data()||{}; o.token=d.id; return o; });
+  } catch(e){
+    var _m=(e&&(e.code||e.message))||'';
+    console.warn('[v9.88] davetler okunamadi:', _m);
+    host.innerHTML = '<div class="card" style="padding:16px;font-size:13px;color:#dc2626">'
+      + (/permission-denied/i.test(_m)
+        ? _L('Invite rules are not published yet — deploy firestore.rules in the Firebase console.',
+             'Davet kuralları henüz yayınlanmamış — Firebase konsolundan firestore.rules yayınlayın.')
+        : _L('Could not load: ','Yüklenemedi: ') + escHtml(String(_m).substring(0,90))) + '</div>';
+    return;
+  }
+
+  var now = Date.now();
+  function expOf(r){
+    var e = r.expiresAt;
+    if(!e) return null;
+    return e.toDate ? e.toDate() : new Date(e);
+  }
+  list.forEach(function(r){
+    var e = expOf(r);
+    r._expired = !!(e && e.getTime() < now && r.status === 'pending');
+    r._state = r.status === 'applied' ? 'applied'
+             : r.status === 'accepted' ? 'accepted'
+             : r.status === 'revoked' ? 'revoked'
+             : r._expired ? 'expired' : 'pending';
+    r._created = r.createdAt && r.createdAt.toDate ? r.createdAt.toDate() : null;
+  });
+  var order = { accepted:0, pending:1, expired:2, applied:3, revoked:4 };
+  list.sort(function(a,b){ return (order[a._state]-order[b._state]) || ((b._created?b._created.getTime():0)-(a._created?a._created.getTime():0)); });
+
+  var cnt = Object.create(null);
+  list.forEach(function(r){ cnt[r._state] = (cnt[r._state]||0)+1; });
+  var SL = { pending:_L('Awaiting reply','Yanıt bekliyor'), accepted:_L('Accepted','Kabul edildi'),
+             applied:_L('Linked','Bağlandı'), revoked:_L('Revoked','İptal'), expired:_L('Expired','Süresi doldu') };
+  var SC = { pending:'#b45309', accepted:'#16a34a', applied:'#2563eb', revoked:'#64748b', expired:'#dc2626' };
+
+  host.innerHTML =
+      '<h2 style="margin:0 0 4px;font-size:19px">' + _L('Invites','Davetler') + '</h2>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">'
+    +   _L('Invites sent from the partner directory. Accepted ones are linked from there.',
+           'Firma Rehberi\u2019nden gönderilen davetler. Kabul edilenler oradan bağlanır.') + '</div>'
+    + '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px">'
+    +   Object.keys(SL).map(function(k){
+          return '<div><span style="font-size:17px;font-weight:800;color:' + SC[k] + '">' + (cnt[k]||0) + '</span>'
+               + ' <span style="font-size:11.5px;color:var(--text-muted)">' + SL[k] + '</span></div>'; }).join('')
+    + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+    +   '<input id="iv-q" placeholder="' + _L('Search company...','Firma ara...') + '" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
+    +   '<select id="iv-state" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
+    +     '<option value="">' + _L('All','Tümü') + '</option>'
+    +     Object.keys(SL).map(function(k){ return '<option value="' + k + '">' + SL[k] + '</option>'; }).join('')
+    +   '</select></div>'
+    + '<div id="iv-list"></div>';
+
+  function render(){
+    var q = (el('iv-q').value||'').toLowerCase().trim();
+    var st = el('iv-state').value;
+    var rows = list.filter(function(r){
+      if(st && r._state !== st) return false;
+      if(!q) return true;
+      return String(r.companyName||'').toLowerCase().indexOf(q) >= 0
+          || String(r.email||'').toLowerCase().indexOf(q) >= 0;
+    });
+    if(!rows.length){
+      el('iv-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">' + _L('No invite.','Davet yok.') + '</div>';
+      return;
+    }
+    el('iv-list').innerHTML = rows.slice(0,300).map(function(r,i){
+      var e = expOf(r);
+      return '<div class="card" style="padding:11px 14px;margin-bottom:7px">'
+        + '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">'
+        +   '<div style="font-size:13.5px;font-weight:700">' + escHtml(r.companyName || r.companyId || '—')
+        +     ' <span style="font-size:10.5px;font-weight:600;color:' + SC[r._state] + ';border:1px solid ' + SC[r._state] + '33;border-radius:10px;padding:1px 7px;margin-left:4px">'
+        +       SL[r._state] + '</span>'
+        +     (r.email ? ' <span style="font-size:11.5px;color:var(--text-muted);font-weight:400">· ' + escHtml(r.email) + '</span>' : '')
+        +     (r.sent === false && r._state === 'pending'
+            ? ' <span style="font-size:11px;color:#b45309">· ' + _L('not emailed','e-posta gitmedi') + '</span>' : '')
+        +   '</div>'
+        +   '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        +     '<span style="font-size:11px;color:var(--text-muted)">'
+        +       (r._created ? _L('sent ','gönderim ') + r._created.toLocaleDateString('tr-TR') : '')
+        +       (e ? ' · ' + _L('valid until ','bitiş ') + e.toLocaleDateString('tr-TR') : '')
+        +     '</span>'
+        +     '<span style="display:flex;gap:6px">'
+        +       '<button class="btn-g btn-sm iv-copy2" data-t="' + escHtml(r.token) + '" style="font-size:11px">' + _L('Copy link','Bağlantı') + '</button>'
+        +       (r._state === 'pending' || r._state === 'expired'
+            ? '<button class="btn-g btn-sm iv-revoke" data-t="' + escHtml(r.token) + '" style="font-size:11px;color:#dc2626">' + _L('Revoke','İptal et') + '</button>'
+            : '')
+        +     '</span>'
+        +   '</div></div></div>';
+    }).join('');
+    bind();
+  }
+
+  function bind(){
+    el('iv-list').querySelectorAll('.iv-copy2').forEach(function(b){
+      b.addEventListener('click', function(){
+        var ta = document.createElement('textarea');
+        ta.value = _inviteLink(b.dataset.t);
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); showToast(_L('Copied.','Kopyalandı.'),'ok'); }
+        catch(e){ showToast(_L('Could not copy.','Kopyalanamadı.'),'err'); }
+        ta.remove();
+      });
+    });
+    el('iv-list').querySelectorAll('.iv-revoke').forEach(function(b){
+      b.addEventListener('click', async function(){
+        if(!confirm(_L('Revoke this invite? The link will stop working.','Bu davet iptal edilsin mi? Bağlantı çalışmayı bırakır.'))) return;
+        b.disabled = true;
+        try {
+          await updateDoc(doc(db,'partner_invites', b.dataset.t), { status:'revoked' });
+          showToast(_L('Revoked.','İptal edildi.'),'ok');
+          admInvites(host);
+        } catch(e){
+          b.disabled = false;
+          var _m=(e&&(e.code||e.message))||'';
+          console.warn('[v9.88] davet iptal edilemedi', b.dataset.t, _m);
+          showToast(_L('Could not revoke: ','İptal edilemedi: ') + String(_m).substring(0,70), 'err');
+        }
+      });
+    });
+  }
+  el('iv-q').addEventListener('input', render);
+  el('iv-state').addEventListener('change', render);
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // v9.87 — REHBER: TEK VERI MODELI
 // ───────────────────────────────────────────────────────────────────────
 // ONCEKI TASARIM HATASI: distributor satirlari gercek kayit DEGILDI,
@@ -32577,7 +32781,7 @@ async function admPartnerDirectory(host){
     own.forEach(function(b){ if(all.indexOf(b) < 0) all.push(b); });
     return { id:c.id, name:nm, type:c.type||'integrator', brands:all, ownBrands:own,
              linkBrands:linkBrands, lines:linesOf[nm] || Object.create(null),
-             city:c.city||'', phone:c.phone||'', web:c.web||'', tier:c.tier||'',
+             city:c.city||'', phone:c.phone||'', web:c.web||'', tier:c.tier||'', email:c.email||'',
              note:c.note||'', vendorId:c.vendorId||'',
              accepted: (c.id && accById[c.id] && !c.vendorId) ? accById[c.id] : null,
              suggest: (!c.vendorId && vByName[_cn(nm)]) ? vByName[_cn(nm)] : null };
