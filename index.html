@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.88 | pochub.co -->
+<!-- PoCHub v9.89 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.88';
+const VERSION = 'v9.89';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.89': ['YANILTICI DAVET ETIKETI (Hasan: bunlar ornek mi, yoksa gercekten ilettin mi?). Bu sorunun sorulmasi ekranin hatasi. Davet satirlarinda gonderim 02.10.2026 yaziyordu ama o tarih OLUSTURMA tarihiydi; v9.88 oncesinde otomatik gonderim yoktu ve sent alani hic yazilmamisti. Dolayisiyla hicbir e-posta gitmemis dort davet, gonderilmis gibi gorunuyordu. (1) Etiket artik ayrim yapiyor: gercekten gonderildiyse e-posta tarihi, gonderilmediyse olusturuldu tarihi. (2) Gonderilmeme isareti sent === false yerine sent !== true kontrol ediyor. Eski davetlerde alan hic YOKTU, yani undefined idi ve isaret gorunmuyordu — tam da yanlis anlasilan kayitlar isaretsiz kaliyordu. (3) Ekranin ustune iki uyari eklendi: kac bekleyen davetin e-postasi gitmemis (yani firmaya hic ulasilmamis) ve kac firmada birden fazla bekleyen davet var. Ikincisi de v9.88 oncesinden kalan bir durum: her tiklama yeni token uretiyor, eskisi gecerli kalmaya devam ediyordu — ELSA da iki davetle gorunuyordu. node --check MODULE SYNTAX OK.'],
   'v9.88': ['DAVET AKISI TAMAMLANDI (Hasan: baglantiyi kopyalayip olmayan adresine mi gondereyim, amator isleri birakalim). Hakliydi — v9.85 te kurdugum akis asgariydi ve en temel parcasi eksikti. (1) FIRMA KAYDINDA E-POSTA ALANI YOKTU. Davet modali company.email okuyordu ama boyle bir alan hic tanimlanmamisti; dolayisiyla E-postada ac dugmesi HIC gorunmuyordu ve davet elle kopyalanip gonderiliyordu. Alan eklendi (duzenleyici + rules v1.10.2). (2) OTOMATIK GONDERIM. Uygulamada EmailJS altyapisi zaten vardi ve 30 yerde kullaniliyordu; davet akisinda kullanilmiyordu. Artik davet olusturulurken e-posta otomatik gidiyor. sendEmail geriye basari bilgisi donduruyor — onceden hatayi yutuyordu, cagiran gonderimin olup olmadigini bilemiyordu; mevcut 30 cagiran donusu yok saydigi icin davranislari degismedi. (3) SURE SINIRI: davetler 30 gun gecerli. Onceden sonsuza kadar gecerliydi. (4) ESKI DAVET IPTALI: ayni firmaya tekrar davet olusturulunca bekleyen eski davetler iptal ediliyor. Onceden her tiklama yeni bir token uretiyor, eskisi de gecerli kalmaya devam ediyordu. (5) DAVET TAKIP EKRANI (yeni Davetler sekmesi): gonderilen, yanit bekleyen, kabul edilen, baglanan, iptal ve suresi dolmus davetler; durum sayaclari, firma/e-posta aramasi, baglanti kopyalama ve iptal. E-postasi gitmeyen davetler ayrica isaretli. node --check MODULE SYNTAX OK.'],
   'v9.87': ['REHBER TEK VERI MODELINE GECTI — tasarim hatasinin duzeltilmesi (Hasan: neden duzenle butonu yok, bu sayfayi neden junior gibi yaptin). Hakliydi: bu ekrani bes surumdur yama yaparak ilerlettim ve her turda bir eksik cikti. KOK NEDEN DUGMELERDE DEGIL VERI MODELINDEYDI: distributor satirlari gercek kayit DEGILDI, brand_distributors dokumanlarindan turetiliyordu. Firma kaydi olmadigi icin adi, sehri, telefonu, notu, davet edilebilirligi yoktu — duzenlenecek bir sey yoktu. Entegratorlerin partner_companies kaydi vardi, onlarin hepsi vardi. Butun asimetri buradan geliyordu. YENI MODEL: HER firma bir partner_companies kaydidir — distributor, entegrator, bayi fark etmez. brand_distributors yalnizca marka ile firma arasindaki BAG olarak kalir (temsilcisiz talep raporu brandNorm uzerinden onu okuyor, orasi bozulmadi). Kaydi olmayan distributorler icin firma kaydi ilk acilista otomatik olusturuluyor. SONUC: tek satir tipi, tek duzenleyici, HER satirda ayni dort eylem — Duzenle, Markalar, Davet (ya da Hesabi bagla), Sil. Ayrica uyelik durumuna gore filtre eklendi: uyeler, uye olmayanlar, daveti kabul edilenler. AD DEGISIKLIGI: brand_distributors dokuman kimligi distributor slugini iceriyor; ad degisince baglar eski ada bagli kalir, markalar kaybolur ve rapor yanlis distributor yazardi. Artik ad degisiminde baglar yeni kimlige tasiniyor ve eski firma kaydi siliniyor. Senaryo sahte veriyle prova edildi: uc marka bagi tasindi, kaybolan bag 0, mukerrer firma kaydi 0. node --check MODULE SYNTAX OK.'],
   'v9.86': ['DISTRIBUTOR SATIRINDA EYLEM YOKTU + DAVET HATA MESAJI (Hasan: permission denied, ayrica bazilarinda duzenle ve sil yok). (1) IZIN HATASI: tarayicidan dogrulandi — partner_companies ve brand_distributors okunuyor ama partner_invites PERMISSION_DENIED veriyor. Yani kural dosyasi (v1.10.1) henuz yayinlanmamis, kodda sorun yok. Bu hatanin sebebini bulmak bir tur aldigi icin mesaji degistirdim: davet olustururken permission-denied gelirse artik ham kod yerine ne yapilacagi yaziyor — Firebase konsolundan firestore.rules yayinlayin. (2) DISTRIBUTOR SATIRLARINDA hicbir eylem yoktu, yalniz Markalar vardi; silme ya da ada mudahale imkansizdi. Artik Sil dugmesi var. Distributor satiri TURETILMIS bir kayit — marka basina ayri dokumanlardan olusuyor — dolayisiyla silmek o dokumanlarin hepsini silmek demek; onayda kac marka bagi silinecegi acikca yaziyor ve islem sirasinda ilerleme sayaci gosteriliyor. Firma satirlarinda Duzenle/Sil/Davet zaten vardi; distributor satirlarinda olmamasi tasarim gereciydi ama eksikti. node --check MODULE SYNTAX OK.'],
@@ -32601,6 +32602,14 @@ async function admInvites(host){
 
   var cnt = Object.create(null);
   list.forEach(function(r){ cnt[r._state] = (cnt[r._state]||0)+1; });
+  // v9.89: ayni firmada birden fazla BEKLEYEN davet — v9.88 oncesinde her
+  // tiklama yeni token uretiyor, eskisi gecerli kalmaya devam ediyordu.
+  var pendBy = Object.create(null);
+  list.filter(function(r){ return r._state === 'pending'; })
+      .forEach(function(r){ var k = r.companyId || r.companyName || '';
+                            (pendBy[k] = pendBy[k] || []).push(r); });
+  var dupCo = Object.keys(pendBy).filter(function(k){ return pendBy[k].length > 1; });
+  var notSent = list.filter(function(r){ return r._state === 'pending' && r.sent !== true; }).length;
   var SL = { pending:_L('Awaiting reply','Yanıt bekliyor'), accepted:_L('Accepted','Kabul edildi'),
              applied:_L('Linked','Bağlandı'), revoked:_L('Revoked','İptal'), expired:_L('Expired','Süresi doldu') };
   var SC = { pending:'#b45309', accepted:'#16a34a', applied:'#2563eb', revoked:'#64748b', expired:'#dc2626' };
@@ -32615,6 +32624,14 @@ async function admInvites(host){
           return '<div><span style="font-size:17px;font-weight:800;color:' + SC[k] + '">' + (cnt[k]||0) + '</span>'
                + ' <span style="font-size:11.5px;color:var(--text-muted)">' + SL[k] + '</span></div>'; }).join('')
     + '</div>'
+    + ((notSent || dupCo.length)
+        ? '<div style="background:rgba(180,83,9,.08);border:1px solid rgba(180,83,9,.25);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#b45309;line-height:1.6">'
+          + (notSent ? '<b>' + notSent + '</b> ' + _L('pending invite was never emailed — the company has not been contacted. Add an email address on the company and send again.',
+                 'bekleyen davetin e-postası gönderilmemiş — firmaya ulaşılmadı. Firma kaydına e-posta ekleyip tekrar gönderin.') + '<br>' : '')
+          + (dupCo.length ? '<b>' + dupCo.length + '</b> ' + _L('company has more than one pending invite — revoke the extras.',
+                 'firmada birden fazla bekleyen davet var — fazlalıkları iptal edin.') : '')
+        + '</div>'
+        : '')
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
     +   '<input id="iv-q" placeholder="' + _L('Search company...','Firma ara...') + '" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
     +   '<select id="iv-state" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
@@ -32644,12 +32661,19 @@ async function admInvites(host){
         +     ' <span style="font-size:10.5px;font-weight:600;color:' + SC[r._state] + ';border:1px solid ' + SC[r._state] + '33;border-radius:10px;padding:1px 7px;margin-left:4px">'
         +       SL[r._state] + '</span>'
         +     (r.email ? ' <span style="font-size:11.5px;color:var(--text-muted);font-weight:400">· ' + escHtml(r.email) + '</span>' : '')
-        +     (r.sent === false && r._state === 'pending'
+        +     (r.sent !== true && r._state === 'pending'
             ? ' <span style="font-size:11px;color:#b45309">· ' + _L('not emailed','e-posta gitmedi') + '</span>' : '')
         +   '</div>'
         +   '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
         +     '<span style="font-size:11px;color:var(--text-muted)">'
-        +       (r._created ? _L('sent ','gönderim ') + r._created.toLocaleDateString('tr-TR') : '')
+        // v9.89: etiket "gonderim" diyordu ama tarih OLUSTURMA tarihiydi.
+        // v9.88 oncesi davetlerde otomatik gonderim yoktu ve sent alani hic
+        // yazilmamisti; dolayisiyla gonderilmemis davetler gonderilmis gibi
+        // gorunuyordu. Artik ayrimi acik: gonderildi / olusturuldu.
+        +       (r._created
+            ? (r.sent === true ? _L('emailed ','e-posta ') : _L('created ','oluşturuldu '))
+              + r._created.toLocaleDateString('tr-TR')
+            : '')
         +       (e ? ' · ' + _L('valid until ','bitiş ') + e.toLocaleDateString('tr-TR') : '')
         +     '</span>'
         +     '<span style="display:flex;gap:6px">'
