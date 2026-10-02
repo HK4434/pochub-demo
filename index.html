@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- PoCHub v9.93 | pochub.co -->
+<!-- PoCHub v9.94 | pochub.co -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.93';
+const VERSION = 'v9.94';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v9.94': ['URUN DURUMU MARKA YETKISINE BAGLANDI + SIHIRBAZ METNI (Hasan: ilk kayitta tek urun kaydi olacak hissi veriyor; urun ekleyince neden Bekliyor diyor, mantigi var mi). ONCE BULDUGUM DAHA CIDDI HATA: urun olusturan DORT yol vardi ve UC farkli semantik kullaniyorlardi — sihirbaz active/awaiting_admin, tekli modal pending, toplu secim (v9.90 ve v9.92 de benim ekledigim iki yol) pending/draft. Kodun hicbir yeri draft degerini tanimiyordu; karsilastirilan degerler active, approved, awaiting_admin, awaiting_integrator, ready. Yani toplu secimle eklenen her urun hicbir kodun anlamadigi bir durumla yaziliyordu. Benim hatam. BEKLIYOR MANTIKLI DEGIL: katalog zaten admin tarafindan kurulmus. Vendor sifirdan urun uydurmadi, o kataloktan sECTI; urun tanimi admin in kendi verisi. Gercek risk marka duzeyinde — temsil etmedigi markayi sahiplenmek. Bu her urunde degil marka basina BIR KEZ sorulmasi gereken bir soru ve cevabi zaten elimizde: brand_relations. YENI KURAL (productStatusFor, tek yerden): katalog kaynakli ve markasi brand_relations ta dogrulanmis ise active/approved; marka yetkisi yoksa ya da urun elle girilmisse pending/awaiting_admin. Dort yol da artik bu fonksiyonu cagiriyor. Toast kac urunun hemen yayinda kac urunun onay bekledigini yaziyor. SIHIRBAZ METNI: Ilk Urununu Ekle ifadesi tek urunle sinirli oldugu hissi veriyordu. Basligi ve aciklamayi degistirdim; bir urunun kurulumu bitirmeye yettigi ama cogu vendor un sonrasinda toplu ekledigi acikca yaziyor. Kural bes senaryoyla prova edildi. node --check MODULE SYNTAX OK.'],
   'v9.93': ['SIHIRBAZ URUN ADIMI ELLE YAZMADAN KURTARILDI (Hasan: neden manuel yazayim, o kadar marka, urun ve kategori girildi). Ekran goruntusundeki adim iki yerden bozuktu. (1) URUN ADI VE MARKA SERBEST METINDI. Katalogda 16.186 sablon varken vendor Fortigate yaziyordu; katalogdaki FortiGate 100F ile eslesmiyor, dolayisiyla o urun hicbir arama ve eslesmeyle bulunmuyordu. Marka icin datalist onerisi vardi ama urun adi icin yoktu ve ikisi de yazim farkina aciktı. (2) KATEGORI LISTESI SEKIZ SABIT SECENEKTI — Guvenlik, Networking, Sunucu ve Depolama gibi. Taksonomide 1.001 kategori var. Yani sihirbazdan eklenen HER urun yanlis kategoriye dusuyordu ve anasayfa kategori satirlariyla, PoC eslesmesiyle baglanti kuramiyordu. Bu daha agir hataydi cunku sessizce yanlis veri uretiyordu. YENI HALI: tek arama kutusu. Iki harften sonra katalog sablonlari suzuluyor, secilen sablon marka ve kategoriyi KENDI getiriyor — vendor hicbirini yazmiyor. Elle giris hala mumkun ama artik katlanmis bir istisna, varsayilan degil; o yolda da kategori listesi gercek taksonomiden geliyor. Aciklama alani kaldirildi, sihirbazda gereksiz surtunmeydi. Arama mantigi prova edildi: fortigate iki modeli, forti ucunu getiriyor, tek harf aramayi tetiklemiyor, eslesmeyen sorgu elle girise yonlendiriyor. node --check MODULE SYNTAX OK.'],
   'v9.92': ['TOPLU KATALOG SECIMI (Hasan: uretici, distributor veya entegrator bunu neden kolayca kullanamiyor, daha pratik hale getirmemiz lazim). Hakliydi. ONCE BIR DUZELTME: Markalarim ekrani ZATEN vardi ve aile kapsamini gosteriyordu — ilk degerlendirmemde yok demistim, yanlisti. Asil eksik baskaydi: EKLEME tek tek ve agir formla yapiliyordu. Her aile satirindaki + Urun Ekle buyuk modali aciyor, bir urun ekleniyor, sonraki icin bastan. 16.186 sablonlu bir katalogda bu kullanilabilir degil. Ustelik yeni vendor in hic urunu olmadigi icin Markalarim ekrani BOS geliyordu — markayi gormek icin once urun eklemek gerekiyordu, tavuk-yumurta. YENI EKRAN iki adim: once marka secimi (7.526 marka icinde arama, cok secim, her markanin kac sablonu oldugu yazili), sonra o markalarin sablonlari rozet olarak coklu isaretleniyor. Secilenler tek seferde urun olarak olusuyor. MUKERRER KORUMASI: vendor in zaten sahip oldugu urunler ekli diye isaretli ve secilemiyor — ayni urunu iki kez eklemesin. Markalarim ekranindan acildiginda vendor in mevcut markalari ON-SECILI geliyor, bastan aramasi gerekmiyor. Urunler status pending ve publishStatus draft ile olusuyor; admin onayindan geciyor. Veri katalog indeksinden okunuyor (brands 3, tpls 14 dokuman) — tam tarama degil. v9.90 daki davet ekraninin genellestirilmis hali; orada markalar hazir geliyordu, burada vendor kendisi seciyor. Mantik sahte veriyle prova edildi: secilmemis markanin sablonu gorunmuyor, ekli urun isaretli ve secilemez. node --check MODULE SYNTAX OK.'],
   'v9.91': ['IPTAL EDILEN DAVETLER LISTEDE KALIYORDU (Hasan: iptal ettiklerim hala burada goruunuyor, bu mantikli mi). Degildi. Hasan tum davetleri iptal etmisti ve ekran bastan asagi iptal satirlarindan olusuyordu — ise yarar hicbir sey gorunmuyordu. (1) IPTAL ve SURESI DOLMUS davetler artik VARSAYILAN OLARAK GIZLI. Kayitlar SILINMIYOR, iz kaliyor; yalnizca gorunurlukten cikariliyor. Ustte kac tanesinin gizlendigi ve Goster baglantisi var. (2) Durum filtresinden Iptal ya da Suresi doldu secilirse yine gorunuyorlar — gizleme yalnizca filtre secilmemisken gecerli. (3) KALICI SILME eklendi: eski davetleri topluca temizleme baglantisi, onayli ve ilerleme sayacli. Gorunurluk mantigi dokuz kayitlik sahte listeyle prova edildi: varsayilan gorunum yalnizca bekleyen, kabul edilen ve baglanan davetleri gosteriyor; Goster tiklaninca hepsi, filtre secilince yalnizca o durum. node --check MODULE SYNTAX OK.'],
@@ -25543,10 +25544,11 @@ function wizStep2() {
 // ═══════════════════════════════════════════════════════════════════════
 function wizStep3() {
   return '<div style="padding:24px 28px">'
-    + '<h2 style="font-size:20px;font-weight:800;margin:0 0 6px;color:#fff">📦 '+t('wiz.s3_title','İlk Ürününü Ekle')+'</h2>'
+    + '<h2 style="font-size:20px;font-weight:800;margin:0 0 6px;color:#fff">📦 '
+    +   _L('Add a product to get started','Başlamak için bir ürün ekle') + '</h2>'
     + '<div style="font-size:13px;color:#475569;margin-bottom:16px">'
-    +   _L('Search the catalog — brand and category come with it. Customers open PoC requests over these products.',
-           'Katalogdan ara — marka ve kategori kendiliğinden gelir. Müşteriler PoC taleplerini bu ürünler üzerinden açar.')
+    +   _L('Search the catalog — brand and category come with it. This is just a start: you can add the rest in bulk from My Brands right after.',
+           'Katalogdan ara — marka ve kategori kendiliğinden gelir. Bu yalnızca bir başlangıç: geri kalanını hemen ardından Markalarım ekranından toplu ekleyebilirsin.')
     + '</div>'
     + '<input id="wiz-prod-q" type="text" autocomplete="off" placeholder="'
     +   _L('Type a product or brand, e.g. FortiGate','Ürün ya da marka yazın, örn. FortiGate')
@@ -25564,7 +25566,8 @@ function wizStep3() {
     +   '</div>'
     + '</div>'
     + '<div style="background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:6px;padding:10px 12px;margin:14px 0;font-size:12px;color:#475569">💡 '
-    +   _L('You can add more products in bulk later from My Brands.','Daha sonra Markalarım ekranından toplu ürün ekleyebilirsin.')
+    +   _L('One product is enough to finish setup — most vendors add 10 to 30 afterwards, a few clicks each.',
+           'Kurulumu bitirmek için bir ürün yeterli — çoğu vendor sonrasında 10-30 ürün ekliyor, her biri birkaç tık.')
     + '</div>'
     + '<div style="display:flex;gap:10px">'
     +   '<button id="wiz-back" style="flex:1;background:rgba(15,23,42,.03);border:1px solid rgba(255,255,255,.12);color:var(--text-secondary);padding:11px;border-radius:8px;font-size:13px;cursor:pointer">← '+t('wiz.back','Geri')+'</button>'
@@ -25741,6 +25744,7 @@ function attachWizardHandlers(card) {
         category = card.querySelector('#wiz-product-category')?.value || '';
       }
       const desc = '';
+      var _wst = productStatusFor(_normBrand(brand), await getMyVerifiedBrands(), !!_wizPick);  // v9.94
       if (!name) { showToast(_L('Pick a product from the catalog or enter one manually.','Katalogdan bir ürün seçin ya da elle girin.'), 'err'); return; }
       if (!category) { showToast(t('wiz.err_cat','Kategori seç'), 'err'); return; }
       try {
@@ -25751,8 +25755,8 @@ function attachWizardHandlers(card) {
           brand: brand,
           category: category,
           description: desc,
-          status: 'active',
-          publishStatus: 'awaiting_admin',
+          status: _wst.status,
+          publishStatus: _wst.publishStatus,
           createdInWizard: true,
           createdAt: serverTimestamp(),
         });
@@ -32269,6 +32273,49 @@ function _parseCsv(text){
 // v9.90'daki davet ekraninin genellestirilmis hali — orada markalar
 // hazir geliyordu, burada vendor kendisi seciyor.
 // ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// v9.94 — URUN DURUMU: MARKA YETKISINE GORE
+// ───────────────────────────────────────────────────────────────────────
+// SORU (Hasan): katalogdan urun secince neden Bekliyor yaziyor?
+// CEVAP: onaylanacak bir sey yok. Katalog zaten admin tarafindan
+// kurulmus — 7.526 marka, 16.186 sablon. Vendor sifirdan urun uydurmadi,
+// o kataloktan sECTI. Urun tanimi admin'in kendi verisi.
+// GERCEK RISK marka duzeyinde: temsil etmedigi bir markayi sahiplenmek.
+// Bu her urunde degil, marka basina BIR KEZ sorulmasi gereken bir soru —
+// ve cevabi zaten elimizde: brand_relations (marka-vendor yetkisi).
+//
+// KURAL:
+//   katalog kaynakli + markasi brand_relations'ta dogrulanmis -> active
+//   katalog kaynakli + marka yetkisi yok                      -> pending
+//   elle girilen urun (katalogda yok)                         -> pending
+// Boylece yetkisi bilinen vendor 22 urunu tek tikla yayina sokar;
+// yetkisiz marka iddiasi ise yine admin'e duser.
+// ═══════════════════════════════════════════════════════════════════════
+var _vbrCache = null;
+async function getMyVerifiedBrands(){
+  if(_vbrCache) return _vbrCache;
+  var set = Object.create(null);
+  try {
+    var snap = await getDocs(query(collection(db,'brand_relations'),
+      where('vendorId','==', CUR_USER.uid), limit(200)));
+    snap.docs.forEach(function(d){
+      var r = d.data()||{};
+      if(r.brandNorm && r.status === 'verified') set[r.brandNorm] = 1;
+    });
+  } catch(e){ console.warn('[v9.94] marka yetkileri okunamadi', e && (e.code||e.message)); }
+  _vbrCache = set; return set;
+}
+
+// Tek yerden urun durumu — dort farkli yol ayni semantigi kullansin diye.
+// Onceden sihirbaz active/awaiting_admin, tekli modal pending, toplu secim
+// pending/draft yaziyordu; draft degerini kodun HICBIR yeri tanimiyordu.
+function productStatusFor(brandNorm, verifiedSet, fromCatalog){
+  var okBrand = !!(brandNorm && verifiedSet && verifiedSet[brandNorm]);
+  return (fromCatalog && okBrand)
+    ? { status:'active',  publishStatus:'approved' }
+    : { status:'pending', publishStatus:'awaiting_admin' };
+}
+
 async function openBulkCatalogPicker(preBrands){
   var modal = document.createElement('div'); modal.className = 'modal-bg on';
   modal.innerHTML = '<div class="modal" style="max-width:660px"><div class="loading"><div class="spinner"></div>'
@@ -32287,6 +32334,7 @@ async function openBulkCatalogPicker(preBrands){
   var have = Object.create(null);
   mine.forEach(function(p){ have[_normBrand(p.brand||'') + '||' + String(p.name||'').toLowerCase().trim()] = 1; });
 
+  var verified = await getMyVerifiedBrands();   // v9.94
   var picked = Object.create(null);      // secili markalar
   [].concat(preBrands||[]).forEach(function(b){ picked[b] = 1; });
   var sel = Object.create(null);         // secili sablonlar
@@ -32401,10 +32449,11 @@ async function openBulkCatalogPicker(preBrands){
     var msg = modal.querySelector('#bcp-msg');
     if(!keys.length){ msg.textContent = _L('Select at least one product.','En az bir ürün seçin.'); return; }
     var btn = modal.querySelector('#bcp-save'); btn.disabled = true;
-    var ok=0, fail=0, errs=[];
+    var ok=0, fail=0, live=0, errs=[];
     for (const k of keys) {
       var parts = k.split('||'), brand = parts[0], name = parts[1];
       var tpl = tpls.filter(function(t){ return t.brandNorm === _normBrand(brand) && (t.name||'') === name; })[0] || {};
+      var _st = productStatusFor(_normBrand(brand), verified, true);   // v9.94
       btn.textContent = (ok+fail+1) + '/' + keys.length;
       try {
         await addDoc(collection(db,'products'), {
@@ -32416,10 +32465,10 @@ async function openBulkCatalogPicker(preBrands){
           origin: 'catalog', sectors: [], directSale: false, country: 'TR',
           description: '', productUrl: '', supportModel: '', catFields: {},
           distributors: [], integrators: [],
-          status: 'pending', publishStatus: 'draft',
+          status: _st.status, publishStatus: _st.publishStatus,
           createdAt: serverTimestamp()
         });
-        ok++;
+        ok++; if(_st.status === 'active') live++;
       } catch(e){
         fail++;
         var _m=(e&&(e.code||e.message))||'';
@@ -32432,7 +32481,9 @@ async function openBulkCatalogPicker(preBrands){
       msg.textContent = fail + ' ' + _L('could not be added','eklenemedi') + (errs.length ? ' — ' + errs.join(' | ') : '');
     }
     if(ok){
-      showToast(ok + ' ' + _L('product added — live after admin review.','ürün eklendi, admin onayından sonra yayına girer.'),'ok');
+      showToast(ok + ' ' + _L('product added','ürün eklendi')
+        + (live ? ' · ' + live + ' ' + _L('live now','hemen yayında') : '')
+        + (ok-live ? ' · ' + (ok-live) + ' ' + _L('awaiting review','onay bekliyor') : ''), 'ok');
       if(!fail){ modal.remove(); if(typeof loadVendTab==='function') loadVendTab(); }
     }
   }
@@ -32455,6 +32506,7 @@ async function openVendorOnboarding(brands){
   if(!brands || !brands.length) return;
   var tpls = [];
   try { tpls = await getBrandProducts(); } catch(e){}   // katalog indeksi — ucuz
+  var _onbVerified = await getMyVerifiedBrands();       // v9.94
 
   // Markalara ait sablonlari topla
   var byBrand = Object.create(null);
@@ -32543,6 +32595,7 @@ async function openVendorOnboarding(brands){
     for (const k of keys) {
       var parts = k.split('||'), brand = parts[0], name = parts[1];
       var tpl = (byBrand[brand]||[]).filter(function(t){ return (t.name||'') === name; })[0] || {};
+      var _st = productStatusFor(_normBrand(brand), _onbVerified, true);   // v9.94
       btn.textContent = (ok+fail+1) + '/' + keys.length;
       try {
         await addDoc(collection(db,'products'), {
@@ -32562,8 +32615,8 @@ async function openVendorOnboarding(brands){
           catFields:   {},
           distributors: [],
           integrators: [],
-          status:      'pending',
-          publishStatus: 'draft',
+          status:      _st.status,
+          publishStatus: _st.publishStatus,
           createdAt:   serverTimestamp()
         });
         ok++;
