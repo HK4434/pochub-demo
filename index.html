@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v9.99';
+const VERSION = 'v10.00';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v10.00': ['MARKA SECIMI GEZINILEBILIR (Hasan: marka nasil aklimda kalsin ki arama kutusuna yazayim; sayfa sayfa ya da asagi kaydirarak da secebilmeliyim, arama kutusu da kalsin). Hakliydi. Katalogdan toplu ekle penceresinin ilk adiminda arama bosken alfabetik ILK 40 marka geliyordu — /N Spro, 10turtle, 11:11 Systems gibi kimsenin aramayacagi adlar — ve kalan 7.500 markaya ancak adini hatirlayarak ulasilabiliyordu. Liste kaydirilsa bile 40 ta bitiyordu. YENI ILK ADIM: (1) Varsayilan siralama urun ailesi sayisina gore; Cisco, Fortinet, VMware gibi buyuk markalar ustte, sayi her satirda yazili. A-Z siralama secilebilir. (2) Kategori filtresi: marka adini bilmeyen ama ne sattigini bilen kullanici icin (Ag Guvenligi Duvarlari secilince o kategoride urun ailesi olan markalar). Secenekler sablonlarda gercekten gecen kategorilerden ve kac marka oldugu yazili. (3) Harf cubugu; bos harfler pasif. (4) Asagi kaydirdikca 120 ser marka ekleniyor, ayrica Daha fazla goster dugmesi var; ustte kac markanin kacinin gosterildigi yazili. (5) Arama urun adinda da calisiyor: FortiGate yazan Fortinet i buluyor ve satirda hangi urunden eslestigi yaziyor. Turkce karakter ve bosluk farki tolere ediliyor (sirket -> Sirket, paloalto -> Palo Alto). (6) Secilen marka listeden KAYBOLMUYOR, yerinde isaretleniyor; eskiden her tikta pencere bastan ciziliyor, kaydirma sifirlaniyordu. Simdi yalniz o satir ve secilenler alani guncelleniyor. (7) Urun ailesi olmayan markalar gezinirken gizli (ikinci adimda zaten bos gelirlerdi); adiyla aranirsa pasif olarak ve katalogda urun ailesi yok notuyla gorunuyor. Marka yetkisi olanlar yetkili olarak isaretli. BAGLAMA: liste icindeki tiklamalar tek dinleyiciyle (delegasyon) yakalaniyor; yeni sayfa eklendiginde yeniden baglama gerekmiyor (v9.71/v9.80/v9.82 deki cizim-sonrasi baglama hatasi sinifi bu yolla ortadan kalkiyor). Arama 160 ms gecikmeli. OKUMA MALIYETI DEGISMEDI: veri yine katalog indeksinden geliyor. PROVA: gercek tarayicida (Chromium) 7.507 marka ve 8.827 sablonluk sahte veriyle 12 adim: acilis sirasi, kaydirmayla 120->240 satir, derindeki satira tiklayinca kaydirma konumu korunuyor (1694->1694), kategori ve kategori+harf filtresi, urun adiyla arama, Turkce karakter, sablonsuz marka pasif, eslesmeyen sorgu mesaji, secilenlerden kaldirma, ikinci adima gecis ve Geri ile arama/secimin korunmasi. Konsol hatasi yok. 1400px ve 390px genislikte ekran goruntusuyle bakildi; dar ekranda alt dugmeler disari tasiyordu, harf cubugu tek satir yatay kaydirmali yapilarak duzeltildi. node --check MODULE SYNTAX OK. RULES degismedi.'],
   'v9.99': ['VENDOR LISTESINDE 0 URUN (Hasan: urun olmasina ragmen 0 urun diye gosteriyor — GITS TEKNOLOJI kartinda 0 urun, profilinde Urunler (60)). TESHIS: benim v9.94 hatam. productStatusFor marka yetkili urunlere publishStatus approved yaziyordu; oysa bu degeri uygulamada YALNIZ vendor profili okuyordu. Vendor listesi, katalog, gunluk one cikanlar ve anasayfa vitrini yayini ready (ya da awaiting_admin/bos) ile taniyor, admin onay dugmesi de ready yaziyor. Sonuc: v9.94ten beri marka yetkisiyle OTOMATIK yayina giren her urun profil disinda hicbir yerde gorunmuyordu — devir notundaki 129 approved urunun tamami. Entegrator1 in 23 urunu ready oldugu icin gorunuyordu, ekrandaki fark buydu. v9.94 CHANGELOG unda approved tanınan degerler arasinda sayilmisti, bu yanlisti. AYRICA v9.95 paneli approved i GECERLI saydigi icin bozuk deger yok raporu verdi; sorun bu yuzden gozden kacti. DUZELTME: (1) productStatusFor artik ready yaziyor. (2) VALID_PS ten approved cikti; Veri Sagligi > Yayin durumu kontrolu bu urunleri bulacak. Onarim approved urunleri ready ye tasir (onay kuyruguna DEGIL — marka yetkisiyle bilerek yayina alinmislardi); diger bilinmeyen degerler eskisi gibi awaiting_admin e gider. (3) Listelenme kosulu tek fonksiyonda toplandi (isListedProduct): vendor listesi, vendor profili, katalog, gunluk one cikanlar ve vitrin karuselleri artik ayni kurali cagiriyor. Profil onceden status active VEYA approved bakiyordu, liste baska kosula; iki ekranin farkli sayi gostermesinin koku buydu. Vitrin onay kontrolu (_isShowcaseProductReady) bilerek daha siki, dokunulmadi. (4) Profildeki Urunler (60) gercek sayi degildi, limit(60) di. Sorgu artik yalniz aktif urunleri okuyor (limit 300), baslik gercek sayiyi yaziyor, kartlar 60 ta kesiliyor ve Katalogda tumunu gor bagi zaten var. (5) Seed test urunleri de approved ile yaziliyordu, ready ye cekildi. Senaryo prova edildi (sahte veri, 6 urun: iki approved, bir ready, bir alansiz eski, bir bekleyen, bir draft): eski kodda liste 2, profil 4 sayiyor; onarimdan sonra ikisi de 4. Yetkili yeni urun active/ready, yetkisiz pending/awaiting_admin olusuyor. Onarim approved urunu ready ye, draft urunu awaiting_admin e tasiyor, ready urune dokunmuyor. node --check MODULE SYNTAX OK. CANLIYA ALINCA YAPILACAK: Admin > Veri Sagligi > Yayin durumu kontrolu > Tara, sonra Onar. RULES degismedi.'],
   'v9.98': ['MARKA BASINA TOPLU SECIM (Hasan: neden o marka altindaki tum urunleri topluca secemiyor, tuhaf). Hakliydi. v9.92 de kurdugum toplu secim ekraninda her sablon TEK TEK tiklaniyordu — ekran goruntusundeki VMware kartinda 40 aile var, yani 40 tiklama. Toplu demek ama toplu degil. YENI: her marka basliginin sagina Tumunu sec dugmesi geldi; secilince Temizle ye donuyor. Zaten ekli olan urunleri ATLIYOR ve kac tanesinin ekli oldugunu baslikta yaziyor — VMware ornegi: 40 aileden 3 u ekliyse dugme 37 secer. Ayni ekleme davet sonrasi urun secimi ekranina da yapildi (v9.90); iki ekran ayni davranisi gostersin diye. Senaryo prova edildi: 40 aileli markada 3 u ekli, Tumunu sec 37 seciyor, ekli olanlara dokunmuyor, dugme Temizle ye donuyor ve ikinci tikta secim sifirlaniyor. Eski halinde 37 ayri tiklama gerekiyordu. node --check MODULE SYNTAX OK.'],
   'v9.97': ['COZUMSUZ MARKA KARTINA ONERI VE TEK TIK DUZELTME (Hasan: canonical marka listesinde yok ne demek). Mesajin kendisi de kusurluydu: hangi markaya benzedigini soylemiyor ve kullaniciyi baska bir akisa yolluyordu. DURUMUN AGIRLIGI: cozumsuz kart neredeyse islevsiz — urun ailesi sablonlari gelmiyor, marka sayfasina baglanti yok, toplu ekleme o markayi disarida birakiyor ve v9.94 kuralina gore urunleri hicbir zaman otomatik yayina giremiyor. Sebep ise neredeyse her zaman YAZIM FARKI: Palo Alto yazilmis, listede Palo Alto Networks var. YENI DAVRANIS: kart en yakin uc canonical adayi gosteriyor (Sunu mu demek istediniz) ve tek tikla duzeltiyor. Duzeltme hem o markadaki TUM urunleri canonical ada tasiyor hem de profildeki beyani guncelliyor — ikincisi olmazsa kart bir dahaki acilista yine cozumsuz gelirdi, duzeltme kalici olmazdi. Onay ekraninda kac urunun tasinacagi yaziyor. ESLESTIRME: normalize edilmis ad uzerinden onek ve icerme kontrolu, uzunluk farkina gore siralama. Uc harften kisa adlar icin oneri uretilmiyor (gurultu). Yakin aday yoksa admin den isteme mesaji kaliyor. Sekiz gercek adla prova edildi: Palo Alto ve Arista dogru adayi buluyor, HPE Aruba icin iki makul aday cikiyor ve karar kullanicida, Fortigate gibi urun adlari oneri almiyor. node --check MODULE SYNTAX OK.'],
@@ -32356,40 +32357,241 @@ async function openBulkCatalogPicker(preBrands){
   var step = Object.keys(picked).length ? 2 : 1;
   var bq = '';
 
-  function brandStep(){
-    var q = bq.toLowerCase().trim();
-    var list = q
-      ? brands.filter(function(b){ return String(b.name||'').toLowerCase().indexOf(q) >= 0; }).slice(0,60)
-      : brands.slice(0,40);
+  // ══ v10.00: MARKA SECIMI GEZINILEBILIR HALE GELDI ═══════════════════════
+  // Onceden arama bos iken alfabetik ilk 40 marka geliyordu ('/N Spro',
+  // '10turtle' ...) ve geri kalan 7.500 markaya ancak adini HATIRLAYARAK
+  // ulasilabiliyordu. Kimse marka listesini ezbere bilmez. Simdi:
+  //  - varsayilan siralama urun ailesi sayisina gore (buyuk markalar ustte)
+  //  - kategori filtresi: "guvenlik duvari satiyorum" diyen marka adini
+  //    bilmeden o kategorideki markalari gorur
+  //  - harf cubugu, A-Z siralama
+  //  - asagi kaydirdikca devami yukleniyor (sayfa basi 120)
+  //  - arama urun adinda da calisiyor: 'FortiGate' yazan Fortinet'i bulur
+  //  - secilen satir yerinde isaretleniyor; liste ziplamiyor, kaydirma korunuyor
+  var bCat = '', bLetter = '', bSort = 'n';
+  var B_PAGE = 120, bShown = 0, bCur = [], bCurMap = Object.create(null);
+  var _bIdx = null;
+
+  function _letterOf(nm){
+    var c = String(nm||'').trim().charAt(0).toLocaleUpperCase('tr');
+    var m = { 'Ç':'C','Ğ':'G','İ':'I','Ö':'O','Ş':'S','Ü':'U' };
+    c = m[c] || c;
+    return /[A-Z]/.test(c) ? c : '#';
+  }
+
+  function brandIndex(){
+    if(_bIdx) return _bIdx;
+    var cnt = Object.create(null), cats = Object.create(null);
+    var tplNames = [];
+    tpls.forEach(function(t){
+      var k = t.brandNorm || _normBrand(t.brand||''); if(!k) return;
+      cnt[k] = (cnt[k]||0) + 1;
+      if(t.category){ var cm = cats[k] || (cats[k] = Object.create(null)); cm[t.category] = (cm[t.category]||0) + 1; }
+      if(t.name) tplNames.push({ norm:k, lc:String(t.name).toLowerCase(), nn:_normBrand(t.name), name:String(t.name) });
+    });
+    var seen = Object.create(null), rows = [];
+    brands.forEach(function(b){
+      var nm = String(b.name||'').trim(); if(!nm) return;
+      var k = _normBrand(nm); if(!k || seen[k]) return; seen[k] = 1;
+      var cm = cats[k] || {};
+      rows.push({ name:nm, norm:k, lc:nm.toLowerCase(), n:cnt[k]||0,
+                  cats:Object.keys(cm).sort(function(a,c){ return cm[c]-cm[a]; }),
+                  letter:_letterOf(nm), ok:!!(verified && verified[k]) });
+    });
+    var catBrands = Object.create(null);
+    rows.forEach(function(r){ if(r.n) r.cats.forEach(function(c){ catBrands[c] = (catBrands[c]||0) + 1; }); });
+    _bIdx = { rows:rows, catBrands:catBrands, tplNames:tplNames,
+              withProducts: rows.filter(function(r){ return r.n; }).length };
+    return _bIdx;
+  }
+
+  function filteredBrands(){
+    var I = brandIndex(), q = bq.toLowerCase().trim();
+    // Normalize edilmis sorgu da denenir: 'sirket' Şirket'i, 'paloalto'
+    // Palo Alto'yu, 'forti gate' FortiGate'i bulur.
+    var qn = _normBrand(q);
+    var hits = null;   // marka -> eslesen ilk urun adi
+    if(q.length >= 2){
+      hits = Object.create(null);
+      I.tplNames.forEach(function(t){
+        if(!hits[t.norm] && (t.lc.indexOf(q) >= 0 || (qn.length >= 2 && t.nn.indexOf(qn) >= 0))) hits[t.norm] = t.name; });
+    }
+    var out = [];
+    I.rows.forEach(function(r){
+      if(bCat && r.cats.indexOf(bCat) < 0) return;
+      if(bLetter && r.letter !== bLetter) return;
+      var why = null, rank = 0;
+      if(q){
+        var at = r.lc.indexOf(q);
+        if(at < 0 && qn) at = r.norm.indexOf(qn);
+        if(at < 0){ if(!(hits && hits[r.norm])) return; why = hits[r.norm]; rank = 2; }
+        else rank = at === 0 ? 0 : 1;
+      } else if(!r.n) return;   // gezinirken urun ailesi olmayanlar gizli
+      out.push({ r:r, why:why, rank:rank });
+    });
+    out.sort(function(a,b){
+      if(q && a.rank !== b.rank) return a.rank - b.rank;
+      if(bSort === 'az') return a.r.name.localeCompare(b.r.name, 'tr');
+      return (b.r.n - a.r.n) || a.r.name.localeCompare(b.r.name, 'tr');
+    });
+    return out;
+  }
+
+  function brandRowHtml(x){
+    var r = x.r, on = !!picked[r.name], dis = !r.n;
+    var sub = x.why ? _L('product: ','ürün: ') + escHtml(x.why)
+            : (r.cats.length ? escHtml(r.cats.slice(0,2).join(' · '))
+            : (dis ? _L('no product families in catalog','katalogda ürün ailesi yok') : ''));
+    return '<button type="button" class="bcp-row" data-b="' + escHtml(r.name) + '"' + (dis ? ' disabled' : '')
+      + ' style="display:flex;align-items:center;gap:9px;text-align:left;width:100%;padding:8px 10px;border-radius:9px;cursor:' + (dis ? 'default' : 'pointer') + ';'
+      + 'border:1px solid ' + (on ? '#16a34a' : 'var(--border)') + ';background:' + (on ? 'rgba(22,163,74,.08)' : 'transparent') + ';opacity:' + (dis ? '.55' : '1') + ';color:var(--text-primary)">'
+      +   '<span style="width:18px;height:18px;flex-shrink:0;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;'
+      +     'border:1.5px solid ' + (on ? '#16a34a' : 'var(--border)') + ';background:' + (on ? '#16a34a' : 'transparent') + ';color:#fff">' + (on ? '✓' : '') + '</span>'
+      +   '<span style="flex:1;min-width:0">'
+      +     '<span style="display:block;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(r.name)
+      +       (r.ok ? ' <span style="font-size:10px;color:#b45309;font-weight:700">· ' + _L('authorised','yetkili') + '</span>' : '') + '</span>'
+      +     '<span style="display:block;font-size:10.5px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + sub + '</span>'
+      +   '</span>'
+      +   (r.n ? '<span style="font-size:11px;color:var(--text-muted);flex-shrink:0" title="' + _L('product families','ürün ailesi') + '">' + r.n + '</span>' : '')
+      + '</button>';
+  }
+
+  function chosenHtml(){
     var chosen = Object.keys(picked);
-    return '<div style="padding:20px 22px 0">'
+    if(!chosen.length) return '<div style="font-size:11.5px;color:var(--text-muted)">' + _L('No brand selected yet.','Henüz marka seçilmedi.') + '</div>';
+    return '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px">' + _L('Selected','Seçilenler') + ' (' + chosen.length + ')</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px;max-height:64px;overflow-y:auto">'
+      + chosen.map(function(b){
+          return '<button type="button" class="bcp-unpick" data-b="' + escHtml(b) + '" style="font-size:11.5px;padding:4px 10px;border-radius:14px;border:1px solid #16a34a;background:rgba(22,163,74,.10);color:#16a34a;font-weight:600;cursor:pointer">✓ '
+            + escHtml(b) + ' ✕</button>'; }).join('')
+      + '</div>';
+  }
+
+  function letterBarHtml(){
+    var I = brandIndex(), lc = Object.create(null);
+    I.rows.forEach(function(r){ if(r.n && (!bCat || r.cats.indexOf(bCat) >= 0)) lc[r.letter] = (lc[r.letter]||0) + 1; });
+    var L = ['']. concat('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')).concat(['#']);
+    return L.map(function(l){
+      var n = l ? (lc[l]||0) : 1, act = bLetter === l;
+      return '<button type="button" class="bcp-let" data-l="' + l + '"' + (n ? '' : ' disabled')
+        + ' style="flex-shrink:0;min-width:24px;min-height:0;height:26px;line-height:1;padding:3px 6px;border-radius:6px;font-size:11px;font-weight:700;cursor:' + (n ? 'pointer' : 'default') + ';'
+        + 'border:1px solid ' + (act ? '#2563eb' : 'transparent') + ';background:' + (act ? 'rgba(37,99,235,.10)' : 'transparent') + ';'
+        + 'color:' + (act ? '#2563eb' : (n ? 'var(--text-secondary)' : 'var(--text-muted)')) + ';opacity:' + (n ? '1' : '.4') + '">'
+        + (l || _L('All','Tümü')) + '</button>';
+    }).join('');
+  }
+
+  function brandStep(){
+    var I = brandIndex();
+    var catKeys = Object.keys(I.catBrands).sort(function(a,b){ return a.localeCompare(b,'tr'); });
+    var sel_ = 'padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:var(--bg-surface);color:var(--text-primary)';
+    return '<div style="padding:20px 22px 0;flex-shrink:0">'
       + '<h3 style="margin:0 0 6px;font-size:17px;font-weight:800">' + _L('Which brands do you represent?','Hangi markaları temsil ediyorsunuz?') + '</h3>'
       + '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">'
-      +   _L('Pick your brands first — then you will only see their products instead of the whole catalog.',
-             'Önce markalarınızı seçin — sonra tüm katalog yerine yalnızca onların ürünlerini göreceksiniz.')
+      +   _L('Browse by category or letter, or search by brand or product name. Then you will only see these brands\u2019 products.',
+             'Kategoriye ya da harfe göre gezinin, veya marka ya da ürün adıyla arayın. Sonra yalnızca bu markaların ürünlerini göreceksiniz.')
       + '</div>'
-      + '<input id="bcp-bq" value="' + escHtml(bq) + '" placeholder="' + _L('Search brand...','Marka ara...') + '" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:10px">'
-      + (chosen.length
-          ? '<div style="margin-bottom:10px"><div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px">'
-            + _L('Selected','Seçilenler') + ' (' + chosen.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
-            + chosen.map(function(b){
-                return '<button class="bcp-unpick" data-b="' + escHtml(b) + '" style="font-size:11.5px;padding:5px 10px;border-radius:14px;border:1px solid #16a34a;background:rgba(22,163,74,.10);color:#16a34a;font-weight:600;cursor:pointer">✓ '
-                  + escHtml(b) + ' ✕</button>'; }).join('')
-            + '</div></div>'
-          : '')
+      + '<input id="bcp-bq" value="' + escHtml(bq) + '" autocomplete="off" placeholder="' + _L('Brand or product name — e.g. Fortinet, FortiGate','Marka ya da ürün adı — ör. Fortinet, FortiGate') + '" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px">'
+      + '<div style="display:flex;gap:8px;margin-bottom:8px">'
+      +   '<select id="bcp-cat" style="flex:1;min-width:150px;max-width:100%;' + sel_ + '"><option value="">' + _L('All categories','Tüm kategoriler') + '</option>'
+      +     catKeys.map(function(c){ return '<option value="' + escHtml(c) + '"' + (c === bCat ? ' selected' : '') + '>' + escHtml(c) + ' (' + I.catBrands[c] + ')</option>'; }).join('')
+      +   '</select>'
+      +   '<select id="bcp-sort" style="flex-shrink:1;min-width:0;max-width:45%;' + sel_ + '">'
+      +     '<option value="n"' + (bSort === 'n' ? ' selected' : '') + '>' + _L('Most product families','En çok ürün ailesi') + '</option>'
+      +     '<option value="az"' + (bSort === 'az' ? ' selected' : '') + '>' + _L('A–Z','A–Z') + '</option>'
+      +   '</select>'
       + '</div>'
-      + '<div style="max-height:40vh;overflow-y:auto;padding:0 22px 14px"><div style="display:flex;flex-wrap:wrap;gap:6px">'
-      +   list.filter(function(b){ return !picked[b.name]; }).map(function(b){
-            var n = tpls.filter(function(t){ return t.brandNorm === _normBrand(b.name); }).length;
-            return '<button class="bcp-pick" data-b="' + escHtml(b.name) + '" style="font-size:11.5px;padding:5px 10px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer">+ '
-              + escHtml(b.name) + (n ? ' <span style="color:var(--text-muted)">(' + n + ')</span>' : '') + '</button>';
-          }).join('')
-      + '</div></div>'
-      + '<div style="padding:14px 22px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">'
+      + '<div id="bcp-letters" style="display:flex;flex-wrap:nowrap;overflow-x:auto;gap:2px;margin-bottom:10px;padding-bottom:2px;scrollbar-width:thin">' + letterBarHtml() + '</div>'
+      + '<div id="bcp-chosen" style="margin-bottom:10px">' + chosenHtml() + '</div>'
+      + '</div>'
+      + '<div id="bcp-list" style="flex:1;min-height:150px;overflow-y:auto;padding:0 22px 12px;border-top:1px solid var(--border)">'
+      +   '<div id="bcp-info" style="font-size:11.5px;color:var(--text-muted);padding:8px 0"></div>'
+      +   '<div id="bcp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:6px"></div>'
+      +   '<div id="bcp-more" style="text-align:center;padding:10px 0 2px"></div>'
+      + '</div>'
+      + '<div style="padding:14px 22px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;flex-shrink:0">'
       +   '<button class="btn-g btn-sm" id="bcp-close">' + _L('Close','Kapat') + '</button>'
-      +   '<button class="btn-p btn-sm" id="bcp-next"' + (chosen.length ? '' : ' disabled') + '>'
+      +   '<button class="btn-p btn-sm" id="bcp-next"' + (Object.keys(picked).length ? '' : ' disabled') + '>'
       +     _L('Next — pick products','Devam — ürünleri seç') + '</button>'
       + '</div>';
+  }
+
+  function renderBrandList(){
+    bCur = filteredBrands(); bCurMap = Object.create(null);
+    bCur.forEach(function(x){ bCurMap[x.r.name] = x; });
+    bShown = Math.min(B_PAGE, bCur.length);
+    var grid = modal.querySelector('#bcp-grid'), list = modal.querySelector('#bcp-list');
+    if(!grid) return;
+    grid.innerHTML = bCur.slice(0, bShown).map(brandRowHtml).join('');
+    if(list) list.scrollTop = 0;
+    renderBrandInfo();
+  }
+  function appendBrandPage(){
+    if(bShown >= bCur.length) return;
+    var grid = modal.querySelector('#bcp-grid'); if(!grid) return;
+    var next = Math.min(bShown + B_PAGE, bCur.length);
+    grid.insertAdjacentHTML('beforeend', bCur.slice(bShown, next).map(brandRowHtml).join(''));
+    bShown = next; renderBrandInfo();
+  }
+  function renderBrandInfo(){
+    var info = modal.querySelector('#bcp-info'), more = modal.querySelector('#bcp-more');
+    var I = brandIndex(), fmt = function(n){ return Number(n).toLocaleString('tr-TR'); };
+    if(info){
+      info.textContent = bCur.length
+        ? fmt(bCur.length) + ' ' + _L('brands','marka') + (bShown < bCur.length ? ' · ' + _L('showing','gösterilen') + ' ' + fmt(bShown) : '')
+          + (!bq.trim() && !bCat && !bLetter
+              ? ' · ' + _L('brands without product families are hidden; search by name to see them.','ürün ailesi olmayan markalar gizli; adıyla aratırsanız görünür.') : '')
+        : _L('No brand matches. Try another spelling, or a product name.','Eşleşen marka yok. Farklı bir yazım ya da bir ürün adı deneyin.');
+    }
+    if(more){
+      more.innerHTML = bShown < bCur.length
+        ? '<button type="button" id="bcp-loadmore" class="btn-g btn-sm">' + _L('Show more','Daha fazla göster') + ' (' + fmt(bCur.length - bShown) + ')</button>'
+        : '';
+    }
+  }
+  function refreshChosen(){
+    var c = modal.querySelector('#bcp-chosen'); if(c) c.innerHTML = chosenHtml();
+    var nx = modal.querySelector('#bcp-next'); if(nx) nx.disabled = !Object.keys(picked).length;
+  }
+  function refreshRow(name){
+    var x = bCurMap[name]; if(!x) return;
+    var grid = modal.querySelector('#bcp-grid'); if(!grid) return;
+    var kids = grid.children;
+    for(var i = 0; i < kids.length; i++){
+      if(kids[i].dataset.b === name){ kids[i].outerHTML = brandRowHtml(x); return; }
+    }
+  }
+
+  // Cizimden SONRA cagrilir; liste icindeki tiklamalar tek bir dinleyiciyle
+  // (delegasyon) yakalanir, sayfa eklendikce yeniden baglama gerekmez.
+  function bindBrandStep(){
+    var inp = modal.querySelector('#bcp-bq'), tmr = null;
+    inp.addEventListener('input', function(){
+      bq = this.value; clearTimeout(tmr); tmr = setTimeout(renderBrandList, 160); });
+    modal.querySelector('#bcp-cat').addEventListener('change', function(){
+      bCat = this.value; bLetter = '';
+      modal.querySelector('#bcp-letters').innerHTML = letterBarHtml(); renderBrandList(); });
+    modal.querySelector('#bcp-sort').addEventListener('change', function(){ bSort = this.value; renderBrandList(); });
+    modal.querySelector('#bcp-letters').addEventListener('click', function(e){
+      var b = e.target.closest('.bcp-let'); if(!b || b.disabled) return;
+      bLetter = b.dataset.l; this.innerHTML = letterBarHtml(); renderBrandList(); });
+    var list = modal.querySelector('#bcp-list');
+    list.addEventListener('click', function(e){
+      if(e.target.closest('#bcp-loadmore')){ appendBrandPage(); return; }
+      var b = e.target.closest('.bcp-row'); if(!b || b.disabled) return;
+      var nm = b.dataset.b;
+      if(picked[nm]) delete picked[nm]; else picked[nm] = 1;
+      refreshRow(nm); refreshChosen();
+    });
+    list.addEventListener('scroll', function(){
+      if(this.scrollTop + this.clientHeight >= this.scrollHeight - 200) appendBrandPage(); });
+    modal.querySelector('#bcp-chosen').addEventListener('click', function(e){
+      var b = e.target.closest('.bcp-unpick'); if(!b) return;
+      var nm = b.dataset.b; delete picked[nm]; refreshRow(nm); refreshChosen(); });
+    modal.querySelector('#bcp-close').addEventListener('click', function(){ modal.remove(); });
+    modal.querySelector('#bcp-next').addEventListener('click', function(){ step = 2; paint(); });
+    renderBrandList();
+    if(!('ontouchstart' in window)) inp.focus();
   }
 
   var byBrandRef = Object.create(null);   // v9.98: toplu secim baglamasi icin
@@ -32457,18 +32659,10 @@ async function openBulkCatalogPicker(preBrands){
   }
 
   function paint(){
-    modal.innerHTML = '<div class="modal" style="max-width:660px;max-height:88vh;display:flex;flex-direction:column">'
+    modal.innerHTML = '<div class="modal" style="max-width:' + (step === 1 ? '780px;height:88vh' : '660px') + ';max-height:88vh;display:flex;flex-direction:column">'
       + (step === 1 ? brandStep() : prodStep()) + '</div>';
     if(step === 1){
-      var inp = modal.querySelector('#bcp-bq');
-      inp.addEventListener('input', function(){ bq = this.value; var pos=this.selectionStart; paint();
-        var ni=modal.querySelector('#bcp-bq'); ni.focus(); try{ ni.setSelectionRange(pos,pos); }catch(e){} });
-      modal.querySelectorAll('.bcp-pick').forEach(function(b){
-        b.addEventListener('click', function(){ picked[b.dataset.b]=1; paint(); }); });
-      modal.querySelectorAll('.bcp-unpick').forEach(function(b){
-        b.addEventListener('click', function(){ delete picked[b.dataset.b]; paint(); }); });
-      modal.querySelector('#bcp-close').addEventListener('click', function(){ modal.remove(); });
-      modal.querySelector('#bcp-next').addEventListener('click', function(){ step = 2; paint(); });
+      bindBrandStep();   // v10.00
     } else {
       modal.querySelectorAll('.bcp-tpl').forEach(function(b){
         b.addEventListener('click', function(){
