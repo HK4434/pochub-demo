@@ -793,11 +793,11 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, PhoneAuthProvider, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp, increment, connectFirestoreEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, Timestamp, increment, connectFirestoreEmulator, writeBatch, deleteField } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v10.03';
+const VERSION = 'v10.04';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v10.04': ['TOPLU ONAY / RET / GERI ALMA (Hasan: cok urun oldugunda tek tek onay pratik degil; topluca secilsin, istenenin isareti kaldirilabilsin, iptal ve geri alma olsun). Admin > Urun Onaylari ekraninda: (1) Onay bekleyen her satirda onay kutusu; basliktaki kutu FILTREYE UYAN tum bekleyenleri secer (tablo sayfalanmiyor, yani gorunen = filtredeki) ve kac tane oldugunu yazar. Firma bazli toplu onay = Vendor filtresi + basliktaki kutu. Tekli Onayla/Reddet dugmeleri oldugu gibi duruyor. (2) Filtre degisince secim SIFIRLANIR: bir firma icin secilenler baska filtreye gecince gorunmeden secili kalip yanlislikla onaylanmasin. Tekli onay/ret sonrasi artik bekleyen olmayan secimler de dusurulur. (3) SUPHELI SATIR ISARETI: ayni firma + ayni markada benzer adli kayit (parantez oncesi ayni ya da biri digerini iceriyor; yayindaki urunle cakisma ayrica belirtiliyor) ve kapanmamis parantezli kesik ad. Karar admin de; secim cubugunda isaretlileri tek tikla secimden cikaran dugme var. (4) Islemden once OZET penceresi: kac urun, firma > marka dokumu, kacinin isaretli oldugu, bildirimlerin geri cekilemeyecegi. Vazgec secimi bozmaz. Toplu ret tek gerekce sorar. (5) Yazma writeBatch ile (400lik parcalar). Firmaya urun basina degil, firma basina TEK bildirim ve TEK e-posta (ilk 5 urun adi + kalan sayisi; e-postada tam liste). Onay status active / publishStatus ready yazar (v9.99 kurali), urun her yerde ayni anda gorunur. (6) GERI ALMA: her toplu islem urune bulkOp {id, action, by, at, prevStatus, prevPublishStatus} yazar. Son toplu islem cubukta tarih ve sayisiyla gorunur; Geri al yalniz o islemden beri DEGISMEMIS urunleri onceki durumuna dondurur (approvedAt/approvedBy ya da rejectedAt/rejectReason silinir), degismis olanlara dokunmaz ve kac tane oldugunu soyler. Kayit urunun uzerinde durdugu icin sayfa yenilense de geri alinabiliyor; yeni koleksiyon ve kural degisikligi gerekmedi (admin products uzerinde zaten tam yetkili). (7) Ustteki Toplam/Aktif/Admin Onayi sayaclari artik islem sonrasi guncelleniyor; eskiden sayfa acilisinda bir kez hesaplaniyordu. writeBatch ve deleteField firestore importuna eklendi. PROVA (Chromium, sahte veri: GITS 7 bekleyen + 1 yayinda, Entegrator1 2 bekleyen + 1 yayinda): isaretler dogru (Sangfor HCI ikilisi, kesik PA-Series, yayindaki PowerStore ile cakisan PowerStore (Dell PowerStore)); GITS filtresinde tumunu sec 7, bir satir kaldirilinca baslik ara durumda, isaretlileri cikar 2 birakti; ozet firma > marka dogru, Vazgec hicbir sey yazmadi; onay 1 batch / 3 yazma, 1 bildirim, 1 e-posta, sayac 9->6; filtre degisince secim bos; aradan bir urun elle degistirildikten ve sayfa YENIDEN YUKLENDIKTEN sonra geri alma 2 urunu dondurdu, 1 ini atladi, sayac 9a dondu; toplu ret gerekceyle 2 urun, firmaya 1 bildirim. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi.'],
   'v10.03': ['PROFIL ILE MARKALARIM SENKRON DEGIL (Hasan: iki taraf senkron degil, sayilar ve markalar tutarsiz; ekleme sonrasi iki taraf ayni olmali, entegratore/distributore elle duzelt diyemem). Hakliydi ve bu bir VERI MODELI hatasiydi, ekran hatasi degil. TESHIS: Markalarim kartlari uc kaynaktan uretiyor (sahiplik + users.brands beyani + urun girilen markalar). Herkese acik profildeki Markalar listesi ise YALNIZ users.brands beyanini okuyor; o alan sadece elle doluyordu. Katalogdan Acronis eklenince Markalarim da Acronis cikiyor, profilde cikmiyordu. Daha onemlisi ayni alan (vendor_public.brands) marka sayfasindaki is ortaklari listesini, ozel PoC talebinde vendor eslestirmeyi (openCustomPoCModal) ve temsilci listesini besliyor: urun ekleyen firma o markanin PoC taleplerine HIC onerilmiyordu. Sayi farki ise ayri: profil yalniz yayindaki urunu sayiyor, Markalarim onay bekleyenleri de sayiyordu ve bunu soylemiyordu. DUZELTME: (1) syncDeclaredBrands: urun eklenen DORT yolun hepsinde (sihirbaz, Urun Ekle penceresi, katalogdan toplu ekle, davet sonrasi urun secimi) urunun markasi beyana eklenir, vendor_public aynasi guncellenir. Beyandaki ad katalogdaki markayla ayniysa katalog yazimina cekilir (CISCO -> Cisco), tekrarlar ayiklanir. Fark yoksa YAZMA YOK. (2) KENDILIGINDEN ONARIM: vendor paneli acilisinda (dashboard urunleri zaten okuyor, EK OKUMA YOK) ve Markalarim acilisinda mevcut urunlerden eksik kalan markalar beyana eklenir. Mevcut veriler icin kimsenin bir sey yapmasi gerekmiyor; vendor paneline ilk girisinde duzelir. (3) TEK KURAL: vendorPublicBrands (beyan ∪ yayindaki urunlerin markalari) hem profil sayfasinda hem Markalarim ozetinde kullaniliyor; urun sayisi ikisinde de isListedProduct. Profil, sahibi panele girmemis vendorlar icin de dogru markalari gosteriyor. (4) Markalarim ustunde Herkese acik profilinde: N urun · M marka · K onay bekliyor satiri — profilde gorunen sayiyla birebir ayni hesap. Kartlarda X urunun (Y profilde · Z onay bekliyor); onay bekleyen urunu olan kartta neden profilde olmadigi ve temsilcilik onaylanirsa beklemeden yayina girecegi yaziyor. ONAY BEKLEME DAVRANISI DEGISMEDI: marka yetkisi olmayan markadaki urun admin onayindan gecer (v9.94 karari); degisen, bunun artik gorunur ve aciklanmis olmasi. PROVA (Chromium, sahte veri: beyan CISCO/VMWARE/HPE/PURE STORAGE/FORTINET + tekrar eden Cisco; urunler Cisco x2, VMware, Broadcom yayinda, Acronis x3 onay bekliyor): tek yazmayla beyan [Cisco, VMware, HPE, Pure Storage, Fortinet, Acronis, Broadcom] oldu, ayna ayni liste; Markalarim ozeti 4 urun · 7 marka · 3 onay bekliyor, profil fonksiyonu ayni 7 marka ve 4 urun; ikinci senkron cagrisi 0 yazma. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi (users.brands ve vendor_public.brands sahibi tarafindan zaten yazilabiliyor).'],
   'v10.02': ['DELL EMC KARTI: NEDEN BOYLE, NEDEN CIKARAMIYORUM (Hasan). IKI SORUN. (1) ESLESME: Dell EMC eski bir ad; Dell 2016 da EMC yi satin aldiktan sonra urunler Dell Technologies adi altinda toplandi, katalog da (Gartner kaynakli) yeni adi kullaniyor. v9.97 deki Sunu mu demek istediniz onerisi adlari bosluksuz birlestirip birbirinin icinde ariyordu: dellemc ile delltechnologies birbirini icermedigi icin aday cikmiyor, kart Katalogda yakin bir eslesme yok diyordu. Artik ilk kelimesi ayni olan canonical adlar da (en dusuk puanla) aday: Dell EMC -> Dell Technologies. Dellwood gibi ayni harflerle baslayan ama farkli kelime olanlar ve EMC Insurance gibi ikinci kelime eslesmeleri bilerek aday degil. (2) CIKARMA: kart uc kaynaktan geliyor — sahip olunan marka, profildeki beyan (users.brands; davetle gelen firmalarda uretici dizinlerinden kopyalaniyor, Dell EMC buradan gelmis olabilir) ve urun girilen marka. Beyan kullanicinin elindeydi ama bu ekranda dugmesi yoktu. Beyan edilmis, sahibi olunmayan ve URUNU OLMAYAN kartlara Listemden cikar eklendi; users.brands ten cikarir. Urunu olan kartta dugme yok: beyan silinse de kart urunler yuzunden yine gelirdi, dugme ise yaramiyormus gibi gorunurdu; o kartlarda yol urunu duzeltmek ya da silmek. Yetkili temsilci kaydi ve bekleyen temsilcilik talebi dokunulmadan kalir, onay penceresi bunu soyler. (3) AYNA HATASI (v9.97 den): marka duzeltme users.brands i guncelliyor ama vendor_public aynasini guncellemiyordu, herkese acik profil eski adi gosteriyordu. Hem duzeltme hem cikarma artik syncVendorPublic cagiriyor. (4) Rozet metni Canonical listede yok -> Katalogda bulunamadi; canonical kullaniciya bir sey anlatmiyordu. PROVA (Chromium, sahte veri: Cisco urunlu, Dell EMC urunsuz, Palo Alto urunlu ve cozumsuz, Veeam urunsuz; katalogda Dell Technologies, Dellwood Labs, EMC Insurance): Dell EMC -> yalniz Dell Technologies onerildi; Listemden cikar yalniz Dell EMC ve Veeam kartlarinda cikti; tiklaninca users.brands [Cisco, Palo Alto, Veeam] yazildi, ayna ayni listeyle guncellendi, kart kayboldu. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi (users kendi brands alanini zaten yazabiliyordu, v9.97 ayni yolu kullaniyor).'],
   'v10.01': ['URUN SECIMINDE LISTE EN USTE ZIPLIYOR (Hasan: bu ekranda secim yapinca en uste atiyor surekli). Sebep: Katalogdan toplu ekle penceresinin ikinci adiminda her cip tiklamasi ve Tumunu sec tum pencereyi bastan ciziyor (paint), urun listesinin kaydirma konumu sifirlaniyordu. v10.00 da ayni sorunu marka adiminda satir bazli guncellemeyle cozmustum, urun adimi eski yapida kalmisti. Ayni hata v9.90 davet sonrasi urun secimi penceresinde de vardi. DUZELTME: iki pencerede de kaydirilan alan data-keep-scroll ile isaretli; yeniden cizimden once konum alinip baglamalardan SONRA geri yaziliyor. Toplu eklemede yalniz ayni adimda kalindikca korunuyor; Devam ya da Geri ile adim degisince liste bastan basliyor. AYNI EKRANDA IKINCI HATA: katalogda ayni markada ayni adli sablon birden fazla var (Acronis Cyber Protect Cloud x2, Broadcom Rally x2). Secim anahtari marka||ad oldugu icin iki cip ayni anahtari paylasiyordu: birine dokununca ikisi birden isaretleniyor, ekranda 4 secili gorunurken sayac 3 diyordu; Tumunu sec sayisi da sisiyordu (Broadcom 15). Secim ekranlarinda ada gore tekillestiriliyor (_dedupTplsByName). Kayit tarafi zaten ilk eslesen sablonu kullaniyordu, eklenen urun degismiyor. Katalogdaki mukerrer sablonlarin kendisi ayri bir temizlik isi; bu surum yalniz secimi duzeltiyor. PROVA (Chromium, iki pencere): liste kaydirilip ortadaki cipe tiklaninca ve Tumunu sec denince konum ayni kaldi (294->294->294, 213->213->213); Geri+Devam sonrasi liste basta (0); Acronis 4 yerine 3 cip, Rally 1 cip. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi.'],
@@ -30831,6 +30832,270 @@ async function admProducts(m) {
     window._adminPreFilter = null;
   }
 
+
+  // ══ v10.04: TOPLU ONAY / RET / GERI ALMA ═══════════════════════════════
+  // Hasan: cok urun oldugunda tek tek onay pratik degil; topluca secilip
+  // istenenlerin isareti kaldirilabilmeli, iptal ve geri alma olmali.
+  // - Onay kutusu yalniz onay bekleyen satirlarda. Basliktaki kutu FILTREYE
+  //   UYAN tum bekleyenleri secer (ekranda gorunenleri degil — tablo zaten
+  //   sayfalanmiyor) ve kac tane oldugunu yazar.
+  // - Filtre degisince secim sifirlanir: GITS icin secilenler baska firmaya
+  //   gecince gorunmeden secili kalmasin.
+  // - Supheli satirlar isaretli (ayni firma+markada benzer ad, kapanmamis
+  //   parantez). Karar admin'de; tek tikla secimden cikarilabilir.
+  // - Islemden once ozet penceresi (firma > marka dokumu).
+  // - Her toplu islem urune bulkOp {id, action, prev*} yazar. Geri alma
+  //   yalniz o islemden beri DEGISMEMIS urunleri eski haline dondurur.
+  //   Kayit urunun uzerinde durdugu icin sayfa yenilense de geri alinabilir;
+  //   yeni koleksiyon ve kural degisikligi gerekmez.
+  // - Yazma writeBatch ile (400'luk parcalar). Firmaya urun basina degil,
+  //   firma basina TEK bildirim + TEK e-posta.
+  var apSel = new Set(), apLastItems = [], apSig = '', apFlags = Object.create(null);
+
+  function _apNeeds(p){
+    return (p.publishStatus||'awaiting_admin') === 'awaiting_admin' && p.status !== 'rejected' && p.status !== 'archived';
+  }
+  function _apBase(n){
+    return _normBrand(String(n||'').split('(')[0]);
+  }
+  function computeApFlags(){
+    apFlags = Object.create(null);
+    var groups = Object.create(null);
+    all.forEach(function(p){
+      var k = (p.vendorId||p.vendorName||'') + '|' + _normBrand(p.brand||'');
+      (groups[k] = groups[k] || []).push(p);
+    });
+    all.forEach(function(p){
+      if(!_apNeeds(p)) return;
+      var f = [];
+      var nm = String(p.name||'');
+      if((nm.match(/\(/g)||[]).length > (nm.match(/\)/g)||[]).length)
+        f.push(_L('name looks truncated (unclosed parenthesis)','ad kesik görünüyor (parantez kapanmamış)'));
+      var g = groups[(p.vendorId||p.vendorName||'') + '|' + _normBrand(p.brand||'')] || [];
+      var b = _apBase(nm), full = _normBrand(nm);
+      var sim = g.filter(function(o){
+        if(o.id === p.id || o.status === 'rejected' || getLifecycleState(o) === 'trash') return false;
+        var ob = _apBase(o.name), of = _normBrand(o.name||'');
+        if(b.length >= 4 && ob === b) return true;
+        if(full.length >= 5 && of.length >= 5 && (of.indexOf(full) >= 0 || full.indexOf(of) >= 0)) return true;
+        return false;
+      }).map(function(o){ return o.name + (o.status === 'active' ? ' (' + _L('live','yayında') + ')' : ''); });
+      if(sim.length) f.push(_L('similar to: ','benzer kayıt: ') + sim.slice(0,3).join(' · '));
+      if(f.length) apFlags[p.id] = f;
+    });
+  }
+
+  function _apEligible(){ return apLastItems.filter(_apNeeds); }
+  // Ust sayaclar islem sonrasi da guncel kalsin (eskiden sayfa acilisinda bir kez hesaplaniyordu)
+  function _apCounts(){
+    var set = function(id, v){ var e = m.querySelector('#'+id); if(e) e.textContent = v; };
+    set('ap-n-total', all.length);
+    set('ap-n-active', all.filter(function(p){ return p.status==='active'; }).length);
+    set('ap-n-admin', all.filter(function(p){ var ps=p.publishStatus||'awaiting_admin'; return ps==='awaiting_admin' && p.status!=='rejected' && p.status!=='archived' && p.status!=='active'; }).length);
+  }
+
+  function renderApBulk(){
+    var host = m.querySelector('#ap-bulk'); if(!host) return;
+    var elig = _apEligible();
+    var nSel = apSel.size;
+    var flaggedSel = 0; apSel.forEach(function(id){ if(apFlags[id]) flaggedSel++; });
+    var op = _apLastOp();
+    var hdr = m.querySelector('#ap-selall');
+    if(hdr){
+      hdr.checked = elig.length > 0 && nSel === elig.length;
+      hdr.indeterminate = nSel > 0 && nSel < elig.length;
+      hdr.disabled = !elig.length;
+    }
+    var html = '';
+    if(nSel){
+      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);border-radius:10px;margin-bottom:10px">'
+        + '<b style="font-size:13px">' + nSel + ' ' + _L('selected','seçili') + '</b>'
+        + '<span style="font-size:12px;color:var(--text-muted)">' + (nSel === elig.length && elig.length ? _L('(all awaiting approval in this filter)','(filtredeki onay bekleyenlerin hepsi)') : (_L('of ','/ ') + elig.length + ' ' + _L('awaiting','onay bekleyen'))) + '</span>'
+        + (flaggedSel ? '<button type="button" id="ap-unflag" class="btn-g btn-sm" style="font-size:11.5px;color:#b45309">⚠ ' + flaggedSel + ' ' + _L('flagged — remove from selection','işaretli — seçimden çıkar') + '</button>' : '')
+        + '<span style="flex:1"></span>'
+        + '<button type="button" id="ap-bulk-clear" class="btn-g btn-sm">' + _L('Clear selection','Seçimi temizle') + '</button>'
+        + '<button type="button" id="ap-bulk-rej" class="btn-sm" style="background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer">✕ ' + _L('Reject selected','Seçilenleri reddet') + '</button>'
+        + '<button type="button" id="ap-bulk-appr" class="btn-sm" style="background:#16a34a;color:#fff;border:1px solid #16a34a;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer">✓ ' + _L('Approve selected','Seçilenleri onayla') + '</button>'
+        + '</div>';
+    } else if(elig.length){
+      html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">'
+        + _L('Tip: tick the box in the header to select all ','İpucu: başlıktaki kutuyla filtredeki ') + elig.length
+        + _L(' products awaiting approval in this filter, then untick the ones you want to leave out.',' onay bekleyen ürünün hepsini seçip, dışarıda bırakmak istediklerinin işaretini kaldırabilirsiniz.')
+        + '</div>';
+    }
+    if(op){
+      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary);margin-bottom:10px">'
+        + '↺ ' + _L('Last bulk action: ','Son toplu işlem: ') + '<b>' + op.count + ' ' + _L('products','ürün') + ' ' + (op.action === 'approve' ? _L('approved','onaylandı') : _L('rejected','reddedildi')) + '</b>'
+        + ' · ' + new Date(op.at).toLocaleString(LDATE())
+        + ' <button type="button" id="ap-undo" class="btn-g btn-sm" style="font-size:11.5px">' + _L('Undo','Geri al') + '</button>'
+        + '</div>';
+    }
+    host.innerHTML = html;
+  }
+
+  function _apLastOp(){
+    var ops = Object.create(null);
+    all.forEach(function(p){
+      var o = p.bulkOp; if(!o || !o.id) return;
+      var x = ops[o.id] || (ops[o.id] = { id:o.id, action:o.action, at:o.at||0, count:0, ids:[] });
+      x.count++; x.ids.push(p.id);
+    });
+    var best = null;
+    Object.keys(ops).forEach(function(k){ if(!best || ops[k].at > best.at) best = ops[k]; });
+    return best;
+  }
+
+  function _apSummaryHtml(items){
+    var byV = Object.create(null);
+    items.forEach(function(p){
+      var v = p.vendorName || '—', b = p.brand || _L('(no brand)','(markasız)');
+      var vv = byV[v] || (byV[v] = { n:0, brands:Object.create(null) });
+      vv.n++; vv.brands[b] = (vv.brands[b]||0) + 1;
+    });
+    return Object.keys(byV).sort().map(function(v){
+      var bb = byV[v].brands;
+      return '<div style="margin-bottom:6px"><b>' + escHtml(v) + '</b> · ' + byV[v].n + '<div style="font-size:12px;color:var(--text-secondary)">'
+        + Object.keys(bb).sort(function(a,c){ return bb[c]-bb[a]; }).map(function(b){ return escHtml(b) + ' ' + bb[b]; }).join(' · ')
+        + '</div></div>';
+    }).join('');
+  }
+
+  // Ozet + onay penceresi. Promise: null (iptal) | { reason }
+  function _apConfirm(action, items){
+    return new Promise(function(resolve){
+      var flagged = items.filter(function(p){ return apFlags[p.id]; }).length;
+      var md = document.createElement('div'); md.className = 'modal-bg on';
+      md.innerHTML = '<div class="modal" style="max-width:560px;max-height:86vh;display:flex;flex-direction:column">'
+        + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:800">'
+        +   (action === 'approve' ? '✓ ' + items.length + ' ' + _L('products will be approved','ürün onaylanacak') : '✕ ' + items.length + ' ' + _L('products will be rejected','ürün reddedilecek')) + '</h3>'
+        + '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:10px;line-height:1.55">'
+        +   (action === 'approve'
+              ? _L('They go live everywhere at once (vendor list, catalog, profile). Each company gets ONE notification.','Hepsi aynı anda her yerde yayına girer (vendor listesi, katalog, profil). Her firmaya TEK bildirim gider.')
+              : _L('Each company gets ONE notification with the reason.','Her firmaya gerekçeyle birlikte TEK bildirim gider.'))
+        +   ' ' + _L('You can undo this afterwards; notifications already sent cannot be recalled.','Sonradan geri alınabilir; gönderilen bildirim geri çekilemez.')
+        + '</div>'
+        + (flagged ? '<div style="font-size:12px;color:#b45309;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);border-radius:8px;padding:7px 10px;margin-bottom:10px">⚠ '
+            + flagged + ' ' + _L('of these are flagged (similar name or truncated).','tanesi işaretli (benzer kayıt ya da kesik ad).') + '</div>' : '')
+        + '<div style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px">' + _apSummaryHtml(items) + '</div>'
+        + (action === 'reject'
+            ? '<textarea id="apc-reason" class="inp" rows="2" placeholder="' + _L('Reason (optional, sent to the company)','Gerekçe (opsiyonel, firmaya iletilir)') + '" style="width:100%;margin-bottom:12px;font-size:13px"></textarea>' : '')
+        + '<div style="display:flex;justify-content:flex-end;gap:8px">'
+        +   '<button type="button" class="btn-g btn-sm" id="apc-cancel">' + _L('Cancel','Vazgeç') + '</button>'
+        +   '<button type="button" class="btn-p btn-sm" id="apc-ok" style="' + (action === 'reject' ? 'background:#dc2626;border-color:#dc2626' : 'background:#16a34a;border-color:#16a34a') + '">'
+        +     (action === 'approve' ? _L('Approve','Onayla') : _L('Reject','Reddet')) + ' (' + items.length + ')</button>'
+        + '</div></div>';
+      document.body.appendChild(md);
+      function close(v){ md.remove(); resolve(v); }
+      md.querySelector('#apc-cancel').addEventListener('click', function(){ close(null); });
+      md.addEventListener('click', function(e){ if(e.target === md) close(null); });
+      md.querySelector('#apc-ok').addEventListener('click', function(){
+        var r = md.querySelector('#apc-reason'); close({ reason: r ? r.value.trim() : '' }); });
+    });
+  }
+
+  async function _apCommit(writes){   // writes: [{id, data}]
+    var done = 0;
+    for(var i = 0; i < writes.length; i += 400){
+      var batch = writeBatch(db);
+      writes.slice(i, i+400).forEach(function(w){ batch.update(doc(db,'products', w.id), w.data); });
+      await batch.commit();
+      done += Math.min(400, writes.length - i);
+    }
+    return done;
+  }
+
+  async function _apNotify(action, items, reason){
+    var byVid = Object.create(null);
+    items.forEach(function(p){ if(p.vendorId) (byVid[p.vendorId] = byVid[p.vendorId] || []).push(p); });
+    for(const vid of Object.keys(byVid)){
+      var ps = byVid[vid], names = ps.map(function(p){ return p.name; });
+      var short = names.slice(0,5).join(', ') + (names.length > 5 ? ' +' + (names.length-5) : '');
+      var title = action === 'approve' ? (ps.length + ' ' + _L('of your products were approved 🎉','ürününüz onaylandı 🎉'))
+                                       : (ps.length + ' ' + _L('of your products could not be approved','ürününüz şu an için onaylanamadı'));
+      var msg = action === 'approve'
+        ? _L('Now live in the PoCHub catalog: ','PoCHub kataloğunda yayında: ') + short
+        : short + (reason ? ' — ' + _L('Reason: ','Gerekçe: ') + reason : '');
+      try {
+        await addDoc(collection(db,'notifications'), {
+          userId: vid, type: action === 'approve' ? 'product_approved' : 'product_rejected',
+          title: title, message: msg, productCount: ps.length,
+          fromUserId: CUR_USER.uid, senderId: CUR_USER.uid,
+          senderName: CUR_PROFILE?.displayName || 'PoCHub Admin', senderEmail: CUR_USER.email || '',
+          senderPhoto: CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl || '',
+          read: false, createdAt: serverTimestamp()
+        });
+      } catch(e){ console.warn('[v10.04] bildirim gonderilemedi', vid, e && (e.code||e.message)); }
+      var ve = ps[0].vendorEmail;
+      if(ve){ try { sendEmail(ve, ps[0].vendorName||'', title + ' — PoCHub', msg + (names.length > 5 ? '\n\n' + names.join('\n') : ''), ''); } catch(e){} }
+    }
+  }
+
+  async function apBulk(action){
+    var items = all.filter(function(p){ return apSel.has(p.id) && _apNeeds(p); });
+    if(!items.length) return;
+    var ans = await _apConfirm(action, items);
+    if(!ans) return;
+    var opId = 'op_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    var at = Date.now();
+    var writes = items.map(function(p){
+      var prev = { action: action, id: opId, at: at, by: CUR_USER.uid,
+                   prevStatus: p.status || null, prevPublishStatus: p.publishStatus || null };
+      var data = action === 'approve'
+        ? { status:'active', publishStatus:'ready', approvedAt: serverTimestamp(), approvedBy: CUR_USER.uid, bulkOp: prev }
+        : { status:'rejected', rejectedAt: serverTimestamp(), rejectReason: ans.reason || '', bulkOp: prev };
+      return { id: p.id, data: data, local: action === 'approve'
+        ? { status:'active', publishStatus:'ready', bulkOp: prev }
+        : { status:'rejected', rejectReason: ans.reason || '', bulkOp: prev } };
+    });
+    var bar = m.querySelector('#ap-bulk');
+    if(bar) bar.innerHTML = '<div style="padding:10px 12px;font-size:13px">' + _L('Working… ','İşleniyor… ') + items.length + '</div>';
+    try {
+      invalidateActiveProducts();
+      await _apCommit(writes);
+    } catch(e){
+      showToast(_L('Bulk action failed, nothing was changed: ','Toplu işlem başarısız, hiçbir şey değişmedi: ') + (e && (e.code||e.message)), 'err');
+      // Parca parca yazildigi icin 400'den buyuk islemde ilk parcalar yazilmis olabilir — gercek durumu yeniden oku
+      if(writes.length > 400) { admProducts(m); return; }
+      renderApBulk(); return;
+    }
+    var byId = Object.create(null); writes.forEach(function(w){ byId[w.id] = w.local; });
+    all = all.map(function(p){ return byId[p.id] ? Object.assign({}, p, byId[p.id]) : p; });
+    apSel.clear();
+    computeApFlags();
+    showToast(items.length + ' ' + (action === 'approve' ? _L('products approved','ürün onaylandı') : _L('products rejected','ürün reddedildi')), 'ok');
+    applyFilter();
+    _apNotify(action, items, ans.reason);   // arka planda; tablo beklemesin
+  }
+
+  async function apUndo(){
+    var op = _apLastOp(); if(!op) return;
+    var items = all.filter(function(p){ return p.bulkOp && p.bulkOp.id === op.id; });
+    // Yalniz o islemden beri DEGISMEMIS olanlar geri alinir
+    var expect = op.action === 'approve'
+      ? function(p){ return p.status === 'active' && p.publishStatus === 'ready'; }
+      : function(p){ return p.status === 'rejected'; };
+    var ok = items.filter(expect), changed = items.length - ok.length;
+    if(!confirm(_L('Undo the last bulk action?','Son toplu işlem geri alınsın mı?') + '\n\n'
+        + ok.length + ' ' + _L('products return to their previous state.','ürün önceki durumuna döner.')
+        + (changed ? '\n' + changed + ' ' + _L('changed since then and will be left as they are.','ürün o zamandan beri değişmiş, onlara dokunulmayacak.') : '')
+        + '\n' + _L('Notifications already sent cannot be recalled.','Gönderilen bildirimler geri çekilemez.'))) return;
+    var writes = items.map(function(p){
+      if(!expect(p)) return { id:p.id, data:{ bulkOp: deleteField() }, local:{ bulkOp: undefined } };
+      var o = p.bulkOp;
+      var data = { status: o.prevStatus || 'pending', publishStatus: o.prevPublishStatus || 'awaiting_admin', bulkOp: deleteField() };
+      if(op.action === 'approve'){ data.approvedAt = deleteField(); data.approvedBy = deleteField(); }
+      else { data.rejectedAt = deleteField(); data.rejectReason = deleteField(); }
+      return { id:p.id, data:data, local:{ status:data.status, publishStatus:data.publishStatus, bulkOp: undefined } };
+    });
+    try { invalidateActiveProducts(); await _apCommit(writes); }
+    catch(e){ showToast(_L('Undo failed: ','Geri alma başarısız: ') + (e && (e.code||e.message)), 'err'); admProducts(m); return; }
+    var byId = Object.create(null); writes.forEach(function(w){ byId[w.id] = w.local; });
+    all = all.map(function(p){ if(!byId[p.id]) return p; var n = Object.assign({}, p, byId[p.id]); delete n.bulkOp; return n; });
+    computeApFlags();
+    showToast(ok.length + ' ' + _L('products restored','ürün önceki durumuna döndü') + (changed ? ' · ' + changed + ' ' + _L('left unchanged','dokunulmadı') : ''), 'ok');
+    applyFilter();
+  }
+
   function matchDate(p) {
     if (!filters.dateFrom && !filters.dateTo) return true;
     var ts = p.createdAt?.toDate ? p.createdAt.toDate() : (p.createdAt?.seconds ? new Date(p.createdAt.seconds*1000) : null);
@@ -30861,7 +31126,16 @@ async function admProducts(m) {
       }
       return true;
     });
+    computeApFlags();
+    _apCounts();
+    // v10.04: filtre degisince secim sifirlanir
+    var sig = JSON.stringify(f);
+    if(sig !== apSig){ apSel.clear(); apSig = sig; }
+    apLastItems = filtered;
+    // Artik bekleyen olmayan secimleri dusur (tekli onay/ret sonrasi)
+    apSel.forEach(function(id){ if(!filtered.some(function(p){ return p.id === id && _apNeeds(p); })) apSel.delete(id); });
     renderTable(filtered);
+    renderApBulk();
   }
 
   function renderTable(items) {
@@ -30893,7 +31167,7 @@ async function admProducts(m) {
         emptyMsg = '🔍 Arama sonucu yok';
         hint = t('aprod.hint_change_filter','Filtre veya arama kriterlerini değiştirin.');
       }
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">' +
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">' +
         '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:6px">'+emptyMsg+'</div>' +
         '<div style="font-size:12px">'+hint+'</div>' +
         '</td></tr>';
@@ -30933,8 +31207,13 @@ async function admProducts(m) {
         archiveBtn = '<button class="ap-arc" data-id="'+p.id+'" style="background:rgba(15,23,42,.04);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">'+t('aprod.archive','📦 Arşivle')+'</button>';
       }
 
-      return '<tr>'+
+      // v10.04: secim kutusu + supheli isareti
+      var _fl = apFlags[p.id];
+      return '<tr'+(apSel.has(p.id)?' style="background:rgba(37,99,235,.05)"':'')+'>'+
+        '<td style="width:30px;text-align:center">'+(needsApproval
+            ? '<input type="checkbox" class="ap-chk" data-id="'+p.id+'"'+(apSel.has(p.id)?' checked':'')+' style="width:16px;height:16px;cursor:pointer">' : '')+'</td>'+
         '<td style="font-weight:600;font-size:13px">'+p.name+
+          (_fl ? '<div title="'+escHtml(_fl.join('\n'))+'" style="font-size:10.5px;font-weight:600;color:#b45309;margin-top:2px">⚠ '+escHtml(_fl.join(' · '))+'</div>' : '')+
           (p.isTestRecord ? '<span style="font-size:9px;background:rgba(217,119,6,.15);color:#d97706;padding:1px 5px;border-radius:4px;margin-left:4px">TEST</span>' : '')+
           (p.origin==='foreign' ? '<div style="font-size:10px;color:#2563eb;margin-top:1px">'+t('aprod.foreign_origin','🌍 Yabancı Menşei')+'</div>' : '')+
         '</td>'+
@@ -31082,9 +31361,9 @@ async function admProducts(m) {
     '<span id="ap-cnt" class="fs12-muted"></span>' +
     '</div>' +
     '<div class="flx-g8-wrap">' +
-    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(37,99,235,.12);color:#2563eb">'+t('ausr.sum_total','Toplam: ')+all.length+'</span>' +
-    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(22,163,74,.12);color:#16a34a">'+t('aprod.sum_active','Aktif: ')+activeCount+'</span>' +
-    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(217,119,6,.12);color:#d97706">'+t('aprod.sum_admin','Admin Onayı: ')+awaitingAdmin+'</span>' +
+    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(37,99,235,.12);color:#2563eb">'+t('ausr.sum_total','Toplam: ')+'<span id="ap-n-total">'+all.length+'</span></span>' +
+    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(22,163,74,.12);color:#16a34a">'+t('aprod.sum_active','Aktif: ')+'<span id="ap-n-active">'+activeCount+'</span></span>' +
+    '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(217,119,6,.12);color:#d97706">'+t('aprod.sum_admin','Admin Onayı: ')+'<span id="ap-n-admin">'+awaitingAdmin+'</span></span>' +
     '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(168,85,247,.12);color:#a855f7">'+t('aprod.sum_chain','Zincir Bekleniyor: ')+awaitingInt+'</span>' +
     (trashedAdminProds.length ? '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(220,38,38,.12);color:#dc2626">'+t('admp.trash','🗑 Çöp:')+' '+trashedAdminProds.length+'</span>' : '') +
     '</div></div>' +
@@ -31124,11 +31403,35 @@ async function admProducts(m) {
     '</div>' +
 
     // Tablo
+    '<div id="ap-bulk"></div>' +
     '<table><thead><tr>' +
+    '<th style="width:30px;text-align:center"><input type="checkbox" id="ap-selall" title="'+_L('Select all awaiting approval in this filter','Filtredeki onay bekleyenlerin hepsini seç')+'" style="width:16px;height:16px;cursor:pointer"></th>' +
     '<th>'+t('vprod.col_product','Ürün')+'</th><th>Vendor</th><th>'+t('vprod.col_category','Kategori')+'</th><th>'+t('ausr.country','Ülke')+'</th><th>'+t('vcal.col_status','Durum')+'</th><th>'+t('vprod.col_publish','Yayın')+'</th><th>'+t('vcal.col_date','Tarih')+'</th><th>'+t('aprod.col_actions','İşlemler')+'</th>' +
     '</tr></thead><tbody id="ap-tbody"></tbody></table>';
 
   // Event listener'lar
+  // v10.04: toplu secim — tbody ve #ap-bulk kalici, tek dinleyiciyle (delegasyon)
+  computeApFlags();
+  m.querySelector('#ap-tbody').addEventListener('change', function(e){
+    var c = e.target.closest('.ap-chk'); if(!c) return;
+    if(c.checked) apSel.add(c.dataset.id); else apSel.delete(c.dataset.id);
+    var tr = c.closest('tr'); if(tr) tr.style.background = c.checked ? 'rgba(37,99,235,.05)' : '';
+    renderApBulk();
+  });
+  m.querySelector('#ap-selall').addEventListener('change', function(){
+    var on = this.checked;
+    apSel.clear();
+    if(on) _apEligible().forEach(function(p){ apSel.add(p.id); });
+    renderTable(apLastItems); renderApBulk();
+  });
+  m.querySelector('#ap-bulk').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    if(b.id === 'ap-bulk-appr') apBulk('approve');
+    else if(b.id === 'ap-bulk-rej') apBulk('reject');
+    else if(b.id === 'ap-bulk-clear'){ apSel.clear(); renderTable(apLastItems); renderApBulk(); }
+    else if(b.id === 'ap-unflag'){ Object.keys(apFlags).forEach(function(id){ apSel.delete(id); }); renderTable(apLastItems); renderApBulk(); }
+    else if(b.id === 'ap-undo') apUndo();
+  });
   m.querySelector('#ap-search').addEventListener('input', function() {
     filters.search = this.value; applyFilter();
   });
