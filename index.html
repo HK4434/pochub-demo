@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v10.02';
+const VERSION = 'v10.03';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v10.03': ['PROFIL ILE MARKALARIM SENKRON DEGIL (Hasan: iki taraf senkron degil, sayilar ve markalar tutarsiz; ekleme sonrasi iki taraf ayni olmali, entegratore/distributore elle duzelt diyemem). Hakliydi ve bu bir VERI MODELI hatasiydi, ekran hatasi degil. TESHIS: Markalarim kartlari uc kaynaktan uretiyor (sahiplik + users.brands beyani + urun girilen markalar). Herkese acik profildeki Markalar listesi ise YALNIZ users.brands beyanini okuyor; o alan sadece elle doluyordu. Katalogdan Acronis eklenince Markalarim da Acronis cikiyor, profilde cikmiyordu. Daha onemlisi ayni alan (vendor_public.brands) marka sayfasindaki is ortaklari listesini, ozel PoC talebinde vendor eslestirmeyi (openCustomPoCModal) ve temsilci listesini besliyor: urun ekleyen firma o markanin PoC taleplerine HIC onerilmiyordu. Sayi farki ise ayri: profil yalniz yayindaki urunu sayiyor, Markalarim onay bekleyenleri de sayiyordu ve bunu soylemiyordu. DUZELTME: (1) syncDeclaredBrands: urun eklenen DORT yolun hepsinde (sihirbaz, Urun Ekle penceresi, katalogdan toplu ekle, davet sonrasi urun secimi) urunun markasi beyana eklenir, vendor_public aynasi guncellenir. Beyandaki ad katalogdaki markayla ayniysa katalog yazimina cekilir (CISCO -> Cisco), tekrarlar ayiklanir. Fark yoksa YAZMA YOK. (2) KENDILIGINDEN ONARIM: vendor paneli acilisinda (dashboard urunleri zaten okuyor, EK OKUMA YOK) ve Markalarim acilisinda mevcut urunlerden eksik kalan markalar beyana eklenir. Mevcut veriler icin kimsenin bir sey yapmasi gerekmiyor; vendor paneline ilk girisinde duzelir. (3) TEK KURAL: vendorPublicBrands (beyan ∪ yayindaki urunlerin markalari) hem profil sayfasinda hem Markalarim ozetinde kullaniliyor; urun sayisi ikisinde de isListedProduct. Profil, sahibi panele girmemis vendorlar icin de dogru markalari gosteriyor. (4) Markalarim ustunde Herkese acik profilinde: N urun · M marka · K onay bekliyor satiri — profilde gorunen sayiyla birebir ayni hesap. Kartlarda X urunun (Y profilde · Z onay bekliyor); onay bekleyen urunu olan kartta neden profilde olmadigi ve temsilcilik onaylanirsa beklemeden yayina girecegi yaziyor. ONAY BEKLEME DAVRANISI DEGISMEDI: marka yetkisi olmayan markadaki urun admin onayindan gecer (v9.94 karari); degisen, bunun artik gorunur ve aciklanmis olmasi. PROVA (Chromium, sahte veri: beyan CISCO/VMWARE/HPE/PURE STORAGE/FORTINET + tekrar eden Cisco; urunler Cisco x2, VMware, Broadcom yayinda, Acronis x3 onay bekliyor): tek yazmayla beyan [Cisco, VMware, HPE, Pure Storage, Fortinet, Acronis, Broadcom] oldu, ayna ayni liste; Markalarim ozeti 4 urun · 7 marka · 3 onay bekliyor, profil fonksiyonu ayni 7 marka ve 4 urun; ikinci senkron cagrisi 0 yazma. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi (users.brands ve vendor_public.brands sahibi tarafindan zaten yazilabiliyor).'],
   'v10.02': ['DELL EMC KARTI: NEDEN BOYLE, NEDEN CIKARAMIYORUM (Hasan). IKI SORUN. (1) ESLESME: Dell EMC eski bir ad; Dell 2016 da EMC yi satin aldiktan sonra urunler Dell Technologies adi altinda toplandi, katalog da (Gartner kaynakli) yeni adi kullaniyor. v9.97 deki Sunu mu demek istediniz onerisi adlari bosluksuz birlestirip birbirinin icinde ariyordu: dellemc ile delltechnologies birbirini icermedigi icin aday cikmiyor, kart Katalogda yakin bir eslesme yok diyordu. Artik ilk kelimesi ayni olan canonical adlar da (en dusuk puanla) aday: Dell EMC -> Dell Technologies. Dellwood gibi ayni harflerle baslayan ama farkli kelime olanlar ve EMC Insurance gibi ikinci kelime eslesmeleri bilerek aday degil. (2) CIKARMA: kart uc kaynaktan geliyor — sahip olunan marka, profildeki beyan (users.brands; davetle gelen firmalarda uretici dizinlerinden kopyalaniyor, Dell EMC buradan gelmis olabilir) ve urun girilen marka. Beyan kullanicinin elindeydi ama bu ekranda dugmesi yoktu. Beyan edilmis, sahibi olunmayan ve URUNU OLMAYAN kartlara Listemden cikar eklendi; users.brands ten cikarir. Urunu olan kartta dugme yok: beyan silinse de kart urunler yuzunden yine gelirdi, dugme ise yaramiyormus gibi gorunurdu; o kartlarda yol urunu duzeltmek ya da silmek. Yetkili temsilci kaydi ve bekleyen temsilcilik talebi dokunulmadan kalir, onay penceresi bunu soyler. (3) AYNA HATASI (v9.97 den): marka duzeltme users.brands i guncelliyor ama vendor_public aynasini guncellemiyordu, herkese acik profil eski adi gosteriyordu. Hem duzeltme hem cikarma artik syncVendorPublic cagiriyor. (4) Rozet metni Canonical listede yok -> Katalogda bulunamadi; canonical kullaniciya bir sey anlatmiyordu. PROVA (Chromium, sahte veri: Cisco urunlu, Dell EMC urunsuz, Palo Alto urunlu ve cozumsuz, Veeam urunsuz; katalogda Dell Technologies, Dellwood Labs, EMC Insurance): Dell EMC -> yalniz Dell Technologies onerildi; Listemden cikar yalniz Dell EMC ve Veeam kartlarinda cikti; tiklaninca users.brands [Cisco, Palo Alto, Veeam] yazildi, ayna ayni listeyle guncellendi, kart kayboldu. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi (users kendi brands alanini zaten yazabiliyordu, v9.97 ayni yolu kullaniyor).'],
   'v10.01': ['URUN SECIMINDE LISTE EN USTE ZIPLIYOR (Hasan: bu ekranda secim yapinca en uste atiyor surekli). Sebep: Katalogdan toplu ekle penceresinin ikinci adiminda her cip tiklamasi ve Tumunu sec tum pencereyi bastan ciziyor (paint), urun listesinin kaydirma konumu sifirlaniyordu. v10.00 da ayni sorunu marka adiminda satir bazli guncellemeyle cozmustum, urun adimi eski yapida kalmisti. Ayni hata v9.90 davet sonrasi urun secimi penceresinde de vardi. DUZELTME: iki pencerede de kaydirilan alan data-keep-scroll ile isaretli; yeniden cizimden once konum alinip baglamalardan SONRA geri yaziliyor. Toplu eklemede yalniz ayni adimda kalindikca korunuyor; Devam ya da Geri ile adim degisince liste bastan basliyor. AYNI EKRANDA IKINCI HATA: katalogda ayni markada ayni adli sablon birden fazla var (Acronis Cyber Protect Cloud x2, Broadcom Rally x2). Secim anahtari marka||ad oldugu icin iki cip ayni anahtari paylasiyordu: birine dokununca ikisi birden isaretleniyor, ekranda 4 secili gorunurken sayac 3 diyordu; Tumunu sec sayisi da sisiyordu (Broadcom 15). Secim ekranlarinda ada gore tekillestiriliyor (_dedupTplsByName). Kayit tarafi zaten ilk eslesen sablonu kullaniyordu, eklenen urun degismiyor. Katalogdaki mukerrer sablonlarin kendisi ayri bir temizlik isi; bu surum yalniz secimi duzeltiyor. PROVA (Chromium, iki pencere): liste kaydirilip ortadaki cipe tiklaninca ve Tumunu sec denince konum ayni kaldi (294->294->294, 213->213->213); Geri+Devam sonrasi liste basta (0); Acronis 4 yerine 3 cip, Rally 1 cip. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi.'],
   'v10.00': ['MARKA SECIMI GEZINILEBILIR (Hasan: marka nasil aklimda kalsin ki arama kutusuna yazayim; sayfa sayfa ya da asagi kaydirarak da secebilmeliyim, arama kutusu da kalsin). Hakliydi. Katalogdan toplu ekle penceresinin ilk adiminda arama bosken alfabetik ILK 40 marka geliyordu — /N Spro, 10turtle, 11:11 Systems gibi kimsenin aramayacagi adlar — ve kalan 7.500 markaya ancak adini hatirlayarak ulasilabiliyordu. Liste kaydirilsa bile 40 ta bitiyordu. YENI ILK ADIM: (1) Varsayilan siralama urun ailesi sayisina gore; Cisco, Fortinet, VMware gibi buyuk markalar ustte, sayi her satirda yazili. A-Z siralama secilebilir. (2) Kategori filtresi: marka adini bilmeyen ama ne sattigini bilen kullanici icin (Ag Guvenligi Duvarlari secilince o kategoride urun ailesi olan markalar). Secenekler sablonlarda gercekten gecen kategorilerden ve kac marka oldugu yazili. (3) Harf cubugu; bos harfler pasif. (4) Asagi kaydirdikca 120 ser marka ekleniyor, ayrica Daha fazla goster dugmesi var; ustte kac markanin kacinin gosterildigi yazili. (5) Arama urun adinda da calisiyor: FortiGate yazan Fortinet i buluyor ve satirda hangi urunden eslestigi yaziyor. Turkce karakter ve bosluk farki tolere ediliyor (sirket -> Sirket, paloalto -> Palo Alto). (6) Secilen marka listeden KAYBOLMUYOR, yerinde isaretleniyor; eskiden her tikta pencere bastan ciziliyor, kaydirma sifirlaniyordu. Simdi yalniz o satir ve secilenler alani guncelleniyor. (7) Urun ailesi olmayan markalar gezinirken gizli (ikinci adimda zaten bos gelirlerdi); adiyla aranirsa pasif olarak ve katalogda urun ailesi yok notuyla gorunuyor. Marka yetkisi olanlar yetkili olarak isaretli. BAGLAMA: liste icindeki tiklamalar tek dinleyiciyle (delegasyon) yakalaniyor; yeni sayfa eklendiginde yeniden baglama gerekmiyor (v9.71/v9.80/v9.82 deki cizim-sonrasi baglama hatasi sinifi bu yolla ortadan kalkiyor). Arama 160 ms gecikmeli. OKUMA MALIYETI DEGISMEDI: veri yine katalog indeksinden geliyor. PROVA: gercek tarayicida (Chromium) 7.507 marka ve 8.827 sablonluk sahte veriyle 12 adim: acilis sirasi, kaydirmayla 120->240 satir, derindeki satira tiklayinca kaydirma konumu korunuyor (1694->1694), kategori ve kategori+harf filtresi, urun adiyla arama, Turkce karakter, sablonsuz marka pasif, eslesmeyen sorgu mesaji, secilenlerden kaldirma, ikinci adima gecis ve Geri ile arama/secimin korunmasi. Konsol hatasi yok. 1400px ve 390px genislikte ekran goruntusuyle bakildi; dar ekranda alt dugmeler disari tasiyordu, harf cubugu tek satir yatay kaydirmali yapilarak duzeltildi. node --check MODULE SYNTAX OK. RULES degismedi.'],
@@ -16973,6 +16974,9 @@ async function loadVendTab() {
     var evs   = evSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var offs  = offSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
     var prods = prodSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
+    // v10.03: panel acilisinda beyan/urun markasi farkini kendiliginden kapat.
+    // Ek okuma yok (urunler zaten okunuyor); fark yoksa yazma da yok.
+    syncDeclaredBrands(prods.map(function(p){ return p.brand; }));
     var invs  = invSnap.docs.map(function(d){ return {...d.data(),id:d.id}; })
       .filter(function(i){ return getLifecycleState(i) === 'active'; });
     var regs  = regSnap.docs.map(function(d){ return {...d.data(),id:d.id}; });
@@ -25769,6 +25773,7 @@ function attachWizardHandlers(card) {
           createdAt: serverTimestamp(),
         });
         showToast(t('wiz.prod_added','✓ Ürün eklendi'));
+        syncDeclaredBrands([brand]);   // v10.03
         WIZ_STEP = 4;
         renderWizardStep(card);
       } catch(e) {
@@ -29292,6 +29297,7 @@ async function openAddProductModal(prefillCat, prefillBrand, prefillFamilyNorm) 
         publishStatus,
         createdAt:     serverTimestamp(),
       });
+      try { await syncDeclaredBrands([(modal.querySelector('#pr-brand')?.value||'').trim()]); } catch(_sb){}   // v10.03
 
       // ── Admin'e yeni ürün bildirimi ─────────────────────────────────
       try {
@@ -32324,6 +32330,57 @@ function productStatusFor(brandNorm, verifiedSet, fromCatalog){
     : { status:'pending', publishStatus:'awaiting_admin' };
 }
 
+// ══ v10.03: MARKA BEYANI URUNLERLE SENKRON ═════════════════════════════
+// Sorun: herkese acik profildeki Markalar listesi, marka sayfasindaki is
+// ortaklari, ozel PoC talebinde vendor eslestirme ve temsilci listesi
+// users.brands (vendor_public.brands) alanini okuyor. O alan YALNIZ elle
+// beyanla doluyordu. Vendor katalogdan Acronis urunu ekleyince Markalarim
+// ekraninda Acronis karti cikiyor (orasi urunlerden de kart uretiyor), ama
+// profil, marka sayfasi ve PoC eslestirmesi Acronis i bilmiyordu. Ayni
+// firma iki ekranda iki farkli marka listesi gosteriyordu ve musteri
+// Acronis PoC'u istediginde bu firma onerilmiyordu.
+// Cozum: urun eklenen her yolda markasi beyana eklenir ve ayna guncellenir;
+// Markalarim acilinca mevcut urunlerden eksik kalan markalar da eklenir
+// (elle mudahale gerekmez). Beyandaki ad katalogdaki adla ayni markaysa
+// katalog yazimina cekilir (CISCO -> Cisco), tekrarlar ayiklanir.
+function _brandCanonMap(){
+  var m = Object.create(null);
+  try { (_brandCache || []).forEach(function(b){ if(b && b.name) m[_normBrand(b.name)] = b.name; }); } catch(e){}
+  return m;
+}
+// Herkese acik marka listesi: beyan ∪ yayindaki urunlerin markalari.
+// Profil sayfasi ve Markalarim ozeti AYNI fonksiyonu kullanir.
+function vendorPublicBrands(declared, products){
+  var canon = _brandCanonMap(), seen = Object.create(null), out = [];
+  function add(n){ var k = _normBrand(n); if(!k || seen[k]) return; seen[k] = 1; out.push(canon[k] || String(n).trim()); }
+  [].concat(declared || []).forEach(add);
+  [].concat(products || []).forEach(function(p){ if(isListedProduct(p)) add(p.brand); });
+  return out;
+}
+async function syncDeclaredBrands(extra){
+  if(!CUR_USER || !CUR_PROFILE) return false;
+  try { await getBrands(); } catch(e){}
+  var canon = _brandCanonMap(), seen = Object.create(null), next = [], changed = false;
+  [].concat(CUR_PROFILE.brands || []).forEach(function(n){
+    var k = _normBrand(n); if(!k || seen[k]){ changed = true; return; }
+    seen[k] = 1; var c = canon[k] || n; if(c !== n) changed = true; next.push(c);
+  });
+  [].concat(extra || []).forEach(function(n){
+    var k = _normBrand(n); if(!k || seen[k]) return;
+    seen[k] = 1; next.push(canon[k] || String(n).trim()); changed = true;
+  });
+  if(!changed) return false;
+  try {
+    await updateDoc(doc(db,'users', CUR_USER.uid), { brands: next });
+    CUR_PROFILE.brands = next;
+    await syncVendorPublic(CUR_USER.uid, CUR_PROFILE);
+    return true;
+  } catch(e){
+    console.warn('[v10.03] marka beyani senkronlanamadi', e && (e.code||e.message));
+    return false;
+  }
+}
+
 // v10.01 — Katalogda ayni markada ayni adli sablon birden fazla olabiliyor
 // (Acronis Cyber Protect Cloud x2, Broadcom Rally x2). Secim anahtari
 // marka||ad oldugu icin iki cip ayni anahtari paylasiyordu: birine
@@ -32745,6 +32802,7 @@ async function openBulkCatalogPicker(preBrands){
       msg.textContent = fail + ' ' + _L('could not be added','eklenemedi') + (errs.length ? ' — ' + errs.join(' | ') : '');
     }
     if(ok){
+      await syncDeclaredBrands(keys.map(function(k){ return k.split('||')[0]; }));   // v10.03
       showToast(ok + ' ' + _L('product added','ürün eklendi')
         + (live ? ' · ' + live + ' ' + _L('live now','hemen yayında') : '')
         + (ok-live ? ' · ' + (ok-live) + ' ' + _L('awaiting review','onay bekliyor') : ''), 'ok');
@@ -32916,6 +32974,7 @@ async function openVendorOnboarding(brands){
       msg.textContent = fail + ' ' + _L('could not be added','eklenemedi') + (errs.length ? ' — ' + errs.join(' | ') : '');
     }
     if(ok){
+      await syncDeclaredBrands(keys.map(function(k){ return k.split('||')[0]; }));   // v10.03
       showToast(ok + ' ' + _L('product added — they go live after admin review.','ürün eklendi, admin onayından sonra yayına girer.'), 'ok');
       if(!fail) modal.remove();
     }
@@ -69295,6 +69354,8 @@ async function vendBrands(m){
         rq.docs.forEach(function(d){ var r=d.data()||{}; pendRep[_normBrand(r.brandName||'')]=r; });
   } catch(e){ console.warn('[v9.96] temsilcilik talepleri okunamadi', e && (e.code||e.message)); }
   var byName=Object.create(null); all.forEach(function(b){ byName[_normBrand(b.name)]=b; });
+  // v10.03: urunlerde olup beyanda olmayan markalari beyana ekle (kendiliginden onarim)
+  try { await syncDeclaredBrands(prods.map(function(p){ return p.brand; })); } catch(_sd){}
   var declared=Object.create(null); [].concat(CUR_PROFILE?.brands||[]).forEach(function(n){ if(n) declared[_normBrand(n)]=n; });
   var prodByBrand={}, noBrandProds=[];
   prods.forEach(function(p){ var nb=_normBrand(p.brand||''); if(!nb){ noBrandProds.push(p); return; } (prodByBrand[nb]=prodByBrand[nb]||[]).push(p); });
@@ -69397,6 +69458,9 @@ async function vendBrands(m){
         +'<div><div style="font-size:15px;font-weight:800">'+(b._unresolved?escHtml(b.name):('<a href="#b/'+encodeURIComponent(nb)+'" style="color:inherit;text-decoration:none">'+escHtml(b.name)+'</a>'))+(b.parent?(' <span style="font-size:11px;color:var(--text-muted);font-weight:400">· '+escHtml(b.parent)+'</span>'):'')
         +(b.website?(' <a href="'+escHtml(b.website)+'" target="_blank" rel="noopener" style="font-size:11px;text-decoration:none">🔗</a>'):'')+'</div>'
         +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px">'+fams.length+' '+_L('families','aile')+' · '+myP.length+' '+_L('of your products','ürünün')
+        // v10.03: profilde gorunen ile onay bekleyen ayri yazilsin — iki ekranin sayisi ayni kurala dayansin
+        +(function(){ var nl=myP.filter(isListedProduct).length, np=myP.length-nl;
+            return np ? (' (<span style="color:#16a34a">'+nl+' '+_L('on profile','profilde')+'</span> · <span style="color:#d97706">'+np+' '+_L('awaiting approval','onay bekliyor')+'</span>)') : ''; })()
         +(fams.length?(' · '+_L('coverage ','kapsama ')+covered+'/'+fams.length):'')+'</div></div>'
         +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+ownBadge
         // v10.02: beyan edilen ama urunu olmayan markayi listeden cikarma.
@@ -69410,6 +69474,17 @@ async function vendBrands(m){
               + _L('Remove from my list','Listemden çıkar') + '</button>'
             : '')
         +'</div></div>'
+      // v10.03: onay bekleyen urun neden profilde yok — kullaniciya soyle
+      +(function(){
+          var np = myP.filter(function(p){ return !isListedProduct(p); }).length;
+          if(!np || b._unresolved) return '';
+          return '<div style="font-size:11.5px;color:var(--text-secondary);background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.22);border-radius:8px;padding:8px 11px;margin-bottom:8px;line-height:1.55">'
+            + np + ' ' + _L('product(s) here are awaiting admin approval and are not on your public profile yet.','ürünün admin onayı bekliyor; onaylanınca herkese açık profilinde görünür.')
+            + ((!myRels[nb] && !owned)
+                ? ' ' + _L('If you are confirmed as a representative of this brand, your products here go live without waiting.','Bu markanın temsilcisi olarak onaylanırsan bu markadaki ürünlerin beklemeden yayına girer.')
+                : '')
+            + '</div>';
+        })()
       +(b._unresolved
         ? (function(){
             var cand = _brandCandidates(b.name);
@@ -69441,8 +69516,15 @@ async function vendBrands(m){
       +'</div>';
   }
 
+  // v10.03: herkese acik profille AYNI hesap (vendorPublicBrands + isListedProduct)
+  var _pubN = prods.filter(isListedProduct).length, _pendN = prods.length - _pubN;
+  var _pubB = vendorPublicBrands(CUR_PROFILE?.brands||[], prods).length;
+  var _pubLine = '<div style="font-size:12px;margin-top:6px;color:var(--text-secondary)">'
+    + _L('On your public profile: ','Herkese açık profilinde: ') + '<b>' + _pubN + '</b> ' + _L('products','ürün') + ' · <b>' + _pubB + '</b> ' + _L('brands','marka')
+    + (_pendN ? ' · <span style="color:#d97706">' + _pendN + ' ' + _L('awaiting approval','onay bekliyor') + '</span>' : '')
+    + '</div>';
   m.innerHTML = '<div class="flx-bw-c-mb18" style="flex-wrap:wrap;gap:8px"><div><h3 class="fs15-fw7">🏷 '+_L('My Brands','Markalarım')+'</h3>'
-    +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px">'+_L('Brands you declared, own, or have products under — with family coverage. New family suggestions go live after admin approval.','Beyan ettiğin, sahibi olduğun veya ürünün bulunan markalar — aile kapsamasıyla. Yeni aile önerileri admin onayından sonra yayınlanır.')+'</div></div>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px">'+_L('Brands you declared, own, or have products under — with family coverage. New family suggestions go live after admin approval.','Beyan ettiğin, sahibi olduğun veya ürünün bulunan markalar — aile kapsamasıyla. Yeni aile önerileri admin onayından sonra yayınlanır.')+'</div>'+_pubLine+'</div>'
     +'<button class="btn-g btn-sm" id="vb-bulk" style="margin-right:6px">⚡ '+_L('Add in bulk from catalog','Katalogdan toplu ekle')+'</button>'
     +'<button class="btn-p btn-sm" id="vb-addprod">'+t('vd.add_product','+ Ürün Ekle')+'</button></div>'
     +(cards.length ? cards.map(cardHtml).join('') : ('<div class="card" style="text-align:center;padding:28px;color:var(--text-muted)">'+_L('No brands yet. Add brands to your profile or add a product with a brand.','Henüz marka yok. Profiline marka ekle ya da markalı bir ürün gir.')+'</div>'))
@@ -72585,6 +72667,8 @@ async function renderVendorPublic(slug) {
     } catch(e) {}
     // v9.99: vendor listesiyle AYNI kural — iki ekran ayni sayiyi gostersin
     var visibleProducts = products.filter(isListedProduct);
+    // v10.03: Markalar = beyan ∪ profilde gorunen urunlerin markalari (Markalarim ozetiyle ayni fonksiyon)
+    vendor = Object.assign({}, vendor, { brands: vendorPublicBrands(vendor.brands || [], visibleProducts) });
 
     // Yaklaşan etkinlikler
     var events = [];
