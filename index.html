@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v10.00';
+const VERSION = 'v10.01';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v10.01': ['URUN SECIMINDE LISTE EN USTE ZIPLIYOR (Hasan: bu ekranda secim yapinca en uste atiyor surekli). Sebep: Katalogdan toplu ekle penceresinin ikinci adiminda her cip tiklamasi ve Tumunu sec tum pencereyi bastan ciziyor (paint), urun listesinin kaydirma konumu sifirlaniyordu. v10.00 da ayni sorunu marka adiminda satir bazli guncellemeyle cozmustum, urun adimi eski yapida kalmisti. Ayni hata v9.90 davet sonrasi urun secimi penceresinde de vardi. DUZELTME: iki pencerede de kaydirilan alan data-keep-scroll ile isaretli; yeniden cizimden once konum alinip baglamalardan SONRA geri yaziliyor. Toplu eklemede yalniz ayni adimda kalindikca korunuyor; Devam ya da Geri ile adim degisince liste bastan basliyor. AYNI EKRANDA IKINCI HATA: katalogda ayni markada ayni adli sablon birden fazla var (Acronis Cyber Protect Cloud x2, Broadcom Rally x2). Secim anahtari marka||ad oldugu icin iki cip ayni anahtari paylasiyordu: birine dokununca ikisi birden isaretleniyor, ekranda 4 secili gorunurken sayac 3 diyordu; Tumunu sec sayisi da sisiyordu (Broadcom 15). Secim ekranlarinda ada gore tekillestiriliyor (_dedupTplsByName). Kayit tarafi zaten ilk eslesen sablonu kullaniyordu, eklenen urun degismiyor. Katalogdaki mukerrer sablonlarin kendisi ayri bir temizlik isi; bu surum yalniz secimi duzeltiyor. PROVA (Chromium, iki pencere): liste kaydirilip ortadaki cipe tiklaninca ve Tumunu sec denince konum ayni kaldi (294->294->294, 213->213->213); Geri+Devam sonrasi liste basta (0); Acronis 4 yerine 3 cip, Rally 1 cip. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi.'],
   'v10.00': ['MARKA SECIMI GEZINILEBILIR (Hasan: marka nasil aklimda kalsin ki arama kutusuna yazayim; sayfa sayfa ya da asagi kaydirarak da secebilmeliyim, arama kutusu da kalsin). Hakliydi. Katalogdan toplu ekle penceresinin ilk adiminda arama bosken alfabetik ILK 40 marka geliyordu — /N Spro, 10turtle, 11:11 Systems gibi kimsenin aramayacagi adlar — ve kalan 7.500 markaya ancak adini hatirlayarak ulasilabiliyordu. Liste kaydirilsa bile 40 ta bitiyordu. YENI ILK ADIM: (1) Varsayilan siralama urun ailesi sayisina gore; Cisco, Fortinet, VMware gibi buyuk markalar ustte, sayi her satirda yazili. A-Z siralama secilebilir. (2) Kategori filtresi: marka adini bilmeyen ama ne sattigini bilen kullanici icin (Ag Guvenligi Duvarlari secilince o kategoride urun ailesi olan markalar). Secenekler sablonlarda gercekten gecen kategorilerden ve kac marka oldugu yazili. (3) Harf cubugu; bos harfler pasif. (4) Asagi kaydirdikca 120 ser marka ekleniyor, ayrica Daha fazla goster dugmesi var; ustte kac markanin kacinin gosterildigi yazili. (5) Arama urun adinda da calisiyor: FortiGate yazan Fortinet i buluyor ve satirda hangi urunden eslestigi yaziyor. Turkce karakter ve bosluk farki tolere ediliyor (sirket -> Sirket, paloalto -> Palo Alto). (6) Secilen marka listeden KAYBOLMUYOR, yerinde isaretleniyor; eskiden her tikta pencere bastan ciziliyor, kaydirma sifirlaniyordu. Simdi yalniz o satir ve secilenler alani guncelleniyor. (7) Urun ailesi olmayan markalar gezinirken gizli (ikinci adimda zaten bos gelirlerdi); adiyla aranirsa pasif olarak ve katalogda urun ailesi yok notuyla gorunuyor. Marka yetkisi olanlar yetkili olarak isaretli. BAGLAMA: liste icindeki tiklamalar tek dinleyiciyle (delegasyon) yakalaniyor; yeni sayfa eklendiginde yeniden baglama gerekmiyor (v9.71/v9.80/v9.82 deki cizim-sonrasi baglama hatasi sinifi bu yolla ortadan kalkiyor). Arama 160 ms gecikmeli. OKUMA MALIYETI DEGISMEDI: veri yine katalog indeksinden geliyor. PROVA: gercek tarayicida (Chromium) 7.507 marka ve 8.827 sablonluk sahte veriyle 12 adim: acilis sirasi, kaydirmayla 120->240 satir, derindeki satira tiklayinca kaydirma konumu korunuyor (1694->1694), kategori ve kategori+harf filtresi, urun adiyla arama, Turkce karakter, sablonsuz marka pasif, eslesmeyen sorgu mesaji, secilenlerden kaldirma, ikinci adima gecis ve Geri ile arama/secimin korunmasi. Konsol hatasi yok. 1400px ve 390px genislikte ekran goruntusuyle bakildi; dar ekranda alt dugmeler disari tasiyordu, harf cubugu tek satir yatay kaydirmali yapilarak duzeltildi. node --check MODULE SYNTAX OK. RULES degismedi.'],
   'v9.99': ['VENDOR LISTESINDE 0 URUN (Hasan: urun olmasina ragmen 0 urun diye gosteriyor — GITS TEKNOLOJI kartinda 0 urun, profilinde Urunler (60)). TESHIS: benim v9.94 hatam. productStatusFor marka yetkili urunlere publishStatus approved yaziyordu; oysa bu degeri uygulamada YALNIZ vendor profili okuyordu. Vendor listesi, katalog, gunluk one cikanlar ve anasayfa vitrini yayini ready (ya da awaiting_admin/bos) ile taniyor, admin onay dugmesi de ready yaziyor. Sonuc: v9.94ten beri marka yetkisiyle OTOMATIK yayina giren her urun profil disinda hicbir yerde gorunmuyordu — devir notundaki 129 approved urunun tamami. Entegrator1 in 23 urunu ready oldugu icin gorunuyordu, ekrandaki fark buydu. v9.94 CHANGELOG unda approved tanınan degerler arasinda sayilmisti, bu yanlisti. AYRICA v9.95 paneli approved i GECERLI saydigi icin bozuk deger yok raporu verdi; sorun bu yuzden gozden kacti. DUZELTME: (1) productStatusFor artik ready yaziyor. (2) VALID_PS ten approved cikti; Veri Sagligi > Yayin durumu kontrolu bu urunleri bulacak. Onarim approved urunleri ready ye tasir (onay kuyruguna DEGIL — marka yetkisiyle bilerek yayina alinmislardi); diger bilinmeyen degerler eskisi gibi awaiting_admin e gider. (3) Listelenme kosulu tek fonksiyonda toplandi (isListedProduct): vendor listesi, vendor profili, katalog, gunluk one cikanlar ve vitrin karuselleri artik ayni kurali cagiriyor. Profil onceden status active VEYA approved bakiyordu, liste baska kosula; iki ekranin farkli sayi gostermesinin koku buydu. Vitrin onay kontrolu (_isShowcaseProductReady) bilerek daha siki, dokunulmadi. (4) Profildeki Urunler (60) gercek sayi degildi, limit(60) di. Sorgu artik yalniz aktif urunleri okuyor (limit 300), baslik gercek sayiyi yaziyor, kartlar 60 ta kesiliyor ve Katalogda tumunu gor bagi zaten var. (5) Seed test urunleri de approved ile yaziliyordu, ready ye cekildi. Senaryo prova edildi (sahte veri, 6 urun: iki approved, bir ready, bir alansiz eski, bir bekleyen, bir draft): eski kodda liste 2, profil 4 sayiyor; onarimdan sonra ikisi de 4. Yetkili yeni urun active/ready, yetkisiz pending/awaiting_admin olusuyor. Onarim approved urunu ready ye, draft urunu awaiting_admin e tasiyor, ready urune dokunmuyor. node --check MODULE SYNTAX OK. CANLIYA ALINCA YAPILACAK: Admin > Veri Sagligi > Yayin durumu kontrolu > Tara, sonra Onar. RULES degismedi.'],
   'v9.98': ['MARKA BASINA TOPLU SECIM (Hasan: neden o marka altindaki tum urunleri topluca secemiyor, tuhaf). Hakliydi. v9.92 de kurdugum toplu secim ekraninda her sablon TEK TEK tiklaniyordu — ekran goruntusundeki VMware kartinda 40 aile var, yani 40 tiklama. Toplu demek ama toplu degil. YENI: her marka basliginin sagina Tumunu sec dugmesi geldi; secilince Temizle ye donuyor. Zaten ekli olan urunleri ATLIYOR ve kac tanesinin ekli oldugunu baslikta yaziyor — VMware ornegi: 40 aileden 3 u ekliyse dugme 37 secer. Ayni ekleme davet sonrasi urun secimi ekranina da yapildi (v9.90); iki ekran ayni davranisi gostersin diye. Senaryo prova edildi: 40 aileli markada 3 u ekli, Tumunu sec 37 seciyor, ekli olanlara dokunmuyor, dugme Temizle ye donuyor ve ikinci tikta secim sifirlaniyor. Eski halinde 37 ayri tiklama gerekiyordu. node --check MODULE SYNTAX OK.'],
@@ -32322,6 +32323,20 @@ function productStatusFor(brandNorm, verifiedSet, fromCatalog){
     : { status:'pending', publishStatus:'awaiting_admin' };
 }
 
+// v10.01 — Katalogda ayni markada ayni adli sablon birden fazla olabiliyor
+// (Acronis Cyber Protect Cloud x2, Broadcom Rally x2). Secim anahtari
+// marka||ad oldugu icin iki cip ayni anahtari paylasiyordu: birine
+// dokununca ikisi birden isaretleniyor, sayac 3 derken ekranda 4 secili
+// gorunuyordu. Secim ekranlarinda ada gore tekillestiriliyor; kayit
+// tarafi zaten ilk eslesen sablonu kullaniyordu, sonuc degismiyor.
+function _dedupTplsByName(list){
+  var seen = Object.create(null);
+  return (list||[]).filter(function(t){
+    var k = String(t.name||'').toLowerCase().replace(/\s+/g,' ').trim();
+    if(!k || seen[k]) return false; seen[k] = 1; return true;
+  });
+}
+
 // v9.99 — HALKA ACIK LISTELENME KURALI, TEK YERDEN.
 // Vendor listesi, vendor profili, katalog ve vitrin ayni urunu ayri
 // kosullarla suzuyordu; vendor listesi ile profil bu yuzden farkli sayi
@@ -32599,7 +32614,7 @@ async function openBulkCatalogPicker(preBrands){
     var chosen = Object.keys(picked);
     var byBrand = Object.create(null);
     chosen.forEach(function(b){
-      var l = tpls.filter(function(t){ return t.brandNorm === _normBrand(b); }).slice(0,60);
+      var l = _dedupTplsByName(tpls.filter(function(t){ return t.brandNorm === _normBrand(b); })).slice(0,60);   // v10.01
       if(l.length) byBrand[b] = l;
     });
     byBrandRef = byBrand;
@@ -32610,7 +32625,7 @@ async function openBulkCatalogPicker(preBrands){
       +   _L('Tap the ones you deliver. Already added ones are marked. Details can be filled in later.',
              'Sunduklarınıza dokunun. Zaten ekli olanlar işaretli. Ayrıntıları sonra doldurabilirsiniz.')
       + '</div></div>'
-      + '<div style="flex:1;overflow-y:auto;padding:14px 22px">'
+      + '<div data-keep-scroll style="flex:1;overflow-y:auto;padding:14px 22px">'
       +   (Object.keys(byBrand).length
           ? Object.keys(byBrand).map(function(b){
               // ══ v9.98: MARKA BASINA TOPLU SECIM ═════════════════════════
@@ -32658,7 +32673,14 @@ async function openBulkCatalogPicker(preBrands){
       + '<div id="bcp-msg" style="padding:0 22px 14px;font-size:12px;color:#dc2626"></div>';
   }
 
+  // v10.01: her secimde pencere bastan ciziliyor ve urun listesi en uste
+  // donuyordu. Ayni adimda kalindikca kaydirma konumu korunuyor; adim
+  // degisince (Devam / Geri) liste bastan baslar.
+  var _paintedStep = 0;
   function paint(){
+    var _sc = modal.querySelector('[data-keep-scroll]');
+    var _top = (_sc && _paintedStep === step) ? _sc.scrollTop : 0;
+    _paintedStep = step;
     modal.innerHTML = '<div class="modal" style="max-width:' + (step === 1 ? '780px;height:88vh' : '660px') + ';max-height:88vh;display:flex;flex-direction:column">'
       + (step === 1 ? brandStep() : prodStep()) + '</div>';
     if(step === 1){
@@ -32681,6 +32703,7 @@ async function openBulkCatalogPicker(preBrands){
       });
       modal.querySelector('#bcp-back').addEventListener('click', function(){ step = 1; paint(); });
       modal.querySelector('#bcp-save').addEventListener('click', save);
+      var _sc2 = modal.querySelector('[data-keep-scroll]'); if(_sc2 && _top) _sc2.scrollTop = _top;   // v10.01
     }
   }
 
@@ -32751,8 +32774,8 @@ async function openVendorOnboarding(brands){
   // Markalara ait sablonlari topla
   var byBrand = Object.create(null);
   brands.forEach(function(b){
-    var list = (tpls||[]).filter(function(t){ return t.brandNorm === _normBrand(b); })
-                         .slice(0,40);
+    var list = _dedupTplsByName((tpls||[]).filter(function(t){ return t.brandNorm === _normBrand(b); }))
+                         .slice(0,40);   // v10.01
     if(list.length) byBrand[b] = list;
   });
   var hasTpl = Object.keys(byBrand).length;
@@ -32779,7 +32802,7 @@ async function openVendorOnboarding(brands){
             + _L('No catalog template for your brands yet — you can add products from your panel.',
                  'Markalarınız için henüz katalog şablonu yok — ürünleri panelinizden ekleyebilirsiniz.') + '</div>')
       + '</div>'
-      + '<div style="flex:1;overflow-y:auto;padding:14px 22px">'
+      + '<div data-keep-scroll style="flex:1;overflow-y:auto;padding:14px 22px">'
       +   Object.keys(byBrand).map(function(b){
             // v9.98: davet ekraninda da marka basina toplu secim
             var _on = byBrand[b].length && byBrand[b].every(function(t){ return sel[b + '||' + (t.name||'')]; });
@@ -32815,6 +32838,8 @@ async function openVendorOnboarding(brands){
   }
 
   function paint(){
+    // v10.01: secimde liste en uste ziplamasin
+    var _sc = modal.querySelector('[data-keep-scroll]'), _top = _sc ? _sc.scrollTop : 0;
     modal.innerHTML = body();
     var n = Object.keys(sel).filter(function(k){ return sel[k]; }).length;
     modal.querySelector('#onb-count').textContent = n
@@ -32840,6 +32865,7 @@ async function openVendorOnboarding(brands){
     });
     modal.querySelector('#onb-skip').addEventListener('click', function(){ modal.remove(); });
     modal.querySelector('#onb-save').addEventListener('click', save);
+    var _sc2 = modal.querySelector('[data-keep-scroll]'); if(_sc2 && _top) _sc2.scrollTop = _top;   // v10.01
   }
 
   async function save(){
