@@ -797,7 +797,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v10.04';
+const VERSION = 'v10.05';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1271,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v10.05': ['KATALOG BILGILERI (Hasan: listede yalniz marka ve urun adi var, tiklayinca bilgi olmali; bos sayfa bizi zayif gosterir; kararlari kidemli muhendis/analist gibi ver). KARARLAR: (1) Iki katman. Urun ailesinin ne oldugu URUNE aittir: family_info/{marka--ad} bir kez yazilir, o urunu sunan her firmanin kartinda ayni gorunur. Firmanin kendi aciklamasi ayrica FIRMA NOTU olarak altta kalir. Marka icin brand_info/{marka}. (2) Ayri koleksiyon: brand_products ve brands onbellege TOPLU okunuyor, aciklama oraya girerse katalog indeksi siser (27.09 kota olayi); ayrinti yalniz tiklaninca tek dokuman okunur (urun penceresi +2 okuma, sonuc onbellekte). (3) Anahtar sablon kimligi degil marka+ad: vendor urunleri sablon kimligi tasimiyor. Parantezli/kesik adlarda parantez oncesi de denenir (Fortinet OT Security Platform (FortiGate OT, FortiEDR -> bulundu). (4) Musteri yalniz ONAYLI kaydi gorur; taslak ve liste admin (kurallar v1.10.4). Bos alan hic gosterilmez. (5) Metin ureticiden kopyalanmaz: kisa ozet + resmi sayfaya baglanti + Ozet PoCHub tarafindan hazirlanmistir notu. GORUNUM: urun penceresi Genel Bakis sekmesinde URUN HAKKINDA kutusu (ozet, Ne ise yarar, Tipik kullanim, kurulum sekli rozetleri, PoCde genelde neye bakilir, uretici sayfasi) + marka karti (ozet, merkez, kurulus, site, Marka sayfasi baglantisi). Marka sayfasinda HAKKINDA blogu, Turkiye distributorleri (brand_distributors zaten vardi, gosterilmiyordu) ve aile satirina tiklayinca aile penceresi (bilgi + o aileyi sunan firmalar + PoC). Marka sayfasi artik yalniz aktif urunleri okuyor (eskiden TUM urunler) ve isListedProduct kullaniyor. ADMIN > Katalog Bilgileri: kullanimdaki aileler/markalar + aciklamasi girilmis diger kayitlar; kapsama ozeti (onayli/taslak/eksik), durum filtresi, arama, onay kutulu toplu secim, Taslak uret (generateCatalogInfo Cloud Function; API anahtari istemcide DURMAZ; onayli kayda dokunmaz; tek tek, Durdur dugmeli), Taslaklari onayla (writeBatch), Duzenle (Taslak kaydet / Kaydet ve onayla; https disi baglanti reddedilir), Eksikleri disa aktar (JSON), JSON ice aktar (kullanimdaki ailelerle marka ilk kelimesi + ad/parantez oncesine gore eslestirir, TASLAK yazar, onayliya dokunmaz). ILK PARTI: 40 marka + 47 aile Claude tarafindan Turkce yazildi (pochub-katalog-ilk-parti.json), officialUrl bilerek bos (kirik baglanti riskine karsi; Taslak uret dolduracak). PROVA (Chromium, sahte veri): ice aktarma 47 aile (5i kullanimdaki urunle eslesti) + 40 marka taslak; fonksiyon yokken anlasilir uyari; toplu onay 47/48; elle duzenlemede http reddi, https kabul; musteri rolunde kesik adli urun icin bilgi bulundu; urun penceresi ve marka sayfasi gorsel kontrol edildi (Cisco HAKKINDA + distributorler + aile penceresi + firma tiklamasi). PoC metni etiketle ayni sozle basladiginda tekrar etmesin diye kirpiliyor. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES v1.10.4: family_info/brand_info (get: onayli ya da admin; list/yazma: admin) + partner_invites read -> get herkes / list admin (v9.98 incelemesinde bulunan acik: tum davet tokenlari ve firma marka listeleri listelenebiliyordu; uygulamada list kullanan 3 yerin 3u de admin).'],
   'v10.04': ['TOPLU ONAY / RET / GERI ALMA (Hasan: cok urun oldugunda tek tek onay pratik degil; topluca secilsin, istenenin isareti kaldirilabilsin, iptal ve geri alma olsun). Admin > Urun Onaylari ekraninda: (1) Onay bekleyen her satirda onay kutusu; basliktaki kutu FILTREYE UYAN tum bekleyenleri secer (tablo sayfalanmiyor, yani gorunen = filtredeki) ve kac tane oldugunu yazar. Firma bazli toplu onay = Vendor filtresi + basliktaki kutu. Tekli Onayla/Reddet dugmeleri oldugu gibi duruyor. (2) Filtre degisince secim SIFIRLANIR: bir firma icin secilenler baska filtreye gecince gorunmeden secili kalip yanlislikla onaylanmasin. Tekli onay/ret sonrasi artik bekleyen olmayan secimler de dusurulur. (3) SUPHELI SATIR ISARETI: ayni firma + ayni markada benzer adli kayit (parantez oncesi ayni ya da biri digerini iceriyor; yayindaki urunle cakisma ayrica belirtiliyor) ve kapanmamis parantezli kesik ad. Karar admin de; secim cubugunda isaretlileri tek tikla secimden cikaran dugme var. (4) Islemden once OZET penceresi: kac urun, firma > marka dokumu, kacinin isaretli oldugu, bildirimlerin geri cekilemeyecegi. Vazgec secimi bozmaz. Toplu ret tek gerekce sorar. (5) Yazma writeBatch ile (400lik parcalar). Firmaya urun basina degil, firma basina TEK bildirim ve TEK e-posta (ilk 5 urun adi + kalan sayisi; e-postada tam liste). Onay status active / publishStatus ready yazar (v9.99 kurali), urun her yerde ayni anda gorunur. (6) GERI ALMA: her toplu islem urune bulkOp {id, action, by, at, prevStatus, prevPublishStatus} yazar. Son toplu islem cubukta tarih ve sayisiyla gorunur; Geri al yalniz o islemden beri DEGISMEMIS urunleri onceki durumuna dondurur (approvedAt/approvedBy ya da rejectedAt/rejectReason silinir), degismis olanlara dokunmaz ve kac tane oldugunu soyler. Kayit urunun uzerinde durdugu icin sayfa yenilense de geri alinabiliyor; yeni koleksiyon ve kural degisikligi gerekmedi (admin products uzerinde zaten tam yetkili). (7) Ustteki Toplam/Aktif/Admin Onayi sayaclari artik islem sonrasi guncelleniyor; eskiden sayfa acilisinda bir kez hesaplaniyordu. writeBatch ve deleteField firestore importuna eklendi. PROVA (Chromium, sahte veri: GITS 7 bekleyen + 1 yayinda, Entegrator1 2 bekleyen + 1 yayinda): isaretler dogru (Sangfor HCI ikilisi, kesik PA-Series, yayindaki PowerStore ile cakisan PowerStore (Dell PowerStore)); GITS filtresinde tumunu sec 7, bir satir kaldirilinca baslik ara durumda, isaretlileri cikar 2 birakti; ozet firma > marka dogru, Vazgec hicbir sey yazmadi; onay 1 batch / 3 yazma, 1 bildirim, 1 e-posta, sayac 9->6; filtre degisince secim bos; aradan bir urun elle degistirildikten ve sayfa YENIDEN YUKLENDIKTEN sonra geri alma 2 urunu dondurdu, 1 ini atladi, sayac 9a dondu; toplu ret gerekceyle 2 urun, firmaya 1 bildirim. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi.'],
   'v10.03': ['PROFIL ILE MARKALARIM SENKRON DEGIL (Hasan: iki taraf senkron degil, sayilar ve markalar tutarsiz; ekleme sonrasi iki taraf ayni olmali, entegratore/distributore elle duzelt diyemem). Hakliydi ve bu bir VERI MODELI hatasiydi, ekran hatasi degil. TESHIS: Markalarim kartlari uc kaynaktan uretiyor (sahiplik + users.brands beyani + urun girilen markalar). Herkese acik profildeki Markalar listesi ise YALNIZ users.brands beyanini okuyor; o alan sadece elle doluyordu. Katalogdan Acronis eklenince Markalarim da Acronis cikiyor, profilde cikmiyordu. Daha onemlisi ayni alan (vendor_public.brands) marka sayfasindaki is ortaklari listesini, ozel PoC talebinde vendor eslestirmeyi (openCustomPoCModal) ve temsilci listesini besliyor: urun ekleyen firma o markanin PoC taleplerine HIC onerilmiyordu. Sayi farki ise ayri: profil yalniz yayindaki urunu sayiyor, Markalarim onay bekleyenleri de sayiyordu ve bunu soylemiyordu. DUZELTME: (1) syncDeclaredBrands: urun eklenen DORT yolun hepsinde (sihirbaz, Urun Ekle penceresi, katalogdan toplu ekle, davet sonrasi urun secimi) urunun markasi beyana eklenir, vendor_public aynasi guncellenir. Beyandaki ad katalogdaki markayla ayniysa katalog yazimina cekilir (CISCO -> Cisco), tekrarlar ayiklanir. Fark yoksa YAZMA YOK. (2) KENDILIGINDEN ONARIM: vendor paneli acilisinda (dashboard urunleri zaten okuyor, EK OKUMA YOK) ve Markalarim acilisinda mevcut urunlerden eksik kalan markalar beyana eklenir. Mevcut veriler icin kimsenin bir sey yapmasi gerekmiyor; vendor paneline ilk girisinde duzelir. (3) TEK KURAL: vendorPublicBrands (beyan ∪ yayindaki urunlerin markalari) hem profil sayfasinda hem Markalarim ozetinde kullaniliyor; urun sayisi ikisinde de isListedProduct. Profil, sahibi panele girmemis vendorlar icin de dogru markalari gosteriyor. (4) Markalarim ustunde Herkese acik profilinde: N urun · M marka · K onay bekliyor satiri — profilde gorunen sayiyla birebir ayni hesap. Kartlarda X urunun (Y profilde · Z onay bekliyor); onay bekleyen urunu olan kartta neden profilde olmadigi ve temsilcilik onaylanirsa beklemeden yayina girecegi yaziyor. ONAY BEKLEME DAVRANISI DEGISMEDI: marka yetkisi olmayan markadaki urun admin onayindan gecer (v9.94 karari); degisen, bunun artik gorunur ve aciklanmis olmasi. PROVA (Chromium, sahte veri: beyan CISCO/VMWARE/HPE/PURE STORAGE/FORTINET + tekrar eden Cisco; urunler Cisco x2, VMware, Broadcom yayinda, Acronis x3 onay bekliyor): tek yazmayla beyan [Cisco, VMware, HPE, Pure Storage, Fortinet, Acronis, Broadcom] oldu, ayna ayni liste; Markalarim ozeti 4 urun · 7 marka · 3 onay bekliyor, profil fonksiyonu ayni 7 marka ve 4 urun; ikinci senkron cagrisi 0 yazma. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi (users.brands ve vendor_public.brands sahibi tarafindan zaten yazilabiliyor).'],
   'v10.02': ['DELL EMC KARTI: NEDEN BOYLE, NEDEN CIKARAMIYORUM (Hasan). IKI SORUN. (1) ESLESME: Dell EMC eski bir ad; Dell 2016 da EMC yi satin aldiktan sonra urunler Dell Technologies adi altinda toplandi, katalog da (Gartner kaynakli) yeni adi kullaniyor. v9.97 deki Sunu mu demek istediniz onerisi adlari bosluksuz birlestirip birbirinin icinde ariyordu: dellemc ile delltechnologies birbirini icermedigi icin aday cikmiyor, kart Katalogda yakin bir eslesme yok diyordu. Artik ilk kelimesi ayni olan canonical adlar da (en dusuk puanla) aday: Dell EMC -> Dell Technologies. Dellwood gibi ayni harflerle baslayan ama farkli kelime olanlar ve EMC Insurance gibi ikinci kelime eslesmeleri bilerek aday degil. (2) CIKARMA: kart uc kaynaktan geliyor — sahip olunan marka, profildeki beyan (users.brands; davetle gelen firmalarda uretici dizinlerinden kopyalaniyor, Dell EMC buradan gelmis olabilir) ve urun girilen marka. Beyan kullanicinin elindeydi ama bu ekranda dugmesi yoktu. Beyan edilmis, sahibi olunmayan ve URUNU OLMAYAN kartlara Listemden cikar eklendi; users.brands ten cikarir. Urunu olan kartta dugme yok: beyan silinse de kart urunler yuzunden yine gelirdi, dugme ise yaramiyormus gibi gorunurdu; o kartlarda yol urunu duzeltmek ya da silmek. Yetkili temsilci kaydi ve bekleyen temsilcilik talebi dokunulmadan kalir, onay penceresi bunu soyler. (3) AYNA HATASI (v9.97 den): marka duzeltme users.brands i guncelliyor ama vendor_public aynasini guncellemiyordu, herkese acik profil eski adi gosteriyordu. Hem duzeltme hem cikarma artik syncVendorPublic cagiriyor. (4) Rozet metni Canonical listede yok -> Katalogda bulunamadi; canonical kullaniciya bir sey anlatmiyordu. PROVA (Chromium, sahte veri: Cisco urunlu, Dell EMC urunsuz, Palo Alto urunlu ve cozumsuz, Veeam urunsuz; katalogda Dell Technologies, Dellwood Labs, EMC Insurance): Dell EMC -> yalniz Dell Technologies onerildi; Listemden cikar yalniz Dell EMC ve Veeam kartlarinda cikti; tiklaninca users.brands [Cisco, Palo Alto, Veeam] yazildi, ayna ayni listeyle guncellendi, kart kayboldu. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi (users kendi brands alanini zaten yazabiliyordu, v9.97 ayni yolu kullaniyor).'],
@@ -8967,7 +8968,9 @@ async function openProductDetailModal(productId) {
       (p.supportModel==='inhouse'?t('cpd.sm_inhouse','🏢 Kendi Bünyesi'):p.supportModel==='outsource'?t('cpd.sm_outsource','🤝 Dış Kaynak'):t('cpd.sm_hybrid','🔄 Hibrit')) + '</span>' +
       (p.featured ? '<span style="font-size:11.5px;padding:4px 10px;border-radius:6px;background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">'+t('feat.featured','⭐ Öne Çıkan Ürün')+'</span>' : '') +
       '</div>' +
-      (p.description ? '<div style="font-size:14px;color:#c8cfdb;line-height:1.7;margin-bottom:16px">'+(p.description)+'</div>' : '') +
+      // v10.05: katalogdaki urun ailesi bilgisi + marka karti (onayliysa doldurulur, yoksa bos kalir)
+      '<div id="pd-catinfo"></div>' +
+      (p.description ? '<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--text-muted);margin-bottom:6px">'+escHtml((p.vendorName||_L('THE COMPANY','FİRMA')).toLocaleUpperCase('tr'))+' '+_L('— NOTES','NOTU')+'</div><div style="font-size:14px;color:var(--text-secondary);line-height:1.7;margin-bottom:16px">'+(p.description)+'</div>' : '') +
       sectorsHtml +
       urlHtml +
       (catFieldsHtml ? '<button class="pd-tab-jump" data-tab="specs" style="margin-top:4px;background:none;border:none;color:#2563eb;font-weight:700;font-size:13px;cursor:pointer;padding:6px 0">'+(EN2?'See all technical specs →':'Tüm teknik özellikleri gör →')+'</button>' : '') +
@@ -8992,6 +8995,15 @@ async function openProductDetailModal(productId) {
 
     document.body.appendChild(modal);
     if (CUR_USER) renderProductReviews(productId, modal.querySelector('#pd-reviews-list'));
+    // v10.05: katalog bilgisi — pencere beklemeden acilir, bilgi gelince yerlesir
+    (async function(){
+      try {
+        var _r = await Promise.all([getFamilyInfo(p.brand, p.name), getBrandInfo(p.brand)]);
+        var _h = modal.querySelector('#pd-catinfo'); if(!_h) return;
+        _h.innerHTML = famInfoHtml(_r[0]) + brandInfoHtml(_r[1], p.brand, true);
+        var _bl = _h.querySelector('.ci-brandlink'); if(_bl) _bl.addEventListener('click', function(){ modal.remove(); });
+      } catch(e){}
+    })();
 
     function _stripProductParam(){ try{ var u=new URL(location.href); if(u.searchParams.has('p')){ u.searchParams.delete('p'); history.replaceState(history.state, '', u.pathname+(u.search||'')+(u.hash||'')); } }catch(e){} }
     modal.querySelector('#close-prod-detail').addEventListener('click', function(){ modal.remove(); _stripProductParam(); });
@@ -29733,7 +29745,7 @@ function renderAdmin() {
     ['events',t('atab.events','Etkinlikler')],
     ...(_rp.canViewAll?[['offers',t('atab.offers','Teklifler')]]:[]),
     ...(CUR_PROFILE?.role==='admin'?[['revenue',t('atab.revenue','📈 Gelir')],['vendorsubs',t('atab.vendorsubs','💼 Vendor Abonelikler')],['vendorapprovals',t('atab.vendorapprovals','✓ Vendor Onayları')],['demo-requests',t('atab.demo_requests','📅 Demo Talepleri')],['packages',t('atab.packages','💎 Paketler')],['analytics',t('atab.analytics','📊 Analitik')],['history',t('atab.history','📜 Değişiklik Geçmişi')],['payments',t('atab.payments','💳 Ödeme Onayları')],['overrides',t('atab.overrides','⚡ Acil Onay Talepleri')],['featured',t('atab.featured','📢 Reklam / Öne Çıkan')],['content',t('atab.content','📝 İçerik Yönetimi')],['kvkk-mgmt',t('atab.kvkk_mgmt','🛡 KVKK & Yasal Sayfalar')],['settings',t('atab.settings','🔧 Sistem Ayarları')]]:[]),
-    ...(_rp.canViewAll?[['partners',t('atab.partners','🏢 Firma Rehberi')],['invites',t('atab.invites','✉ Davetler')],['health',t('atab.health','🩺 Veri Sağlığı')]]:[]),
+    ...(_rp.canViewAll?[['partners',t('atab.partners','🏢 Firma Rehberi')],['catinfo',_L('📚 Catalog Info','📚 Katalog Bilgileri')],['invites',t('atab.invites','✉ Davetler')],['health',t('atab.health','🩺 Veri Sağlığı')]]:[]),
     ['profile',t('atab.profile','👤 Profilim')],
   ];
   el('scr-admin').innerHTML = `<div class="dash">
@@ -29781,6 +29793,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'featured')   { await admFeaturedAds(m); return; }
     if (CUR_ADM_TAB === 'settings')   { await admSettings(m);   return; }
   if (CUR_ADM_TAB === 'partners')   { await admPartnerDirectory(m); return; }
+  if (CUR_ADM_TAB === 'catinfo')    { await admCatalogInfo(m); return; }   // v10.05
   if (CUR_ADM_TAB === 'invites')    { await admInvites(m); return; }
   if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
     if (CUR_ADM_TAB === 'profile')    { await renderUserProfile(m, 'admin');  return; }
@@ -72768,6 +72781,527 @@ window.openOfferDetailModal = openOfferDetailModal;
 // SEO-friendly, paylaşılabilir, logout için signup CTA'lı
 // ════════════════════════════════════════════════════════════════════
 // ═══ v8.99: PUBLIC MARKA SAYFASI (#b/<brandNorm>) — marka profili + aileler + katalog urunleri + temsilci vendorlar ═══
+// ══ v10.05: KATALOG BILGILERI (urun ailesi + marka aciklamalari) ═════════
+// Hasan: listede yalniz marka ve urun adi var; tiklayinca bilgi olmali,
+// bos sayfa bizi zayif gosterir. KARARLAR:
+//  - Bilgi iki katmanli. Urun ailesinin ne oldugu URUNE aittir: bir kez
+//    yazilir, o urunu sunan her firmanin kartinda ayni gorunur
+//    (family_info). Firmanin ne sundugu ayrica kendi kaydinda kalir.
+//  - Ayri koleksiyon (family_info/{marka--ad}, brand_info/{marka}):
+//    brand_products ve brands onbellege TOPLU okunuyor; aciklama oraya
+//    girerse katalog indeksi siser (27.09 kota olayi). Ayrinti yalniz
+//    tiklaninca, tek dokuman olarak okunur.
+//  - Anahtar sablon kimligi degil marka+ad: vendor urunleri sablon
+//    kimligi tasimiyor, marka+ad ise hem sablonda hem urunde var.
+//    Parantezli adlar icin parantez oncesi de denenir.
+//  - Herkes yalniz ONAYLI kaydi gorur; taslaklar admin'de (kural v1.10.4).
+//  - Bos alan gosterilmez. Bilgi yoksa kutu hic cikmaz.
+//  - Metin ureticiden kopyalanmaz: kisa ozet + resmi sayfaya baglanti.
+var CATINFO_DEPLOY = {
+  onprem:   ['On-premises','Yerinde kurulum'],
+  saas:     ['SaaS','SaaS'],
+  cloud:    ['Public cloud','Genel bulut'],
+  hybrid:   ['Hybrid','Hibrit'],
+  appliance:['Hardware appliance','Donanım cihazı'],
+  virtual:  ['Virtual appliance','Sanal cihaz'],
+  software: ['Software','Yazılım']
+};
+function famInfoKey(brand, name){
+  var b = _normBrand(brand||''), n = _normBrand(name||'');
+  return (b && n) ? (b + '--' + n).slice(0, 400) : '';
+}
+function famBaseName(name){ return String(name||'').split('(')[0].trim(); }
+var _ciCache = Object.create(null);
+async function _ciGet(col, id){
+  if(!id) return null;
+  var ck = col + '/' + id;
+  if(ck in _ciCache) return _ciCache[ck];
+  var v = null;
+  try {
+    var s = await getDoc(doc(db, col, id));
+    if(s.exists() && s.data().status === 'approved') v = s.data();
+  } catch(e){ /* yok ya da onaysiz: kural get'i reddeder, bilgi yok sayilir */ }
+  _ciCache[ck] = v;
+  return v;
+}
+async function getFamilyInfo(brand, name){
+  var k1 = famInfoKey(brand, name), k2 = famInfoKey(brand, famBaseName(name));
+  var r = await _ciGet('family_info', k1);
+  if(!r && k2 && k2 !== k1) r = await _ciGet('family_info', k2);
+  return r;
+}
+async function getBrandInfo(brand){ return _ciGet('brand_info', _normBrand(brand||'')); }
+// Etiket zaten "PoC'de genelde neye bakilir" diyor; metin ayni sozle baslarsa tekrar etmesin
+function _ciPocText(t){ t = String(t||'').trim().replace(/^PoC['\u2019]?de\s+(genelde\s+)?/i,''); return t ? t.charAt(0).toLocaleUpperCase('tr') + t.slice(1) : t; }
+function _ciSafeUrl(u){ u = String(u||'').trim(); return /^https:\/\/[^\s"'<>]+$/i.test(u) ? u : ''; }
+
+function famInfoHtml(fi){
+  if(!fi) return '';
+  var lst = function(a){ return (a||[]).filter(Boolean).slice(0,6).map(function(x){ return '<li style="margin-bottom:3px">' + escHtml(x) + '</li>'; }).join(''); };
+  var ul = 'margin:0;padding-left:18px;font-size:12.5px;color:var(--text-secondary);line-height:1.5';
+  var dep = (fi.deployment||[]).filter(function(k){ return CATINFO_DEPLOY[k]; }).map(function(k){
+    return '<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:rgba(37,99,235,.08);color:#2563eb;font-weight:600">' + _L(CATINFO_DEPLOY[k][0], CATINFO_DEPLOY[k][1]) + '</span>'; }).join('');
+  var hasS = fi.solves && fi.solves.length, hasU = fi.useCases && fi.useCases.length;
+  var url = _ciSafeUrl(fi.officialUrl);
+  return '<div class="ci-box" style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:16px;background:var(--bg-surface)">'
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:6px">' + _L('ABOUT THE PRODUCT','ÜRÜN HAKKINDA') + '</div>'
+    + (fi.summary ? '<div style="font-size:13.5px;line-height:1.65;color:var(--text-primary);margin-bottom:10px">' + escHtml(fi.summary) + '</div>' : '')
+    + ((hasS || hasU) ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:10px">'
+        + (hasS ? '<div><div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text-primary)">' + _L('What it does','Ne işe yarar') + '</div><ul style="' + ul + '">' + lst(fi.solves) + '</ul></div>' : '')
+        + (hasU ? '<div><div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text-primary)">' + _L('Typical use cases','Tipik kullanım') + '</div><ul style="' + ul + '">' + lst(fi.useCases) + '</ul></div>' : '')
+      + '</div>' : '')
+    + (dep ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + dep + '</div>' : '')
+    + (fi.pocNotes ? '<div style="font-size:12.5px;line-height:1.55;color:var(--text-secondary);background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px;padding:8px 10px;margin-bottom:10px"><b style="color:var(--text-primary)">' + _L('What a PoC usually checks: ','PoC\u2019de genelde neye bakılır: ') + '</b>' + escHtml(_ciPocText(fi.pocNotes)) + '</div>' : '')
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--text-muted)">'
+    +   (url ? '<a href="' + escHtml(url) + '" target="_blank" rel="noopener nofollow" style="color:#2563eb;font-weight:700;font-size:12px;text-decoration:none">' + _L('Manufacturer\u2019s product page ↗','Üreticinin ürün sayfası ↗') + '</a>' : '<span></span>')
+    +   '<span>' + _L('Summary prepared by PoCHub; check the manufacturer for technical details.','Özet PoCHub tarafından hazırlanmıştır; teknik ayrıntı için üreticiye başvurun.') + '</span>'
+    + '</div></div>';
+}
+
+// compact: urun penceresinde kucuk kart; degilse marka sayfasi icin tam blok
+function brandInfoHtml(bi, brandName, compact){
+  if(!bi) return '';
+  var meta = [];
+  if(bi.hq) meta.push(_L('HQ: ','Merkez: ') + escHtml(bi.hq));
+  if(bi.founded) meta.push(_L('Founded: ','Kuruluş: ') + escHtml(String(bi.founded)));
+  var web = _ciSafeUrl(bi.website);
+  if(web) meta.push('<a href="' + escHtml(web) + '" target="_blank" rel="noopener nofollow" style="color:#2563eb">' + escHtml(web.replace(/^https:\/\//,'').replace(/\/$/,'')) + '</a>');
+  var focus = (bi.focus||[]).filter(Boolean).slice(0,8).map(function(f){
+    return '<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:rgba(15,23,42,.05);color:var(--text-secondary)">' + escHtml(f) + '</span>'; }).join('');
+  if(compact){
+    return '<div style="border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:16px">'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px">'
+      +   '<div style="font-size:12.5px;font-weight:800;color:var(--text-primary)">' + escHtml(bi.name || brandName) + ' ' + _L('— about the brand','hakkında') + '</div>'
+      +   '<a href="#b/' + encodeURIComponent(_normBrand(bi.name || brandName)) + '" class="ci-brandlink" style="font-size:12px;color:#2563eb;font-weight:700;text-decoration:none">' + _L('Brand page →','Marka sayfası →') + '</a>'
+      + '</div>'
+      + (bi.summary ? '<div style="font-size:12.5px;line-height:1.6;color:var(--text-secondary)">' + escHtml(bi.summary) + '</div>' : '')
+      + (meta.length ? '<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px">' + meta.join(' · ') + '</div>' : '')
+      + '</div>';
+  }
+  return '<div style="border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:18px;background:var(--bg-surface)">'
+    + '<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:6px">' + _L('ABOUT','HAKKINDA') + '</div>'
+    + (bi.summary ? '<div style="font-size:14px;line-height:1.7;color:var(--text-primary);margin-bottom:10px">' + escHtml(bi.summary) + '</div>' : '')
+    + (focus ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">' + focus + '</div>' : '')
+    + (meta.length ? '<div style="font-size:12px;color:var(--text-muted)">' + meta.join(' · ') + '</div>' : '')
+    + '</div>';
+}
+
+// Urun ailesi penceresi — marka sayfasindaki aile satirindan acilir
+async function openFamilyInfoModal(o){
+  o = o || {};
+  var md = document.createElement('div'); md.className = 'modal-bg on';
+  md.innerHTML = '<div class="modal" style="max-width:680px;width:95vw;max-height:88vh;display:flex;flex-direction:column;padding:0"><div style="padding:30px;text-align:center"><div class="spinner"></div></div></div>';
+  document.body.appendChild(md);
+  md.addEventListener('click', function(e){ if(e.target === md) md.remove(); });
+  var fi = null, bi = null;
+  try { var r = await Promise.all([getFamilyInfo(o.brand, o.name), getBrandInfo(o.brand)]); fi = r[0]; bi = r[1]; } catch(e){}
+  var offers = (o.offers || []);
+  var offersHtml = offers.length
+    ? '<div style="font-size:12px;font-weight:800;margin:4px 0 8px;color:var(--text-primary)">' + _L('Companies offering it in Türkiye','Türkiye\u2019de sunan firmalar') + ' (' + offers.length + ')</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:6px">'
+      + offers.map(function(p){ return '<div class="fim-offer" data-id="' + escHtml(p.id) + '" style="border:1px solid var(--border);border-radius:9px;padding:9px 11px;cursor:pointer"><div style="font-size:12.5px;font-weight:700">' + escHtml(p.vendorName||'—') + '</div><div style="font-size:11px;color:var(--text-muted)">' + escHtml(p.name||'') + '</div></div>'; }).join('')
+      + '</div>'
+    : '';
+  md.querySelector('.modal').innerHTML =
+      '<div style="display:flex;justify-content:space-between;gap:10px;padding:18px 22px;border-bottom:1px solid var(--border);flex-shrink:0">'
+    +   '<div><div style="font-size:11px;color:#2563eb;font-weight:700;letter-spacing:.5px;margin-bottom:4px">' + escHtml(o.category || (fi && fi.category) || '') + '</div>'
+    +   '<div style="font-size:19px;font-weight:800">' + escHtml(o.name || '') + '</div>'
+    +   '<div style="font-size:13px;color:var(--text-muted);margin-top:2px">' + escHtml(o.brand || '') + '</div></div>'
+    +   '<button type="button" class="fim-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary);align-self:flex-start">×</button>'
+    + '</div>'
+    + '<div style="padding:18px 22px;overflow-y:auto;flex:1">'
+    +   (fi ? famInfoHtml(fi) : '<div style="font-size:13px;color:var(--text-muted);padding:4px 0 14px">' + _L('A description for this product family is being prepared.','Bu ürün ailesi için açıklama hazırlanıyor.') + '</div>')
+    +   brandInfoHtml(bi, o.brand, true)
+    +   offersHtml
+    + '</div>'
+    + (o.onPoc ? '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;flex-shrink:0"><button type="button" class="btn-p fim-poc">' + _L('Request PoC','PoC Talep Et') + '</button></div>' : '');
+  md.querySelector('.fim-close').addEventListener('click', function(){ md.remove(); });
+  md.querySelectorAll('.fim-offer').forEach(function(x){ x.addEventListener('click', function(){ md.remove(); try { openProductDetailModal(this.dataset.id); } catch(e){} }); });
+  var pb = md.querySelector('.fim-poc'); if(pb) pb.addEventListener('click', function(){ md.remove(); o.onPoc(); });
+  var bl = md.querySelector('.ci-brandlink'); if(bl) bl.addEventListener('click', function(){ md.remove(); });
+}
+
+// ── ADMIN: Katalog Bilgileri ─────────────────────────────────────────────
+// Yalniz KULLANIMDAKI aileler ve markalar listelenir (vendor urunu olanlar):
+// 16 bin sablonu doldurmak hem gereksiz hem pahali. Bir vendor yeni bir
+// urun eklediginde o aile bu listeye kendiliginden girer.
+// Icerik uc yoldan gelir: (1) Taslak uret — generateCatalogInfo Cloud
+// Function'i (API anahtari istemcide DURMAZ), (2) JSON ice aktar,
+// (3) elle duzenleme. Hepsi TASLAK yazar; yayin admin onayiyla.
+async function admCatalogInfo(m){
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>' + _L('Loading…','Yükleniyor…') + '</div>';
+  var prods = [], fInfo = Object.create(null), bInfo = Object.create(null);
+  try {
+    var r = await Promise.all([
+      getDocs(collection(db,'products')),
+      getDocs(collection(db,'family_info')),
+      getDocs(collection(db,'brand_info'))
+    ]);
+    prods = r[0].docs.map(function(d){ var o = d.data(); o.id = d.id; return o; })
+      .filter(function(p){ return p.status !== 'rejected' && getLifecycleState(p) !== 'trash' && p.brand && p.name; });
+    r[1].docs.forEach(function(d){ fInfo[d.id] = d.data(); });
+    r[2].docs.forEach(function(d){ bInfo[d.id] = d.data(); });
+  } catch(e){
+    m.innerHTML = '<div class="empty">' + _L('Could not load: ','Yüklenemedi: ') + escHtml((e && (e.code||e.message)) || '') + '<br><small>' + _L('If this says permission-denied, publish rules v1.10.4.','permission-denied ise kurallar v1.10.4 yayınlanmamış olabilir.') + '</small></div>';
+    return;
+  }
+  // Kullanimdaki aileler ve markalar
+  var fams = Object.create(null), brands = Object.create(null);
+  prods.forEach(function(p){
+    var k = famInfoKey(p.brand, p.name); if(!k) return;
+    var f = fams[k] || (fams[k] = { key:k, baseKey:famInfoKey(p.brand, famBaseName(p.name)), brand:p.brand, name:p.name, category:p.category||'', vendors:Object.create(null), n:0 });
+    f.n++; f.vendors[p.vendorId||p.vendorName||'?'] = 1;
+    var bn = _normBrand(p.brand);
+    var b = brands[bn] || (brands[bn] = { key:bn, name:p.brand, n:0, vendors:Object.create(null) });
+    b.n++; b.vendors[p.vendorId||p.vendorName||'?'] = 1;
+  });
+  try { var canon = _brandCanonMap(); Object.keys(brands).forEach(function(k){ if(canon[k]) brands[k].name = canon[k]; }); } catch(e){}
+  // Kullanimda olmayan ama bilgisi girilmis kayitlar da listede: marka sayfasindaki
+  // aile listesi vendor urunu olmadan da musteriye gorunuyor, onaylanabilmeliler.
+  function augment(){
+  var _usedBase = Object.create(null); Object.values(fams).forEach(function(f){ if(f.baseKey) _usedBase[f.baseKey] = 1; });
+  Object.keys(fInfo).forEach(function(id){
+    if(fams[id] || _usedBase[id]) return;
+    var i = fInfo[id];
+    fams[id] = { key:id, baseKey:'', brand:i.brand || id.split('--')[0], name:i.name || id, category:i.category || '', vendors:Object.create(null), n:0 };
+  });
+  Object.keys(bInfo).forEach(function(id){
+    if(brands[id]) return;
+    brands[id] = { key:id, name:bInfo[id].name || id, n:0, vendors:Object.create(null) };
+  });
+  }
+  augment();
+  function famInfoOf(f){ return fInfo[f.key] || (f.baseKey && fInfo[f.baseKey]) || null; }
+  function famInfoId(f){ return fInfo[f.key] ? f.key : ((f.baseKey && fInfo[f.baseKey]) ? f.baseKey : f.key); }
+  function stOf(x){ return x ? (x.status === 'approved' ? 'approved' : 'draft') : 'none'; }
+
+  var tab = 'fam', stF = '', q = '', sel = new Set(), busy = false, stopReq = false;
+
+  function rows(){
+    var list = tab === 'fam' ? Object.values(fams) : Object.values(brands);
+    return list.map(function(x){
+      var info = tab === 'fam' ? famInfoOf(x) : bInfo[x.key];
+      return { x:x, info:info, st:stOf(info), nv:Object.keys(x.vendors).length };
+    }).filter(function(r){
+      if(stF && r.st !== stF) return false;
+      if(q){ var s = (r.x.name + ' ' + (r.x.brand||'')).toLowerCase(); if(s.indexOf(q) < 0) return false; }
+      return true;
+    }).sort(function(a,b){ return (b.nv - a.nv) || (b.x.n - a.x.n) || String(a.x.name).localeCompare(String(b.x.name),'tr'); });
+  }
+  function counts(){
+    var fl = Object.values(fams), bl = Object.values(brands);
+    var c = function(l, get){ var o = { approved:0, draft:0, none:0 }; l.forEach(function(x){ o[stOf(get(x))]++; }); return o; };
+    return { f:c(fl, famInfoOf), b:c(bl, function(x){ return bInfo[x.key]; }), fn:fl.length, bn:bl.length };
+  }
+  var stLbl = { approved:['#16a34a','rgba(22,163,74,.10)',_L('Approved','Onaylı')], draft:['#d97706','rgba(217,119,6,.10)',_L('Draft','Taslak')], none:['#64748b','rgba(100,116,139,.10)',_L('Missing','Eksik')] };
+  function badge(st){ var s = stLbl[st]; return '<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;color:' + s[0] + ';background:' + s[1] + '">' + s[2] + '</span>'; }
+
+  function paint(){
+    var c = counts(), R = rows();
+    var cov = function(o, n){ return '<b>' + o.approved + '</b>/' + n + ' ' + _L('approved','onaylı') + ' · ' + o.draft + ' ' + _L('draft','taslak') + ' · ' + o.none + ' ' + _L('missing','eksik'); };
+    m.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+      + '<div><h2 class="fs18-fw7" style="margin:0 0 4px">📚 ' + _L('Catalog information','Katalog Bilgileri') + '</h2>'
+      +   '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6">' + _L('Descriptions shown when a product or brand is opened. Listed: families and brands that have vendor products, plus anything that already has a description. Everything is saved as a draft; customers only see approved entries.','Ürün ya da marka açılınca görünen açıklamalar. Listede vendor ürünü olan aileler ve markalar ile açıklaması girilmiş diğer kayıtlar var. Her şey taslak olarak kaydedilir; müşteri yalnız onaylıları görür.') + '</div>'
+      +   '<div style="font-size:12px;margin-top:6px">' + _L('Product families: ','Ürün aileleri: ') + cov(c.f, c.fn) + ' &nbsp;|&nbsp; ' + _L('Brands: ','Markalar: ') + cov(c.b, c.bn) + '</div></div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +   '<button type="button" class="btn-g btn-sm" id="ci-export">⬇ ' + _L('Export missing (JSON)','Eksikleri dışa aktar (JSON)') + '</button>'
+      +   '<button type="button" class="btn-g btn-sm" id="ci-import">⬆ ' + _L('Import JSON','JSON içe aktar') + '</button>'
+      + '</div></div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+      +   '<button type="button" class="ci-tab ' + (tab==='fam'?'btn-p':'btn-g') + ' btn-sm" data-t="fam">' + _L('Product families','Ürün aileleri') + ' (' + c.fn + ')</button>'
+      +   '<button type="button" class="ci-tab ' + (tab==='brand'?'btn-p':'btn-g') + ' btn-sm" data-t="brand">' + _L('Brands','Markalar') + ' (' + c.bn + ')</button>'
+      +   '<span style="border-left:1px solid var(--border);margin:0 4px"></span>'
+      +   [['',_L('All','Tümü')],['none',_L('Missing','Eksik')],['draft',_L('Draft','Taslak')],['approved',_L('Approved','Onaylı')]].map(function(p){
+            return '<button type="button" class="ci-st ' + (stF===p[0]?'btn-p':'btn-g') + ' btn-sm" data-s="' + p[0] + '">' + p[1] + '</button>'; }).join('')
+      +   '<input id="ci-q" class="inp" placeholder="' + _L('Search…','Ara…') + '" value="' + escHtml(q) + '" style="flex:1;min-width:160px;font-size:13px">'
+      + '</div>'
+      + '<div id="ci-bar"></div>'
+      + '<div id="ci-prog"></div>'
+      + '<table><thead><tr><th style="width:30px;text-align:center"><input type="checkbox" id="ci-all" style="width:16px;height:16px"></th>'
+      +   '<th>' + (tab==='fam' ? _L('Product family','Ürün ailesi') : _L('Brand','Marka')) + '</th>'
+      +   (tab==='fam' ? '<th>' + _L('Brand','Marka') + '</th>' : '')
+      +   '<th>' + _L('Vendors','Firma') + '</th><th>' + _L('Status','Durum') + '</th><th>' + _L('Preview','Önizleme') + '</th><th></th></tr></thead><tbody>'
+      + (R.length ? R.map(function(r){
+          var id = r.x.key;
+          var prev = r.info ? escHtml(String(r.info.summary||'').slice(0,110)) + (String(r.info.summary||'').length > 110 ? '…' : '') : '<span style="color:var(--text-muted)">—</span>';
+          return '<tr' + (sel.has(id)?' style="background:rgba(37,99,235,.05)"':'') + '>'
+            + '<td style="text-align:center"><input type="checkbox" class="ci-chk" data-id="' + escHtml(id) + '"' + (sel.has(id)?' checked':'') + ' style="width:16px;height:16px"></td>'
+            + '<td style="font-weight:600;font-size:13px">' + escHtml(r.x.name) + (tab==='fam' && r.x.category ? '<div style="font-size:11px;color:var(--text-muted);font-weight:400">' + escHtml(r.x.category) + '</div>' : '') + '</td>'
+            + (tab==='fam' ? '<td style="font-size:12px">' + escHtml(r.x.brand) + '</td>' : '')
+            + '<td style="font-size:12px">' + r.nv + '</td>'
+            + '<td>' + badge(r.st) + (r.info && r.info.source ? '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">' + escHtml(r.info.source) + '</div>' : '') + '</td>'
+            + '<td style="font-size:12px;color:var(--text-secondary);max-width:340px">' + prev + '</td>'
+            + '<td><button type="button" class="btn-g btn-sm ci-edit" data-id="' + escHtml(id) + '">✎ ' + _L('Edit','Düzenle') + '</button></td></tr>';
+        }).join('')
+        : '<tr><td colspan="7" style="text-align:center;padding:26px;color:var(--text-muted)">' + _L('Nothing here.','Kayıt yok.') + '</td></tr>')
+      + '</tbody></table>';
+    bind(); bar();
+  }
+  function curIds(){ return rows().map(function(r){ return r.x.key; }); }
+  function bar(){
+    var h = m.querySelector('#ci-bar'); if(!h) return;
+    var all_ = m.querySelector('#ci-all'), ids = curIds();
+    if(all_){ all_.checked = ids.length > 0 && sel.size === ids.length; all_.indeterminate = sel.size > 0 && sel.size < ids.length; }
+    if(!sel.size){ h.innerHTML = ''; return; }
+    var nDraft = Array.from(sel).filter(function(id){ var i = tab==='fam' ? (fInfo[id] || (fams[id] && famInfoOf(fams[id]))) : bInfo[id]; return i && i.status !== 'approved'; }).length;
+    h.innerHTML = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);border-radius:10px;margin-bottom:10px">'
+      + '<b style="font-size:13px">' + sel.size + ' ' + _L('selected','seçili') + '</b><span style="flex:1"></span>'
+      + '<button type="button" class="btn-g btn-sm" id="ci-clear">' + _L('Clear','Temizle') + '</button>'
+      + '<button type="button" class="btn-g btn-sm" id="ci-gen" title="' + _L('Uses the generateCatalogInfo Cloud Function. Existing approved entries are not overwritten.','generateCatalogInfo Cloud Function\u2019ını kullanır. Onaylı kayıtların üzerine yazmaz.') + '">✨ ' + _L('Generate drafts','Taslak üret') + '</button>'
+      + '<button type="button" class="btn-sm" id="ci-appr" ' + (nDraft ? '' : 'disabled') + ' style="background:#16a34a;color:#fff;border:1px solid #16a34a;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer;opacity:' + (nDraft?'1':'.5') + '">✓ ' + _L('Approve drafts','Taslakları onayla') + ' (' + nDraft + ')</button>'
+      + '</div>';
+  }
+  function bind(){
+    m.querySelectorAll('.ci-tab').forEach(function(b){ b.addEventListener('click', function(){ tab = this.dataset.t; sel.clear(); paint(); }); });
+    m.querySelectorAll('.ci-st').forEach(function(b){ b.addEventListener('click', function(){ stF = this.dataset.s; sel.clear(); paint(); }); });
+    var qi = m.querySelector('#ci-q'), tm = null;
+    qi.addEventListener('input', function(){ var v = this.value; clearTimeout(tm); tm = setTimeout(function(){ q = v.toLowerCase().trim(); sel.clear(); paint(); var n = m.querySelector('#ci-q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); });
+    m.querySelector('#ci-all').addEventListener('change', function(){ sel.clear(); if(this.checked) curIds().forEach(function(id){ sel.add(id); }); paint(); });
+    m.querySelectorAll('.ci-chk').forEach(function(c){ c.addEventListener('change', function(){ if(this.checked) sel.add(this.dataset.id); else sel.delete(this.dataset.id); this.closest('tr').style.background = this.checked ? 'rgba(37,99,235,.05)' : ''; bar(); }); });
+    m.querySelectorAll('.ci-edit').forEach(function(b){ b.addEventListener('click', function(){ openEditor(this.dataset.id); }); });
+    m.querySelector('#ci-export').addEventListener('click', exportMissing);
+    m.querySelector('#ci-import').addEventListener('click', openImport);
+    m.querySelector('#ci-bar').addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b || busy) return;
+      if(b.id === 'ci-clear'){ sel.clear(); paint(); }
+      else if(b.id === 'ci-appr') approveSel();
+      else if(b.id === 'ci-gen') generateSel();
+    });
+  }
+
+  // ── duzenleyici
+  function openEditor(id){
+    var isFam = tab === 'fam';
+    var x = isFam ? fams[id] : brands[id];
+    var docId = isFam ? famInfoId(x) : id;
+    var cur = (isFam ? fInfo[docId] : bInfo[docId]) || {};
+    var ta = 'width:100%;font-size:13px;margin-bottom:10px';
+    var lab = function(t, h){ return '<div style="font-size:12px;font-weight:700;margin-bottom:4px">' + t + (h ? ' <span style="font-weight:400;color:var(--text-muted)">' + h + '</span>' : '') + '</div>'; };
+    var md = document.createElement('div'); md.className = 'modal-bg on';
+    md.innerHTML = '<div class="modal" style="max-width:640px;max-height:90vh;overflow-y:auto">'
+      + '<h3 style="margin:0 0 2px;font-size:17px;font-weight:800">' + escHtml(x.name) + '</h3>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">' + (isFam ? escHtml(x.brand) + (x.category ? ' · ' + escHtml(x.category) : '') : _L('Brand','Marka')) + ' · ' + badge(stOf(cur.status ? cur : null)) + '</div>'
+      + lab(_L('Summary','Özet'), _L('2–3 sentences, own words','2–3 cümle, kendi cümlelerimiz')) + '<textarea id="ce-summary" class="inp" rows="3" style="' + ta + '">' + escHtml(cur.summary||'') + '</textarea>'
+      + (isFam
+        ? lab(_L('What it does','Ne işe yarar'), _L('one per line','her satıra bir madde')) + '<textarea id="ce-solves" class="inp" rows="4" style="' + ta + '">' + escHtml((cur.solves||[]).join('\n')) + '</textarea>'
+          + lab(_L('Typical use cases','Tipik kullanım'), _L('one per line','her satıra bir madde')) + '<textarea id="ce-uses" class="inp" rows="3" style="' + ta + '">' + escHtml((cur.useCases||[]).join('\n')) + '</textarea>'
+          + lab(_L('Deployment','Kurulum şekli')) + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px">'
+          +   Object.keys(CATINFO_DEPLOY).map(function(k){ return '<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" class="ce-dep" value="' + k + '"' + ((cur.deployment||[]).indexOf(k) >= 0 ? ' checked' : '') + '>' + _L(CATINFO_DEPLOY[k][0], CATINFO_DEPLOY[k][1]) + '</label>'; }).join('')
+          + '</div>'
+          + lab(_L('What a PoC usually checks','PoC\u2019de genelde neye bakılır')) + '<textarea id="ce-poc" class="inp" rows="2" style="' + ta + '">' + escHtml(cur.pocNotes||'') + '</textarea>'
+          + lab(_L('Manufacturer product page (https)','Üreticinin ürün sayfası (https)')) + '<input id="ce-url" class="inp" value="' + escHtml(cur.officialUrl||'') + '" style="' + ta + '">'
+        : lab(_L('Focus areas','Odak alanları'), _L('one per line','her satıra bir madde')) + '<textarea id="ce-focus" class="inp" rows="3" style="' + ta + '">' + escHtml((cur.focus||[]).join('\n')) + '</textarea>'
+          + '<div style="display:grid;grid-template-columns:1fr 110px;gap:8px">'
+          +   '<div>' + lab(_L('Headquarters','Merkez')) + '<input id="ce-hq" class="inp" value="' + escHtml(cur.hq||'') + '" style="' + ta + '"></div>'
+          +   '<div>' + lab(_L('Founded','Kuruluş')) + '<input id="ce-founded" class="inp" value="' + escHtml(cur.founded||'') + '" style="' + ta + '"></div>'
+          + '</div>'
+          + lab(_L('Website (https)','Web sitesi (https)')) + '<input id="ce-web" class="inp" value="' + escHtml(cur.website||'') + '" style="' + ta + '">')
+      + '<div id="ce-msg" style="font-size:12px;color:#dc2626;min-height:16px;margin-bottom:6px"></div>'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+      +   '<button type="button" class="btn-g btn-sm" id="ce-cancel">' + _L('Cancel','Vazgeç') + '</button>'
+      +   '<span style="display:flex;gap:8px">'
+      +     '<button type="button" class="btn-g btn-sm" id="ce-draft">' + _L('Save as draft','Taslak kaydet') + '</button>'
+      +     '<button type="button" class="btn-p btn-sm" id="ce-ok" style="background:#16a34a;border-color:#16a34a">' + _L('Save & approve','Kaydet ve onayla') + '</button>'
+      +   '</span></div></div>';
+    document.body.appendChild(md);
+    var g = function(s){ var e = md.querySelector(s); return e ? e.value.trim() : ''; };
+    var lines = function(s){ return g(s).split('\n').map(function(l){ return l.replace(/^[-•*\s]+/,'').trim(); }).filter(Boolean).slice(0,8); };
+    md.querySelector('#ce-cancel').addEventListener('click', function(){ md.remove(); });
+    async function save(status){
+      var msg = md.querySelector('#ce-msg');
+      var data = { summary:g('#ce-summary'), status:status, source:(cur.source && cur.source !== 'manual' ? cur.source + '+edit' : 'manual').slice(0,40), updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid };
+      if(!data.summary){ msg.textContent = _L('Summary is required.','Özet zorunlu.'); return; }
+      if(isFam){
+        var url = g('#ce-url');
+        if(url && !_ciSafeUrl(url)){ msg.textContent = _L('URL must start with https://','Bağlantı https:// ile başlamalı.'); return; }
+        Object.assign(data, { brand:x.brand, brandNorm:_normBrand(x.brand), name:x.name, nameNorm:_normBrand(x.name), category:x.category||'',
+          solves:lines('#ce-solves'), useCases:lines('#ce-uses'),
+          deployment:Array.from(md.querySelectorAll('.ce-dep:checked')).map(function(c){ return c.value; }),
+          pocNotes:g('#ce-poc'), officialUrl:url });
+      } else {
+        var w = g('#ce-web');
+        if(w && !_ciSafeUrl(w)){ msg.textContent = _L('Website must start with https://','Web sitesi https:// ile başlamalı.'); return; }
+        Object.assign(data, { name:x.name, brandNorm:id, summary:data.summary, focus:lines('#ce-focus'), hq:g('#ce-hq'), founded:g('#ce-founded'), website:w });
+      }
+      if(status === 'approved'){ data.approvedAt = serverTimestamp(); data.approvedBy = CUR_USER.uid; }
+      try {
+        await setDoc(doc(db, isFam ? 'family_info' : 'brand_info', docId), data, { merge:true });
+        var local = Object.assign({}, cur, data);
+        if(isFam) fInfo[docId] = local; else bInfo[docId] = local;
+        delete _ciCache[(isFam ? 'family_info/' : 'brand_info/') + docId];
+        md.remove(); showToast(status === 'approved' ? _L('Saved and approved','Kaydedildi ve onaylandı') : _L('Draft saved','Taslak kaydedildi'), 'ok'); paint();
+      } catch(e){ msg.textContent = _L('Could not save: ','Kaydedilemedi: ') + ((e && (e.code||e.message)) || ''); }
+    }
+    md.querySelector('#ce-draft').addEventListener('click', function(){ save('draft'); });
+    md.querySelector('#ce-ok').addEventListener('click', function(){ save('approved'); });
+  }
+
+  // ── toplu onay (yalniz taslaklar)
+  async function approveSel(){
+    var isFam = tab === 'fam', col = isFam ? 'family_info' : 'brand_info';
+    var ids = Array.from(sel).map(function(id){ return isFam ? famInfoId(fams[id]) : id; })
+      .filter(function(id){ var i = isFam ? fInfo[id] : bInfo[id]; return i && i.status !== 'approved'; });
+    if(!ids.length) return;
+    if(!confirm(ids.length + ' ' + _L('drafts will be published. Continue?','taslak yayına alınacak. Devam?'))) return;
+    busy = true;
+    try {
+      for(var i = 0; i < ids.length; i += 400){
+        var bt = writeBatch(db);
+        ids.slice(i, i+400).forEach(function(id){ bt.update(doc(db, col, id), { status:'approved', approvedAt:serverTimestamp(), approvedBy:CUR_USER.uid }); });
+        await bt.commit();
+      }
+      ids.forEach(function(id){ var o = isFam ? fInfo[id] : bInfo[id]; o.status = 'approved'; delete _ciCache[col + '/' + id]; });
+      sel.clear(); showToast(ids.length + ' ' + _L('approved','onaylandı'), 'ok');
+    } catch(e){ showToast(_L('Approve failed: ','Onay başarısız: ') + ((e && (e.code||e.message)) || ''), 'err'); }
+    busy = false; paint();
+  }
+
+  // ── taslak uretimi (Cloud Function)
+  async function generateSel(){
+    var isFam = tab === 'fam';
+    var items = Array.from(sel).map(function(id){ return isFam ? fams[id] : brands[id]; }).filter(Boolean)
+      .filter(function(x){ var i = isFam ? famInfoOf(x) : bInfo[x.key]; return !i || i.status !== 'approved'; });
+    if(!items.length){ showToast(_L('Selected items are already approved.','Seçilenlerin hepsi zaten onaylı.'), 'err'); return; }
+    if(!confirm(items.length + ' ' + _L('drafts will be generated (about 10–20 s each). Approved entries are left alone. Continue?','taslak üretilecek (her biri ~10–20 sn). Onaylı kayıtlara dokunulmaz. Devam?'))) return;
+    busy = true; stopReq = false;
+    var ok = 0, fail = 0, lastErr = '';
+    var pg = m.querySelector('#ci-prog');
+    for(var i = 0; i < items.length; i++){
+      if(stopReq) break;
+      var x = items[i];
+      if(pg) pg.innerHTML = '<div style="display:flex;gap:10px;align-items:center;font-size:12.5px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px"><div class="spinner" style="width:16px;height:16px"></div>'
+        + (i+1) + '/' + items.length + ' · ' + escHtml(x.name) + ' <span style="flex:1"></span>✓ ' + ok + (fail ? ' · ✕ ' + fail : '') + ' <button type="button" class="btn-g btn-sm" id="ci-stop">' + _L('Stop','Durdur') + '</button></div>';
+      var sb = m.querySelector('#ci-stop'); if(sb) sb.onclick = function(){ stopReq = true; this.disabled = true; };
+      try {
+        var res = await callFunction('generateCatalogInfo', isFam
+          ? { kind:'family', key:famInfoId(x), brand:x.brand, name:x.name, category:x.category||'' }
+          : { kind:'brand', key:x.key, brand:x.name });
+        if(res && res.ok && res.data){
+          if(isFam) fInfo[famInfoId(x)] = res.data; else bInfo[x.key] = res.data;
+          ok++;
+        } else { fail++; lastErr = (res && res.error) || 'bos yanit'; }
+      } catch(e){
+        fail++; lastErr = (e && (e.code||e.message)) || '';
+        if(/not-found|unimplemented|internal/i.test(lastErr) && ok === 0 && i === 0){
+          if(pg) pg.innerHTML = '';
+          busy = false;
+          alert(_L('The generateCatalogInfo Cloud Function is not reachable (','generateCatalogInfo Cloud Function\u2019ına ulaşılamadı (') + lastErr + ').\n\n'
+            + _L('Deploy it first (see catalog-info-function.js), or use Import JSON.','Önce yayınlanması gerekiyor (catalog-info-function.js), ya da JSON içe aktar yolunu kullanın.'));
+          return;
+        }
+      }
+    }
+    if(pg) pg.innerHTML = '';
+    busy = false; sel.clear();
+    showToast(ok + ' ' + _L('drafts generated','taslak üretildi') + (fail ? ' · ' + fail + ' ' + _L('failed','başarısız') + (lastErr ? ' (' + lastErr.slice(0,60) + ')' : '') : ''), fail && !ok ? 'err' : 'ok');
+    paint();
+  }
+
+  // ── disa aktar: eksik olanlar (Claude ile sohbette doldurmak icin)
+  function exportMissing(){
+    var out = {
+      note: 'PoCHub katalog bilgileri — eksik kayitlar. Doldurulup "JSON ice aktar" ile geri yuklenir.',
+      exportedAt: new Date().toISOString(),
+      brands: Object.values(brands).filter(function(b){ return !bInfo[b.key]; }).map(function(b){ return { name:b.name }; }),
+      families: Object.values(fams).filter(function(f){ return !famInfoOf(f); }).map(function(f){ return { brand:f.brand, name:f.name, category:f.category }; })
+    };
+    var blob = new Blob([JSON.stringify(out, null, 2)], { type:'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pochub-katalog-eksik-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    showToast(out.families.length + ' ' + _L('families and ','aile ve ') + out.brands.length + ' ' + _L('brands exported','marka dışa aktarıldı'), 'ok');
+  }
+
+  // ── ice aktar
+  function openImport(){
+    var md = document.createElement('div'); md.className = 'modal-bg on';
+    md.innerHTML = '<div class="modal" style="max-width:620px">'
+      + '<h3 style="margin:0 0 6px;font-size:17px;font-weight:800">⬆ ' + _L('Import JSON','JSON içe aktar') + '</h3>'
+      + '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:10px">'
+      +   _L('Format: {"brands":[{name, summary, hq, founded, website, focus[]}], "families":[{brand, name, summary, solves[], useCases[], deployment[], pocNotes, officialUrl}]}. Entries are matched to families in use by brand + name and saved as DRAFTS. Approved entries are not overwritten.',
+               'Biçim: {"brands":[{name, summary, hq, founded, website, focus[]}], "families":[{brand, name, summary, solves[], useCases[], deployment[], pocNotes, officialUrl}]}. Kayıtlar kullanımdaki ailelerle marka + ada göre eşleştirilir ve TASLAK olarak kaydedilir. Onaylı kayıtların üzerine yazılmaz.')
+      + '</div>'
+      + '<input type="file" id="ci-file" accept=".json,application/json" style="margin-bottom:8px;font-size:12.5px">'
+      + '<textarea id="ci-json" class="inp" rows="8" placeholder="' + _L('…or paste JSON here','…ya da JSON\u2019u buraya yapıştırın') + '" style="width:100%;font-family:monospace;font-size:12px;margin-bottom:8px"></textarea>'
+      + '<div id="ci-imsg" style="font-size:12px;min-height:16px;margin-bottom:8px"></div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn-g btn-sm" id="ci-icancel">' + _L('Close','Kapat') + '</button>'
+      + '<button type="button" class="btn-p btn-sm" id="ci-igo">' + _L('Import as drafts','Taslak olarak aktar') + '</button></div></div>';
+    document.body.appendChild(md);
+    md.querySelector('#ci-icancel').addEventListener('click', function(){ md.remove(); });
+    md.querySelector('#ci-file').addEventListener('change', function(){
+      var f = this.files && this.files[0]; if(!f) return;
+      var rd = new FileReader(); rd.onload = function(){ md.querySelector('#ci-json').value = rd.result; }; rd.readAsText(f);
+    });
+    md.querySelector('#ci-igo').addEventListener('click', async function(){
+      var msg = md.querySelector('#ci-imsg'), btn = this, J;
+      try { J = JSON.parse(md.querySelector('#ci-json').value); } catch(e){ msg.style.color = '#dc2626'; msg.textContent = _L('Invalid JSON: ','Geçersiz JSON: ') + e.message; return; }
+      btn.disabled = true; msg.style.color = 'var(--text-secondary)'; msg.textContent = _L('Importing…','Aktarılıyor…');
+      try {
+        var rep = await importCatalogJson(J);
+        msg.style.color = '#16a34a';
+        msg.innerHTML = rep.html;
+        paint();
+      } catch(e){ msg.style.color = '#dc2626'; msg.textContent = _L('Import failed: ','Aktarma başarısız: ') + ((e && (e.code||e.message)) || ''); }
+      btn.disabled = false;
+    });
+  }
+  // Kullanimdaki aileyle eslestir: marka ilk kelime + (tam ad | parantez oncesi)
+  function matchFam(brand, name){
+    var b0 = _normBrand(String(brand||'').trim().split(/\s+/)[0] || '');
+    var nf = _normBrand(name), nb = _normBrand(famBaseName(name));
+    var best = null;
+    Object.values(fams).forEach(function(f){
+      var fb = _normBrand(f.brand), fb0 = _normBrand(String(f.brand).trim().split(/\s+/)[0] || '');
+      var brandOk = fb === _normBrand(brand) || (b0 && fb0 === b0);
+      if(!brandOk) return;
+      var fn = _normBrand(f.name), fbn = _normBrand(famBaseName(f.name));
+      var sc = fn === nf ? 3 : (fbn === nf || fn === nb) ? 2 : (fbn === nb && nb.length >= 4) ? 1 : 0;
+      if(sc && (!best || sc > best.sc)) best = { f:f, sc:sc };
+    });
+    return best && best.f;
+  }
+  async function importCatalogJson(J){
+    var srcTag = String(J.source || 'import').slice(0,40);
+    var writes = [], skipped = 0, unmatched = [], matched = 0;
+    var arr = function(a){ return Array.isArray(a) ? a.map(function(x){ return String(x||'').trim(); }).filter(Boolean).slice(0,8) : []; };
+    (Array.isArray(J.families) ? J.families : []).forEach(function(it){
+      if(!it || !it.brand || !it.name || !it.summary) return;
+      var f = matchFam(it.brand, it.name);
+      var id = f ? famInfoId(f) : famInfoKey(it.brand, it.name);
+      if(!id) return;
+      if(fInfo[id] && fInfo[id].status === 'approved'){ skipped++; return; }
+      if(f) matched++; else unmatched.push(it.brand + ' / ' + it.name);
+      var url = _ciSafeUrl(it.officialUrl);
+      var data = { brand:f ? f.brand : String(it.brand), brandNorm:_normBrand(f ? f.brand : it.brand), name:f ? f.name : String(it.name), nameNorm:_normBrand(f ? f.name : it.name),
+        category:(f && f.category) || String(it.category||''), summary:String(it.summary).trim().slice(0,1200), solves:arr(it.solves), useCases:arr(it.useCases),
+        deployment:arr(it.deployment).filter(function(k){ return CATINFO_DEPLOY[k]; }), pocNotes:String(it.pocNotes||'').trim().slice(0,800), officialUrl:url,
+        status:'draft', source:srcTag, updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid };
+      writes.push({ col:'family_info', id:id, data:data });
+    });
+    (Array.isArray(J.brands) ? J.brands : []).forEach(function(it){
+      if(!it || !it.name || !it.summary) return;
+      var id = _normBrand(it.name); if(!id) return;
+      if(bInfo[id] && bInfo[id].status === 'approved'){ skipped++; return; }
+      writes.push({ col:'brand_info', id:id, data:{ name:(brands[id] && brands[id].name) || String(it.name), brandNorm:id, summary:String(it.summary).trim().slice(0,1200),
+        focus:arr(it.focus), hq:String(it.hq||'').slice(0,80), founded:String(it.founded||'').slice(0,10), website:_ciSafeUrl(it.website),
+        status:'draft', source:srcTag, updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid } });
+    });
+    for(var i = 0; i < writes.length; i += 400){
+      var bt = writeBatch(db);
+      writes.slice(i, i+400).forEach(function(w){ bt.set(doc(db, w.col, w.id), w.data, { merge:true }); });
+      await bt.commit();
+    }
+    writes.forEach(function(w){ var loc = Object.assign({}, w.data, { status:'draft' }); if(w.col === 'family_info') fInfo[w.id] = loc; else bInfo[w.id] = loc; });
+    augment();
+    var nb = writes.filter(function(w){ return w.col === 'brand_info'; }).length;
+    return { html: '✓ ' + (writes.length - nb) + ' ' + _L('families','aile') + ' (' + matched + ' ' + _L('matched to products in use','kullanımdaki ürünle eşleşti') + ') · ' + nb + ' ' + _L('brands imported as drafts','marka taslak olarak aktarıldı')
+      + (skipped ? ' · ' + skipped + ' ' + _L('approved entries left untouched','onaylı kayda dokunulmadı') : '')
+      + (unmatched.length ? '<div style="color:var(--text-muted);margin-top:4px">' + _L('Not in use yet (saved for later): ','Henüz kullanımda değil (ileride eşleşmek üzere kaydedildi): ') + escHtml(unmatched.slice(0,8).join(', ')) + (unmatched.length > 8 ? ' +' + (unmatched.length-8) : '') + '</div>' : '') };
+  }
+
+  paint();
+}
+
 async function renderBrandPage(bn){
   document.querySelectorAll('.scr').forEach(function(s){ s.classList.remove('on'); });
   var c = document.getElementById('scr-brand');
@@ -72784,9 +73318,20 @@ async function renderBrandPage(bn){
   }
   try { fams=(await getBrandProducts()).filter(function(p){ return p.brandNorm===norm && p.status!=='pending'; }); } catch(e){}
   try {
-    var ps=await getDocs(collection(db,'products'));
+    // v10.05: yalniz aktif urunler okunur (eskiden tum urunler) ve listelenme
+    // kurali profil/katalogla ayni (isListedProduct)
+    var ps=await getDocs(query(collection(db,'products'), where('status','==','active')));
     prods=ps.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; })
-      .filter(function(p){ return _normBrand(p.brand||'')===norm && p.status!=='trash' && (p.publishStatus==='active'||p.status==='active'); });
+      .filter(function(p){ return _normBrand(p.brand||'')===norm && isListedProduct(p); });
+  } catch(e){}
+  // v10.05: marka aciklamasi + Turkiye distributorleri (brand_distributors zaten vardi, gosterilmiyordu)
+  var bInfo=null, dists=[];
+  try { bInfo=await getBrandInfo(brand.name); } catch(e){}
+  try {
+    var ds=await getDocs(query(collection(db,'brand_distributors'), where('brandNorm','==',norm)));
+    var _seenD={};
+    ds.docs.forEach(function(d){ var r=d.data(); var k=_normBrand(r.distributorName||''); if(k && !_seenD[k]){ _seenD[k]=1; dists.push(r); } });
+    dists.sort(function(a,b){ return String(a.distributorName).localeCompare(String(b.distributorName),'tr'); });
   } catch(e){}
   try {
     vends=(await getVendorsPublic())   // v9.64: ayna
@@ -72805,7 +73350,8 @@ async function renderBrandPage(bn){
   var famRows=fams.map(function(f){
     var has=covered[f.id];
     return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px">'
-      +'<div style="flex:1"><b>'+escHtml(f.name)+'</b><div style="font-size:11px;color:var(--text-muted)">'+escHtml(f.category||'—')+'</div></div>'
+      // v10.05: aile adina tiklayinca urun bilgisi penceresi
+      +'<div class="bp-fam" data-name="'+escHtml(f.name)+'" data-cat="'+escHtml(f.category||'')+'" style="flex:1;cursor:pointer"><b style="color:var(--text-primary)">'+escHtml(f.name)+'</b> <span style="font-size:11px;color:#2563eb">'+_L('details','bilgi')+' ›</span><div style="font-size:11px;color:var(--text-muted)">'+escHtml(f.category||'—')+'</div></div>'
       +(has?'<span style="font-size:11px;color:#16a34a;font-weight:700">✓ '+_L('in catalog','katalogda')+'</span>':'')
       +'<button class="btn-p btn-sm bp-poc" data-name="'+escHtml(f.name)+'" data-cat="'+escHtml(f.category||'')+'" style="font-size:11px">'+_L('Request PoC','PoC Talep Et')+'</button></div>';
   }).join('');
@@ -72834,6 +73380,7 @@ async function renderBrandPage(bn){
         +(brand.website?('<a href="'+escHtml(brand.website)+'" target="_blank" rel="noopener" style="color:#2563eb">'+escHtml(brand.website.replace(/^https?:\/\//,''))+'</a> · '):'')
         +(brand.categories||[]).slice(0,4).map(escHtml).join(', ')+'</div></div>'
       +'<button class="btn-p" id="bp-poc-main">'+_L('Request PoC for this brand','Bu markada PoC aç')+'</button></div>'
+    + brandInfoHtml(bInfo, brand.name, false)
     +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px">'
       +'<div class="stat" style="flex:1;min-width:120px"><div class="stat-val">'+fams.length+'</div><div class="stat-lbl">'+_L('Product Families','Ürün Ailesi')+'</div></div>'
       +'<div class="stat" style="flex:1;min-width:120px"><div class="stat-val">'+prods.length+'</div><div class="stat-lbl">'+_L('Products in Catalog','Katalogdaki Ürün')+'</div></div>'
@@ -72843,6 +73390,10 @@ async function renderBrandPage(bn){
     +'<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:20px;max-height:420px;overflow:auto">'+(famRows||('<div style="padding:16px;color:var(--text-muted);font-size:13px">'+_L('No families defined yet.','Henüz aile tanımlı değil.')+'</div>'))+'</div>'
     +(prods.length?('<h3 style="font-size:15px;font-weight:800;margin-bottom:8px">🛒 '+_L('Products in Catalog','Katalogdaki Ürünler')+'</h3>'
       +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:20px">'+prodCards+'</div>'):'')
+    +(dists.length?('<h3 style="font-size:15px;font-weight:800;margin-bottom:8px">🚚 '+_L('Distributors in Türkiye','Türkiye distribütörleri')+'</h3>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">'
+      +dists.map(function(d){ return '<span style="font-size:12.5px;padding:6px 12px;border:1px solid var(--border);border-radius:18px;background:var(--bg-surface)"><b>'+escHtml(d.distributorName)+'</b>'+(d.productLine?' <span style="color:var(--text-muted)">· '+escHtml(d.productLine)+'</span>':'')+'</span>'; }).join('')
+      +'</div>'):'')
     +'<h3 style="font-size:15px;font-weight:800;margin-bottom:8px">🤝 '+_L('Vendors representing this brand','Bu markayı temsil eden vendorlar')+'</h3>'
     +(vendCards?('<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:24px">'+vendCards+'</div>')
       :('<div style="padding:16px;color:var(--text-muted);font-size:13px;border:1px solid var(--border);border-radius:10px;margin-bottom:24px">'+_L('No vendor represents this brand yet. Your PoC request goes to the pool and our team matches it.','Bu markayı henüz temsil eden vendor yok. PoC talebin havuza düşer, ekibimiz eşleştirir.')+'</div>'))
@@ -72856,6 +73407,12 @@ async function renderBrandPage(bn){
   c.querySelector('#bp-poc-main')?.addEventListener('click', function(){ _poc('',''); });
   c.querySelectorAll('.bp-poc').forEach(function(b){ b.addEventListener('click', function(){ _poc(this.dataset.name, this.dataset.cat); }); });
   c.querySelectorAll('.bp-prod').forEach(function(x){ x.addEventListener('click', function(){ try { openProductDetailModal(this.dataset.id); } catch(e){} }); });
+  // v10.05: aile bilgisi penceresi — o aileyi sunan firmalar da listelenir
+  c.querySelectorAll('.bp-fam').forEach(function(x){ x.addEventListener('click', function(){
+    var nm=this.dataset.name, ct=this.dataset.cat, nn=_normBrand(nm), nb=_normBrand(famBaseName(nm));
+    var offers=prods.filter(function(p){ var pn=_normBrand(p.name||''), pb=_normBrand(famBaseName(p.name||'')); return pn===nn || pb===nb || pn===nb || pb===nn; });
+    openFamilyInfoModal({ brand:brand.name, name:nm, category:ct, offers:offers, onPoc:function(){ _poc(nm, ct); } });
+  }); });
   try { updatePageSEO && updatePageSEO(brand.name+' — PoCHub', (brand.name)+' '+_L('product families, catalog products and authorized vendors in Türkiye.','ürün aileleri, katalog ürünleri ve Türkiye temsilcileri.')); } catch(e){}
 }
 async function renderVendorPublic(slug) {
