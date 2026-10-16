@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- v10.08: test paketi HICBIR ZAMAN indekslenmemeli -->
 <meta name="robots" content="noindex,nofollow,noarchive">
-<title>PoCHub Seed v10.13 — Kıdemli Analist Test Paketi</title>
+<title>PoCHub Seed v10.14 — Kıdemli Analist Test Paketi</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#07080d;color:#e9ecf3;min-height:100vh}
@@ -65,7 +65,7 @@ textarea.inp{resize:vertical;min-height:60px}
 <div id="seed-gate"></div>
 
 <div class="hdr">
-  <div class="logo">Poc<b>Hub</b>.co <span style="font-size:12px;font-weight:400;color:rgba(255,255,255,.3)">Seed v10.13</span></div>
+  <div class="logo">Poc<b>Hub</b>.co <span style="font-size:12px;font-weight:400;color:rgba(255,255,255,.3)">Seed v10.14</span></div>
   <span class="badge">⚗ KIDEMLİ ANALİST TEST PAKETİ</span>
 </div>
 
@@ -75,7 +75,7 @@ textarea.inp{resize:vertical;min-height:60px}
   <div style="background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(34,208,120,.05));border:1px solid rgba(59,124,255,.2);border-radius:12px;padding:18px 22px;margin-bottom:28px;display:flex;align-items:center;gap:16px">
     <div style="font-size:28px">🧪</div>
     <div>
-      <div style="font-size:15px;font-weight:700;margin-bottom:4px">PoCHub v10.13 — Kıdemli Analist Test Paketi</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">PoCHub v10.14 — Kıdemli Analist Test Paketi</div>
       <div style="font-size:12.5px;color:rgba(255,255,255,.55);line-height:1.7">
         Firebase <b style="color:#f0a429">pochub-co</b> üzerinde 8 kritik iş akışını test eder. ID'ler akışlar arası otomatik aktarılır.
         Test kayıtları <code style="background:rgba(240,164,41,.1);color:#f0a429;padding:1px 5px;border-radius:3px">isTestRecord:true</code> ile işaretlenir.
@@ -581,7 +581,7 @@ var TF = {
         setTimeout(function () { self.refreshState(); }, 600);
       } catch (e) {
         document.getElementById('tf-iframe-status').textContent = '⚠ Cross-origin (DOM erişimi yok)';
-        self.log('⚠ Cross-origin: DOM\'a erişilemiyor. App\'i bu seed ile AYNI origin\'den yükle (ör. ' + location.origin + '/pochub-v10.13.html).', 'err');
+        self.log('⚠ Cross-origin: DOM\'a erişilemiyor. App\'i bu seed ile AYNI origin\'den yükle (ör. ' + location.origin + '/pochub-v10.14.html).', 'err');
         self.iframeLoaded = false;
       }
     };
@@ -2463,7 +2463,18 @@ if (document.readyState === 'loading') {
     <div id="trv-results" style="margin-top:14px"></div>
   </div>
 
-  <div class="stitle" style="margin-top:32px;margin-bottom:14px"><span>10. v10.13 Değişiklik Kaydı</span></div>
+  <div class="stitle" style="margin-top:32px;margin-bottom:14px"><span>14. v10.14 — Profil XSS ve Partner Etkinlikleri (kural v1.10.9)</span></div>
+  <div class="card">
+    <div style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,.62);margin-bottom:14px">
+      Önce <b>VENDOR</b>, sonra <b>MÜŞTERİ</b> hesabıyla çalıştırın. Profil alanlarına etiket / javascript: bağlantısı yazma
+      denemeleri ve müşterinin partner etkinliklerini filtresiz listeleme denemesi. Hepsi REDDEDİLMELİ; hiçbiri iz bırakmaz
+      (reddedilen yazma hiçbir şeyi değiştirmez).
+    </div>
+    <button class="btn" id="sec14-run">🛡 Lansman Güvenlik Testlerini Çalıştır</button>
+    <div id="sec14-results" style="margin-top:14px"></div>
+  </div>
+
+  <div class="stitle" style="margin-top:32px;margin-bottom:14px"><span>10. v10.14 Değişiklik Kaydı</span></div>
   <div class="card">
     <div id="changelog" style="font-size:12.5px;line-height:2.1;color:rgba(255,255,255,.65)"></div>
   </div>
@@ -4505,6 +4516,11 @@ window.loadAllStats = async function() {
 
 // ── Changelog ───────────────────────────────────────────────────
 const CL = {
+  'v10.14': [
+    'GUVENLIK: users / vendor_public metin alanlarinda etiket yasagi, baglanti/gorsel alanlarinda javascript: yasagi (profil stored-XSS). Partner etkinlikleri kural duzeyinde gizli.',
+    'AKSIYON (TERS SIRA): ONCE uygulama v10.14, admin bir kez giris, SONRA kurallar v1.10.9.',
+    'TEST: Bolum 14 — vendor ve musteri hesabiyla ayri ayri; tum satirlar Reddedildi.',
+  ],
   'v10.13': [
     'FAZ 3 (ek maliyetsiz): yetkili egitim merkezi basvurusu + admin onayi + rozet/filtre; admin tanimli lab saglayicilari. Odeme altyapisi bilerek yok (ek maliyet).',
     'AKSIYON: ONCE kurallar v1.10.8, SONRA uygulama.',
@@ -13335,6 +13351,31 @@ async function runTrvTests(){
   btn.disabled = false;
 }
 document.getElementById('trv-run').addEventListener('click', runTrvTests);
+
+/* v10.14 — LANSMAN GUVENLIK TESTLERI (kural v1.10.9) */
+async function runSec14Tests(){
+  var btn = document.getElementById('sec14-run'); btn.disabled = true;
+  var R = [], add = function(name, r, detail){ R.push({ name:name, ok:r.ok, err:r.err, detail:detail }); };
+  if(!U){ _secRender('sec14-results', [{ name:'Giriş yapılmış', ok:false, err:'Önce giriş yapın' }], null, 'deny'); btn.disabled=false; return; }
+  var uid = U.uid, role = (P && P.role) || '';
+  add('users: firma adına <img onerror>', await _mustDeny(function(){ return updateDoc(doc(db,'users',uid), { company:'Test <img src=x onerror=alert(1)>' }); }), 'v1.10.9 öncesi İZİN VERİLİYORDU');
+  add('users: kısa açıklamaya <script>', await _mustDeny(function(){ return updateDoc(doc(db,'users',uid), { shortDescription:'<scr'+'ipt>alert(1)<\/scr'+'ipt>' }); }));
+  add('users: web sitesine javascript:', await _mustDeny(function(){ return updateDoc(doc(db,'users',uid), { website:'javascript:alert(1)' }); }));
+  add('users: logo adresine tırnak ile öznitelik kaçışı', await _mustDeny(function(){ return updateDoc(doc(db,'users',uid), { logoUrl:'https://x.y/a.png" onerror="alert(1)' }); }));
+  if(role === 'vendor'){
+    add('vendor_public: firma adına <img onerror>', await _mustDeny(function(){ return setDoc(doc(db,'vendor_public',uid), { vendorId:uid, company:'Test <img src=x onerror=alert(1)>' }, { merge:true }); }));
+    add('vendor_public: web sitesine javascript:', await _mustDeny(function(){ return setDoc(doc(db,'vendor_public',uid), { vendorId:uid, website:'javascript:alert(1)' }, { merge:true }); }));
+  } else R.push({ name:'vendor_public testleri', skip:true, detail:'vendor hesabıyla çalıştırın' });
+  if(role === 'customer'){
+    add('public_events: müşteri filtresiz liste (partner etkinlikleri dahil)', await _mustDeny(function(){ return getDocs(query(collection(db,'public_events'), where('status','==','published'))); }));
+    var pos = { ok:true };
+    try { await getDocs(query(collection(db,'public_events'), where('status','==','published'), where('audience','==','public'), limit(5))); } catch(e){ pos = { ok:false, err:(e && e.code) || 'okunamadı' }; }
+    R.push({ name:'POZİTİF: müşteri herkese açık etkinlikleri okur', ok:pos.ok, err:pos.err });
+  } else R.push({ name:'partner etkinliği testleri', skip:true, detail:'müşteri hesabıyla çalıştırın' });
+  _secRender('sec14-results', R, null, 'deny');
+  btn.disabled = false;
+}
+document.getElementById('sec14-run').addEventListener('click', runSec14Tests);
 
 </script>
 </body>

@@ -798,7 +798,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v10.13';
+const VERSION = 'v10.14';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1272,6 +1272,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v10.14': ['LANSMAN ONCESI GUVENLIK (Hasan: sonraki adim; devir notundaki lansman oncesi acik isler). (1) PROFIL ALANLARINDA STORED-XSS KAPATILDI: urunlerde v1.9.5 ten beri etiket yasagi (noTags) var ama users ve vendor_public kurallarinda YOKTU. Vendor konsoldan firma adina ya da kisa aciklamasina <img onerror=...> yazip herkese acik profilde (h1, aciklama, iletisim alanlari ham basiliyordu), anasayfa logo seridinde ve admin ekranlarinda calistirabiliyordu; admin oturumunu ele gecirme yolu. KOK: kural v1.10.9 users (sahibi) ve vendor_public (vendor) yazmalarinda ad, firma, aciklama, adres, sehir, telefon, referans, ulke, slug alanlarina etiket yasagi; website / logoUrl / photoBase64 icin javascript:, tirnak ve acili parantez yasagi; photoBase64 yalniz data:image. Yalniz DEGISEN alan denetlenir (eski kayitlarin profil kaydi kilitlenmesin). EKRAN: herkese acik profil (firma, aciklama, web, telefon, adres, ulke, kategoriler, logo), anasayfa logo seridi (alt ve onerror icinden innerHTML ile isim basiliyordu) ve ortak avatar fonksiyonu (src ham) kacislandi: safeImgSrc (yalniz https ve data:image), safeHref (javascript/data/vbscript yok, semasiz adrese https). MEVCUT VERI: admin ilk giriste bir kez tarar (pochub_config/sec_heal); aynada etiketli metin temizlenir, guvensiz baglanti bosaltilir; kullanici kayitlarinda bulunanlar admin kutusuna raporlanir (kullanici verisine kendiliginden dokunulmaz). (2) PARTNER ETKINLIKLERI KURAL DUZEYINDE: yalniz is ortaklari etkinlikleri v9.60 tan beri yalniz ARAYUZDE gizleniyordu, API den herkes okuyabiliyordu (gizlilik isaretli uretici icerigi). Kural: musteri ve anonim yalniz audience=public okur; vendor ve admin hepsini. Musteri / anonim sorgularina audience filtresi (etkinlikler ekrani, anasayfa sayaclari, vendor profili). Klonlanan etkinlik audience tasir; eski kayitlara admin ilk giriste bir kez audience=public yazilir. YAYIN SIRASI BU SURUMDE TERS: ONCE uygulama v10.14, admin bir kez giris (tarama + audience), SONRA kurallar v1.10.9 — kurallar once yayinlanirsa audience alani olmayan eski etkinlikler musteri listesinden duser. (3) robots.txt + sitemap.xml lansman icin hazirlandi (ayri dosya). TESPIT: uygulama hash yonlendirmesi (#v/firma, #trainings) kullaniyor; arama motorlari # sonrasini ayri sayfa saymaz, vendor profilleri ve egitimler bu haliyle dizine girmez. Cozum Firebase Hosting rewrite ile gercek yollar (ucretsiz) — ayri is. PROVA (Chromium, sahte veri): etiketli firma adi profilde metin olarak gorunuyor, javascript: web adresi baglanti uretmiyor, guvensiz logo basilmiyor; admin taramasi aynayi temizledi ve kullanici kaydini raporladi; musteri etkinlik listesinde partner etkinligi yok, vendor goruyor; audience eksik eski etkinlige alan yazildi. node --check MODULE SYNTAX OK. RULES v1.10.9.'],
   'v10.13': ['EGITIMLER FAZ 3 — EK MALIYETSIZ KISIM (Hasan: sonrakine gecebiliriz). Faz 3 te uc is vardi: platform uzerinden odeme + komisyon, yetkili egitim merkezi dogrulamasi, lab entegrasyonu. ODEME BILEREK YAPILMADI: sanal POS sozlesmesi, gizli anahtar ve sunucu tarafi (Blaze + Cloud Functions) gerektirir; gelir baslayana kadar ek maliyet yok karari. Ucretler aylik fatura raporuyla devam ediyor. (1) YETKILI EGITIM MERKEZI: saglayici Egitimlerim den marka bazinda basvurur, her marka icin ureticinin herkese acik partner / ATC sayfasi baglantisi (https) zorunlu. Admin > Egitimler > Egitmenler detayinda markalari tek tek onaylar (users + ayna birlikte). Onaylanan markadaki egitimlerde kartta ve detayda Yetkili egitim merkezi rozeti, profil seridinde Yetkili: marka rozetleri, listede Yalniz yetkili merkez filtresi. Rozet kaynagi aynadaki atcBrands; vendor bu alani yazamaz (kural v1.10.8), vendor tarafi ayna senkronu da yazmaz. Bekleyen basvuru Egitmenler listesinde uyari isareti ve dashboard Aksiyon Merkezi nde (Sertifika / yetki dogrulama kuyruguna eklendi). (2) LAB SAGLAYICILARI: admin Ayarlar dan listeyi yonetir (her satir: ad | https | not; statik icerik kurali); saglayici egitim formunda listeden secer; egitim detayinda lab satirinda saglayiciya baglanti. Liste bos baslar; hangi lab saglayicisinin eklenecegi is karari. PROVA (Chromium, sahte veri): basvuru, admin onayi, kart/detay/profil rozeti, filtre, lab listesi kaydi, formdan secim ve detay baglantisi, dashboard kuyrugu. node --check MODULE SYNTAX OK. RULES v1.10.8 (ONCE KURALLAR).'],
   'v10.12': ['ADMIN DASHBOARD EGITIM GORUNURLUGU (Hasan: dashboard son eklenenler icin guncellendi mi — guncellenmemisti; v10.09-v10.11 egitim isleri yalniz Admin > Egitimler sekmesindeydi, dashboard da bekleyen egitim isi gorunmuyordu). AKSIYON MERKEZI: onay bekleyen egitim, iletisim talebi, sponsorlu talebi, sertifika dogrulama talebi ve bildirilen (okunmamis) yorum kuyruklari eklendi; tiklayinca Admin > Egitimler in ilgili alt sekmesi acilir (dashboard dan alt sekmeye gecis icin _adminPreFilter.trTab). EGITIMLER KARTI: yayindaki egitim (sponsorlu sayisiyla), toplam mezun, ortalama puan (degerlendirme sayisiyla), bu ay faturalanacak tutar (basari + sponsorlu ucret kayitlari; iletisim paylasimlari fatura raporunda). Faturalanacak tutar bilerek Son 30 Gun Gelir e EKLENMEDI: bu kayitlar tahsilat degil, ay sonunda GITS in kesecegi fatura. OKUMA MALIYETI: yalniz esitlik filtreli kuyruk sorgulari, bu ayin ucret kayitlari ve kucuk tr_stats koleksiyonu; tam tarama yok. Yalniz admin rolunde gorunur (Egitimler sekmesi de yalniz admin de). PROVA (Chromium, sahte veri): kuyruk sayilari, kartlar, tiklayinca dogru alt sekme. node --check MODULE SYNTAX OK. RULES degismedi (v1.10.7).'],
   'v10.11': ['EGITIMLER FAZ 2b + ADMIN EGITMEN GORUNUMU (Hasan: egitmenlerin tum profil bilgileri, yildiz ve yorumlari admin panelde de gorunmeli). KARAR: puanlari moderasyon yapan ve sponsorlu onaylayan admin, bu karari egitmenin tam resmini gormeden vermemeli. Admin > Egitimler > Egitmenler: bagimsiz egitmenler + egitim veren kurumlar; tek ekranda herkese acik OLMAYAN iletisim bilgileri dahil profil, yildiz / kriter / NPS / mezun, GIZLENENLER DAHIL tum yorumlar (yorumcunun adi ve e-postasiyla, gizle/goster), egitimler (kayit / katildi sayisi), basari ve sponsorlu ucret toplamlari, sponsorlu gecmisi; tek tikla dogrula / dogrulamayi kaldir (users + ayna birlikte), ucretsiz one cikar. UYARI ISARETLERI (bir sey kanitlamaz, nereye bakilacagini gosterir): yorumcunun e-posta alan adi egitmeninkiyle ayni (gmail gibi ucretsiz saglayicilar haric), 24 saatte 5+ yorum, 5+ yorumun hepsi 5 yildiz, ayni kisi 3+ kez, 20+ mezun ama hic yorum yok, gizlenmis yorum, bekleyen sertifika dogrulamasi. Varsayilan siralama: once uyarili. Okuma maliyeti yuksek oldugu icin yalniz sekme acilinca tarar (27.09 kota dersi). FAZ 2b: (1) KURUMA OZEL TEKLIF: saglayici talebe fiyat (grup/kisi basi, para birimi), tarih, bicim ve notla teklif verir (bildirim + e-posta); katilimci Kayitlarim dan kabul/ret eder; kabulde kayit kesinlesir ve Faz 2 akisi (katildi, anket, belge, mezun, basari ucreti) aynen isler; belgedeki tarih tekliften gelir. (2) PoC SONRASI ONERI: musteri panelinde tamamlanan PoC kartinda Egitim dugmesi; PoC nin markasindaki egitimler, yoksa ilgi bildir. Marka urun kaydindan, yoksa marka izinden (brandNorm) bulunur. (3) SERTIFIKA DOGRULAMA: egitmen her sertifikasi icin dogrulama baglantisi (https) ve/veya sertifika no girer; admin tek tek isaretler; dogrulananlar profilde Dogrulandi rozetiyle, digerleri beyan notuyla gorunur. Dosya yukleme bilerek yok (Storage kurulumu + kural isi; baglanti + numara bugun icin yeterli). trainerCredVerified yalniz admin den yazilir (kural). (4) EGITMEN PROFILI SADELESTI: PoC ac dugmesi yerine Egitimlerini gor; urun / PoC / etkinlik sayaclari ve bos urun kutusu egitmende gosterilmez. PROVA (Chromium, sahte veri): teklif ver, kabul, katildi, belgede teklif tarihi; ret; PoC kartindan oneri; sertifika talebi ve admin onayi, profilde rozet; admin egitmen listesi ve detay penceresi (gizli yorum, uyari isaretleri, dogrula). node --check MODULE SYNTAX OK. RULES v1.10.7 (ONCE KURALLAR).'],
@@ -6222,7 +6223,7 @@ function renderAvatar(user, size, opts) {
   if (!user) user = {};
   if (!size) size = 32;
   opts = opts || {};
-  var photo = user.photoBase64 || user.logoUrl || '';
+  var photo = safeImgSrc(user.photoBase64 || user.logoUrl || '');   // v10.14: yalniz https / data:image
   var nameSource = user.displayName || user.company || user.email || '?';
   var initials = String(nameSource).trim().split(/\s+/)
     .map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase();
@@ -6252,7 +6253,7 @@ function renderAvatar(user, size, opts) {
 
   if (photo) {
     return '<div style="width:'+size+'px;height:'+size+'px;border-radius:'+borderRadius+';background:transparent;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;'+border+'">'
-      + '<img src="'+photo+'" style="width:100%;height:100%;object-fit:cover" alt="'+escHtml(nameSource)+'">'
+      + '<img src="'+escHtml(safeImgSrc(photo))+'" style="width:100%;height:100%;object-fit:cover" alt="'+escHtml(nameSource)+'">'
       + '</div>';
   }
   return '<div style="width:'+size+'px;height:'+size+'px;border-radius:'+borderRadius+';background:linear-gradient(135deg,'+grad[0]+','+grad[1]+');display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-family:Segoe UI,sans-serif;font-size:'+fontSize+'px;flex-shrink:0;line-height:1;'+border+'">'
@@ -8581,7 +8582,7 @@ async function renderHome() {
       return getDoc(d).then(function(s){ return s.exists() ? s.data() : null; }).catch(function(){ return null; });
     };
     var [evCount, statsData, prodCount] = await Promise.all([
-      safeGetDocs(query(collection(db,'public_events'), where('status','==','published'))),
+      safeGetDocs(query(collection(db,'public_events'), where('status','==','published'), ..._evAudFilter())),   // v10.14
       safeGetDoc(doc(db,'pochub_config','global_stats')),
       getActiveProducts().then(function(a){ return a.length; }).catch(function(){ return 0; }),   // v9.33: sayi doner (safeGetDocs ile ayni sozlesme)
     ]);
@@ -8637,7 +8638,7 @@ async function renderHome() {
   let allEvents = [];
   try {
     const snap = await Promise.race([
-      getDocs(query(collection(db,'public_events'), where('status','==','published'))),
+      getDocs(query(collection(db,'public_events'), where('status','==','published'), ..._evAudFilter())),   // v10.14
       new Promise(function(_r,rej){ setTimeout(function(){ rej(new Error('events-timeout')); }, 9000); })
     ]);
     var _now = new Date();
@@ -10183,7 +10184,7 @@ async function loadVendorLogoBar() {
       var photo = v.photoBase64 || v.logoUrl || '';
       var inner;
       if (photo) {
-        inner = '<img src="'+photo+'" alt="'+(v.company||'Vendor')+'" style="max-width:100px;max-height:48px;object-fit:contain;filter:grayscale(.2);transition:filter .2s" onerror="this.parentElement.innerHTML=\''+typeIcon+' '+(v.company||'').replace(/\'/g,"\\\\\'")+'\'">';
+        inner = '<img src="'+escHtml(safeImgSrc(photo))+'" alt="'+escHtml(v.company||'Vendor')+'" data-fb="'+escHtml(typeIcon+' '+(v.company||''))+'" style="max-width:100px;max-height:48px;object-fit:contain;filter:grayscale(.2);transition:filter .2s" onerror="this.parentElement.textContent=this.dataset.fb">';   // v10.14: innerHTML yerine textContent
       } else {
         // renderAvatar 48px square
         inner = renderAvatar({
@@ -10191,7 +10192,7 @@ async function loadVendorLogoBar() {
           company: v.company,
           uid: v.uid,
         }, 44, {square: true})
-        + '<div style="font-size:11.5px;color:var(--text-secondary);font-weight:600;text-align:center;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(v.company || 'Vendor')+'</div>';
+        + '<div style="font-size:11.5px;color:var(--text-secondary);font-weight:600;text-align:center;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(v.company || 'Vendor')+'</div>';
       }
       var verified = v.vendorStatus === 'admin_verified'
         ? '<span style="position:absolute;top:6px;right:6px;background:#2563eb;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:700">✓</span>'
@@ -11248,7 +11249,7 @@ async function loadEventsList() {
   syncEventURL();
   listEl.innerHTML = '<div class="loading"><div class="spinner"></div>'+t('common.loading','Yükleniyor...')+'</div>';
   try {
-    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published')));
+    const snap = await getDocs(query(collection(db,'public_events'), where('status','==','published'), ..._evAudFilter()));   // v10.14
     let allDocs = snap.docs.map(d => ({...d.data(), id:d.id})).filter(e => getLifecycleState(e) === 'active');
     var evPeriod = CUR_EV_PERIOD || 'upcoming';
     var now2=new Date(),
@@ -19441,7 +19442,7 @@ async function loadVendTab() {
           if (!confirm('"' + (src.title||'') + '"'+t('vev.cf_clone','etkinliği klonlansın mı? Yeni bir taslak oluşturulur, tarihi/saati ve detayları siz düzenlersiniz.')+'')) return;
           b.disabled = true;
           try {
-            var clone = {...src};
+            var clone = {...src}; clone.audience = src.audience === 'partners' ? 'partners' : 'public';   // v10.14: kural audience ister
             // Sadece çoğaltılabilir alanları kopyala — id, kayıtlar, status temizle
             delete clone.id;
             delete clone._fr;
@@ -29790,7 +29791,8 @@ function renderAdmin() {
     return;
   }
   try { setTimeout(function(){ syncCatInfoBundle(); }, 4000); } catch(_cb){}
-  try { setTimeout(function(){ trHealVendorStatusOnce(); }, 7000); } catch(_vh){}   // v10.09: dogrulama durumu aynaya (bir kez)   // v10.06: paketli katalog bilgisi (surum basina bir kez)
+  try { setTimeout(function(){ trHealVendorStatusOnce(); }, 7000); } catch(_vh){}
+  try { setTimeout(function(){ secHealOnce(); }, 9000); } catch(_sh){}   // v10.14: profil XSS + etkinlik audience (bir kez)   // v10.09: dogrulama durumu aynaya (bir kez)   // v10.06: paketli katalog bilgisi (surum basina bir kez)
   if (el('adm-main') && window._admNavLocale === window.CUR_LOCALE) { loadAdmTab(); return; }
   window._admNavLocale = window.CUR_LOCALE;
   const _rp = getRolePerm(CUR_PROFILE?.role);
@@ -74872,6 +74874,66 @@ function trParseLabLines(txt){
 }
 function trLabLinesText(cfg){ return trLabProviders(cfg).map(function(x){ return [x.name, x.url||'', x.note||''].join(' | '); }).join('\n'); }
 
+
+// ══════════════════════════════════════════════════════════════════════
+// v10.14 — LANSMAN ÖNCESİ GÜVENLİK
+//  (1) PROFİL ALANLARINDA STORED-XSS: users ve vendor_public kurallarında
+//      noTags yoktu (ürünlerde v1.9.5'ten beri var). Vendor, firma adına
+//      "<img onerror=…>" yazıp herkese açık profilde, anasayfa logo
+//      şeridinde ve admin ekranlarında çalıştırabiliyordu. Kök kural
+//      düzeyinde kesildi (v1.10.9); ekranda da kaçış eklendi; mevcut veri
+//      bir kez taranıp ayna temizlenir, kullanıcı kaydı admin'e raporlanır.
+//  (2) GÖRSEL / BAĞLANTI ALANLARI: logoUrl / photoBase64 / website
+//      doğrudan src / href içine basılıyordu. safeImgSrc / safeHref.
+//  (3) PARTNER ETKİNLİKLERİ: "yalnız iş ortakları" etkinlikleri yalnız
+//      arayüzde gizleniyordu; API'den herkes okuyabiliyordu. Artık kural
+//      düzeyinde (müşteri / anonim yalnız audience=='public' okur); eski
+//      kayıtlara audience='public' bir kez yazılır.
+// ══════════════════════════════════════════════════════════════════════
+function safeImgSrc(u){
+  var s = String(u || '');
+  if(/^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+$/i.test(s)) return s;
+  if(/^https:\/\/[^\s"'<>]+$/i.test(s)) return s;
+  return '';
+}
+function safeHref(u){
+  var s = String(u || '').trim();
+  if(!s || /[\s"'<>]/.test(s)) return '';
+  if(/^(javascript|data|vbscript):/i.test(s)) return '';
+  if(!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  return s;
+}
+function _hasTag(v){ return typeof v === 'string' && /<[a-zA-Z\/!?]/.test(v); }
+function _unsafeUrl(v){ return typeof v === 'string' && v !== '' && (/[<>"]/.test(v) || /^\s*(javascript|vbscript|data):/i.test(v) && !/^data:image\//i.test(v)); }
+var SEC_TEXT_FIELDS = ['displayName','company','shortDescription','bio','address','city','phone','refs','country','slug'];
+var SEC_URL_FIELDS = ['website','logoUrl','photoBase64'];
+function _evAudFilter(){
+  var r = CUR_PROFILE && CUR_PROFILE.role;
+  return (r === 'vendor' || r === 'admin') ? [] : [where('audience','==','public')];
+}
+async function secHealOnce(){
+  if(!CUR_USER || CUR_PROFILE?.role !== 'admin') return;
+  try {
+    var cs = await getDoc(doc(db,'pochub_config','sec_heal'));
+    if(cs.exists() && cs.data().v === 'v10.14') return;
+    var R = await Promise.all([ getDocs(collection(db,'vendor_public')), getDocs(query(collection(db,'users'), where('role','==','vendor'))), getDocs(collection(db,'public_events')) ]);
+    var vpFix = [], userFlag = [], evFix = [];
+    R[0].docs.forEach(function(d){ var x = d.data(), u = {};
+      SEC_TEXT_FIELDS.forEach(function(f){ if(_hasTag(x[f])) u[f] = String(x[f]).replace(/<[^>]*>?/g, '').trim(); });
+      SEC_URL_FIELDS.forEach(function(f){ if(_unsafeUrl(x[f])) u[f] = ''; });
+      if(Object.keys(u).length) vpFix.push([d.id, u]); });
+    R[1].docs.forEach(function(d){ var x = d.data(), bad = SEC_TEXT_FIELDS.filter(function(f){ return _hasTag(x[f]); }).concat(SEC_URL_FIELDS.filter(function(f){ return _unsafeUrl(x[f]); }));
+      if(bad.length) userFlag.push((x.company || x.email || d.id) + ' [' + bad.join(',') + ']'); });
+    R[2].docs.forEach(function(d){ if(!('audience' in d.data())) evFix.push(d.id); });
+    var ops = vpFix.map(function(x){ return ['vendor_public', x[0], x[1]]; }).concat(evFix.map(function(id){ return ['public_events', id, { audience:'public' }]; }));
+    for(var i = 0; i < ops.length; i += 400){ var bt = writeBatch(db); ops.slice(i, i+400).forEach(function(o){ bt.update(doc(db, o[0], o[1]), o[2]); }); await bt.commit(); }
+    if(userFlag.length) notifyAdmins({ type:'security', title:_L('Profiles with unsafe content','Güvenli olmayan içerik taşıyan profiller'), message:userFlag.slice(0,30).join(' · ') });
+    await setDoc(doc(db,'pochub_config','sec_heal'), { v:'v10.14', vendorPublicFixed:vpFix.length, usersFlagged:userFlag.length, eventsAudienceSet:evFix.length, at:serverTimestamp() });
+    if(vpFix.length) invalidateVendorPublicCache();
+    console.info('[v10.14] guvenlik taramasi', { vendorPublicFixed:vpFix.length, usersFlagged:userFlag.length, eventsAudienceSet:evFix.length });
+  } catch(e){ console.warn('[v10.14] guvenlik taramasi', e && (e.code||e.message)); }
+}
+
 // ══ v10.08: KATEGORI KATMANI ═══════════════════════════════════════════
 // Katalogda ~16.200 urun ailesi sablonu var; yalniz vendor urunu olan
 // ~330'unun kendine ozel aciklamasi var. 16 bini tek tek yazmak hem
@@ -75641,7 +75703,7 @@ async function renderVendorPublic(slug) {
     var events = [];
     try {
       var now = new Date();
-      var eSnap = await getDocs(query(collection(db,'public_events'), where('vendorId','==',vendor.uid), limit(5)));
+      var eSnap = await getDocs(query(collection(db,'public_events'), where('vendorId','==',vendor.uid), ..._evAudFilter(), limit(5)));   // v10.14
       events = eSnap.docs.map(function(d){ return { ...d.data(), id:d.id }; });
       events = events.filter(function(ev){
         var d = ev.date?.toDate ? ev.date.toDate() : new Date(ev.date);
@@ -75660,7 +75722,7 @@ async function renderVendorPublic(slug) {
     var heroPhoto = vendor.photoBase64 || vendor.logoUrl || '';
     var logoHtml;
     if (heroPhoto) {
-      logoHtml = '<img src="'+heroPhoto+'" alt="'+vendor.company+' logo" style="width:120px;height:120px;object-fit:cover;border-radius:14px;background:#fff;padding:'+(vendor.photoBase64?'0':'10px')+';border:1px solid var(--border)" onerror="this.style.display=\'none\'">';
+      logoHtml = '<img src="'+escHtml(safeImgSrc(heroPhoto))+'" alt="'+escHtml(vendor.company)+' logo" style="width:120px;height:120px;object-fit:cover;border-radius:14px;background:#fff;padding:'+(vendor.photoBase64?'0':'10px')+';border:1px solid var(--border)" onerror="this.style.display=\'none\'">';
     } else {
       logoHtml = renderAvatar({
         displayName: vendor.company || vendor.displayName,
@@ -75695,8 +75757,8 @@ async function renderVendorPublic(slug) {
       +         '<span style="font-size:13px;color:var(--text-muted);font-weight:600">'+typeIcon+' '+typeLabel+'</span>'
       +         verifiedBadge + tierBadge + referralBadgeHtml + phoneBadgeHtml
       +       '</div>'
-      +       '<h1 style="font-size:30px;font-weight:800;color:var(--text-primary);margin:0 0 8px;line-height:1.2">'+vendor.company+'</h1>'
-      +       (vendor.shortDescription ? '<div style="font-size:14.5px;color:var(--text-secondary);margin-bottom:14px;line-height:1.5">'+vendor.shortDescription+'</div>' : '')
+      +       '<h1 style="font-size:30px;font-weight:800;color:var(--text-primary);margin:0 0 8px;line-height:1.2">'+escHtml(vendor.company)+'</h1>'
+      +       (vendor.shortDescription ? '<div style="font-size:14.5px;color:var(--text-secondary);margin-bottom:14px;line-height:1.5">'+escHtml(vendor.shortDescription)+'</div>' : '')
       +       '<div style="display:flex;gap:8px;flex-wrap:wrap">'
       +         ctaHtml
       +         '<button class="btn-g" id="vp-share-btn" style="padding:12px 18px;font-size:13.5px">'+t('vpub.share','🔗 Paylaş')+'</button>'
@@ -75717,11 +75779,11 @@ async function renderVendorPublic(slug) {
       + '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px">'
       +   '<h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0 0 12px">'+t('vpub.contact_details','📇 İletişim & Detaylar')+'</h3>'
       +   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;font-size:13.5px;color:var(--text-secondary)">'
-      +     (vendor.website ? '<div><strong style="color:var(--text-primary)">🌐 Web Sitesi:</strong><br><a href="'+vendor.website+'" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none">'+vendor.website+' ↗</a></div>' : '')
-      +     (vendor.phone ? '<div><strong style="color:var(--text-primary)">'+t('vpub.phone','📞 Telefon:')+'</strong><br>'+vendor.phone+'</div>' : '')
-      +     (vendor.address ? '<div><strong style="color:var(--text-primary)">'+t('vpub.address','📍 Adres:')+'</strong><br>'+vendor.address+'</div>' : '')
-      +     (vendor.origin ? '<div><strong style="color:var(--text-primary)">'+t('vpub.origin_label','🌍 Menşei:')+'</strong><br>'+(vendor.origin==='foreign'?t('vpub.foreign','Yabancı')+(vendor.country?' ('+vendor.country+')':''):t('vpub.domestic','Yerli'))+'</div>' : '')
-      +     (vendor.categories?.length ? '<div><strong style="color:var(--text-primary)">📂 Kategoriler:</strong><br>'+vendor.categories.slice(0,5).join(', ')+(vendor.categories.length>5?'...':'')+'</div>' : '')
+      +     (safeHref(vendor.website) ? '<div><strong style="color:var(--text-primary)">🌐 Web Sitesi:</strong><br><a href="'+escHtml(safeHref(vendor.website))+'" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:none">'+escHtml(vendor.website)+' ↗</a></div>' : '')
+      +     (vendor.phone ? '<div><strong style="color:var(--text-primary)">'+t('vpub.phone','📞 Telefon:')+'</strong><br>'+escHtml(vendor.phone)+'</div>' : '')
+      +     (vendor.address ? '<div><strong style="color:var(--text-primary)">'+t('vpub.address','📍 Adres:')+'</strong><br>'+escHtml(vendor.address)+'</div>' : '')
+      +     (vendor.origin ? '<div><strong style="color:var(--text-primary)">'+t('vpub.origin_label','🌍 Menşei:')+'</strong><br>'+(vendor.origin==='foreign'?t('vpub.foreign','Yabancı')+(vendor.country?' ('+escHtml(vendor.country)+')':''):t('vpub.domestic','Yerli'))+'</div>' : '')
+      +     (vendor.categories?.length ? '<div><strong style="color:var(--text-primary)">📂 Kategoriler:</strong><br>'+vendor.categories.slice(0,5).map(escHtml).join(', ')+(vendor.categories.length>5?'...':'')+'</div>' : '')
       +     (vendor.brands?.length ? '<div><strong style="color:var(--text-primary)">'+_L('🏷 Brands:','🏷 Markalar:')+'</strong><br>'+vendorBrandGroupsHtml(vendor)+'</div>' : '')
       +   '</div>'
       + '</div>'
