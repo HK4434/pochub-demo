@@ -798,7 +798,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v10.10';
+const VERSION = 'v10.11';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1272,6 +1272,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v10.11': ['EGITIMLER FAZ 2b + ADMIN EGITMEN GORUNUMU (Hasan: egitmenlerin tum profil bilgileri, yildiz ve yorumlari admin panelde de gorunmeli). KARAR: puanlari moderasyon yapan ve sponsorlu onaylayan admin, bu karari egitmenin tam resmini gormeden vermemeli. Admin > Egitimler > Egitmenler: bagimsiz egitmenler + egitim veren kurumlar; tek ekranda herkese acik OLMAYAN iletisim bilgileri dahil profil, yildiz / kriter / NPS / mezun, GIZLENENLER DAHIL tum yorumlar (yorumcunun adi ve e-postasiyla, gizle/goster), egitimler (kayit / katildi sayisi), basari ve sponsorlu ucret toplamlari, sponsorlu gecmisi; tek tikla dogrula / dogrulamayi kaldir (users + ayna birlikte), ucretsiz one cikar. UYARI ISARETLERI (bir sey kanitlamaz, nereye bakilacagini gosterir): yorumcunun e-posta alan adi egitmeninkiyle ayni (gmail gibi ucretsiz saglayicilar haric), 24 saatte 5+ yorum, 5+ yorumun hepsi 5 yildiz, ayni kisi 3+ kez, 20+ mezun ama hic yorum yok, gizlenmis yorum, bekleyen sertifika dogrulamasi. Varsayilan siralama: once uyarili. Okuma maliyeti yuksek oldugu icin yalniz sekme acilinca tarar (27.09 kota dersi). FAZ 2b: (1) KURUMA OZEL TEKLIF: saglayici talebe fiyat (grup/kisi basi, para birimi), tarih, bicim ve notla teklif verir (bildirim + e-posta); katilimci Kayitlarim dan kabul/ret eder; kabulde kayit kesinlesir ve Faz 2 akisi (katildi, anket, belge, mezun, basari ucreti) aynen isler; belgedeki tarih tekliften gelir. (2) PoC SONRASI ONERI: musteri panelinde tamamlanan PoC kartinda Egitim dugmesi; PoC nin markasindaki egitimler, yoksa ilgi bildir. Marka urun kaydindan, yoksa marka izinden (brandNorm) bulunur. (3) SERTIFIKA DOGRULAMA: egitmen her sertifikasi icin dogrulama baglantisi (https) ve/veya sertifika no girer; admin tek tek isaretler; dogrulananlar profilde Dogrulandi rozetiyle, digerleri beyan notuyla gorunur. Dosya yukleme bilerek yok (Storage kurulumu + kural isi; baglanti + numara bugun icin yeterli). trainerCredVerified yalniz admin den yazilir (kural). (4) EGITMEN PROFILI SADELESTI: PoC ac dugmesi yerine Egitimlerini gor; urun / PoC / etkinlik sayaclari ve bos urun kutusu egitmende gosterilmez. PROVA (Chromium, sahte veri): teklif ver, kabul, katildi, belgede teklif tarihi; ret; PoC kartindan oneri; sertifika talebi ve admin onayi, profilde rozet; admin egitmen listesi ve detay penceresi (gizli yorum, uyari isaretleri, dogrula). node --check MODULE SYNTAX OK. RULES v1.10.7 (ONCE KURALLAR).'],
   'v10.10': ['EGITIMLER FAZ 2 — DEGERLENDIRME, MEZUN, BELGE, EGITMEN PROFILI (Hasan: egitmen profili on planda olsun; ders sonunda memnuniyet anketi, egitmen yildizi, mezun sayisi; buradan da gelir; ince dusunelim). ASIL RISK SAHTE YILDIZDI: puan guvenilmezse egitmeni one cikarmanin degeri kalmaz. KARARLAR: (1) Yalniz saglayicinin Katildi isaretledigi kaydin SAHIBI anket doldurur; anket kimligi kayit kimligi (kayit basina bir). Saglayici yorumu silemez/degistiremez, bir kez herkese acik yanit yazar; kotuye kullanim icin Bildir, admin gizler. (2) Toplamlar tr_stats/{p_|t_|tr_}kimlik dokumanlarinda ve SERBEST YAZILAMAZ: kural artisin ayni toplu yazmada olusan anketin (createdAt == request.time) ya da Katildi isaretinin (attendedAt == request.time) degerine birebir esit oldugunu getAfter ile dogruluyor. Eski bir anket/kayit bir daha request.time a esit olamayacagi icin tekrar oynatma yok. Urun puanindaki SEC-7 sinifi acik (ratingCount=99999) burada olusamaz; Cloud Function gerekmez. (3) Siralama Bayes ortalamasiyla (1 yorumlu 5.0, 40 yorumlu 4.8 in onune gecmez). (4) Mezun = Katildi isaretli kisi sayisi; Katildi geri alinamaz. ANKET: genel, egitmen, icerik, lab/materyal, organizasyon (1-5), tavsiye 0-10 (NPS), yorum, firma adi gorunsun mu. Ad Ayse D. bicimiyle gosterilir. EGITMEN ON PLANDA: Egitimler sekmesinde Egitmenler dizini (yildiz, mezun, sertifika, marka; en yuksek puan / en cok mezun / en yeni); vendor profilinin en ustunde istatistik seridi (yildiz, mezun, NPS, aktif egitim, kriter cubuklari) ve son yorumlar; kartlarda ve egitim detayinda yildiz + mezun + yorumlar. Egitmenin kendi verdigi egitimler de egitmen istatistigine yazilir. KATILIM BELGESI: katilimci tek tikla olusturur (#cert/KOD, yazdir/PDF, LinkedIn paylas, dogrulama kodu). Uzerinde resmi uretici sertifikasi DEGILDIR yazar (oyle gorunmesi hukuki risk). KAYITLARIM: Egitimler ekraninda (her rol) — durum, iptal, Degerlendir, Belgem. Katildi isaretlenince katilimciya bildirim + e-posta (#tr-survey/kayit). GELIR (ikisi de kapali baslar): (A) KATILIMCI BASI BASARI UCRETI: PoCHub uzerinden gelip Katildi isaretlenen kisi basi sabit TL, ucretsiz egitimler varsayilan muaf, aylik fatura raporuna girer. Ucret ilan onaylanirken ilana yazilir (feeSeat); ayar degisince yayindaki ilanlara da islenir; ucretsizden ucretliye gecen ilan yeniden onaya duser (aksi halde ucretten kacilirdi). INCE NOKTA: ucret aciksa kural mezun sayacini YALNIZ ucret kaydiyla birlikte artiriyor — itibar ile ucret ayni dugmeye bagli; ucretten kacmak icin katilimi isaretlemeyen mezun ve yildiz da kazanamaz. Kural ucret tutarinin feeSeat x kisi oldugunu da dogruluyor. (B) SPONSORLU ONE CIKARMA: egitim ya da egitmen haftalik ucretle listenin ustunde SPONSORLU etiketiyle; talep saglayicidan, onay ve ucret kaydi admin den. Puan siralamasini DEGISTIRMEZ (Liderler sayfasindaki ucretli siralama yok ilkesi). BILEREK YAPILMAYAN: yorum gizleme ya da puan yukseltme karsiligi ucret. Fatura raporu artik uc kalemi (iletisim paylasimi, basari ucreti, sponsorlu) tur kolonuyla topluyor. Admin > Egitimler: Degerlendirmeler (gizle/goster, puan ve mezunlari yeniden hesapla), Sponsorlu (onay), Ayarlar (basari ucreti, muafiyet, sponsorlu acik/haftalik ucret). ERISIM CAGRISI SINIRI: toplu yazma basina 20 belge okuma; ilana bagli egitmen en fazla 3, kural dallarinda once alan kontrolu sonra okuma. PROVA (Chromium, sahte veri): katilim isaretleme + sayaclar + ucret kaydi, anket + yildiz/NPS toplamlari, ikinci anket engeli, belge olusturma ve dogrulama sayfasi, egitmen dizini ve profil seridi, sponsorlu onay ve fatura raporu. node --check MODULE SYNTAX OK. RULES v1.10.6 (ONCE KURALLAR).'],
   'v10.09': ['EGITIMLER MODULU — FAZ 1 (Hasan: urunlerle ilgili ucretli/ucretsiz, uzaktan/yerinde, 1-X gunluk egitimler; veren uretici, distributor, entegrator ya da bagimsiz uzman olabilir; siniflar icin talep toplanip egitim verenlere bildirilsin; odeme altyapisi olmadan kucuk de olsa gelir). YENI SEKME Egitimler: arama + marka/bicim/tur/ucret filtreleri, kart ve detay penceresi, takvimli sinifa KAYIT, kuruma ozel TALEP, ILGI BILDIR. Iki tur bilerek ayrildi: acik sinif (tarih + kontenjan, kayit alir) ve kuruma ozel (tarihsiz, talep alir); bir egitim ikisini birden sunabilir. BAGIMSIZ EGITMEN: yeni vendorType egitmen (Giris menusu > Bagimsiz egitmen). Kisisel e-posta ve bos firma adi kabul (bagimsiz uzmanin kurumsal adresi olmayabilir), sertifikalar profilde gorunur ve Profilim den duzenlenir. Marka temsilcisi SAYILMAZ: marka sayfasindaki temsilci listesine ve PoC marka eslestirmesine girmez (yoksa PoC talepleri egitmene giderdi). Vendor kendi egitimine kayitli egitmeni baglar (profiline link) ya da adini serbest yazar. GUVEN: egitmen dogrulamasi mevcut Dogrulanmis rozeti. Her yeni egitim admin onayindan gecer; dogrulanmis saglayicinin duzenlemesi yayinda kalir, digerlerininki yeniden onaya duser (kural da ayni seyi uygular). TALEP HAVUZU: ilgi bildirenin iletisim bilgisi training_interest te (yalniz kendisi ve admin okur); herkese acik olan yalniz ozet training_pools/{marka__konu__sehir}: kisi, koltuk, bicim dagilimi. Esik (varsayilan 5) ve her katinda o markayi beyan etmis vendorlara + o markada egitim veren saglayicilara bildirim (en fazla 25) ve admin kutusuna not. GELIR (odeme altyapisi yok, iki model, ikisi de ayardan acilir): (1) ILETISIM BILGISI KARSILIGI UCRET: saglayici havuzun iletisim bilgilerini ister, admin onaylayinca kisiler saglayicinin paneline acilir; ucretli modda yeni paylasilan kisi basi ucret kaydedilir, Admin > Egitimler > Fatura raporu ay ve saglayiciya gore toplar, CSV verir, faturayi GITS keser. Ucret saglayicinin gonderdigi degerden degil onay anindaki ayardan hesaplanir. Ucretsiz modda da paylasim admin onayiyla (KVKK + kalite). Ayni havuza sonradan gelenler icin Yenileri iste; yalniz yeni kisiler ucretlenir. (2) PAKET KOTASI: paketlere Egitim ilani limiti (-1 sinirsiz); ayar kapaliyken uygulanmaz. KVKK: kayit, talep ve ilgi formlarinda acik riza kutusu zorunlu, consentAt kaydedilir. KAYNAK: her kayit/talep/ilgi source pochub tasir (ileride komisyon modeli secilirse geriye donuk veri hazir). ENTEGRASYON: urun penceresi, aile bilgi penceresi ve marka sayfasinda o markanin egitimleri + Bu urun icin egitim talep et baglantisi; vendor profilinde egitimler ve sertifikalar. Vendor paneli > Egitimlerim: ilan ekle/duzenle/arsivle (oturum satirlari, egitmenler, mufredat, on kosul, sertifika, lab), kayit ve talep kutusu (durum: yeni/iletisime gecildi/kesinlesti/iptal), markalarim icin talep havuzlari. Admin > Egitimler: onay (tek tek ve hepsini onayla, ret gerekcesi saglayiciya bildirim), tumu, havuzlar, iletisim talepleri, fatura raporu, ayarlar (esik, paylasim modu, kisi basi ucret, kota). GUVENLIK ACIGI KAPATILDI (kural v1.10.5): users kuralinda vendorStatus korunmuyordu; vendor konsoldan kendini admin_verified yapip Dogrulanmis rozeti alabiliyordu. Bu rozet artik egitmen guveninin de dayanagi oldugu icin kapatildi: vendor alani degistiremez (tek istisna eski kayitlardaki eksik alanin auto_approved yapilmasi), kayitta yalniz auto_approved. vendor_public aynasinda da ayni: durum yalniz admin den. Admin dogrula/reddet/geri al artik aynaya da yaziyor (onceden ayna vendor bir sonraki giriste profilini kaydedene kadar eski kaliyordu); admin ilk giriste uyumsuz kayitlari bir kez esitler (pochub_config/vstatus_heal). Vendor tarafi ayna senkronu vendorStatus u yazmiyor (eski bir profil kopyasi dogrulamayi geri almasin). AYNI SINIF IKINCI HATA: vendor senkronu aynaya isVerified/evidenceScore da yaziyordu; kural bu alanlari vendor a kapattigi icin admin vendoru Vendor Dogrulama ekranindan dogruladiktan sonra vendorun TUM ayna senkronu (firma adi, logo, markalar) sessizce reddediliyordu. Artik vendor senkronu bu uc alani yazmiyor, admin ekranlari aynaya kendisi yaziyor, users.isVerified de korunuyor. AYRICA: v10.04 urun onayi bildirimi productCount alani yuzunden kurala takilip HIC gitmiyordu (alan beyaz listede yok) — data.productCount a tasindi. Profil kaydi herkese acik profile hemen yansiyor. PROVA (Chromium, sahte veri): kayit, kontenjan sayaci, ilgi bildirimi ile havuz olusumu ve esikte bildirim, iletisim talebi, admin onayi ile kisilerin paylasilmasi ve ucret kaydi, fatura CSV, yenileri iste ile yalniz yeni kisinin ucretlenmesi, egitmenin marka temsilcisi listesine girmemesi. node --check MODULE SYNTAX OK. RULES v1.10.5 (ONCE KURALLAR YAYINLANMALI).'],
   'v10.08': ['KATEGORI KATMANI (Hasan: 16 bin urun arasinda 360 kayit yeterli mi). Yeterli degildi: vendor urunu olan her aile aciklamali ama katalogdaki ~16.200 urun ailesi sablonu (marka sayfalari, katalogdaki Marka katalogu kartlari) bilgisizdi. KARAR: 16 bini tek tek yazmak yerine 986 kategorinin (taksonominin tamami) her biri icin kisa aciklama + PoCde genelde neye bakilir notu yazildi. Kendi aciklamasi olmayan bir aile acildiginda BU KATEGORI HAKKINDA basligiyla kategori metni gosterilir ve metnin urune degil kategoriye ozel oldugu acikca yazar (uydurma urun bilgisi yok). Altyapi/guvenlik kategorilerinde PoC notu kategoriye ozel; is uygulamalarinda genel PoC notu, hizmet kategorilerinde (danismanlik, BPO, ajans) PoC yerine referans/kapsam degerlendirmesi. Ayni kavramin farkli adlari (Uc Nokta Koruma / Endpoint gibi) ayni metne baglandi. DEPOLAMA: pochub_content/catinfo_<kategori> — KURAL DEGISIKLIGI YOK (pochub_content herkes okur, admin yazar; uygulama bu koleksiyonu yalniz dogrudan kimlikle okuyor). Okuma maliyeti: kendi aciklamasi olmayan aile acilinca +1 okuma. SENKRON: paket kategori icerigi degisince (catHash) bir kez ~1.000 okuma + degisen kadar yazma (ilk seferde 986); icerik ayniysa kategorilere hic dokunulmaz. Elle duzenlenen kategori ezilmez. AYRICA: (1) Katalogdaki Marka katalogu sablon kartina tiklayinca artik dogrudan bilgi penceresi aciliyor (eskiden marka sayfasina gidip ikinci tik gerekiyordu); pencerede Marka sayfasi baglantisi var. (2) Urun penceresinde kendi aciklamasi yoksa kategori aciklamasi. (3) Admin > Katalog Bilgileri > Kategoriler sekmesi: arama, duzenleme (statik icerik kurali). PROVA (Chromium): ilk senkron 986 kategori yazdi, ikinci senkron 0; elle duzenlenen kategori sonraki paketle korundu; sablon kartindan acilan pencerede kategori kutusu, PoC ve marka baglantisi; kendi aciklamasi olan aile kategori yerine kendi metnini gosteriyor. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi.'],
@@ -15256,11 +15257,13 @@ async function loadCustTab() {
               : '')
           +   (r.status==='completed'
               ? '<button class="rq-eval btn-p btn-sm" data-id="'+r.id+'">⭐ '+(r.criteriaRatings?t('cust.update_eval','Değerlendirmeyi Güncelle'):t('cust.evaluate','Değerlendir'))+'</button>'
+                + '<button class="rq-trn btn-g btn-sm" data-id="'+r.id+'">🎓 '+_L('Training for the team','Ekibe eğitim')+'</button>'   // v10.11
               : '')
           + '</div>'
         ;
         card.querySelector('.rq-detail')?.addEventListener('click', function(){ openPocTimeline(r); });
         card.querySelector('.rq-eval')?.addEventListener('click', function(){ openPocEvalModal(r); });
+        card.querySelector('.rq-trn')?.addEventListener('click', function(){ openPocTrainings(r); });   // v10.11
         lst.appendChild(card);
       });
       m.appendChild(lst);
@@ -27025,7 +27028,7 @@ var VP_PUBLIC_FIELDS = ['vendorId','displayName','company','slug','role','logoUr
   'website','shortDescription','categories','brands','sectors','regions','city','country','origin',
   'phone','address','phoneVerified','vendorType','vendorStatus','isVerified','evidenceScore',
   'subscriptionTier','publicProfileEnabled','vendorReferralBadge','vendorReferralCount',
-  'productCount','avgRating','ratingCount','trainerCredentials'];
+  'productCount','avgRating','ratingCount','trainerCredentials','trainerCredVerified'];
 
 function vpProject(u, uid){
   var out = { vendorId: uid || u.id || u.uid };
@@ -27067,7 +27070,7 @@ async function syncVendorPublic(uid, data){
     // v10.09: vendorStatus aynada yalniz admin'in alani (kural v1.10.5). Vendor
     // tarafindaki eski bir CUR_PROFILE kopyasi dogrulamayi geri almasin.
     // isVerified / evidenceScore da ayni: kural vendor'a kapali, farkli deger tum senkronu reddettiriyordu.
-    if (CUR_PROFILE?.role !== 'admin') { delete _vpd.vendorStatus; delete _vpd.isVerified; delete _vpd.evidenceScore; }
+    if (CUR_PROFILE?.role !== 'admin') { delete _vpd.vendorStatus; delete _vpd.isVerified; delete _vpd.evidenceScore; delete _vpd.trainerCredVerified; }
     await setDoc(doc(db,'vendor_public', uid), { ..._vpd, updatedAt: serverTimestamp() }, { merge:true });
     invalidateVendorPublicCache();
   } catch(e){ console.warn('[v9.64] vendor_public senkronu basarisiz:', e && e.message); }
@@ -73579,16 +73582,23 @@ async function trAppendVendorProfile(scr, vendor){
       +   tile(nps === null ? '—' : (nps > 0 ? '+' : '') + nps, _L('recommendation (NPS)','tavsiye skoru (NPS)'))
       +   tile(mine.length, _L('active trainings','aktif eğitim'))
       + '</div>'
-      + (creds.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + creds.map(function(c){ return trChip('🏅 ' + escHtml(c),'green'); }).join('') + '</div>'
-          + (vendor.vendorStatus === 'admin_verified' ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">' + _L('Credentials are declared by the trainer; not yet verified by PoCHub.','Sertifikalar eğitmenin beyanıdır; PoCHub tarafından henüz doğrulanmadı.') + '</div>') : '')
+      + (creds.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + creds.map(function(c){ var ok = (vendor.trainerCredVerified||[]).indexOf(c) >= 0;
+            return ok ? trChip('🏅 ' + escHtml(c) + ' · ✓ ' + _L('Verified','Doğrulandı'),'green') : trChip('🏅 ' + escHtml(c)); }).join('') + '</div>'
+          + (creds.every(function(c){ return (vendor.trainerCredVerified||[]).indexOf(c) >= 0; }) ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">' + _L('Credentials without ✓ are declared by the trainer and not yet verified by PoCHub.','✓ olmayan sertifikalar eğitmenin beyanıdır; PoCHub tarafından henüz doğrulanmadı.') + '</div>') : '')
       + (n ? '<div style="margin-top:10px">' + trCritBars(st) + '</div>' : '')
       + '</div>';
     if(hero && hero.parentNode === outer) hero.insertAdjacentElement('afterend', top); else outer.insertBefore(top, outer.firstChild);
+    // v10.11: egitmen profilinde urun / PoC sayaclari ve "PoC ac" anlamsiz — kaldir, yerine egitimlere git
+    if(isT){
+      outer.querySelectorAll('.vp-stats-grid').forEach(function(x){ x.remove(); });
+      outer.querySelectorAll('.vp-noprod').forEach(function(x){ x.remove(); });
+    }
     var bottom = document.createElement('div');
     bottom.style.cssText = 'margin:18px 0';
     bottom.innerHTML = (mine.length ? '<div class="card" style="padding:14px 16px;margin-bottom:12px"><h3 style="font-size:16px;font-weight:700;margin:0 0 10px">🎓 ' + _L('Trainings','Eğitimler') + ' (' + mine.length + ')</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">' + mine.map(trCardHtml).join('') + '</div></div>' : '')
       + (revs.length ? '<div class="card" style="padding:14px 16px"><h3 style="font-size:16px;font-weight:700;margin:0 0 4px">★ ' + _L('Attendee reviews','Katılımcı değerlendirmeleri') + ' (' + revs.length + ')</h3>' + revs.slice(0,10).map(function(r){ return trReviewHtml(r, { showTraining:true, canReport:true }); }).join('') + '</div>' : '');
     top.insertAdjacentElement('afterend', bottom);
+    var tc = scr.querySelector('#vp-trn-cta'); if(tc) tc.addEventListener('click', function(e){ e.preventDefault(); bottom.scrollIntoView({ behavior:'smooth', block:'start' }); });
     bottom.querySelectorAll('.tr-card').forEach(function(c){ c.addEventListener('click', function(){ var t = mine.filter(function(x){ return x.id === c.dataset.id; })[0]; if(t) openTrainingDetail(t); }); });
     trBindReviewActions(bottom, revs);
   } catch(e){ console.warn('[v10.10] profil egitim blogu', e && (e.message||e)); }
@@ -73627,6 +73637,7 @@ async function vendTrainings(m){
   if(cfg.quotaEnabled){ var pk = await _trMyPackage(); var lim = (pk.trainingLimit === undefined || pk.trainingLimit === null) ? -1 : Number(pk.trainingLimit); limitTxt = active + ' / ' + (lim < 0 ? '∞' : lim) + ' ' + _L('listings used','ilan kullanımı'); m._trLimit = lim; } else m._trLimit = -1;
   var stB = function(s){ return s === 'active' ? trChip(_L('Live','Yayında'),'green') : s === 'pending' ? trChip(_L('Awaiting approval','Onay bekliyor'),'amber') : s === 'rejected' ? trChip(_L('Rejected','Reddedildi')) : trChip(_L('Archived','Arşiv')); };
   var regSt = { new:_L('New','Yeni'), contacted:_L('Contacted','İletişime geçildi'), confirmed:_L('Confirmed','Kesinleşti'), cancelled:_L('Cancelled','İptal') };
+  var regStX = { offered:_L('Offer sent','Teklif gönderildi'), declined:_L('Offer declined','Teklif reddedildi') };
   var mySt = trSt((CUR_PROFILE && CUR_PROFILE.vendorType === 'egitmen' ? 't_' : 'p_') + uid);
   var feeTxt = Number(cfg.seatFee||0) > 0 ? _L('A success fee of ','Katılımcı başı ') + Number(cfg.seatFee).toLocaleString('tr-TR') + ' TRY ' + _L('per attendee who came via PoCHub is invoiced monthly','başarı ücreti aylık faturalanır') + (cfg.feeFreeExempt !== false ? _L(' (free trainings exempt).',' (ücretsiz eğitimler muaf).') : '.') : '';
   var newRegs = regs.filter(function(r){ return r.status === 'new'; }).length;
@@ -73637,6 +73648,7 @@ async function vendTrainings(m){
     + '<button type="button" class="btn-p btn-sm" id="vt-new">+ ' + _L('New training','Yeni eğitim') + '</button></div>'
     + '<div class="card" style="padding:12px 14px;margin-bottom:16px;font-size:13px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>' + (trStatLine(mySt, { showNew:true }) || '') + (trNps(mySt) !== null ? ' · NPS <b>' + trNps(mySt) + '</b>' : '') + '</div>'
     +   '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    +   ((CUR_PROFILE && (CUR_PROFILE.trainerCredentials||[]).length) ? '<button type="button" class="btn-g btn-sm" id="vt-credver">🏅 ' + _L('Verify my credentials','Sertifikalarımı doğrulat') + ((CUR_PROFILE.trainerCredVerified||[]).length ? ' (' + CUR_PROFILE.trainerCredVerified.length + '/' + CUR_PROFILE.trainerCredentials.length + ' ✓)' : '') + '</button>' : '')
     +   (CUR_PROFILE && CUR_PROFILE.vendorType === 'egitmen' && cfg.promoEnabled && !trIsFeatured(mySt) && !myPromos.some(function(p){ return p.kind === 'trainer' && p.status === 'requested'; }) ? '<button type="button" class="btn-g btn-sm" id="vt-promo-me">⭐ ' + _L('Sponsor my profile','Profilimi öne çıkar') + '</button>' : '')
     +   (CUR_PROFILE && CUR_PROFILE.slug ? '<a href="#v/' + escHtml(CUR_PROFILE.slug) + '" style="font-size:12.5px;color:#2563eb;font-weight:700;text-decoration:none">' + _L('View my public profile →','Herkese açık profilim →') + '</a>' : '') + '</div></div>'
     + (mine.length ? '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">' + mine.map(function(t){
@@ -73659,10 +73671,13 @@ async function vendTrainings(m){
         return '<div class="card" style="padding:10px 12px;font-size:12.5px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">'
           + '<div style="min-width:0"><b>' + escHtml(r.name||'') + '</b>' + (r.company ? ' · ' + escHtml(r.company) : '') + ' · ' + (r.kind === 'private' ? trChip(_L('Private','Kuruma özel'),'amber') : trChip(_L('Registration','Kayıt'),'blue'))
           + '<div style="color:var(--text-muted)">' + escHtml(r.trainingTitle||'') + ' · ' + (r.seats||1) + ' ' + _L('people','kişi') + (r.session ? ' · ' + escHtml(trSessionText(r.session)) : '') + (r.city ? ' · ' + escHtml(r.city) : '') + '</div>'
-          + '<div>✉ <a href="mailto:' + escHtml(r.email||'') + '">' + escHtml(r.email||'') + '</a>' + (r.phone ? ' · ☎ ' + escHtml(r.phone) : '') + (r.note ? '<div style="color:var(--text-secondary)">“' + escHtml(r.note) + '”</div>' : '') + '</div></div>'
+          + '<div>✉ <a href="mailto:' + escHtml(r.email||'') + '">' + escHtml(r.email||'') + '</a>' + (r.phone ? ' · ☎ ' + escHtml(r.phone) : '') + (r.note ? '<div style="color:var(--text-secondary)">“' + escHtml(r.note) + '”</div>' : '') + '</div>'
+          + (r.offer ? '<div style="margin-top:3px">💼 <b>' + escHtml(trOfferText(r.offer)) + '</b> ' + (r.status === 'offered' ? trChip(regStX.offered,'amber') : r.status === 'declined' ? trChip(regStX.declined) : r.status === 'confirmed' ? trChip(_L('Accepted','Kabul edildi'),'green') : '') + '</div>' : '') + '</div>'
           + (r.status === 'attended' ? '<div>' + trChip('✓ ' + _L('Attended','Katıldı'),'green') + '</div></div>'
-            : '<div style="display:flex;gap:6px;align-items:center">' + (canAttend(r) ? '<button type="button" class="btn-sm vt-att" data-id="' + r.id + '" style="background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">✓ ' + _L('Attended','Katıldı') + '</button>' : '')
-            + '<select class="inp vt-rst" data-id="' + r.id + '" style="font-size:12px;padding:5px 8px;width:auto">' + Object.keys(regSt).map(function(k){ return '<option value="' + k + '"' + (r.status === k ? ' selected' : '') + '>' + regSt[k] + '</option>'; }).join('') + '</select></div></div>');
+            : '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+            + (r.kind === 'private' && ['new','contacted','offered','declined'].indexOf(r.status) >= 0 ? '<button type="button" class="btn-g btn-sm vt-offer" data-id="' + r.id + '">💼 ' + (r.offer ? _L('Revise offer','Teklifi güncelle') : _L('Send offer','Teklif ver')) + '</button>' : '')
+            + (canAttend(r) ? '<button type="button" class="btn-sm vt-att" data-id="' + r.id + '" style="background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">✓ ' + _L('Attended','Katıldı') + '</button>' : '')
+            + '<select class="inp vt-rst" data-id="' + r.id + '" style="font-size:12px;padding:5px 8px;width:auto">' + (regStX[r.status] ? '<option value="' + r.status + '" selected disabled>' + regStX[r.status] + '</option>' : '') + Object.keys(regSt).map(function(k){ return '<option value="' + k + '"' + (r.status === k ? ' selected' : '') + '>' + regSt[k] + '</option>'; }).join('') + '</select></div></div>');
       }).join('') + '</div>'
       : '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:20px">' + _L('No registrations yet.','Henüz kayıt yok.') + '</div>')
     + '<h3 class="fs15-fw7" style="margin-bottom:6px">★ ' + _L('Reviews','Değerlendirmeler') + ' (' + myRevs.length + ')</h3>'
@@ -73710,6 +73725,8 @@ async function vendTrainings(m){
     showToast(ok + ' ' + _L('marked as attended','kayıt katıldı olarak işaretlendi') + (ok < list.length ? ' · ' + (list.length - ok) + ' ' + _L('failed','başarısız') : ''), ok ? 'ok' : 'err');
     vendTrainings(m);
   };
+  m.querySelectorAll('.vt-offer').forEach(function(b){ b.addEventListener('click', function(){ openTrainingOffer(regById[b.dataset.id], function(){ vendTrainings(m); }); }); });
+  var cvb = m.querySelector('#vt-credver'); if(cvb) cvb.addEventListener('click', function(){ openCredVerifyRequest(); });
   m.querySelectorAll('.vt-att').forEach(function(b){ b.addEventListener('click', function(){ attend([regById[b.dataset.id]], b); }); });
   m.querySelectorAll('.vt-attall').forEach(function(b){ b.addEventListener('click', function(){ attend(regs.filter(function(r){ return r.trainingId === b.dataset.id && canAttend(r); }), b); }); });
   m.querySelectorAll('.vt-promo').forEach(function(b){ b.addEventListener('click', async function(){ var t = trById[b.dataset.id]; await trRequestPromo('training', t.id, t.title); vendTrainings(m); }); });
@@ -73849,9 +73866,11 @@ async function admTrainings(m){
   var tb = function(k, l, n){ return '<button type="button" class="btn-sm at-tab ' + (tab === k ? 'btn-p' : 'btn-g') + '" data-t="' + k + '">' + l + (n ? ' (' + n + ')' : '') + '</button>'; };
   var html = '<div style="margin-bottom:12px"><h2 class="fs18-fw7" style="margin:0 0 4px">🎓 ' + _L('Trainings','Eğitimler') + '</h2>'
     + '<div style="font-size:12.5px;color:var(--text-secondary)">' + all.filter(function(t){ return t.status === 'active'; }).length + ' ' + _L('live','yayında') + ' · ' + pend.length + ' ' + _L('awaiting approval','onay bekliyor') + ' · ' + pools.length + ' ' + _L('demand pools','talep havuzu') + ' · ' + reqs.length + ' ' + _L('contact requests','iletişim talebi') + '</div></div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">' + tb('pending', _L('Approval','Onay'), pend.length) + tb('all', _L('All','Tümü')) + tb('pools', _L('Demand pools','Talep havuzları'), pools.length) + tb('unlocks', _L('Contact requests','İletişim talepleri'), reqs.length) + tb('reviews', _L('Reviews','Değerlendirmeler')) + tb('promos', _L('Sponsored','Sponsorlu'), promos.filter(function(p){ return p.status === 'requested'; }).length) + tb('invoice', _L('Invoice report','Fatura raporu')) + tb('settings', _L('Settings','Ayarlar')) + '</div>';
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">' + tb('pending', _L('Approval','Onay'), pend.length) + tb('trainers', '👤 ' + _L('Trainers','Eğitmenler')) + tb('all', _L('All','Tümü')) + tb('pools', _L('Demand pools','Talep havuzları'), pools.length) + tb('unlocks', _L('Contact requests','İletişim talepleri'), reqs.length) + tb('reviews', _L('Reviews','Değerlendirmeler')) + tb('promos', _L('Sponsored','Sponsorlu'), promos.filter(function(p){ return p.status === 'requested'; }).length) + tb('invoice', _L('Invoice report','Fatura raporu')) + tb('settings', _L('Settings','Ayarlar')) + '</div>';
   var stB = function(s){ return s === 'active' ? trChip(_L('Live','Yayında'),'green') : s === 'pending' ? trChip(_L('Pending','Bekliyor'),'amber') : trChip(escHtml(s||'')); };
-  if(tab === 'pending' || tab === 'all'){
+  if(tab === 'trainers'){
+    html += '<div id="at-trainers"></div>';
+  } else if(tab === 'pending' || tab === 'all'){
     var L = tab === 'pending' ? pend : all.slice().sort(function(x,y){ return ((y.createdAt&&y.createdAt.seconds)||0) - ((x.createdAt&&x.createdAt.seconds)||0); });
     html += (tab === 'pending' && L.length ? '<div style="margin-bottom:8px"><button type="button" class="btn-sm" id="at-apall" style="background:#16a34a;color:#fff;border:1px solid #16a34a;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer">✓ ' + _L('Approve all','Hepsini onayla') + ' (' + L.length + ')</button></div>' : '')
       + (L.length ? '<table><thead><tr><th>' + _L('Training','Eğitim') + '</th><th>' + _L('Provider','Sağlayıcı') + '</th><th>' + _L('Type','Tür') + '</th><th>' + _L('Status','Durum') + '</th><th></th></tr></thead><tbody>'
@@ -73914,6 +73933,7 @@ async function admTrainings(m){
       + '<button type="button" class="btn-p btn-sm" id="as-save">' + _L('Save','Kaydet') + '</button></div>';
   }
   m.innerHTML = html;
+  if(tab === 'trainers'){ admTrainers(m, m.querySelector('#at-trainers')); }
   m.querySelectorAll('.at-tab').forEach(function(b){ b.addEventListener('click', function(){ m._trTab = this.dataset.t; admTrainings(m); }); });
   var byId = Object.create(null); all.forEach(function(t){ byId[t.id] = t; });
   m.querySelectorAll('.at-view').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); var t = byId[this.dataset.id]; if(t) openTrainingDetail(t); }); });
@@ -74150,25 +74170,30 @@ async function openMyTrainingRegs(){
   var md = _trModal('<div class="loading"><div class="spinner"></div></div>', 640);
   var regs = await trMyRegs(), rev = await trMyReviewIds();
   regs.sort(function(a,b){ return ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0); });
-  var stL = { new:_L('Received','Alındı'), contacted:_L('Provider contacted you','Sağlayıcı iletişime geçti'), confirmed:_L('Confirmed','Kesinleşti'), cancelled:_L('Cancelled','İptal'), attended:_L('Attended','Katıldınız') };
+  var stL = { new:_L('Received','Alındı'), contacted:_L('Provider contacted you','Sağlayıcı iletişime geçti'), confirmed:_L('Confirmed','Kesinleşti'), cancelled:_L('Cancelled','İptal'), attended:_L('Attended','Katıldınız'), offered:_L('Offer received','Teklif geldi'), declined:_L('Offer declined','Teklif reddedildi') };
   md.querySelector('.modal').innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0;font-size:17px;font-weight:800">🎓 ' + _L('My trainings','Kayıtlarım') + '</h3><button type="button" class="trm-x" style="background:none;border:none;font-size:22px;cursor:pointer">×</button></div>'
     + (regs.length ? regs.map(function(r){
         var act = '';
         if(r.status === 'attended'){
           act = (rev[r.id] ? trChip('✓ ' + _L('Reviewed','Değerlendirildi'),'green') : '<button type="button" class="btn-p btn-sm trm-sv" data-id="' + r.id + '">★ ' + _L('Review','Değerlendir') + '</button>')
               + ' <button type="button" class="btn-g btn-sm trm-cert" data-id="' + r.id + '">📜 ' + (r.certCode ? _L('My certificate','Belgem') : _L('Get certificate','Belgemi oluştur')) + '</button>';
-        } else if(r.status !== 'cancelled' && r.kind === 'register'){
+        } else if(r.status === 'offered'){
+          act = '<button type="button" class="btn-p btn-sm trm-acc" data-id="' + r.id + '">✓ ' + _L('Accept offer','Teklifi kabul et') + '</button> <button type="button" class="btn-g btn-sm trm-dec" data-id="' + r.id + '">' + _L('Decline','Reddet') + '</button>';
+        } else if(['new','contacted','confirmed'].indexOf(r.status) >= 0 && (r.kind === 'register' || r.status !== 'confirmed')){
           act = '<button type="button" class="btn-g btn-sm trm-cancel" data-id="' + r.id + '">' + _L('Cancel','İptal et') + '</button>';
         }
         return '<div class="card" style="padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">'
           + '<div style="min-width:0"><div style="font-size:13.5px;font-weight:700">' + escHtml(r.trainingTitle||'') + '</div>'
-          + '<div style="font-size:11.5px;color:var(--text-muted)">' + (r.kind === 'private' ? _L('Private class request','Kuruma özel talep') : (r.session ? escHtml(trSessionText(r.session)) : '')) + ' · ' + (stL[r.status] || r.status) + '</div></div>'
+          + '<div style="font-size:11.5px;color:var(--text-muted)">' + (r.kind === 'private' ? _L('Private class request','Kuruma özel talep') : (r.session ? escHtml(trSessionText(r.session)) : '')) + ' · ' + (stL[r.status] || r.status) + '</div>'
+          + (r.offer ? '<div style="font-size:12px;margin-top:3px">💼 <b>' + escHtml(trOfferText(r.offer)) + '</b>' + (r.offer.note ? '<div style="color:var(--text-secondary)">“' + escHtml(r.offer.note) + '”</div>' : '') + '</div>' : '') + '</div>'
           + '<div style="display:flex;gap:6px;flex-wrap:wrap">' + act + '</div></div>';
       }).join('') : '<div style="font-size:13px;color:var(--text-muted);padding:10px 0">' + _L('You have no training registrations yet.','Henüz eğitim kaydınız yok.') + '</div>');
   md.querySelector('.trm-x').addEventListener('click', function(){ md.remove(); });
   var byId = Object.create(null); regs.forEach(function(r){ byId[r.id] = r; });
   md.querySelectorAll('.trm-sv').forEach(function(b){ b.addEventListener('click', function(){ md.remove(); openTrainingSurvey(byId[b.dataset.id]); }); });
   md.querySelectorAll('.trm-cert').forEach(function(b){ b.addEventListener('click', function(){ md.remove(); trOpenCertificate(byId[b.dataset.id]); }); });
+  md.querySelectorAll('.trm-acc').forEach(function(b){ b.addEventListener('click', async function(){ if(await trAnswerOffer(byId[b.dataset.id], true)){ md.remove(); openMyTrainingRegs(); } }); });
+  md.querySelectorAll('.trm-dec').forEach(function(b){ b.addEventListener('click', async function(){ if(await trAnswerOffer(byId[b.dataset.id], false)){ md.remove(); openMyTrainingRegs(); } }); });
   md.querySelectorAll('.trm-cancel').forEach(function(b){ b.addEventListener('click', async function(){
     if(!confirm(_L('Cancel this registration?','Bu kaydı iptal etmek istiyor musunuz?'))) return;
     try { await updateDoc(doc(db,'training_regs', b.dataset.id), { status:'cancelled', updatedAt:serverTimestamp() }); var r = byId[b.dataset.id];
@@ -74238,7 +74263,7 @@ async function trOpenCertificate(reg){
   var code = _trCertCode(), bt = writeBatch(db);
   bt.set(doc(db,'tr_certs', code), { code:code, regId:reg.id, userId:CUR_USER.uid, name:String(reg.name||'').slice(0,120), trainingId:reg.trainingId,
     trainingTitle:String(reg.trainingTitle||tr.title||'').slice(0,200), brand:String(tr.brand||'').slice(0,120), providerName:String(tr.providerName||'').slice(0,160),
-    trainerNames:(tr.trainers||[]).map(function(x){ return x.name; }).join(', ').slice(0,300), dateText:reg.session ? trSessionText(reg.session) : '',
+    trainerNames:(tr.trainers||[]).map(function(x){ return x.name; }).join(', ').slice(0,300), dateText:reg.session ? trSessionText(reg.session) : (reg.offer && reg.offer.start ? trSessionText({ start:reg.offer.start, end:reg.offer.end||'' }) : ''),
     hours:Number(tr.durationHours||0), issuedAt:serverTimestamp() });
   bt.update(doc(db,'training_regs', reg.id), { certCode:code });
   try { await bt.commit(); location.hash = '#cert/' + code; }
@@ -74422,6 +74447,269 @@ async function trRecomputeStats(){
     }, 1800);
   }, 100);
 })();
+
+// ══════════════════════════════════════════════════════════════════════
+// v10.11 — EĞİTİMLER (Faz 2b) + ADMIN EĞİTMEN GÖRÜNÜMÜ
+//  - Kuruma özel teklif: sağlayıcı fiyat/tarih/biçimle teklif verir,
+//    katılımcı Kayıtlarım'dan kabul/ret eder. Kabulde kayıt kesinleşir ve
+//    Faz 2 akışı (katıldı → anket → belge → mezun/ücret) aynen işler.
+//  - PoC sonrası öneri: tamamlanan PoC'nin markasındaki eğitimler.
+//  - Sertifika doğrulama: eğitmen bağlantı / sertifika no girer, admin tek
+//    tek onaylar; onaylananlar profilde "✓ Doğrulandı". Dosya yükleme yok
+//    (Storage kurulumu ve kural işi; bağlantı + numara bugün için yeterli).
+//  - Admin › Eğitimler › Eğitmenler: herkese açık olmayan iletişim bilgileri
+//    dahil tam profil, puanlar, GİZLİ yorumlar dahil tüm yorumlar, eğitimler,
+//    ücretler, sponsorlu geçmişi ve UYARI İŞARETLERİ. İşaretler bir şeyi
+//    kanıtlamaz; nereye bakılacağını gösterir. Okuma maliyeti yüksek
+//    olduğu için yalnız sekme açılınca çalışır (27.09 kota dersi).
+// ══════════════════════════════════════════════════════════════════════
+var TR_FREE_MAIL = ['gmail','hotmail','yahoo','outlook','icloud','yandex','protonmail','live','msn','me.com','googlemail'];
+function trMailDomain(e){ var d = String(e||'').toLowerCase().split('@')[1] || ''; return TR_FREE_MAIL.some(function(p){ return d.indexOf(p) >= 0; }) ? '' : d; }
+function trOfferText(o){
+  if(!o) return '';
+  var p = Number(o.price||0) ? Number(o.price).toLocaleString('tr-TR') + ' ' + (o.currency||'TRY') + (o.basis === 'person' ? ' / ' + _L('person','kişi') : ' / ' + _L('group','grup')) : _L('Free','Ücretsiz');
+  return p + (o.start ? ' · ' + trSessionText({ start:o.start, end:o.end||'' }) : '') + (o.format ? ' · ' + (o.format === 'online' ? _L('Remote','Uzaktan') : _L('On-site','Yerinde')) : '');
+}
+
+// ── Sağlayıcı: kuruma özel talebe teklif ────────────────────────────
+function openTrainingOffer(reg, done){
+  var o = reg.offer || {}, inp = 'width:100%;font-size:13px;margin-bottom:8px';
+  var md = _trModal('<h3 style="margin:0 0 4px;font-size:17px;font-weight:800">💼 ' + _L('Offer for private class','Kuruma özel eğitim teklifi') + '</h3>'
+    + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:12px">' + escHtml(reg.name||'') + (reg.company ? ' · ' + escHtml(reg.company) : '') + ' · ' + escHtml(reg.trainingTitle||'') + ' · ' + (reg.seats||1) + ' ' + _L('people','kişi') + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+    +   '<div><label class="lbl">' + _L('Price','Fiyat') + '</label><input id="tof-p" type="number" min="0" class="inp" style="' + inp + '" value="' + escHtml(o.price||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Currency','Para birimi') + '</label><select id="tof-c" class="inp" style="' + inp + '">' + ['TRY','USD','EUR'].map(function(c){ return '<option' + ((o.currency||'TRY') === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></div>'
+    +   '<div><label class="lbl">' + _L('Basis','Fiyat tipi') + '</label><select id="tof-b" class="inp" style="' + inp + '"><option value="group">' + _L('Whole group','Grup toplamı') + '</option><option value="person"' + (o.basis === 'person' ? ' selected' : '') + '>' + _L('Per person','Kişi başı') + '</option></select></div>'
+    +   '<div><label class="lbl">' + _L('Start','Başlangıç') + ' *</label><input id="tof-s" type="date" class="inp" style="' + inp + '" value="' + escHtml(o.start||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('End','Bitiş') + '</label><input id="tof-e" type="date" class="inp" style="' + inp + '" value="' + escHtml(o.end||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Delivery','Biçim') + '</label><select id="tof-f" class="inp" style="' + inp + '"><option value="online">' + _L('Remote','Uzaktan') + '</option><option value="onsite"' + ((o.format || reg.format) === 'onsite' ? ' selected' : '') + '>' + _L('On-site','Yerinde') + '</option></select></div>'
+    + '</div>'
+    + '<label class="lbl">' + _L('Note to customer','Müşteriye not') + '</label><textarea id="tof-n" class="inp" rows="3" maxlength="1000" style="' + inp + '">' + escHtml(o.note||'') + '</textarea>'
+    + '<div id="tof-m" style="font-size:12px;color:#dc2626;min-height:16px"></div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn-g btn-sm" id="tof-x">' + _L('Cancel','Vazgeç') + '</button><button type="button" class="btn-p btn-sm" id="tof-go">' + _L('Send offer','Teklifi gönder') + '</button></div>', 600);
+  md.querySelector('#tof-x').addEventListener('click', function(){ md.remove(); });
+  md.querySelector('#tof-go').addEventListener('click', async function(){
+    var g = function(id){ return String(md.querySelector('#' + id).value||'').trim(); }, msg = md.querySelector('#tof-m'), btn = this;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(g('tof-s'))){ msg.textContent = _L('Start date is required.','Başlangıç tarihi zorunlu.'); return; }
+    if(g('tof-e') && g('tof-e') < g('tof-s')){ msg.textContent = _L('End date is before start.','Bitiş tarihi başlangıçtan önce.'); return; }
+    var offer = { price:Math.max(0, parseFloat(g('tof-p')) || 0), currency:g('tof-c'), basis:g('tof-b'), start:g('tof-s'), end:g('tof-e'), format:g('tof-f'), note:g('tof-n').slice(0,1000) };
+    btn.disabled = true;
+    try {
+      await updateDoc(doc(db,'training_regs', reg.id), { status:'offered', offer:offer, offeredAt:serverTimestamp(), updatedAt:serverTimestamp() });
+      _trNotify(reg.userId, _L('You received an offer','Eğitim teklifi geldi'), (reg.trainingTitle||'') + ' — ' + trOfferText(offer) + ' · ' + _L('Trainings › My trainings','Eğitimler › Kayıtlarım'), reg.id, 'training_offer');
+      if(reg.email){ try { sendEmail(reg.email, reg.name||'', _L('Training offer','Eğitim teklifi') + ' — ' + (reg.trainingTitle||''), trOfferText(offer) + (offer.note ? '\n\n' + offer.note : '') + '\n\n' + _L('Accept or decline: ','Kabul / ret: ') + location.origin + '/#trainings', ''); } catch(e){} }
+      md.remove(); showToast(_L('Offer sent','Teklif gönderildi'), 'ok'); if(done) done();
+    } catch(e){ btn.disabled = false; msg.textContent = _L('Could not send: ','Gönderilemedi: ') + ((e && (e.code||e.message)) || ''); }
+  });
+}
+async function trAnswerOffer(reg, accept){
+  if(!confirm(accept ? _L('Accept this offer? The provider will be notified and the class becomes confirmed.','Teklif kabul edilsin mi? Sağlayıcıya bildirilir ve eğitim kesinleşir.') : _L('Decline this offer?','Teklif reddedilsin mi?'))) return false;
+  var u = accept ? { status:'confirmed', offerAcceptedAt:serverTimestamp(), updatedAt:serverTimestamp() } : { status:'declined', offerDeclinedAt:serverTimestamp(), updatedAt:serverTimestamp() };
+  try {
+    await updateDoc(doc(db,'training_regs', reg.id), u);
+    _trNotify(reg.providerId, accept ? _L('Offer accepted 🎉','Teklif kabul edildi 🎉') : _L('Offer declined','Teklif reddedildi'), (reg.name||'') + (reg.company ? ' (' + reg.company + ')' : '') + ' · ' + (reg.trainingTitle||'') + ' · ' + trOfferText(reg.offer), reg.id, 'training_offer');
+    showToast(accept ? _L('Accepted — the provider will contact you.','Kabul edildi — sağlayıcı sizinle iletişime geçecek.') : _L('Declined','Reddedildi'), 'ok');
+    return true;
+  } catch(e){ showToast(_L('Failed: ','Başarısız: ') + (e && (e.code||e.message)), 'err'); return false; }
+}
+
+// ── PoC sonrası: markanın eğitimleri ────────────────────────────────
+async function trPocBrand(r){
+  var b = '';
+  try { if(r.productId && String(r.productId).indexOf('custom_') !== 0){ var s = await getDoc(doc(db,'products', r.productId)); if(s.exists()) b = s.data().brand || ''; } } catch(e){}
+  if(!b && r.brandNorm){ try { (await getBrands()).some(function(x){ if(_normBrand(x.name) === r.brandNorm){ b = x.name; return true; } return false; }); } catch(e){} }
+  if(!b && r.vendorName && r.isCustomProduct) b = r.vendorName;   // ozel talepte marka adi vendorName alaninda
+  return b;
+}
+async function openPocTrainings(r){
+  var md = _trModal('<div class="loading"><div class="spinner"></div></div>', 640);
+  var brand = await trPocBrand(r), list = brand ? trForBrand(await getActiveTrainings(), brand, r.productName) : [];
+  await getTrStats();
+  md.querySelector('.modal').innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px"><div><h3 style="margin:0;font-size:17px;font-weight:800">🎓 ' + _L('Trainings for your team','Ekibiniz için eğitim') + '</h3>'
+    + '<div style="font-size:12.5px;color:var(--text-muted)">' + escHtml(brand || '') + (r.productName ? ' · ' + escHtml(displayProductName(r.productName)) : '') + '</div></div><button type="button" class="tpc-x" style="background:none;border:none;font-size:22px;cursor:pointer">×</button></div>'
+    + '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.55;margin-bottom:12px">' + _L('After the PoC, a short training usually makes the rollout faster and avoids misconfiguration.','PoC sonrası kısa bir eğitim, devreye almayı hızlandırır ve yanlış yapılandırmanın önüne geçer.') + '</div>'
+    + (list.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:12px">' + list.slice(0,6).map(trCardHtml).join('') + '</div>'
+                   : '<div style="font-size:13px;color:var(--text-muted);padding:10px 0 12px">' + _L('No training listed for this brand yet. Register your interest and providers will be notified.','Bu marka için henüz eğitim yok. İlgi bildirin, eğitim verenlere iletilsin.') + '</div>')
+    + '<div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn-g btn-sm tpc-int">' + _L('Register interest','İlgi bildir') + '</button></div>';
+  md.querySelector('.tpc-x').addEventListener('click', function(){ md.remove(); });
+  md.querySelector('.tpc-int').addEventListener('click', function(){ md.remove(); openTrainingInterest({ brand:brand, topic:r.productName || '' }); });
+  md.querySelectorAll('.tr-card').forEach(function(c){ c.addEventListener('click', function(){ var t = list.filter(function(x){ return x.id === c.dataset.id; })[0]; if(t){ md.remove(); openTrainingDetail(t); } }); });
+}
+
+// ── Eğitmen: sertifika doğrulama talebi ─────────────────────────────
+async function openCredVerifyRequest(){
+  var creds = (CUR_PROFILE && CUR_PROFILE.trainerCredentials) || [], ver = (CUR_PROFILE && CUR_PROFILE.trainerCredVerified) || [];
+  if(!creds.length){ showToast(_L('Add your credentials under My Profile first.','Önce Profilim bölümünden sertifikalarınızı ekleyin.'), 'err'); return; }
+  var prev = {}; try { var s = await getDoc(doc(db,'tr_credreqs', CUR_USER.uid)); if(s.exists()) (s.data().items||[]).forEach(function(x){ prev[x.name] = x; }); } catch(e){}
+  var md = _trModal('<h3 style="margin:0 0 4px;font-size:17px;font-weight:800">🏅 ' + _L('Verify my credentials','Sertifikalarımı doğrulat') + '</h3>'
+    + '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.55;margin-bottom:12px">' + _L('For each credential, add a public verification link (e.g. Credly, the vendor’s certification portal) and/or the certificate number. PoCHub checks them one by one; verified ones show “✓ Verified” on your profile.','Her sertifika için herkese açık bir doğrulama bağlantısı (Credly, üretici sertifika portalı gibi) ve/veya sertifika numarası girin. PoCHub tek tek kontrol eder; doğrulananlar profilinizde “✓ Doğrulandı” olarak görünür.') + '</div>'
+    + creds.map(function(c, i){ var p = prev[c] || {}, ok = ver.indexOf(c) >= 0;
+        return '<div style="border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:8px"><div style="font-size:13px;font-weight:700;margin-bottom:6px">' + escHtml(c) + (ok ? ' ' + trChip('✓ ' + _L('Verified','Doğrulandı'),'green') : '') + '</div>'
+          + '<div style="display:grid;grid-template-columns:2fr 1fr;gap:6px"><input class="inp tcv-u" data-i="' + i + '" placeholder="https://…" value="' + escHtml(p.url||'') + '" style="font-size:12.5px"><input class="inp tcv-n" data-i="' + i + '" placeholder="' + _L('Certificate no','Sertifika no') + '" value="' + escHtml(p.certId||'') + '" style="font-size:12.5px"></div></div>'; }).join('')
+    + '<div id="tcv-m" style="font-size:12px;color:#dc2626;min-height:16px"></div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn-g btn-sm" id="tcv-x">' + _L('Cancel','Vazgeç') + '</button><button type="button" class="btn-p btn-sm" id="tcv-go">' + _L('Send for verification','Doğrulamaya gönder') + '</button></div>', 620);
+  md.querySelector('#tcv-x').addEventListener('click', function(){ md.remove(); });
+  md.querySelector('#tcv-go').addEventListener('click', async function(){
+    var items = creds.map(function(c, i){ var u = String(md.querySelector('.tcv-u[data-i="' + i + '"]').value||'').trim(), n = String(md.querySelector('.tcv-n[data-i="' + i + '"]').value||'').trim();
+      return { name:String(c).slice(0,120), url:/^https:\/\//i.test(u) ? u.slice(0,400) : '', certId:n.slice(0,80) }; }).filter(function(x){ return x.url || x.certId; }).slice(0,20);
+    if(!items.length){ md.querySelector('#tcv-m').textContent = _L('Add a link or number for at least one credential.','En az bir sertifika için bağlantı ya da numara girin (bağlantı https:// ile başlamalı).'); return; }
+    this.disabled = true;
+    try {
+      await setDoc(doc(db,'tr_credreqs', CUR_USER.uid), { uid:CUR_USER.uid, name:(CUR_PROFILE.company || CUR_PROFILE.displayName || '').slice(0,160), items:items, status:'requested', requestedAt:serverTimestamp() });
+      notifyAdmins({ type:'trainer_cred', title:_L('Credential verification request','Sertifika doğrulama talebi'), message:(CUR_PROFILE.company || CUR_PROFILE.displayName || '') + ' · ' + items.length + ' ' + _L('items','kalem'), relatedId:CUR_USER.uid });
+      md.remove(); showToast(_L('Sent — PoCHub will review.','Gönderildi — PoCHub inceleyecek.'), 'ok');
+    } catch(e){ this.disabled = false; md.querySelector('#tcv-m').textContent = String(e && (e.code||e.message)); }
+  });
+}
+
+// ── Admin › Eğitimler › Eğitmenler ──────────────────────────────────
+async function admTrainers(m, host){
+  host.innerHTML = '<div class="loading"><div class="spinner"></div>' + _L('Loading trainers… (on-demand scan)','Eğitmenler yükleniyor… (istek üzerine tarama)') + '</div>';
+  var R = await Promise.all([
+    getDocs(query(collection(db,'users'), where('role','==','vendor'))).catch(function(){ return { docs:[] }; }),
+    getDocs(collection(db,'trainings')).catch(function(){ return { docs:[] }; }),
+    getDocs(collection(db,'training_regs')).catch(function(){ return { docs:[] }; }),
+    getDocs(collection(db,'training_reviews')).catch(function(){ return { docs:[] }; }),
+    getDocs(collection(db,'tr_charges')).catch(function(){ return { docs:[] }; }),
+    getDocs(collection(db,'tr_promos')).catch(function(){ return { docs:[] }; }),
+    getDocs(collection(db,'tr_credreqs')).catch(function(){ return { docs:[] }; }),
+    getTrStats(true)
+  ]);
+  var D = function(s){ return s.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); };
+  var users = D(R[0]), trs = D(R[1]), regs = D(R[2]), revs = D(R[3]), chs = D(R[4]), prs = D(R[5]), crs = D(R[6]);
+  var regById = Object.create(null); regs.forEach(function(r){ regById[r.id] = r; });
+  var crBy = Object.create(null); crs.forEach(function(c){ crBy[c.id] = c; });
+  var provIds = Object.create(null); trs.forEach(function(t){ provIds[t.providerId] = 1; });
+  var people = users.filter(function(u){ return u.vendorType === 'egitmen' || provIds[u.id]; });
+  var mine = function(u){ return trs.filter(function(t){ return t.providerId === u.id || trTrainerUids(t).indexOf(u.id) >= 0; }); };
+  var revsOf = function(u){ return revs.filter(function(r){ return r.providerId === u.id || (r.trainerUids||[]).indexOf(u.id) >= 0; }); };
+  var statOf = function(u){ var a = trSt('t_' + u.id), b = trSt('p_' + u.id); return (u.vendorType === 'egitmen' && (Number(a.ratingCount||0) || Number(a.graduates||0))) ? a : (Number(b.ratingCount||0) || Number(b.graduates||0) ? b : a); };
+  function flags(u){
+    var F = [], rv = revsOf(u), st = statOf(u), dom = trMailDomain(u.email);
+    if(dom){ var same = rv.filter(function(r){ var g = regById[r.regId]; return g && trMailDomain(g.email) === dom; }); if(same.length) F.push(['red', same.length + ' ' + _L('reviews from the provider’s own e-mail domain','yorum sağlayıcının kendi e-posta alan adından') + ' (' + dom + ')']); }
+    var ts = rv.map(function(r){ return (r.createdAt && r.createdAt.seconds) || 0; }).filter(Boolean).sort();
+    for(var i = 0; i + 4 < ts.length; i++){ if(ts[i+4] - ts[i] <= 86400){ F.push(['amber', _L('5+ reviews within 24 hours','24 saat içinde 5+ yorum')]); break; } }
+    if(rv.length >= 5 && rv.every(function(r){ return r.overall === 5; })) F.push(['amber', _L('All reviews are 5 stars','Tüm yorumlar 5 yıldız') + ' (' + rv.length + ')']);
+    var byUser = Object.create(null); rv.forEach(function(r){ byUser[r.userId] = (byUser[r.userId]||0) + 1; });
+    var rep = Object.keys(byUser).filter(function(k){ return byUser[k] >= 3; }); if(rep.length) F.push(['amber', _L('Same person reviewed 3+ times','Aynı kişi 3+ kez değerlendirmiş')]);
+    var g = Number(st.graduates||0); if(g >= 20 && !rv.length) F.push(['gray', g + ' ' + _L('graduates but no reviews','mezun var ama hiç yorum yok')]);
+    var hid = rv.filter(function(r){ return r.status !== 'visible'; }).length; if(hid) F.push(['gray', hid + ' ' + _L('hidden reviews','gizlenmiş yorum')]);
+    if(crBy[u.id] && crBy[u.id].status === 'requested') F.push(['blue', _L('Credential verification waiting','Sertifika doğrulaması bekliyor')]);
+    return F;
+  }
+  var tone = { red:['rgba(220,38,38,.10)','#dc2626'], amber:['rgba(217,119,6,.12)','#b45309'], gray:['rgba(15,23,42,.06)','var(--text-secondary)'], blue:['rgba(37,99,235,.08)','#2563eb'] };
+  var flagChip = function(f){ var c = tone[f[0]]; return '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + c[0] + ';color:' + c[1] + ';font-weight:700;white-space:nowrap">' + (f[0] === 'red' ? '⚠ ' : '') + escHtml(f[1]) + '</span>'; };
+  var F = m._trnF || (m._trnF = { q:'', type:'', sort:'flags' });
+  host.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+    + '<input id="atn-q" class="inp" placeholder="' + _L('Search name, e-mail, credential…','Ad, e-posta, sertifika ara…') + '" value="' + escHtml(F.q) + '" style="flex:2;min-width:200px;font-size:13px">'
+    + '<select id="atn-t" class="inp" style="width:auto;font-size:13px"><option value="">' + _L('Trainers + providers','Eğitmen + kurum') + '</option><option value="egitmen"' + (F.type === 'egitmen' ? ' selected' : '') + '>' + _L('Independent trainers','Bağımsız eğitmen') + '</option><option value="org"' + (F.type === 'org' ? ' selected' : '') + '>' + _L('Organisations','Kurum') + '</option></select>'
+    + '<select id="atn-s" class="inp" style="width:auto;font-size:13px"><option value="flags">' + _L('Warnings first','Önce uyarılı') + '</option><option value="score"' + (F.sort === 'score' ? ' selected' : '') + '>' + _L('Best rated','En yüksek puan') + '</option><option value="grad"' + (F.sort === 'grad' ? ' selected' : '') + '>' + _L('Most graduates','En çok mezun') + '</option><option value="new"' + (F.sort === 'new' ? ' selected' : '') + '>' + _L('Newest','En yeni') + '</option></select></div>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px">' + _L('Warning signs do not prove anything; they show where to look.','Uyarı işaretleri bir şey kanıtlamaz; nereye bakılacağını gösterir.') + '</div>'
+    + '<div id="atn-list"></div>';
+  function paint(){
+    var q = _normBrand(F.q);
+    var L = people.filter(function(u){
+      if(F.type === 'egitmen' && u.vendorType !== 'egitmen') return false;
+      if(F.type === 'org' && u.vendorType === 'egitmen') return false;
+      return !q || _normBrand([u.company, u.displayName, u.email, (u.trainerCredentials||[]).join(' ')].join(' ')).indexOf(q) >= 0;
+    }).map(function(u){ return { u:u, st:statOf(u), fl:flags(u) }; });
+    L.sort(function(a,b){
+      if(F.sort === 'score') return (b.st.ratingCount ? trBayes(b.st) : 0) - (a.st.ratingCount ? trBayes(a.st) : 0);
+      if(F.sort === 'grad') return Number(b.st.graduates||0) - Number(a.st.graduates||0);
+      if(F.sort === 'new') return ((b.u.createdAt&&b.u.createdAt.seconds)||0) - ((a.u.createdAt&&a.u.createdAt.seconds)||0);
+      var w = function(x){ return x.fl.filter(function(f){ return f[0] === 'red'; }).length * 10 + x.fl.filter(function(f){ return f[0] === 'amber' || f[0] === 'blue'; }).length; };
+      return w(b) - w(a);
+    });
+    host.querySelector('#atn-list').innerHTML = L.length ? '<table><thead><tr><th>' + _L('Trainer / provider','Eğitmen / kurum') + '</th><th>' + _L('Rating','Puan') + '</th><th>' + _L('Graduates','Mezun') + '</th><th>NPS</th><th>' + _L('Trainings','Eğitim') + '</th><th>' + _L('Warnings','Uyarılar') + '</th></tr></thead><tbody>'
+      + L.map(function(x){ var u = x.u, n = Number(x.st.ratingCount||0), nps = trNps(x.st);
+          return '<tr class="atn-row" data-id="' + escHtml(u.id) + '" style="cursor:pointer"><td style="font-size:13px"><b>' + escHtml(u.company || u.displayName || u.email) + '</b>' + (u.vendorStatus === 'admin_verified' ? ' <span style="color:#16a34a">✓</span>' : '') + (trIsFeatured(trSt('t_' + u.id)) ? ' ' + trChip(_L('Sponsored','Sponsorlu'),'amber') : '')
+            + '<div style="font-size:11px;color:var(--text-muted)">' + trTypeLabel(u.vendorType) + ' · ' + escHtml(u.email||'') + '</div></td>'
+            + '<td style="white-space:nowrap">' + (n ? '<b style="color:#b45309">★ ' + trAvg(x.st).toFixed(1) + '</b> <span style="font-size:11px;color:var(--text-muted)">(' + n + ')</span>' : '—') + '</td>'
+            + '<td>' + Number(x.st.graduates||0) + '</td><td>' + (nps === null ? '—' : nps) + '</td><td>' + mine(u).length + '</td>'
+            + '<td><div style="display:flex;gap:4px;flex-wrap:wrap">' + x.fl.map(flagChip).join('') + '</div></td></tr>'; }).join('')
+      + '</tbody></table>' : '<div class="empty" style="padding:22px">' + _L('No trainers yet.','Henüz eğitmen yok.') + '</div>';
+    host.querySelectorAll('.atn-row').forEach(function(tr){ tr.addEventListener('click', function(){ var u = people.filter(function(p){ return p.id === tr.dataset.id; })[0]; if(u) openAdmTrainer(u); }); });
+  }
+  function openAdmTrainer(u){
+    var st = statOf(u), rv = revsOf(u).sort(function(a,b){ return ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0); }), ts = mine(u), fl = flags(u), cr = crBy[u.id];
+    var ch = chs.filter(function(c){ return c.providerId === u.id; }), chSum = function(k){ return ch.filter(function(c){ return (k === 'featured') === (c.kind === 'featured'); }).reduce(function(a,c){ return a + Number(c.amount||0); }, 0); };
+    var pr = prs.filter(function(p){ return p.providerId === u.id; }), ver = u.trainerCredVerified || [];
+    var kv = function(k, v){ return v ? '<div style="font-size:12.5px;padding:3px 0"><span style="color:var(--text-muted);display:inline-block;min-width:110px">' + k + '</span> ' + v + '</div>' : ''; };
+    var created = u.createdAt && u.createdAt.seconds ? new Date(u.createdAt.seconds * 1000).toLocaleDateString(LDATE()) : '';
+    var md = _trModal('<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px"><div><div style="font-size:11px;color:#2563eb;font-weight:800;letter-spacing:.5px">' + trTypeLabel(u.vendorType).toUpperCase() + (u.vendorStatus === 'admin_verified' ? ' · <span style="color:#16a34a">✓ ' + _L('VERIFIED','DOĞRULANMIŞ') + '</span>' : '') + '</div>'
+        + '<h3 style="margin:2px 0 0;font-size:19px;font-weight:800">' + escHtml(u.company || u.displayName || '') + '</h3></div><button type="button" class="atd-x" style="background:none;border:none;font-size:22px;cursor:pointer">×</button></div>'
+      + (fl.length ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">' + fl.map(flagChip).join('') + '</div>' : '')
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:12px">'
+      +   '<div class="card" style="padding:10px 12px"><div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:4px">' + _L('PROFILE (private fields included)','PROFİL (gizli alanlar dahil)') + '</div>'
+      +     kv(_L('Name','Ad'), escHtml(u.displayName||'')) + kv(_L('E-mail','E-posta'), '<a href="mailto:' + escHtml(u.email||'') + '">' + escHtml(u.email||'') + '</a>') + kv(_L('Phone','Telefon'), escHtml(u.phone||''))
+      +     kv(_L('City / address','Şehir / adres'), escHtml([u.city, u.address].filter(Boolean).join(' · '))) + kv('Web', u.website ? '<a href="' + escHtml(u.website) + '" target="_blank" rel="noopener">' + escHtml(u.website) + '</a>' : '')
+      +     kv(_L('Brands','Markalar'), escHtml((u.brands||[]).join(', '))) + kv(_L('Experience','Deneyim'), escHtml(u.refs||'')) + kv(_L('Member since','Üyelik'), escHtml(created))
+      +     kv(_L('Public profile','Herkese açık profil'), u.slug ? '<a href="#v/' + escHtml(u.slug) + '" class="atd-link">#v/' + escHtml(u.slug) + '</a>' : '') + '</div>'
+      +   '<div class="card" style="padding:10px 12px"><div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:4px">' + _L('RATINGS','PUANLAR') + '</div>'
+      +     '<div style="font-size:13px;margin-bottom:4px">' + (trStatLine(st, { showNew:true }) || '') + (trNps(st) !== null ? ' · NPS <b>' + trNps(st) + '</b>' : '') + '</div>' + trCritBars(st)
+      +     '<div style="font-size:12px;margin-top:8px;color:var(--text-secondary)">' + _L('Fees: ','Ücretler: ') + '<b>' + chSum('seat').toLocaleString('tr-TR') + ' TRY</b> ' + _L('success','başarı') + ' · <b>' + chSum('featured').toLocaleString('tr-TR') + ' TRY</b> ' + _L('sponsored','sponsorlu') + ' · ' + pr.length + ' ' + _L('sponsor requests','sponsorlu talep') + '</div></div>'
+      + '</div>'
+      + '<div class="card" style="padding:10px 12px;margin-bottom:12px"><div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:6px">🏅 ' + _L('CREDENTIALS','SERTİFİKALAR') + '</div>'
+      +   ((u.trainerCredentials||[]).length ? (u.trainerCredentials||[]).map(function(c, i){ var it = cr && (cr.items||[]).filter(function(x){ return x.name === c; })[0];
+            return '<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;padding:4px 0;flex-wrap:wrap"><input type="checkbox" class="atd-cv" value="' + escHtml(c) + '"' + (ver.indexOf(c) >= 0 ? ' checked' : '') + '> <b>' + escHtml(c) + '</b>'
+              + (it && it.url ? ' <a href="' + escHtml(it.url) + '" target="_blank" rel="noopener noreferrer" style="color:#2563eb">' + _L('verification link ↗','doğrulama bağlantısı ↗') + '</a>' : '') + (it && it.certId ? ' <span style="font-family:monospace;color:var(--text-muted)">#' + escHtml(it.certId) + '</span>' : '') + '</label>'; }).join('')
+            + '<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button type="button" class="btn-p btn-sm" id="atd-cvsave">' + _L('Save verified credentials','Doğrulananları kaydet') + '</button>' + (cr ? '<span style="font-size:11.5px;color:var(--text-muted)">' + _L('Request: ','Talep: ') + (cr.status === 'requested' ? _L('waiting','bekliyor') : _L('reviewed','incelendi')) + '</span>' : '') + '</div>'
+          : '<div style="font-size:12.5px;color:var(--text-muted)">' + _L('No credentials declared.','Beyan edilmiş sertifika yok.') + '</div>') + '</div>'
+      + '<div class="card" style="padding:10px 12px;margin-bottom:12px"><div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:6px">🎓 ' + _L('TRAININGS','EĞİTİMLER') + ' (' + ts.length + ')</div>'
+      +   (ts.length ? ts.map(function(t){ var rg = regs.filter(function(r){ return r.trainingId === t.id; }), at = rg.filter(function(r){ return r.status === 'attended'; });
+            return '<div style="font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--border)"><b>' + escHtml(t.title) + '</b> · ' + ({ active:_L('Live','Yayında'), pending:_L('Pending','Onay bekliyor'), rejected:_L('Rejected','Reddedildi'), archived:_L('Archived','Arşiv') }[t.status] || escHtml(t.status)) + ' · ' + trPriceText(t) + ' · ' + rg.length + ' ' + _L('registrations','kayıt') + ' / ' + at.length + ' ' + _L('attended','katıldı') + (t.providerId !== u.id ? ' · <span style="color:var(--text-muted)">' + _L('by ','sağlayıcı: ') + escHtml(t.providerName||'') + '</span>' : '') + '</div>'; }).join('')
+          : '<div style="font-size:12.5px;color:var(--text-muted)">—</div>') + '</div>'
+      + '<div class="card" style="padding:4px 12px 10px;margin-bottom:12px"><div style="font-size:11px;font-weight:800;color:var(--text-muted);margin:8px 0 2px">★ ' + _L('ALL REVIEWS (hidden included)','TÜM YORUMLAR (gizliler dahil)') + ' (' + rv.length + ')</div>'
+      +   (rv.length ? rv.map(function(r){ var g = regById[r.regId] || {};
+            return '<div' + (r.status !== 'visible' ? ' style="opacity:.55"' : '') + '>' + trReviewHtml(r, { showTraining:true })
+              + '<div style="font-size:11px;color:var(--text-muted);margin:-4px 0 4px">' + _L('Reviewer: ','Yorumcu: ') + escHtml(g.name||'') + ' · ' + escHtml(g.email||'') + ' · NPS ' + r.nps + ' · ' + (r.status === 'visible' ? _L('Visible','Yayında') : _L('Hidden','Gizli'))
+              + ' <button type="button" class="btn-g btn-sm atd-rvt" data-id="' + escHtml(r.id) + '" data-s="' + (r.status === 'visible' ? 'hidden' : 'visible') + '">' + (r.status === 'visible' ? _L('Hide','Gizle') : _L('Show','Göster')) + '</button></div></div>'; }).join('')
+          : '<div style="font-size:12.5px;color:var(--text-muted)">—</div>') + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
+      +   (u.vendorStatus === 'admin_verified' ? '<button type="button" class="btn-g btn-sm" id="atd-unver">' + _L('Remove verification','Doğrulamayı kaldır') + '</button>' : '<button type="button" class="btn-p btn-sm" id="atd-ver">✓ ' + _L('Verify trainer','Eğitmeni doğrula') + '</button>')
+      +   '<button type="button" class="btn-g btn-sm" id="atd-feat">⭐ ' + _L('Sponsor profile (no fee)','Profili öne çıkar (ücretsiz)') + '</button></div>', 820);
+    var close = function(){ md.remove(); };
+    md.querySelector('.atd-x').addEventListener('click', close);
+    md.querySelectorAll('.atd-link').forEach(function(a){ a.addEventListener('click', close); });
+    var reload = function(){ md.remove(); admTrainers(m, host); };
+    md.querySelectorAll('.atd-rvt').forEach(function(b){ b.addEventListener('click', async function(){
+      try { await updateDoc(doc(db,'training_reviews', b.dataset.id), { status:b.dataset.s, moderatedAt:serverTimestamp(), moderatedBy:CUR_USER.uid }); await trRecomputeStats(); reload(); } catch(e){ showToast(String(e && (e.code||e.message)), 'err'); }
+    }); });
+    var cvs = md.querySelector('#atd-cvsave'); if(cvs) cvs.addEventListener('click', async function(){
+      var list = Array.prototype.map.call(md.querySelectorAll('.atd-cv:checked'), function(x){ return x.value; });
+      try {
+        var bt = writeBatch(db);
+        bt.update(doc(db,'users', u.id), { trainerCredVerified:list, trainerCredVerifiedAt:serverTimestamp() });
+        bt.set(doc(db,'vendor_public', u.id), { trainerCredVerified:list, updatedAt:serverTimestamp() }, { merge:true });
+        if(cr) bt.update(doc(db,'tr_credreqs', u.id), { status:'reviewed', reviewedAt:serverTimestamp(), verified:list });
+        await bt.commit(); invalidateVendorPublicCache();
+        _trNotify(u.id, _L('Credentials reviewed','Sertifikalarınız incelendi'), list.length + ' ' + _L('credentials verified','sertifika doğrulandı'), u.id, 'trainer_cred');
+        showToast(_L('Saved','Kaydedildi'), 'ok'); reload();
+      } catch(e){ showToast(String(e && (e.code||e.message)), 'err'); }
+    });
+    var setVer = async function(status){
+      try { await updateDoc(doc(db,'users', u.id), status === 'admin_verified' ? { vendorStatus:status, verifiedAt:serverTimestamp(), verifiedBy:CUR_USER.uid } : { vendorStatus:status, verifiedAt:null, verifiedBy:null });
+        await trMirrorVendorStatus(u.id, status); if(window._vendorBadgeCache) delete window._vendorBadgeCache[u.id];
+        if(status === 'admin_verified') _trNotify(u.id, _L('✓ Your profile is verified','✓ Profiliniz doğrulandı'), _L('Your profile now shows the Verified badge.','Profilinizde artık Doğrulanmış rozeti görünüyor.'), u.id, 'vendor_verified');
+        showToast(_L('Updated','Güncellendi'), 'ok'); reload(); }
+      catch(e){ showToast(String(e && (e.code||e.message)), 'err'); }
+    };
+    var vb = md.querySelector('#atd-ver'); if(vb) vb.addEventListener('click', function(){ if(confirm(_L('Mark this trainer as verified?','Bu eğitmen doğrulanmış olarak işaretlensin mi?'))) setVer('admin_verified'); });
+    var ub = md.querySelector('#atd-unver'); if(ub) ub.addEventListener('click', function(){ if(confirm(_L('Remove verification?','Doğrulama kaldırılsın mı?'))) setVer('auto_approved'); });
+    md.querySelector('#atd-feat').addEventListener('click', async function(){
+      var w = parseInt(prompt(_L('How many weeks? (1–8)','Kaç hafta? (1–8)'), '1'), 10); if(!w || w < 1 || w > 8) return;
+      try { var cur = trSt('t_' + u.id).featuredUntil, base = cur && cur.seconds ? Math.max(Date.now(), cur.seconds * 1000) : Date.now();
+        await setDoc(doc(db,'tr_stats','t_' + u.id), { kind:'t', target:u.id, featuredUntil:Timestamp.fromMillis(base + w * 7 * 86400000) }, { merge:true });
+        invalidateTrStats(); showToast(_L('Sponsored','Öne çıkarıldı'), 'ok'); reload(); }
+      catch(e){ showToast(String(e && (e.code||e.message)), 'err'); }
+    });
+  }
+  paint();
+  var tm = null;
+  host.querySelector('#atn-q').addEventListener('input', function(){ var v = this.value; clearTimeout(tm); tm = setTimeout(function(){ F.q = v; paint(); }, 200); });
+  host.querySelector('#atn-t').addEventListener('change', function(){ F.type = this.value; paint(); });
+  host.querySelector('#atn-s').addEventListener('change', function(){ F.sort = this.value; paint(); });
+}
 
 // ══ v10.08: KATEGORI KATMANI ═══════════════════════════════════════════
 // Katalogda ~16.200 urun ailesi sablonu var; yalniz vendor urunu olan
@@ -75221,7 +75509,9 @@ async function renderVendorPublic(slug) {
     }
 
     // CTA — logged-in için "PoC Aç", logout için "Vendor olarak katıl"
-    var ctaHtml = CUR_USER
+    var ctaHtml = vendor.vendorType === 'egitmen'   // v10.11: egitmen PoC almaz; egitimlerine yonlendir
+      ? '<a href="#" class="btn-p" id="vp-trn-cta" style="padding:12px 24px;font-size:14px;font-weight:700;text-decoration:none">🎓 '+_L('See trainings','Eğitimlerini gör')+'</a>'
+      : CUR_USER
       ? '<button class="btn-p" id="vp-poc-cta" style="padding:12px 24px;font-size:14px;font-weight:700">'+t('vpub.open_poc','📋 PoC Talebi Aç')+'</button>'
       : '<button class="btn-ok" id="vp-signup-cta" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer">'+t('vpub.register_poc','🎁 Müşteri Olarak Kayıt Ol — PoC Aç')+'</button>';
 
@@ -75255,7 +75545,7 @@ async function renderVendorPublic(slug) {
       + '</div>'
 
       // İSTATİSTİKLER + İLETİŞİM
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px">'
+      + '<div class="vp-stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px">'
       +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#16a34a">'+visibleProducts.length+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">'+t('vpub.stat_products','Aktif Ürün')+'</div></div>'
       +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#2563eb">'+completedPocs+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">'+t('vpub.stat_completed','Tamamlanan PoC')+'</div></div>'
       +   '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center"><div style="font-size:26px;font-weight:800;color:#d97706">'+events.length+'</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;font-weight:600">'+t('vpub.stat_event','Yaklaşan Etkinlik')+'</div></div>'
@@ -75296,7 +75586,7 @@ async function renderVendorPublic(slug) {
             }).join('')
           + '</div>'
           + '</div>'
-        : '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:30px;margin-bottom:18px;text-align:center;color:var(--text-muted)"><div style="font-size:32px;margin-bottom:8px">📦</div>'+t('vpub.no_products','Henüz ürün eklenmemiş')+'</div>')
+        : '<div class="vp-noprod" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:30px;margin-bottom:18px;text-align:center;color:var(--text-muted)"><div style="font-size:32px;margin-bottom:8px">📦</div>'+t('vpub.no_products','Henüz ürün eklenmemiş')+'</div>')
 
       // ETKİNLİKLER (varsa)
       + (events.length > 0
