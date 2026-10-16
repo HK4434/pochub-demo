@@ -669,6 +669,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--color-primary);out
 <div class="scr" id="scr-leaderboard"></div>
 <div class="scr" id="scr-vendors"></div>
 <div class="scr" id="scr-events"></div>
+<div class="scr" id="scr-trainings"></div>
 <div class="scr" id="scr-customer"></div>
 <div class="scr" id="scr-vendor"></div>
 <div class="scr" id="scr-admin"></div>
@@ -797,7 +798,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateD
 // v4.75: Firebase Functions client SDK
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
-const VERSION = 'v10.08';
+const VERSION = 'v10.09';
 
 // ── Timestamp yardımcısı ─────────────────────────────────────────
 function LDATE(){ try { return (window.CUR_LOCALE==='en')?'en-US':'tr-TR'; } catch(e){ return 'tr-TR'; } }
@@ -1271,6 +1272,7 @@ function getOfferVatInfo(offer) {
    CHANGELOG — Son 10 versiyon:
 ══════════════════════════════════════════════════════════════ */
 const CHANGELOG = {
+  'v10.09': ['EGITIMLER MODULU — FAZ 1 (Hasan: urunlerle ilgili ucretli/ucretsiz, uzaktan/yerinde, 1-X gunluk egitimler; veren uretici, distributor, entegrator ya da bagimsiz uzman olabilir; siniflar icin talep toplanip egitim verenlere bildirilsin; odeme altyapisi olmadan kucuk de olsa gelir). YENI SEKME Egitimler: arama + marka/bicim/tur/ucret filtreleri, kart ve detay penceresi, takvimli sinifa KAYIT, kuruma ozel TALEP, ILGI BILDIR. Iki tur bilerek ayrildi: acik sinif (tarih + kontenjan, kayit alir) ve kuruma ozel (tarihsiz, talep alir); bir egitim ikisini birden sunabilir. BAGIMSIZ EGITMEN: yeni vendorType egitmen (Giris menusu > Bagimsiz egitmen). Kisisel e-posta ve bos firma adi kabul (bagimsiz uzmanin kurumsal adresi olmayabilir), sertifikalar profilde gorunur ve Profilim den duzenlenir. Marka temsilcisi SAYILMAZ: marka sayfasindaki temsilci listesine ve PoC marka eslestirmesine girmez (yoksa PoC talepleri egitmene giderdi). Vendor kendi egitimine kayitli egitmeni baglar (profiline link) ya da adini serbest yazar. GUVEN: egitmen dogrulamasi mevcut Dogrulanmis rozeti. Her yeni egitim admin onayindan gecer; dogrulanmis saglayicinin duzenlemesi yayinda kalir, digerlerininki yeniden onaya duser (kural da ayni seyi uygular). TALEP HAVUZU: ilgi bildirenin iletisim bilgisi training_interest te (yalniz kendisi ve admin okur); herkese acik olan yalniz ozet training_pools/{marka__konu__sehir}: kisi, koltuk, bicim dagilimi. Esik (varsayilan 5) ve her katinda o markayi beyan etmis vendorlara + o markada egitim veren saglayicilara bildirim (en fazla 25) ve admin kutusuna not. GELIR (odeme altyapisi yok, iki model, ikisi de ayardan acilir): (1) ILETISIM BILGISI KARSILIGI UCRET: saglayici havuzun iletisim bilgilerini ister, admin onaylayinca kisiler saglayicinin paneline acilir; ucretli modda yeni paylasilan kisi basi ucret kaydedilir, Admin > Egitimler > Fatura raporu ay ve saglayiciya gore toplar, CSV verir, faturayi GITS keser. Ucret saglayicinin gonderdigi degerden degil onay anindaki ayardan hesaplanir. Ucretsiz modda da paylasim admin onayiyla (KVKK + kalite). Ayni havuza sonradan gelenler icin Yenileri iste; yalniz yeni kisiler ucretlenir. (2) PAKET KOTASI: paketlere Egitim ilani limiti (-1 sinirsiz); ayar kapaliyken uygulanmaz. KVKK: kayit, talep ve ilgi formlarinda acik riza kutusu zorunlu, consentAt kaydedilir. KAYNAK: her kayit/talep/ilgi source pochub tasir (ileride komisyon modeli secilirse geriye donuk veri hazir). ENTEGRASYON: urun penceresi, aile bilgi penceresi ve marka sayfasinda o markanin egitimleri + Bu urun icin egitim talep et baglantisi; vendor profilinde egitimler ve sertifikalar. Vendor paneli > Egitimlerim: ilan ekle/duzenle/arsivle (oturum satirlari, egitmenler, mufredat, on kosul, sertifika, lab), kayit ve talep kutusu (durum: yeni/iletisime gecildi/kesinlesti/iptal), markalarim icin talep havuzlari. Admin > Egitimler: onay (tek tek ve hepsini onayla, ret gerekcesi saglayiciya bildirim), tumu, havuzlar, iletisim talepleri, fatura raporu, ayarlar (esik, paylasim modu, kisi basi ucret, kota). GUVENLIK ACIGI KAPATILDI (kural v1.10.5): users kuralinda vendorStatus korunmuyordu; vendor konsoldan kendini admin_verified yapip Dogrulanmis rozeti alabiliyordu. Bu rozet artik egitmen guveninin de dayanagi oldugu icin kapatildi: vendor alani degistiremez (tek istisna eski kayitlardaki eksik alanin auto_approved yapilmasi), kayitta yalniz auto_approved. vendor_public aynasinda da ayni: durum yalniz admin den. Admin dogrula/reddet/geri al artik aynaya da yaziyor (onceden ayna vendor bir sonraki giriste profilini kaydedene kadar eski kaliyordu); admin ilk giriste uyumsuz kayitlari bir kez esitler (pochub_config/vstatus_heal). Vendor tarafi ayna senkronu vendorStatus u yazmiyor (eski bir profil kopyasi dogrulamayi geri almasin). AYNI SINIF IKINCI HATA: vendor senkronu aynaya isVerified/evidenceScore da yaziyordu; kural bu alanlari vendor a kapattigi icin admin vendoru Vendor Dogrulama ekranindan dogruladiktan sonra vendorun TUM ayna senkronu (firma adi, logo, markalar) sessizce reddediliyordu. Artik vendor senkronu bu uc alani yazmiyor, admin ekranlari aynaya kendisi yaziyor, users.isVerified de korunuyor. AYRICA: v10.04 urun onayi bildirimi productCount alani yuzunden kurala takilip HIC gitmiyordu (alan beyaz listede yok) — data.productCount a tasindi. Profil kaydi herkese acik profile hemen yansiyor. PROVA (Chromium, sahte veri): kayit, kontenjan sayaci, ilgi bildirimi ile havuz olusumu ve esikte bildirim, iletisim talebi, admin onayi ile kisilerin paylasilmasi ve ucret kaydi, fatura CSV, yenileri iste ile yalniz yeni kisinin ucretlenmesi, egitmenin marka temsilcisi listesine girmemesi. node --check MODULE SYNTAX OK. RULES v1.10.5 (ONCE KURALLAR YAYINLANMALI).'],
   'v10.08': ['KATEGORI KATMANI (Hasan: 16 bin urun arasinda 360 kayit yeterli mi). Yeterli degildi: vendor urunu olan her aile aciklamali ama katalogdaki ~16.200 urun ailesi sablonu (marka sayfalari, katalogdaki Marka katalogu kartlari) bilgisizdi. KARAR: 16 bini tek tek yazmak yerine 986 kategorinin (taksonominin tamami) her biri icin kisa aciklama + PoCde genelde neye bakilir notu yazildi. Kendi aciklamasi olmayan bir aile acildiginda BU KATEGORI HAKKINDA basligiyla kategori metni gosterilir ve metnin urune degil kategoriye ozel oldugu acikca yazar (uydurma urun bilgisi yok). Altyapi/guvenlik kategorilerinde PoC notu kategoriye ozel; is uygulamalarinda genel PoC notu, hizmet kategorilerinde (danismanlik, BPO, ajans) PoC yerine referans/kapsam degerlendirmesi. Ayni kavramin farkli adlari (Uc Nokta Koruma / Endpoint gibi) ayni metne baglandi. DEPOLAMA: pochub_content/catinfo_<kategori> — KURAL DEGISIKLIGI YOK (pochub_content herkes okur, admin yazar; uygulama bu koleksiyonu yalniz dogrudan kimlikle okuyor). Okuma maliyeti: kendi aciklamasi olmayan aile acilinca +1 okuma. SENKRON: paket kategori icerigi degisince (catHash) bir kez ~1.000 okuma + degisen kadar yazma (ilk seferde 986); icerik ayniysa kategorilere hic dokunulmaz. Elle duzenlenen kategori ezilmez. AYRICA: (1) Katalogdaki Marka katalogu sablon kartina tiklayinca artik dogrudan bilgi penceresi aciliyor (eskiden marka sayfasina gidip ikinci tik gerekiyordu); pencerede Marka sayfasi baglantisi var. (2) Urun penceresinde kendi aciklamasi yoksa kategori aciklamasi. (3) Admin > Katalog Bilgileri > Kategoriler sekmesi: arama, duzenleme (statik icerik kurali). PROVA (Chromium): ilk senkron 986 kategori yazdi, ikinci senkron 0; elle duzenlenen kategori sonraki paketle korundu; sablon kartindan acilan pencerede kategori kutusu, PoC ve marka baglantisi; kendi aciklamasi olan aile kategori yerine kendi metnini gosteriyor. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi.'],
   'v10.07': ['KATALOG BILGISI TAMAMLANDI (Hasan: eksikleri tamamla; 11.10 disa aktarimi yalniz 12 eksik gosterdi — v10.06 paketi canlida yazilmis). v10.05 te bilerek bos biraktigim 12 aile yazildi: Huawei SE1000-E300/E600 (kurumsal SBC), IT Services for CSP, DCS, Service-Oriented SON, CSP AI pazarlama/satis; HPE GenAI Services for Banking, IoT Services; Microsoft Grants Management Template; Oracle Digital Evidence Management, DataFox, NetSuite Vendor Management. Hizmet olanlarda PoC yerine referans/kapsam degerlendirmesi yazildi; emin olunamayan ayrintilarda (model kapasitesi, urunun guncel durumu, tuketim modeli) uretici teyidi notu var, rakam yok. Paket surumu 2026-10-11a; admin girisinde kendiliginden yazilir. MALIYET DUZELTMESI: senkron artik icerigi degismemis paket kayitlarini YENIDEN YAZMIYOR (ozet ve teknik profil karsilastirilir) — bu surumde ~360 yerine 12 yazma. Elle duzenlenmis kayit kurali aynen. Kapsama: vendor urunu olan tum aileler (327) ve markalar aciklamali. PROVA: Chromium da v10.06 durumu (360 kayit) uzerinde yeni paket: 12 yazma, 360 ayni, elle yazilmis kayit korundu. node --check MODULE SYNTAX OK. RULES degismedi.'],
   'v10.06': ['TEKNIK OZELLIKLER BOS + DIGER URUNLER (Hasan: teknik ozellikler sekmesi bos; diger urunler ne olacak; gizli degisken tanimlayamam, ek maliyet olmasin, bana is birakma). KARARLAR: (1) Cloud Function beklenmiyor. Claude un yazdigi 46 marka + 315 aile bilgisi (iki parti) uygulamanin icinde paketli (#catinfo-bundle, ~250 KB) ve admin paneli acildiginda KENDILIGINDEN onayli olarak Firestore a yaziliyor; paket surumu pochub_config/catinfo_bundle da, ayni surum ikinci kez yazilmaz. JSON ice aktarma ve taslak onaylama adimi kalmadi. Maliyet: surum basina bir kez ~2 liste okumasi + ~360 yazma. Admin in elle duzenledigi (source manual / +edit) ya da paket disi kaynakla onayladigi kayit ASLA ezilmez. Katalog Bilgileri ekraninda Paketi yeniden uygula dugmesi var. (2) TEKNIK PROFIL: rakam yazilmadi — ayni ailede modeller arasi fark kat kat, aileye tek performans rakami yazmak yanlis olur. 82 urun grubu (116 aile kaydi; guvenlik duvari, anahtar, kablosuz, depolama, HCI, sanallastirma, sunucu, NAC, SIEM, WAF, yedekleme) icin dogrulanabilir profil: urun tipi, cihaz bicimleri, yonetim, lisans modeli, model yelpazesi, entegrasyonlar, standartlar/protokoller + model rakamlari icin uretici veri sayfasi notu ve uretici sitesi baglantisi. Vendor kendi teknik alanlarini doldurduysa once onlar, altinda aile profili. Hicbir bilgi yoksa Teknik Ozellikler sekmesi GIZLI (eskiden girilmemis yazan bos sekme). Teknik profil Admin > Katalog Bilgileri > Duzenle den duzenlenebilir (statik icerik kurali). (3) KESIK ADLAR: displayProductName kapanmamis parantezden onceye kirpar (FortiGate: Next Generation Firewall (Fortinet -> FortiGate: Next Generation Firewall); veri degismez, eslestirme ham adi kullanir. Urun penceresi basligi, katalog kartlari (iki gorunum), vendor profil kartlari, marka sayfasi ve aile penceresinde uygulandi. (4) Marka sayfasinda sunan firmasi olmayan aile penceresi: PoCHubda bu urunu sunan firma henuz yok, PoC talebi acin eslestirelim mesaji + teknik profil. PROVA (Chromium, sahte veri): ilk senkron 360 yazma, elle yazilmis kayit korundu, ikinci cagri atlandi (0 yazma); musteri rolunde kesik adli FortiGate urununde baslik temiz, Teknik Ozellikler sekmesi profil ile dolu (gorsel kontrol edildi); bilgisi olmayan urunde sekme gizli; sunanı olmayan ailede mesaj. Konsol hatasi yok. node --check MODULE SYNTAX OK. RULES degismedi (v1.10.4 yeterli; pochub_config admin yazar).'],
@@ -5972,6 +5974,7 @@ function buildNav() {
   let tabItems = [
     ['home',    t('nav.home', 'Ana Sayfa')],
     ['events',  t('nav.events', 'Etkinlikler')],
+    ['trainings', _L('🎓 Trainings','🎓 Eğitimler')],   // v10.09
     ['catalog', t('nav.catalog', 'Katalog')],
     ['leaderboard', t('nav.leaderboard', '🏆 Liderler')],
     ['vendors', (window.CUR_LOCALE==='en'?'🏢 Vendors':'🏢 Vendorlar')],
@@ -6107,6 +6110,7 @@ function buildNav() {
           <button class="login-opt" data-role="vendor" data-vtype="ureticid">${window.CUR_LOCALE==='en'?'Manufacturer':'Üretici'}</button>
           <button class="login-opt" data-role="vendor" data-vtype="distributor">${window.CUR_LOCALE==='en'?'Distributor':'Distribütör'}</button>
           <button class="login-opt" data-role="vendor" data-vtype="integrator">${window.CUR_LOCALE==='en'?'Integrator':'Entegratör'}</button>
+          <button class="login-opt" data-role="vendor" data-vtype="egitmen">${window.CUR_LOCALE==='en'?'🎓 Independent trainer':'🎓 Bağımsız eğitmen'}</button>
           <div style="border-top:1px solid rgba(15,23,42,.08);margin:4px 0"></div>
           <button class="login-opt" data-role="admin" style="color:#d97706">${window.CUR_LOCALE==='en'?'Admin Login':'Admin Girişi'}</button>
         </div>
@@ -6602,6 +6606,7 @@ function renderScreen(s) {
   if (s==='home') renderHome();
   else if (s==='about') renderAbout();
   else if (s==='events') renderEvents();
+  else if (s==='trainings') renderTrainings();   // v10.09
   else if (s==='catalog') renderCatalog();
   else if (s==='leaderboard') renderLeaderboard();
   else if (s==='vendors') renderVendors();
@@ -6849,7 +6854,7 @@ async function populateAuthCatPickers(){
   });
 }
 function renderAuthForm() {
-  const roleLabels = {customer:t('auth.role_customer','Müşteri'), vendor: AUTH_VTYPE==='ureticid'?t('auth.role_manufacturer','Üretici'):AUTH_VTYPE==='distributor'?t('auth.role_distributor','Distribütör'):AUTH_VTYPE==='integrator'?t('auth.role_integrator','Entegratör'):'Vendor', admin:'Admin'};
+  const roleLabels = {customer:t('auth.role_customer','Müşteri'), vendor: AUTH_VTYPE==='ureticid'?t('auth.role_manufacturer','Üretici'):AUTH_VTYPE==='distributor'?t('auth.role_distributor','Distribütör'):AUTH_VTYPE==='integrator'?t('auth.role_integrator','Entegratör'):AUTH_VTYPE==='egitmen'?_L('Trainer','Eğitmen'):'Vendor', admin:'Admin'};
   el('auth-title').textContent = (AUTH_MODE==='login'?t('auth.login','Giriş Yap'):t('auth.register','Kayıt Ol')) + ' — ' + (roleLabels[AUTH_ROLE]||AUTH_ROLE);
 
   let html = '';
@@ -6865,9 +6870,10 @@ function renderAuthForm() {
   if (AUTH_MODE === 'register') {
     // ── Ortak temel alanlar ──────────────────────────────────────────
     html += `<label class="lbl">${t('auth.fullname','Ad Soyad')} <span class="t-red">*</span></label><input class="inp" id="a-name" placeholder="${t('auth.fullname_ph','Ad Soyad (zorunlu)')}"><br>`;
-    html += `<label class="lbl">${t('auth.company','Şirket Adı')} <span class="t-red">*</span></label><input class="inp" id="a-company" placeholder="${t('auth.company_ph','Şirket adı (zorunlu)')}"><br>`;
-    html += `<label class="lbl">${t('auth.phone','Şirket Telefonu')} <span class="t-red">*</span></label><input class="inp" id="a-phone" placeholder="+90 212 xxx xx xx"><br>`;
-    html += `<label class="lbl">${t('auth.address','Şirket Adresi')} <span class="t-red">*</span></label><textarea class="inp" id="a-address" rows="2" placeholder="${t('auth.address_ph','Mahalle, Sokak No, İlçe, İl')}" style="resize:none"></textarea><br>`;
+    if (AUTH_ROLE === 'vendor' && AUTH_VTYPE === 'egitmen') html += `<label class="lbl">${_L('Company / title','Firma / ünvan')} <span class="muted-fs11">(${t('common.optional','opsiyonel')})</span></label><input class="inp" id="a-company" placeholder="${_L('Leave empty to use your name','Boş bırakırsanız adınız kullanılır')}"><br>`;   // v10.09
+    else html += `<label class="lbl">${t('auth.company','Şirket Adı')} <span class="t-red">*</span></label><input class="inp" id="a-company" placeholder="${t('auth.company_ph','Şirket adı (zorunlu)')}"><br>`;
+    html += `<label class="lbl">${(AUTH_ROLE==='vendor'&&AUTH_VTYPE==='egitmen')?_L('Phone','Telefon'):t('auth.phone','Şirket Telefonu')} <span class="t-red">*</span></label><input class="inp" id="a-phone" placeholder="+90 212 xxx xx xx"><br>`;
+    html += `<label class="lbl">${(AUTH_ROLE==='vendor'&&AUTH_VTYPE==='egitmen')?(_L('Address / city','Adres / şehir')+' <span class="muted-fs11">('+t('common.optional','opsiyonel')+')</span>'):(t('auth.address','Şirket Adresi')+' <span class="t-red">*</span>')}</label><textarea class="inp" id="a-address" rows="2" placeholder="${t('auth.address_ph','Mahalle, Sokak No, İlçe, İl')}" style="resize:none"></textarea><br>`;
     html += `<label class="lbl">${t('auth.website','Şirket Web Sitesi')} <span class="muted-fs11">(${t('common.optional','opsiyonel')})</span></label><input class="inp" id="a-website" placeholder="https://www.sirket.com"><br>`;
     html += `<label class="lbl">${t('auth.taxno','Vergi No / TC No')} <span class="muted-fs11">(${t('common.optional','opsiyonel')})</span></label><input class="inp" id="a-taxno" placeholder="${t('auth.taxno_ph','Vergi kimlik numarası')}"><br>`;
 
@@ -6942,6 +6948,23 @@ function renderAuthForm() {
     }
 
     // ── ENTEGRATÖR'e özel alanlar ─────────────────────────────────────
+    // v10.09: Bagimsiz egitmen — uzmanlik, markalar, sertifikalar
+    if (AUTH_VTYPE === 'egitmen') {
+      html += `
+      <div style="background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.18);border-radius:8px;padding:14px;margin:10px 0">
+        <div style="font-size:11px;font-weight:700;color:#7c3aed;letter-spacing:.6px;margin-bottom:6px">${_L('TRAINER DETAILS','EĞİTMEN BİLGİLERİ')}</div>
+        <div style="font-size:11.5px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">${_L('You can publish trainings and receive registrations. You are not listed as a brand representative.','Eğitim yayınlayabilir ve kayıt alabilirsiniz. Marka temsilcisi olarak listelenmezsiniz.')}</div>
+        <label class="lbl">${_L('Areas of expertise','Uzmanlık alanları')} <span class="muted-fs11">(${_L('optional','opsiyonel')})</span></label>
+        <div id="a-spec-picker" class="a-cat-picker" data-chk="a-spec-chk"></div>
+        <label class="lbl">${_L('Brands you train on','Eğitim verdiğiniz markalar')} <span class="muted-fs11">${t('common.optional','(opsiyonel)')}</span></label>
+        <div id="a-brand-picker" class="a-brand-picker" data-chk="a-brand-chk" data-src="a-spec-chk"></div>
+        <label class="lbl">${_L('Certifications / trainer credentials','Sertifikalar / eğitmen yetkinlikleri')} <span class="muted-fs11">(${_L('one per line','her satıra bir tane')})</span></label>
+        <textarea class="inp" id="a-trainer-creds" rows="3" placeholder="${_L('e.g. Fortinet Certified Trainer (FCT)\nCCIE #12345','örn: Fortinet Certified Trainer (FCT)\nCCIE #12345')}" style="resize:vertical"></textarea>
+        <label class="lbl">${_L('Experience / references','Deneyim / referanslar')} <span class="muted-fs11">(${_L('optional','opsiyonel')})</span></label>
+        <textarea class="inp" id="a-refs" rows="2" style="resize:none"></textarea>
+      </div>`;
+    }
+
     if (AUTH_VTYPE === 'integrator') {
       html += `
       <div style="background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.15);border-radius:8px;padding:14px;margin:10px 0">
@@ -6958,7 +6981,7 @@ function renderAuthForm() {
       </div>`;
     }
 
-    html += `<div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.20);border-radius:7px;padding:10px;font-size:12px;color:#2563eb;margin-bottom:4px">${t('auth.corp_email_notice','ℹ Kayıt için kurumsal e-posta adresi zorunludur. (Gmail, Hotmail vb. kabul edilmez)')}</div>`;
+    if (!(AUTH_ROLE === 'vendor' && AUTH_VTYPE === 'egitmen')) html += `<div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.20);border-radius:7px;padding:10px;font-size:12px;color:#2563eb;margin-bottom:4px">${t('auth.corp_email_notice','ℹ Kayıt için kurumsal e-posta adresi zorunludur. (Gmail, Hotmail vb. kabul edilmez)')}</div>`;
   }
   html += `<label class="lbl">${t('auth.email','E-posta')} *</label><input class="inp" id="a-email" type="email" placeholder="ornek@sirket.com"><br>`;
   html += `<label class="lbl">${t('auth.password','Şifre')} *</label><input class="inp" id="a-pass" type="password" placeholder="${t('auth.password_ph','En az 6 karakter')}"><br>`;
@@ -7084,7 +7107,8 @@ async function handleAuth() {
       go(profile?.role === 'customer' ? 'customer' : profile?.role === 'vendor' ? 'vendor' : profile?.role === 'admin' ? 'admin' : 'home');
     } else {
       const name = el('a-name')?.value?.trim() || '';
-      const company = el('a-company')?.value?.trim() || '';
+      const _isTrainer = AUTH_ROLE === 'vendor' && AUTH_VTYPE === 'egitmen';   // v10.09
+      const company = el('a-company')?.value?.trim() || (_isTrainer ? name : '');
       const phone = el('a-phone')?.value?.trim() || '';
       const address = el('a-address')?.value?.trim() || '';
       const taxno = el('a-taxno')?.value?.trim() || '';
@@ -7106,7 +7130,7 @@ async function handleAuth() {
       const freeProviders = ['gmail','hotmail','yahoo','outlook','icloud','yandex','protonmail','live','msn','me.com','googlemail'];
       const emailDomain = email.split('@')[1]?.toLowerCase()||'';
       const isFree = freeProviders.some(p => emailDomain.includes(p));
-      if (isFree) {
+      if (isFree && !_isTrainer) {   // v10.09: bagimsiz egitmenin kurumsal adresi olmayabilir
         errDiv.innerHTML = `<div class="alert alert-err">${window.CUR_LOCALE==='en'?"Please use your corporate email. (Free providers like Gmail, Hotmail, Yahoo are not accepted.)":"Lütfen kurumsal e-posta adresinizi girin. (Gmail, Hotmail, Yahoo gibi ücretsiz e-posta adresleri kabul edilmemektedir.)"}</div>`;
         btn.disabled=false; btn.textContent=t('auth.register_btn','Kayıt Ol'); return;
       }
@@ -7114,7 +7138,7 @@ async function handleAuth() {
         errDiv.innerHTML = `<div class="alert alert-err">${t('auth.err_company','Şirket adı zorunludur.')}</div>`;
         btn.disabled=false; btn.textContent=t('auth.register_btn','Kayıt Ol'); return;
       }
-      if (!address) {
+      if (!address && !_isTrainer) {
         errDiv.innerHTML = `<div class="alert alert-err">${t('auth.err_address','Şirket adresi zorunludur.')}</div>`;
         btn.disabled=false; btn.textContent=t('auth.register_btn','Kayıt Ol'); return;
       }
@@ -7198,6 +7222,7 @@ async function handleAuth() {
 
       // Referanslar (entegratör)
       const refs = el('a-refs')?.value.trim() || '';
+      const trainerCredentials = (el('a-trainer-creds')?.value || '').split('\n').map(function(x){ return x.trim().slice(0,120); }).filter(Boolean).slice(0,20);   // v10.09
 
       // Distribütörler (üretici - yabancı)
       const distRows = document.querySelectorAll('#a-dist-list > div');
@@ -7256,7 +7281,7 @@ async function handleAuth() {
       await setDoc(doc(db, 'users', cred.user.uid), {
         email, displayName: name, company, phone, address, taxNo: taxno,
         website, origin, country, categories, specializations, regions, brands, refs,
-        distributors, integrators, distributedCategories,
+        distributors, integrators, distributedCategories, trainerCredentials,
         role: AUTH_ROLE, vendorType: AUTH_VTYPE,
         billingCurrency: (document.getElementById('a-currency')?.value || 'TRY'),
         emailVerified: false,
@@ -7605,6 +7630,7 @@ function _vendTypeLabel(tp, EN){
   if(tp==='ureticid'||tp==='uretici'||tp==='manufacturer') return EN?'🏭 Manufacturer':'🏭 Üretici';
   if(tp==='distributor') return EN?'🚚 Distributor':'🚚 Distribütör';
   if(tp==='integrator') return EN?'🔧 Integrator':'🔧 Entegratör';
+  if(tp==='egitmen') return EN?'🎓 Trainer':'🎓 Eğitmen';   // v10.09
   return EN?'💼 Vendor':'💼 Vendor';
 }
 async function renderVendors(){
@@ -7656,6 +7682,7 @@ async function renderVendors(){
           '<option value="ureticid"'+(VEND_TYPE==='ureticid'?' selected':'')+'>'+(EN?'Manufacturer':'Üretici')+'</option>' +
           '<option value="distributor"'+(VEND_TYPE==='distributor'?' selected':'')+'>'+(EN?'Distributor':'Distribütör')+'</option>' +
           '<option value="integrator"'+(VEND_TYPE==='integrator'?' selected':'')+'>'+(EN?'Integrator':'Entegratör')+'</option>' +
+          '<option value="egitmen"'+(VEND_TYPE==='egitmen'?' selected':'')+'>'+(EN?'Trainer':'Eğitmen')+'</option>' +
         '</select>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary);font-weight:600;cursor:pointer;user-select:none"><input id="vd-ver" type="checkbox"'+(VEND_VER?' checked':'')+'> '+(EN?'Verified only':'Yalnız doğrulanmış')+'</label>' +
       '</div>' +
@@ -9014,6 +9041,7 @@ async function openProductDetailModal(productId) {
           else if(_tech){ _sp.innerHTML = _tech; _st.style.display = ''; }
         }
         var _bl = _h.querySelector('.ci-brandlink'); if(_bl) _bl.addEventListener('click', function(){ modal.remove(); });
+        await trAppendForBrand(_h, p.brand, p.name);   // v10.09
       } catch(e){}
     })();
 
@@ -10019,7 +10047,7 @@ async function loadTopVendors() {
       var slug = v.slug || generateSlug(v.company || v.displayName || 'vendor');
       var typeIcon = v.vendorType === 'ureticid' ? '🏭'
                   : v.vendorType === 'distributor' ? '🚚'
-                  : v.vendorType === 'integrator' ? '🔧' : '💼';
+                  : v.vendorType === 'integrator' ? '🔧' : v.vendorType === 'egitmen' ? '🎓' : '💼';
       var avatar = renderAvatar({photoBase64:v.photoBase64,logoUrl:v.logoUrl,company:v.company,displayName:v.displayName,uid:v.uid},40,{square:true});
       return '<a href="#v/'+slug+'" class="lb-row" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 14px;display:flex;align-items:center;gap:12px;text-decoration:none;cursor:pointer">'
         + _lbRankMedal(rank)
@@ -10145,7 +10173,7 @@ async function loadVendorLogoBar() {
     var logoHtml = topVendors.map(function(v){
       var typeIcon = v.vendorType === 'ureticid' ? '🏭'
                   : v.vendorType === 'distributor' ? '🚚'
-                  : v.vendorType === 'integrator' ? '🔧' : '💼';
+                  : v.vendorType === 'integrator' ? '🔧' : v.vendorType === 'egitmen' ? '🎓' : '💼';
       var slug = v.slug || generateSlug(v.company || v.displayName || 'vendor');
       // v5.09: Avatar - photoBase64 > logoUrl > initials placeholder
       var photo = v.photoBase64 || v.logoUrl || '';
@@ -13275,7 +13303,7 @@ function openCustomPoCModal(prefill) {   // v8.99: {name, brand, category} ön-d
         var _bn99 = _normBrand(vendorName||'');
         if(_bn99){
           var _hits99 = (await getVendorsPublic())   // v9.64: ayna
-            .filter(function(v){ return (v.brands||[]).some(function(x){ return _normBrand(x)===_bn99; }); }).slice(0,25);
+            .filter(function(v){ return v.vendorType!=='egitmen' && (v.brands||[]).some(function(x){ return _normBrand(x)===_bn99; }); }).slice(0,25);   // v10.09
           for(var _i99=0;_i99<_hits99.length;_i99++){
             try { await addDoc(collection(db,'notifications'), {
               userId:_hits99[_i99].id, type:'brand_poc',
@@ -16925,7 +16953,7 @@ function renderVendor() {
   }
   if (el('vend-main') && window._vendNavLocale === window.CUR_LOCALE) { loadVendTab(); return; }
   window._vendNavLocale = window.CUR_LOCALE;
-  const vtypeLabels = {ureticid:t('auth.role_manufacturer','Üretici'),distributor:t('auth.role_distributor','Distribütör'),integrator:t('auth.role_integrator','Entegratör')};
+  const vtypeLabels = {ureticid:t('auth.role_manufacturer','Üretici'),distributor:t('auth.role_distributor','Distribütör'),integrator:t('auth.role_integrator','Entegratör'),egitmen:_L('Trainer','Eğitmen')};
   const vtypeLabel = vtypeLabels[CUR_PROFILE.vendorType]||'Vendor';
   // v5.03: Vendor Analytics tab opsiyonel (config'e göre)
   var anCfg = (window.SYSTEM_CONFIG && window.SYSTEM_CONFIG.vendorAnalytics) || DEFAULT_CONFIG.vendorAnalytics;
@@ -16935,7 +16963,7 @@ function renderVendor() {
     ...analyticsTab,
     ['requests',t('vtab.requests','PoC Talepleri')],['calendar',t('vtab.calendar','Takvim')],
     ['products',t('vtab.products','Ürünlerim')],['brands','🏷 '+_L('My Brands','Markalarım')],['portfolio',t('vtab.portfolio','Portföyüm')],['featured',t('vtab.featured','📢 Reklamlarım')],
-    ['events',t('vtab.events','Etkinliklerim')],['invites',t('vtab.invites','Davetlerim')],['offers-sent',t('vtab.offers_sent','💰 Tekliflerim')],['messages',t('tab.messages','💬 Mesajlar')],
+    ['events',t('vtab.events','Etkinliklerim')],['trainings','🎓 '+_L('My Trainings','Eğitimlerim')],['invites',t('vtab.invites','Davetlerim')],['offers-sent',t('vtab.offers_sent','💰 Tekliflerim')],['messages',t('tab.messages','💬 Mesajlar')],
     ['referrals',t('vtab.referrals','🎁 Davet Et')],
     ['subscription',t('vtab.subscription','💎 Aboneliğim')],['billing',t('vtab.billing','💳 Cari Hesap')],
     ['profile',t('tab.profile','👤 Profilim')],
@@ -16972,6 +17000,7 @@ async function loadVendTab() {
 
   if (CUR_VEND_TAB === 'portfolio') { await vendPortfolio(m); return; }
   if (CUR_VEND_TAB === 'brands')    { await vendBrands(m); return; }   // v8.98
+  if (CUR_VEND_TAB === 'trainings') { await vendTrainings(m); return; }   // v10.09
   if (CUR_VEND_TAB === 'invites')   { await vendInvites(m);   return; }
   if (CUR_VEND_TAB === 'messages')  { await loadMessagesTab(m, 'vendor'); return; }
   if (CUR_VEND_TAB === 'requests')  { await vendRequests(m);  return; }
@@ -22633,6 +22662,8 @@ async function renderUserProfile(m, role) {
       +     '<label class="lbl">'+t('prof.certs','Sertifikalar (virgülle ayırın)')+'</label>'
       +     '<input id="pf-certs" class="inp" value="'+escHtml((p.certifications||[]).join(', '))+'" placeholder="ISO 27001, ISO 9001, CISSP, MCSA, vs.">'
       +   '</div>'
+      + (p.vendorType === 'egitmen' ? ('<div style="grid-column:1/-1"><label class="lbl">🎓 '+_L('Trainer credentials (one per line, shown on your profile)','Eğitmen yetkinlikleri (her satıra bir tane, profilinizde görünür)')+'</label>'
+      +     '<textarea id="pf-trainer-creds" class="inp" rows="3">'+escHtml((p.trainerCredentials||[]).join('\n'))+'</textarea></div>') : '')
       +   '<div style="grid-column:1/-1">'
       +     '<label class="lbl">'+t('prof.short_desc','Kısa Açıklama (max 160 karakter)')+'</label>'
       +     '<textarea id="pf-short-desc" class="inp" rows="2" maxlength="160" placeholder="'+t('prof.ph_short','Vendor profilinizde gözükecek kısa tanıtım')+'">'+escHtml(p.shortDescription||'')+'</textarea>'
@@ -23118,6 +23149,7 @@ async function renderUserProfile(m, role) {
         updates.certifications = rawCerts ? rawCerts.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
         updates.promoVideoUrl = el('pf-video')?.value.trim() || '';
         updates.twitterUrl = el('pf-twitter')?.value.trim() || '';
+        if (el('pf-trainer-creds')) updates.trainerCredentials = el('pf-trainer-creds').value.split('\n').map(function(x){ return x.trim().slice(0,120); }).filter(Boolean).slice(0,20);   // v10.09
       } else if (role === 'customer') {
         updates.jobTitle = updates.position;
         updates.department = el('pf-dept')?.value.trim() || '';
@@ -23137,6 +23169,7 @@ async function renderUserProfile(m, role) {
 
       // Cache güncelle
       if (CUR_PROFILE) Object.assign(CUR_PROFILE, updates);
+      if (role === 'vendor') { try { syncVendorPublic(CUR_USER.uid, CUR_PROFILE); } catch(_sv){} }   // v10.09: profil degisikligi herkese acik profile hemen yansisin
 
       showToast(t('pf.toast_saved','✓ Profil güncellendi'));
       btn.textContent = '✓ Kaydedildi';
@@ -25515,8 +25548,8 @@ function renderWizardStep(card) {
 }
 
 function wizStep1() {
-  const typeLabel = CUR_PROFILE.vendorType === 'ureticid' ? t('vtype.ureticid','Üretici') : CUR_PROFILE.vendorType === 'distributor' ? t('vtype.distributor','Distribütör') : CUR_PROFILE.vendorType === 'integrator' ? t('vtype.integrator','Entegratör') : 'Vendor';
-  const typeIcon = CUR_PROFILE.vendorType === 'ureticid' ? '🏭' : CUR_PROFILE.vendorType === 'distributor' ? '🚚' : CUR_PROFILE.vendorType === 'integrator' ? '🔧' : '💼';
+  const typeLabel = CUR_PROFILE.vendorType === 'ureticid' ? t('vtype.ureticid','Üretici') : CUR_PROFILE.vendorType === 'distributor' ? t('vtype.distributor','Distribütör') : CUR_PROFILE.vendorType === 'integrator' ? t('vtype.integrator','Entegratör') : CUR_PROFILE.vendorType === 'egitmen' ? _L('Trainer','Eğitmen') : 'Vendor';
+  const typeIcon = CUR_PROFILE.vendorType === 'ureticid' ? '🏭' : CUR_PROFILE.vendorType === 'distributor' ? '🚚' : CUR_PROFILE.vendorType === 'integrator' ? '🔧' : CUR_PROFILE.vendorType === 'egitmen' ? '🎓' : '💼';
   return '<div style="padding:28px 28px 24px;text-align:center">'
     + '<div style="font-size:56px;margin-bottom:12px">🎉</div>'
     + '<h2 style="font-size:24px;font-weight:800;margin:0 0 8px;color:#fff">Hoş geldin, '+(CUR_PROFILE.displayName || CUR_PROFILE.company || 'Vendor')+'!</h2>'
@@ -26991,7 +27024,7 @@ var VP_PUBLIC_FIELDS = ['vendorId','displayName','company','slug','role','logoUr
   'website','shortDescription','categories','brands','sectors','regions','city','country','origin',
   'phone','address','phoneVerified','vendorType','vendorStatus','isVerified','evidenceScore',
   'subscriptionTier','publicProfileEnabled','vendorReferralBadge','vendorReferralCount',
-  'productCount','avgRating','ratingCount'];
+  'productCount','avgRating','ratingCount','trainerCredentials'];
 
 function vpProject(u, uid){
   var out = { vendorId: uid || u.id || u.uid };
@@ -27029,7 +27062,12 @@ async function syncVendorPublic(uid, data){
   try {
     if (!uid || !data) return;
     if ((data.role || 'vendor') !== 'vendor') return;
-    await setDoc(doc(db,'vendor_public', uid), { ...vpProject(data, uid), updatedAt: serverTimestamp() }, { merge:true });
+    var _vpd = vpProject(data, uid);
+    // v10.09: vendorStatus aynada yalniz admin'in alani (kural v1.10.5). Vendor
+    // tarafindaki eski bir CUR_PROFILE kopyasi dogrulamayi geri almasin.
+    // isVerified / evidenceScore da ayni: kural vendor'a kapali, farkli deger tum senkronu reddettiriyordu.
+    if (CUR_PROFILE?.role !== 'admin') { delete _vpd.vendorStatus; delete _vpd.isVerified; delete _vpd.evidenceScore; }
+    await setDoc(doc(db,'vendor_public', uid), { ..._vpd, updatedAt: serverTimestamp() }, { merge:true });
     invalidateVendorPublicCache();
   } catch(e){ console.warn('[v9.64] vendor_public senkronu basarisiz:', e && e.message); }
 }
@@ -29745,7 +29783,8 @@ function renderAdmin() {
     el('scr-admin').innerHTML = `<div class="wrap"><div class="empty"><div class="empty-icon">🔒</div>${_L("You don't have access to this section.","Bu bölüme erişim yetkiniz yok.")}</div></div>`;
     return;
   }
-  try { setTimeout(function(){ syncCatInfoBundle(); }, 4000); } catch(_cb){}   // v10.06: paketli katalog bilgisi (surum basina bir kez)
+  try { setTimeout(function(){ syncCatInfoBundle(); }, 4000); } catch(_cb){}
+  try { setTimeout(function(){ trHealVendorStatusOnce(); }, 7000); } catch(_vh){}   // v10.09: dogrulama durumu aynaya (bir kez)   // v10.06: paketli katalog bilgisi (surum basina bir kez)
   if (el('adm-main') && window._admNavLocale === window.CUR_LOCALE) { loadAdmTab(); return; }
   window._admNavLocale = window.CUR_LOCALE;
   const _rp = getRolePerm(CUR_PROFILE?.role);
@@ -29756,6 +29795,7 @@ function renderAdmin() {
     ...(_rp.canApproveProducts?[['products',t('atab.products','Ürün Onayları')]]:[]),
     ['requests',t('atab.requests','PoC Talepleri')],
     ['events',t('atab.events','Etkinlikler')],
+    ...(CUR_PROFILE?.role==='admin'?[['trainings','🎓 '+_L('Trainings','Eğitimler')]]:[]),   // v10.09
     ...(_rp.canViewAll?[['offers',t('atab.offers','Teklifler')]]:[]),
     ...(CUR_PROFILE?.role==='admin'?[['revenue',t('atab.revenue','📈 Gelir')],['vendorsubs',t('atab.vendorsubs','💼 Vendor Abonelikler')],['vendorapprovals',t('atab.vendorapprovals','✓ Vendor Onayları')],['demo-requests',t('atab.demo_requests','📅 Demo Talepleri')],['packages',t('atab.packages','💎 Paketler')],['analytics',t('atab.analytics','📊 Analitik')],['history',t('atab.history','📜 Değişiklik Geçmişi')],['payments',t('atab.payments','💳 Ödeme Onayları')],['overrides',t('atab.overrides','⚡ Acil Onay Talepleri')],['featured',t('atab.featured','📢 Reklam / Öne Çıkan')],['content',t('atab.content','📝 İçerik Yönetimi')],['kvkk-mgmt',t('atab.kvkk_mgmt','🛡 KVKK & Yasal Sayfalar')],['settings',t('atab.settings','🔧 Sistem Ayarları')]]:[]),
     ...(_rp.canViewAll?[['partners',t('atab.partners','🏢 Firma Rehberi')],['catinfo',_L('📚 Catalog Info','📚 Katalog Bilgileri')],['invites',t('atab.invites','✉ Davetler')],['health',t('atab.health','🩺 Veri Sağlığı')]]:[]),
@@ -29806,6 +29846,7 @@ async function loadAdmTab() {
     if (CUR_ADM_TAB === 'featured')   { await admFeaturedAds(m); return; }
     if (CUR_ADM_TAB === 'settings')   { await admSettings(m);   return; }
   if (CUR_ADM_TAB === 'partners')   { await admPartnerDirectory(m); return; }
+  if (CUR_ADM_TAB === 'trainings')  { await admTrainings(m); return; }   // v10.09
   if (CUR_ADM_TAB === 'catinfo')    { await syncCatInfoBundle(); await admCatalogInfo(m); return; }   // v10.05 / v10.06: once paket
   if (CUR_ADM_TAB === 'invites')    { await admInvites(m); return; }
   if (CUR_ADM_TAB === 'health')     { await admDataHealth(m);  return; }
@@ -31044,7 +31085,7 @@ async function admProducts(m) {
       try {
         await addDoc(collection(db,'notifications'), {
           userId: vid, type: action === 'approve' ? 'product_approved' : 'product_rejected',
-          title: title, message: msg, productCount: ps.length,
+          title: title, message: msg, data: { productCount: ps.length },   // v10.09: kural alan listesinde yoktu
           fromUserId: CUR_USER.uid, senderId: CUR_USER.uid,
           senderName: CUR_PROFILE?.displayName || 'PoCHub Admin', senderEmail: CUR_USER.email || '',
           senderPhoto: CUR_PROFILE?.photoBase64 || CUR_PROFILE?.logoUrl || '',
@@ -44067,7 +44108,7 @@ async function admVendorVerify(m) {
           var card = document.createElement('div');
           card.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px';
           var dt = v.createdAt?.seconds ? new Date(v.createdAt.seconds*1000).toLocaleDateString(LDATE()) : '—';
-          var vtypeLabels = {ureticid:t('auth.role_manufacturer','Üretici'),distributor:t('auth.role_distributor','Distribütör'),integrator:t('auth.role_integrator','Entegratör')};
+          var vtypeLabels = {ureticid:t('auth.role_manufacturer','Üretici'),distributor:t('auth.role_distributor','Distribütör'),integrator:t('auth.role_integrator','Entegratör'),egitmen:_L('Trainer','Eğitmen')};
           var vtypeLabel = vtypeLabels[v.vendorType] || 'Vendor';
           var verifiedDt = v.verifiedAt?.seconds ? new Date(v.verifiedAt.seconds*1000).toLocaleDateString(LDATE()) : '';
           var isVerified = v.isVerified === true;
@@ -44121,6 +44162,7 @@ async function admVendorVerify(m) {
               verifiedAt: serverTimestamp(),
               verifiedBy: CUR_PROFILE?.displayName || CUR_USER?.email || 'admin',
             });
+            try { await setDoc(doc(db,'vendor_public', b.dataset.id), { isVerified:true, updatedAt:serverTimestamp() }, { merge:true }); invalidateVendorPublicCache(); } catch(_m){}   // v10.09
             if (window._vendorBadgeCache && window._vendorBadgeCache[b.dataset.id]) {
               delete window._vendorBadgeCache[b.dataset.id];
             }
@@ -44154,6 +44196,7 @@ async function admVendorVerify(m) {
               verifiedAt: null,
               verifiedBy: null,
             });
+            try { await setDoc(doc(db,'vendor_public', b.dataset.id), { isVerified:false, updatedAt:serverTimestamp() }, { merge:true }); invalidateVendorPublicCache(); } catch(_m){}   // v10.09
             if (window._vendorBadgeCache && window._vendorBadgeCache[b.dataset.id]) {
               delete window._vendorBadgeCache[b.dataset.id];
             }
@@ -44319,7 +44362,7 @@ async function loadUserDetailExtras(u, host) {
 function openVendorDetailModal(v) {
   var modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
-  var vtypeLabels = {ureticid:t('auth.role_manufacturer','Üretici'),distributor:t('auth.role_distributor','Distribütör'),integrator:t('auth.role_integrator','Entegratör')};
+  var vtypeLabels = {ureticid:t('auth.role_manufacturer','Üretici'),distributor:t('auth.role_distributor','Distribütör'),integrator:t('auth.role_integrator','Entegratör'),egitmen:_L('Trainer','Eğitmen')};
   modal.innerHTML =
     '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto">'
     + '<div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'
@@ -44970,6 +45013,7 @@ function openPackageEditor(pkgId, allPackages) {
     + '<div class="g2">'
     + '<div><label class="lbl-mini">'+t('pe.overflow_price','Aşan PoC Fiyatı (TRY)')+'</label><input class="inp" type="number" id="pe-overflow" value="'+pkg.pocOverflowPrice+'"></div>'
     + '<div><label class="lbl-mini">'+t('pe.prodlimit','Ürün Limiti (-1 = ∞)')+'</label><input class="inp" type="number" id="pe-prod" value="'+pkg.productLimit+'"></div>'
+    + '<div><label class="lbl-mini">🎓 '+_L('Training listings (-1 = ∞)','Eğitim ilanı limiti (-1 = ∞)')+'</label><input class="inp" type="number" id="pe-trn" value="'+((pkg.trainingLimit===undefined||pkg.trainingLimit===null)?-1:pkg.trainingLimit)+'"></div>'
     + '</div>'
     + '<div class="g2">'
     + '<div><label class="lbl-mini">'+t('pe.invlimit','Davet/Ay Limiti (-1 = ∞)')+'</label><input class="inp" type="number" id="pe-invite" value="'+pkg.inviteQuotaPerMonth+'"></div>'
@@ -45012,6 +45056,7 @@ function openPackageEditor(pkgId, allPackages) {
       pocQuota: parseInt(modal.querySelector('#pe-poc').value),
       pocOverflowPrice: parseInt(modal.querySelector('#pe-overflow').value) || 0,
       productLimit: parseInt(modal.querySelector('#pe-prod').value),
+      trainingLimit: (function(v){ return isNaN(v) ? -1 : v; })(parseInt(modal.querySelector('#pe-trn').value)),   // v10.09
       inviteQuotaPerMonth: parseInt(modal.querySelector('#pe-invite').value),
       overrideLimit: parseInt(modal.querySelector('#pe-override').value),
       overrideMultiplier: (function(){ var v = parseInt(modal.querySelector('#pe-override-markup').value); return (v > 0) ? (1 + v/100) : null; })(),
@@ -47932,6 +47977,7 @@ async function admVendorApprovals(m) {
             verifiedAt: serverTimestamp(),
             verifiedBy: CUR_USER.uid,
           });
+          await trMirrorVendorStatus(b.dataset.uid, 'admin_verified');   // v10.09
           // Bildirim gönder vendor'a
           try {
             await addDoc(collection(db,'notifications'), {
@@ -47965,6 +48011,7 @@ async function admVendorApprovals(m) {
             rejectedBy: CUR_USER.uid,
             rejectionReason: reason || t('avap.unspecified','Belirtilmedi'),
           });
+          await trMirrorVendorStatus(b.dataset.uid, 'rejected');   // v10.09
           try {
             await addDoc(collection(db,'notifications'), {
               userId: b.dataset.uid,
@@ -47993,6 +48040,7 @@ async function admVendorApprovals(m) {
             verifiedAt: null,
             verifiedBy: null,
           });
+          await trMirrorVendorStatus(b.dataset.uid, 'auto_approved');   // v10.09
           if (window._vendorBadgeCache) delete window._vendorBadgeCache[b.dataset.uid];
           showToast(t('avap.toast_revoked','Doğrulama kaldırıldı'));
           admVendorApprovals(m);
@@ -48006,6 +48054,7 @@ async function admVendorApprovals(m) {
             vendorStatus: 'auto_approved',
             rejectionReason: null,
           });
+          await trMirrorVendorStatus(b.dataset.uid, 'auto_approved');   // v10.09
           if (window._vendorBadgeCache) delete window._vendorBadgeCache[b.dataset.uid];
           showToast(t('avap.toast_to_pending','Vendor "Bekleyen" listesine alındı'));
           admVendorApprovals(m);
@@ -72428,7 +72477,7 @@ function openCatModal(existing) {
 function openSendOfferModal(pocId, customerId, customerEmail, customerName, productName, vendorType) {
   if (!CUR_USER) { showToast(t('sof.must_login',t('tst.login_needed','Oturum açmanız gerekiyor.')), 'err'); return; }
   var vtype = vendorType || CUR_PROFILE?.vendorType || '';
-  var vtypeLabels = {ureticid:t('auth.role_manufacturer','Üretici'),distributor:t('auth.role_distributor','Distribütör'),integrator:t('auth.role_integrator','Entegratör')};
+  var vtypeLabels = {ureticid:t('auth.role_manufacturer','Üretici'),distributor:t('auth.role_distributor','Distribütör'),integrator:t('auth.role_integrator','Entegratör'),egitmen:_L('Trainer','Eğitmen')};
   var vtypeLabel = vtypeLabels[vtype] || 'Vendor';
 
   var modal = document.createElement('div');
@@ -73038,6 +73087,792 @@ async function syncCatInfoBundle(force){
 }
 
 
+
+// ══════════════════════════════════════════════════════════════════════
+// v10.09 — EĞİTİMLER (Faz 1)
+// ──────────────────────────────────────────────────────────────────────
+// Hasan: ürünlerle ilgili ücretli/ücretsiz, uzaktan/yerinde, 1–X günlük
+// eğitimler; veren üretici, distribütör, entegratör ya da bağımsız uzman
+// olabilir; sınıflar için talep toplanıp eğitim verenlere bildirilsin,
+// ödeme altyapısı olmadan gelir alınabilsin.
+// KARARLAR:
+//  - İki tür: AÇIK SINIF (takvimli, kontenjanlı, kayıt alır) ve KURUMA
+//    ÖZEL (tarihsiz, talep alır). Bir eğitim ikisini birden sunabilir.
+//  - Bağımsız uzman kendi profiliyle üye olur: vendorType 'egitmen'.
+//    Marka temsilcisi DEĞİLDİR (marka sayfasında ve PoC eşleştirmesinde
+//    temsilci listesine girmez). Vendor kendi eğitimine kayıtlı bir
+//    eğitmeni bağlayabilir ya da adını serbest yazar.
+//  - Güven: eğitmenin doğrulanması mevcut "Doğrulanmış" rozeti
+//    (vendorStatus=admin_verified). Kural v1.10.5 ile bu alanı vendor
+//    artık KENDİSİ değiştiremiyor (önceden değiştirebiliyordu).
+//  - Her eğitim admin onayından geçer. Doğrulanmış sağlayıcının
+//    düzenlemesi yayında kalır; doğrulanmamışınki yeniden onaya düşer.
+//  - TALEP HAVUZU: ilgi bildirenlerin iletişim bilgisi training_interest
+//    (yalnız sahibi ve admin okur). Herkese açık olan yalnız özet:
+//    training_pools/{marka__konu__şehir} → kişi sayısı, koltuk, biçim.
+//    Eşik dolunca o markada eğitim verebilecek sağlayıcılara bildirim.
+//  - GELİR (ödeme altyapısı yok, kapalı başlar):
+//    (1) İletişim bilgisi karşılığı ücret: sağlayıcı havuzun iletişim
+//        bilgilerini ister → admin onaylar → kişiler sağlayıcıya açılır.
+//        Ücretli modda kişi başı ücret kaydedilir, ay sonu fatura raporu
+//        (CSV) çıkar; GİTS faturayı keser. Ücretsiz modda da onay admin'de
+//        (KVKK + kalite kontrolü).
+//    (2) Paket kotası: paketlere trainingLimit (-1 = sınırsız). Ayar
+//        kapalıyken kota uygulanmaz.
+//  - KAYNAK TAKİBİ: her kayıt/talep/ilgi source:'pochub' taşır; ileride
+//    hangi gelir modeli seçilirse seçilsin geriye dönük veri hazır.
+//  - KVKK: kayıt, talep ve ilgi formlarında açık rıza kutusu zorunlu.
+//  - Okuma maliyeti: eğitim listesi tek sorgu (status==active), 2 dk önbellek.
+// ══════════════════════════════════════════════════════════════════════
+var TR_FMT = { online:['Remote','Uzaktan'], onsite:['On-site','Yerinde'], hybrid:['Hybrid','Hibrit'] };
+var TR_LEVEL = { intro:['Introductory','Giriş'], mid:['Intermediate','Orta'], adv:['Advanced','İleri'] };
+var TR_PRICE = { free:['Free','Ücretsiz'], person:['Per person','Kişi başı'], group:['Per group','Grup fiyatı'], quote:['On request','Teklif ile'] };
+var TR_TIME = { m1:['Within 1 month','1 ay içinde'], m3:['Within 3 months','3 ay içinde'], flex:['Flexible','Esnek'] };
+var TR_PTYPE = { ureticid:['Manufacturer','Üretici'], distributor:['Distributor','Distribütör'], integrator:['Integrator','Entegratör'], egitmen:['Trainer','Eğitmen'] };
+function _trL(map, k){ var v = map[k]; return v ? _L(v[0], v[1]) : (k || ''); }
+function trTypeLabel(tp){ return _trL(TR_PTYPE, tp) || 'Vendor'; }
+
+var _trCfgCache = null;
+async function trCfg(force){
+  if(_trCfgCache && !force) return _trCfgCache;
+  var d = { threshold:5, leadMode:'free', leadPrice:0, quotaEnabled:false };
+  try { var s = await getDoc(doc(db,'pochub_config','training')); if(s.exists()) d = Object.assign(d, s.data()||{}); } catch(e){}
+  _trCfgCache = d; return d;
+}
+function trPoolKey(brand, topic, fmt, city){
+  var b = _normBrand(brand||'') || 'genel', tp = _normBrand(topic||'') || 'genel';
+  var c = fmt === 'online' ? 'uzaktan' : (_normBrand(city||'') || 'farketmez');
+  return (b + '__' + tp + '__' + c).slice(0, 300);
+}
+var _trCache = null, _trCacheAt = 0;
+function invalidateTrainings(){ _trCache = null; }
+async function getActiveTrainings(force){
+  if(!force && _trCache && (Date.now() - _trCacheAt) < 120000) return _trCache;
+  var list = [];
+  try {
+    var s = await getDocs(query(collection(db,'trainings'), where('status','==','active')));
+    list = s.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
+  } catch(e){ console.warn('[v10.09] egitimler okunamadi', e && (e.code||e.message)); }
+  _trCache = list; _trCacheAt = Date.now();
+  return list;
+}
+function trUpcoming(t){
+  var today = new Date().toISOString().slice(0,10);
+  return (t.sessions||[]).filter(function(s){ return (s.end || s.start) >= today; }).sort(function(a,b){ return a.start < b.start ? -1 : 1; });
+}
+function trFmtDate(d){ if(!d) return ''; try { return new Date(d + 'T12:00:00').toLocaleDateString(window.CUR_LOCALE==='en'?'en-GB':'tr-TR', { day:'numeric', month:'short', year:'numeric' }); } catch(e){ return d; } }
+function trSessionText(s){ return trFmtDate(s.start) + (s.end && s.end !== s.start ? ' – ' + trFmtDate(s.end) : '') + (s.time ? ' · ' + s.time : ''); }
+function trPriceText(t){
+  if(t.priceType === 'free') return _L('Free','Ücretsiz');
+  if(t.priceType === 'quote' || !t.price) return _L('On request','Teklif ile');
+  var p = Number(t.price).toLocaleString('tr-TR') + ' ' + (t.currency || 'TRY');
+  return p + (t.priceType === 'group' ? ' / ' + _L('group','grup') : ' / ' + _L('person','kişi'));
+}
+function trDurationText(t){
+  var d = Number(t.durationDays||0), h = Number(t.durationHours||0);
+  if(d && h) return d + ' ' + _L('days','gün') + ' · ' + h + ' ' + _L('hours','saat');
+  if(d) return d + ' ' + _L('days','gün');
+  if(h) return h + ' ' + _L('hours','saat');
+  return '';
+}
+function trChip(txt, tone){
+  var c = { blue:['rgba(37,99,235,.08)','#2563eb'], green:['rgba(22,163,74,.10)','#16a34a'], amber:['rgba(217,119,6,.10)','#b45309'], gray:['rgba(15,23,42,.05)','var(--text-secondary)'] }[tone||'gray'];
+  return '<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:' + c[0] + ';color:' + c[1] + ';font-weight:600;white-space:nowrap">' + txt + '</span>';
+}
+function trCardHtml(t){
+  var up = trUpcoming(t), next = up[0];
+  var chips = [];
+  (t.formats||[]).forEach(function(f){ chips.push(trChip(_trL(TR_FMT,f),'blue')); });
+  if(t.offersOpen && next) chips.push(trChip('📅 ' + trFmtDate(next.start), 'green'));
+  if(t.offersPrivate) chips.push(trChip(_L('Private class','Kuruma özel'), 'amber'));
+  var dur = trDurationText(t);
+  return '<div class="card tr-card" data-id="' + escHtml(t.id) + '" style="display:flex;flex-direction:column;padding:14px 15px;cursor:pointer;background:var(--bg-surface,#fff)">'
+    + '<div style="font-size:11px;color:#2563eb;font-weight:700;letter-spacing:.3px;margin-bottom:4px">' + escHtml(t.brand||'') + (t.family ? ' · ' + escHtml(displayProductName(t.family)) : '') + '</div>'
+    + '<div style="font-size:14.5px;font-weight:800;line-height:1.3;margin-bottom:6px;color:var(--text-primary)">' + escHtml(t.title||'') + '</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' + escHtml(t.providerName||'') + ' · ' + trTypeLabel(t.providerType) + (t.providerVerified ? ' <span style="color:#16a34a;font-weight:700">✓</span>' : '') + '</div>'
+    + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">' + chips.join('') + '</div>'
+    + '<div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px">'
+    +   '<span style="color:var(--text-secondary)">' + (dur ? '⏱ ' + dur : '') + (t.level ? ' · ' + _trL(TR_LEVEL, t.level) : '') + '</span>'
+    +   '<b style="color:' + (t.priceType === 'free' ? '#16a34a' : 'var(--text-primary)') + '">' + trPriceText(t) + '</b>'
+    + '</div></div>';
+}
+function trMiniListHtml(list, title){
+  if(!list.length) return '';
+  return '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:8px">🎓 ' + (title || _L('TRAININGS','EĞİTİMLER')) + ' (' + list.length + ')</div>'
+    + '<div style="display:flex;flex-direction:column;gap:6px">'
+    + list.slice(0,6).map(function(t){
+        var next = trUpcoming(t)[0];
+        return '<div class="tr-mini" data-id="' + escHtml(t.id) + '" style="display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--border);border-radius:9px;padding:9px 11px;cursor:pointer">'
+          + '<div style="min-width:0"><div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(t.title) + '</div>'
+          + '<div style="font-size:11.5px;color:var(--text-muted)">' + escHtml(t.providerName||'') + ' · ' + (t.formats||[]).map(function(f){ return _trL(TR_FMT,f); }).join(', ')
+          + (next ? ' · ' + trFmtDate(next.start) : (t.offersPrivate ? ' · ' + _L('private class','kuruma özel') : '')) + '</div></div>'
+          + '<b style="font-size:12px;white-space:nowrap">' + trPriceText(t) + '</b></div>';
+      }).join('') + '</div></div>';
+}
+function trBindMini(root){
+  root.querySelectorAll('.tr-mini').forEach(function(x){ x.addEventListener('click', function(e){
+    e.stopPropagation(); var id = this.dataset.id;
+    var t = (_trCache||[]).filter(function(z){ return z.id === id; })[0];
+    if(t){ document.querySelectorAll('.modal-bg.on').forEach(function(mm){ if(mm.querySelector('.fim-close') || mm.id === 'prod-detail-modal') mm.remove(); }); openTrainingDetail(t); }
+  }); });
+}
+function trForBrand(list, brand, family){
+  var bn = _normBrand(brand||''), fn = _normBrand(famBaseName(family||''));
+  return list.filter(function(t){ return t.brandNorm === bn; }).sort(function(a,b){
+    var am = fn && _normBrand(famBaseName(a.family||'')) === fn ? 1 : 0, bm = fn && _normBrand(famBaseName(b.family||'')) === fn ? 1 : 0;
+    return bm - am;
+  });
+}
+function _trConsentHtml(id){
+  return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text-secondary);line-height:1.5;margin:6px 0 10px;cursor:pointer">'
+    + '<input type="checkbox" id="' + id + '" style="margin-top:2px;flex-shrink:0">'
+    + '<span>' + _L('I consent to my name, company, e-mail and phone being shared with training providers for this request. ',
+                    'Ad, firma, e-posta ve telefon bilgilerimin bu talep kapsamında eğitim sağlayıcılarla paylaşılmasına açık rıza veriyorum. ')
+    + '<a href="#legal/kvkk" target="_blank" style="color:#2563eb">' + _L('Privacy notice','Aydınlatma metni') + '</a></span></label>';
+}
+function _trNeedLogin(){
+  if(CUR_USER) return false;
+  showToast(_L('Please sign in first.','Önce giriş yapın.'), 'err');
+  try { openAuthModal('customer',''); } catch(e){}
+  return true;
+}
+function _trModal(html, w){
+  var md = document.createElement('div'); md.className = 'modal-bg on';
+  md.innerHTML = '<div class="modal" style="max-width:' + (w||640) + 'px;width:95vw;max-height:90vh;overflow-y:auto">' + html + '</div>';
+  document.body.appendChild(md);
+  md.addEventListener('click', function(e){ if(e.target === md) md.remove(); });
+  return md;
+}
+async function _trNotify(userId, title, message, relatedId, type){
+  if(!userId) return;
+  try { await addDoc(collection(db,'notifications'), { userId:userId, type:type||'training', title:title, message:message, relatedId:relatedId||null,
+        senderId:CUR_USER.uid, senderName:(CUR_PROFILE && (CUR_PROFILE.company||CUR_PROFILE.displayName)) || '', read:false, createdAt:serverTimestamp() }); }
+  catch(e){ console.warn('[v10.09] bildirim gonderilemedi', e && (e.code||e.message)); }
+}
+
+// ── Eğitim detayı ────────────────────────────────────────────────────
+function openTrainingDetail(t){
+  var up = trUpcoming(t);
+  var seatsLeft = t.capacity ? Math.max(0, Number(t.capacity) - Number(t.registeredSeats||0)) : null;
+  var row = function(lbl, val){ return val ? '<div style="display:grid;grid-template-columns:minmax(96px,32%) 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><div style="color:var(--text-muted);font-weight:700;font-size:12px">' + lbl + '</div><div>' + val + '</div></div>' : ''; };
+  var trainers = (t.trainers||[]).map(function(x){ return x.slug ? '<a href="#v/' + escHtml(x.slug) + '" class="trd-link" style="color:#2563eb">' + escHtml(x.name) + '</a>' : escHtml(x.name); }).join(', ');
+  var md = _trModal(
+      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px">'
+    +   '<div><div style="font-size:11px;color:#2563eb;font-weight:700;margin-bottom:4px">' + escHtml(t.brand||'') + (t.family ? ' · ' + escHtml(displayProductName(t.family)) : '') + '</div>'
+    +   '<h3 style="margin:0 0 4px;font-size:19px;font-weight:800">' + escHtml(t.title||'') + '</h3>'
+    +   '<div style="font-size:13px;color:var(--text-muted)">' + (t.providerSlug ? '<a href="#v/' + escHtml(t.providerSlug) + '" class="trd-link" style="color:inherit">' + escHtml(t.providerName||'') + '</a>' : escHtml(t.providerName||''))
+    +     ' · ' + trTypeLabel(t.providerType) + (t.providerVerified ? ' <span style="color:#16a34a;font-weight:700">✓ ' + _L('Verified','Doğrulanmış') + '</span>' : '') + '</div></div>'
+    +   '<button type="button" class="trd-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary)">×</button></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+    +   (t.formats||[]).map(function(f){ return trChip(_trL(TR_FMT,f),'blue'); }).join('')
+    +   (t.level ? trChip(_trL(TR_LEVEL,t.level)) : '') + (t.language ? trChip(escHtml(t.language)) : '')
+    +   (t.officialCurriculum ? trChip(_L('Official curriculum','Resmi müfredat'),'green') : '')
+    + '</div>'
+    + (t.summary ? '<div style="font-size:13.5px;line-height:1.65;margin-bottom:12px">' + escHtml(t.summary) + '</div>' : '')
+    + row(_L('Duration','Süre'), escHtml(trDurationText(t)))
+    + row(_L('Price','Ücret'), '<b>' + trPriceText(t) + '</b>')
+    + row(_L('Dates','Tarihler'), t.offersOpen ? (up.length ? up.map(function(s){ return escHtml(trSessionText(s)); }).join('<br>') : '<span style="color:var(--text-muted)">' + _L('No upcoming date — register interest to be notified.','Yaklaşan tarih yok — ilgi bildirirseniz haber verilir.') + '</span>') : '')
+    + row(_L('Location','Yer'), escHtml([t.city, t.venue].filter(Boolean).join(' · ')))
+    + row(_L('Seats','Kontenjan'), t.offersOpen && t.capacity ? (seatsLeft + ' ' + _L('seats left · capacity ','boş koltuk · toplam ') + t.capacity) : '')
+    + row(_L('Private class','Kuruma özel'), t.offersPrivate ? _L('Can be delivered for your organisation (remote or on-site).','Kurumunuza özel verilebilir (uzaktan ya da yerinde).') : '')
+    + row(_L('Trainer(s)','Eğitmen(ler)'), trainers)
+    + row(_L('Prerequisites','Ön koşullar'), escHtml(t.prerequisites||''))
+    + row(_L('Certification','Sertifika / sınav'), escHtml(t.certification||''))
+    + row(_L('Lab environment','Lab ortamı'), escHtml(t.lab||''))
+    + (t.syllabus ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;margin-bottom:6px">' + _L('Syllabus','Müfredat') + '</div><div style="font-size:13px;line-height:1.6;white-space:pre-wrap;color:var(--text-secondary)">' + escHtml(t.syllabus) + '</div></div>' : '')
+    + '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:16px">'
+    +   (t.offersOpen && up.length && (seatsLeft === null || seatsLeft > 0) ? '<button type="button" class="btn-p trd-reg">' + _L('Register','Kayıt ol') + '</button>' : '')
+    +   (t.offersPrivate ? '<button type="button" class="btn-g trd-priv">' + _L('Request for my organisation','Kurumuma özel talep et') + '</button>' : '')
+    +   '<button type="button" class="btn-g trd-int">' + _L('Register interest','İlgi bildir') + '</button>'
+    + '</div>', 680);
+  md.querySelector('.trd-close').addEventListener('click', function(){ md.remove(); });
+  md.querySelectorAll('.trd-link').forEach(function(a){ a.addEventListener('click', function(){ md.remove(); }); });
+  var r = md.querySelector('.trd-reg'); if(r) r.addEventListener('click', function(){ if(_trNeedLogin()) return; md.remove(); openTrainingRegister(t, 'register'); });
+  var p = md.querySelector('.trd-priv'); if(p) p.addEventListener('click', function(){ if(_trNeedLogin()) return; md.remove(); openTrainingRegister(t, 'private'); });
+  md.querySelector('.trd-int').addEventListener('click', function(){ md.remove(); openTrainingInterest({ brand:t.brand, topic:t.family || t.title, trainingId:t.id }); });
+}
+
+// ── Kayıt / kuruma özel talep ───────────────────────────────────────
+function openTrainingRegister(t, kind){
+  var P = CUR_PROFILE || {}, up = trUpcoming(t);
+  var inp = 'width:100%;font-size:13px;margin-bottom:8px';
+  var md = _trModal(
+      '<h3 style="margin:0 0 4px;font-size:17px;font-weight:800">' + (kind === 'private' ? _L('Private class request','Kuruma özel eğitim talebi') : _L('Register','Kayıt')) + '</h3>'
+    + '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:12px">' + escHtml(t.title) + ' · ' + escHtml(t.providerName||'') + '</div>'
+    + (kind === 'register' ? '<label class="lbl">' + _L('Session','Oturum') + '</label><select id="trr-ses" class="inp" style="' + inp + '">' + up.map(function(s, i){ return '<option value="' + i + '">' + escHtml(trSessionText(s)) + '</option>'; }).join('') + '</select>' : '')
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +   '<div><label class="lbl">' + _L('Name','Ad soyad') + ' *</label><input id="trr-name" class="inp" style="' + inp + '" value="' + escHtml(P.displayName||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Company','Firma') + '</label><input id="trr-co" class="inp" style="' + inp + '" value="' + escHtml(P.company||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('E-mail','E-posta') + ' *</label><input id="trr-mail" class="inp" style="' + inp + '" value="' + escHtml((CUR_USER && CUR_USER.email)||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Phone','Telefon') + '</label><input id="trr-tel" class="inp" style="' + inp + '" value="' + escHtml(P.phone||'') + '"></div>'
+    +   '<div><label class="lbl">' + (kind === 'private' ? _L('Participants','Katılımcı sayısı') : _L('Seats','Kişi sayısı')) + ' *</label><input id="trr-seats" type="number" min="1" max="50" class="inp" style="' + inp + '" value="1"></div>'
+    +   (kind === 'private'
+        ? '<div><label class="lbl">' + _L('Delivery','Biçim') + '</label><select id="trr-fmt" class="inp" style="' + inp + '"><option value="online">' + _L('Remote','Uzaktan') + '</option><option value="onsite">' + _L('On-site','Yerinde') + '</option><option value="any">' + _L('Either','Farketmez') + '</option></select></div>'
+        : '<div></div>')
+    + '</div>'
+    + (kind === 'private' ? '<label class="lbl">' + _L('City (for on-site)','Şehir (yerinde ise)') + '</label><input id="trr-city" class="inp" style="' + inp + '">'
+        + '<label class="lbl">' + _L('Preferred timing','Tercih edilen zaman') + '</label><select id="trr-time" class="inp" style="' + inp + '">' + Object.keys(TR_TIME).map(function(k){ return '<option value="' + k + '">' + _trL(TR_TIME,k) + '</option>'; }).join('') + '</select>' : '')
+    + '<label class="lbl">' + _L('Note','Not') + '</label><textarea id="trr-note" class="inp" rows="2" style="' + inp + '"></textarea>'
+    + _trConsentHtml('trr-ok')
+    + '<div id="trr-msg" style="font-size:12px;color:#dc2626;min-height:16px;margin-bottom:6px"></div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn-g btn-sm" id="trr-c">' + _L('Cancel','Vazgeç') + '</button><button type="button" class="btn-p btn-sm" id="trr-go">' + _L('Send','Gönder') + '</button></div>', 560);
+  md.querySelector('#trr-c').addEventListener('click', function(){ md.remove(); });
+  md.querySelector('#trr-go').addEventListener('click', async function(){
+    var g = function(id){ var e = md.querySelector('#' + id); return e ? String(e.value||'').trim() : ''; };
+    var msg = md.querySelector('#trr-msg'), btn = this;
+    var seats = Math.max(1, Math.min(50, parseInt(g('trr-seats'),10) || 1));
+    if(!g('trr-name') || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(g('trr-mail'))){ msg.textContent = _L('Name and a valid e-mail are required.','Ad ve geçerli bir e-posta zorunlu.'); return; }
+    if(!md.querySelector('#trr-ok').checked){ msg.textContent = _L('Consent is required to share your details with the provider.','Bilgilerinizin sağlayıcıyla paylaşılması için onay gerekli.'); return; }
+    var ses = kind === 'register' ? up[parseInt(g('trr-ses'),10) || 0] : null;
+    if(kind === 'register' && t.capacity && (Number(t.registeredSeats||0) + seats) > Number(t.capacity)){ msg.textContent = _L('Not enough seats left.','Yeterli kontenjan yok.'); return; }
+    btn.disabled = true;
+    var data = { kind:kind, trainingId:t.id, trainingTitle:String(t.title||'').slice(0,200), providerId:t.providerId, userId:CUR_USER.uid,
+      name:g('trr-name').slice(0,120), company:g('trr-co').slice(0,160), email:g('trr-mail').slice(0,160), phone:g('trr-tel').slice(0,40),
+      seats:seats, note:g('trr-note').slice(0,1000), session:ses ? { start:ses.start, end:ses.end||'', time:ses.time||'' } : null,
+      format:g('trr-fmt') || '', city:g('trr-city').slice(0,60), timeframe:g('trr-time') || '',
+      consent:true, consentAt:serverTimestamp(), source:'pochub', status:'new', createdAt:serverTimestamp() };
+    try {
+      var ref = await addDoc(collection(db,'training_regs'), data);
+      if(kind === 'register'){ try { await updateDoc(doc(db,'trainings', t.id), { registeredSeats: increment(seats) }); t.registeredSeats = Number(t.registeredSeats||0) + seats; } catch(e){ console.warn('[v10.09] kontenjan sayaci', e && (e.code||e.message)); } }
+      _trNotify(t.providerId, kind === 'private' ? _L('New private class request','Yeni kuruma özel eğitim talebi') : _L('New training registration','Yeni eğitim kaydı'),
+        data.name + (data.company ? ' (' + data.company + ')' : '') + ' · ' + t.title + ' · ' + seats + ' ' + _L('people','kişi'), ref.id, 'training_reg');
+      md.remove();
+      showToast(kind === 'private' ? _L('Request sent to the provider.','Talebiniz sağlayıcıya iletildi.') : _L('Registration received.','Kaydınız alındı.'), 'ok');
+    } catch(e){
+      btn.disabled = false;
+      var c = (e && (e.code||e.message)) || '';
+      msg.textContent = /permission/i.test(c) ? _L('Please verify your e-mail address first.','Önce e-posta adresinizi doğrulayın.') : _L('Could not send: ','Gönderilemedi: ') + c;
+    }
+  });
+}
+
+// ── İlgi bildir (talep havuzu) ──────────────────────────────────────
+function _trBrandSuggest(input, box, onPick){
+  var tm = null;
+  input.addEventListener('input', function(){
+    var v = this.value; clearTimeout(tm);
+    tm = setTimeout(async function(){
+      var q = _normBrand(v); if(q.length < 2){ box.innerHTML = ''; return; }
+      var all = []; try { all = (await getBrands()) || []; } catch(e){}
+      var hits = all.filter(function(b){ return _normBrand(b.name).indexOf(q) === 0; }).slice(0,8);
+      if(hits.length < 8) hits = hits.concat(all.filter(function(b){ var n = _normBrand(b.name); return n.indexOf(q) > 0; }).slice(0, 8 - hits.length));
+      box.innerHTML = hits.map(function(b){ return '<button type="button" class="tr-sug" data-v="' + escHtml(b.name) + '" style="display:block;width:100%;text-align:left;padding:6px 9px;border:none;background:transparent;cursor:pointer;font-size:12.5px">' + escHtml(b.name) + '</button>'; }).join('');
+      box.querySelectorAll('.tr-sug').forEach(function(x){ x.addEventListener('click', function(){ input.value = this.dataset.v; box.innerHTML = ''; if(onPick) onPick(this.dataset.v); }); });
+    }, 180);
+  });
+}
+async function _trFillFamilies(sel, brand, current){
+  var bn = _normBrand(brand||''), list = [], tok = (sel._trTok = (sel._trTok||0) + 1);
+  if(!current && sel.value && sel._trBrand === bn) current = sel.value;   // ayni marka icin yeniden doldurulursa secim kaybolmasin
+  try { list = (await getBrandProducts()).filter(function(p){ return p.brandNorm === bn; }); } catch(e){}
+  if(tok !== sel._trTok) return;   // daha yeni bir doldurma basladiysa eskisi yazmasin
+  sel._trBrand = bn;
+  var seen = Object.create(null);
+  list = list.filter(function(p){ var k = _normBrand(famBaseName(p.name)); if(!k || seen[k]) return false; seen[k] = 1; return true; });
+  sel.innerHTML = '<option value="">' + _L('General / whole brand','Genel / markanın tamamı') + '</option>'
+    + list.map(function(p){ return '<option value="' + escHtml(p.name) + '" data-cat="' + escHtml(p.category||'') + '"' + (current && _normBrand(current) === _normBrand(p.name) ? ' selected' : '') + '>' + escHtml(displayProductName(p.name)) + '</option>'; }).join('')
+    + (current && !list.some(function(p){ return _normBrand(p.name) === _normBrand(current); }) ? '<option value="' + escHtml(current) + '" selected>' + escHtml(displayProductName(current)) + '</option>' : '');
+}
+function openTrainingInterest(pre){
+  pre = pre || {};
+  if(_trNeedLogin()) return;
+  var P = CUR_PROFILE || {}, inp = 'width:100%;font-size:13px;margin-bottom:8px';
+  var md = _trModal(
+      '<h3 style="margin:0 0 4px;font-size:17px;font-weight:800">' + _L('Register interest in a training','Eğitim için ilgi bildir') + '</h3>'
+    + '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.55;margin-bottom:12px">' + _L('When enough people ask for the same training, providers on PoCHub are notified and can open a class.','Aynı eğitimi isteyen kişi sayısı yeterli olduğunda PoCHub’daki eğitim verenlere bildirilir ve sınıf açabilirler.') + '</div>'
+    + '<label class="lbl">' + _L('Brand','Marka') + ' *</label><div style="position:relative"><input id="tri-brand" class="inp" autocomplete="off" style="' + inp + '" value="' + escHtml(pre.brand||'') + '" placeholder="' + _L('e.g. Fortinet','ör. Fortinet') + '"><div id="tri-sug" style="position:absolute;z-index:5;left:0;right:0;top:40px;background:var(--bg-surface,#fff);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12)"></div></div>'
+    + '<label class="lbl">' + _L('Product / topic','Ürün / konu') + '</label><select id="tri-topic" class="inp" style="' + inp + '"></select>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +   '<div><label class="lbl">' + _L('People','Kişi sayısı') + ' *</label><input id="tri-seats" type="number" min="1" max="50" class="inp" style="' + inp + '" value="1"></div>'
+    +   '<div><label class="lbl">' + _L('Delivery','Biçim') + '</label><select id="tri-fmt" class="inp" style="' + inp + '"><option value="online">' + _L('Remote','Uzaktan') + '</option><option value="onsite">' + _L('On-site / classroom','Yerinde / sınıf') + '</option><option value="any">' + _L('Either','Farketmez') + '</option></select></div>'
+    +   '<div><label class="lbl">' + _L('City','Şehir') + '</label><input id="tri-city" class="inp" style="' + inp + '" value="' + escHtml(P.city||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Timing','Zaman') + '</label><select id="tri-time" class="inp" style="' + inp + '">' + Object.keys(TR_TIME).map(function(k){ return '<option value="' + k + '">' + _trL(TR_TIME,k) + '</option>'; }).join('') + '</select></div>'
+    +   '<div><label class="lbl">' + _L('Name','Ad soyad') + ' *</label><input id="tri-name" class="inp" style="' + inp + '" value="' + escHtml(P.displayName||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Company','Firma') + '</label><input id="tri-co" class="inp" style="' + inp + '" value="' + escHtml(P.company||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('E-mail','E-posta') + ' *</label><input id="tri-mail" class="inp" style="' + inp + '" value="' + escHtml((CUR_USER && CUR_USER.email)||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Phone','Telefon') + '</label><input id="tri-tel" class="inp" style="' + inp + '" value="' + escHtml(P.phone||'') + '"></div>'
+    + '</div>'
+    + '<label class="lbl">' + _L('Note','Not') + '</label><textarea id="tri-note" class="inp" rows="2" style="' + inp + '" placeholder="' + _L('Level, content you need…','Seviye, ihtiyaç duyduğunuz içerik…') + '"></textarea>'
+    + _trConsentHtml('tri-ok')
+    + '<div id="tri-msg" style="font-size:12px;color:#dc2626;min-height:16px;margin-bottom:6px"></div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn-g btn-sm" id="tri-c">' + _L('Cancel','Vazgeç') + '</button><button type="button" class="btn-p btn-sm" id="tri-go">' + _L('Send','Gönder') + '</button></div>', 600);
+  var bi = md.querySelector('#tri-brand'), ts = md.querySelector('#tri-topic');
+  _trFillFamilies(ts, pre.brand, pre.topic);
+  _trBrandSuggest(bi, md.querySelector('#tri-sug'), function(v){ _trFillFamilies(ts, v, ''); });
+  bi.addEventListener('change', function(){ _trFillFamilies(ts, this.value, ''); });
+  md.querySelector('#tri-c').addEventListener('click', function(){ md.remove(); });
+  md.querySelector('#tri-go').addEventListener('click', async function(){
+    var g = function(id){ var e = md.querySelector('#' + id); return e ? String(e.value||'').trim() : ''; };
+    var msg = md.querySelector('#tri-msg'), btn = this;
+    var brand = g('tri-brand'), topic = g('tri-topic'), fmt = g('tri-fmt'), city = g('tri-city');
+    var seats = Math.max(1, Math.min(50, parseInt(g('tri-seats'),10) || 1));
+    if(!brand){ msg.textContent = _L('Brand is required.','Marka zorunlu.'); return; }
+    if(!g('tri-name') || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(g('tri-mail'))){ msg.textContent = _L('Name and a valid e-mail are required.','Ad ve geçerli bir e-posta zorunlu.'); return; }
+    if(!md.querySelector('#tri-ok').checked){ msg.textContent = _L('Consent is required.','Açık rıza onayı gerekli.'); return; }
+    try { var canon = _brandCanonMap(); if(canon[_normBrand(brand)]) brand = canon[_normBrand(brand)]; } catch(e){}
+    var key = trPoolKey(brand, topic, fmt, city);
+    btn.disabled = true;
+    try {
+      await addDoc(collection(db,'training_interest'), { poolKey:key, userId:CUR_USER.uid, brand:brand.slice(0,120), brandNorm:_normBrand(brand), topic:topic.slice(0,200),
+        trainingId:pre.trainingId || '', seats:seats, format:fmt, city:city.slice(0,60), timeframe:g('tri-time'),
+        name:g('tri-name').slice(0,120), company:g('tri-co').slice(0,160), email:g('tri-mail').slice(0,160), phone:g('tri-tel').slice(0,40), note:g('tri-note').slice(0,1000),
+        consent:true, consentAt:serverTimestamp(), source:'pochub', status:'open', createdAt:serverTimestamp() });
+      var pref = doc(db,'training_pools', key), ps = null;
+      try { ps = await getDoc(pref); } catch(e){}
+      var fmtField = fmt === 'online' ? 'fmtOnline' : fmt === 'onsite' ? 'fmtOnsite' : 'fmtAny';
+      var newCount = 1;
+      if(ps && ps.exists()){
+        var u = { count:increment(1), seats:increment(seats), lastAt:serverTimestamp() }; u[fmtField] = increment(1);
+        await updateDoc(pref, u); newCount = Number(ps.data().count||0) + 1;
+      } else {
+        var c0 = { poolKey:key, brand:brand.slice(0,120), brandNorm:_normBrand(brand), topic:topic.slice(0,200), topicNorm:_normBrand(topic), city:fmt === 'online' ? '' : city.slice(0,60),
+          count:1, seats:seats, fmtOnline:0, fmtOnsite:0, fmtAny:0, notifiedAt:0, lastAt:serverTimestamp(), createdAt:serverTimestamp() };
+        c0[fmtField] = 1;
+        await setDoc(pref, c0);
+      }
+      md.remove();
+      showToast(_L('Thanks — your interest was recorded.','Teşekkürler — ilginiz kaydedildi.'), 'ok');
+      trMaybeNotifyPool(key, brand, topic, newCount);
+    } catch(e){ btn.disabled = false; msg.textContent = _L('Could not send: ','Gönderilemedi: ') + ((e && (e.code||e.message)) || ''); }
+  });
+}
+// Eşik dolunca (ve her eşik katında) o markada eğitim verebilecek sağlayıcılara bildirim
+async function trMaybeNotifyPool(key, brand, topic, count){
+  try {
+    var cfg = await trCfg(), th = Math.max(1, Number(cfg.threshold||5));
+    if(count < th || count % th !== 0) return;
+    var bn = _normBrand(brand), ids = Object.create(null);
+    try { (await getVendorsPublic()).forEach(function(v){ if((v.brands||[]).some(function(x){ return _normBrand(x) === bn; })) ids[v.id || v.vendorId] = 1; }); } catch(e){}
+    try { (await getActiveTrainings()).forEach(function(t){ if(t.brandNorm === bn) ids[t.providerId] = 1; }); } catch(e){}
+    delete ids[CUR_USER.uid];
+    var title = _L('Training demand: ','Eğitim talebi: ') + brand + (topic ? ' · ' + displayProductName(topic) : '');
+    var msg = count + ' ' + _L('people want this training. See Vendor Panel › Trainings › Demand pools.','kişi bu eğitimi istiyor. Vendor Paneli › Eğitimlerim › Talep havuzları.');
+    var n = 0;
+    for(const uid of Object.keys(ids).slice(0,25)){ await _trNotify(uid, title, msg, key, 'training_pool'); n++; }
+    try { await updateDoc(doc(db,'training_pools', key), { notifiedAt:count }); } catch(e){}
+    try { notifyAdmins({ type:'training_pool', title:title, message:count + ' ' + _L('people','kişi') + ' · ' + n + ' ' + _L('providers notified','sağlayıcıya bildirildi'), relatedId:key }); } catch(e){}
+  } catch(e){ console.warn('[v10.09] havuz bildirimi', e && (e.code||e.message)); }
+}
+
+// ── Herkese açık Eğitimler sekmesi ──────────────────────────────────
+var TR_F = { q:'', brand:'', fmt:'', kind:'', price:'' };
+async function renderTrainings(){
+  var scr = el('scr-trainings'); if(!scr) return;
+  scr.innerHTML = '<div class="wrap"><div class="loading"><div class="spinner"></div>' + _L('Loading trainings…','Eğitimler yükleniyor…') + '</div></div>';
+  var list = await getActiveTrainings(), pools = [];
+  try { var ps = await getDocs(query(collection(db,'training_pools'), orderBy('count','desc'), limit(12))); pools = ps.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); } catch(e){}
+  var brands = Object.create(null); list.forEach(function(t){ if(t.brand) brands[t.brand] = 1; });
+  var isProv = CUR_PROFILE && CUR_PROFILE.role === 'vendor';
+  var sel = 'padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg-surface)';
+  scr.innerHTML = '<div class="wrap" style="max-width:1100px">'
+    + '<div style="text-align:center;padding:10px 0 18px"><h1 style="font-size:26px;font-weight:800;margin:0 0 6px">🎓 ' + _L('Trainings','Eğitimler') + '</h1>'
+    +   '<div style="font-size:14px;color:var(--text-secondary);max-width:620px;margin:0 auto;line-height:1.6">' + _L('Product trainings from manufacturers, distributors, integrators and independent experts — classroom, remote or for your organisation.','Üretici, distribütör, entegratör ve bağımsız uzmanlardan ürün eğitimleri — sınıfta, uzaktan ya da kurumunuza özel.') + '</div>'
+    +   '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">'
+    +     '<button type="button" class="btn-g" id="trs-int">' + _L('Can’t find it? Register interest','Aradığını bulamadın mı? İlgi bildir') + '</button>'
+    +     (isProv ? '<button type="button" class="btn-p" id="trs-pub">+ ' + _L('Publish a training','Eğitim yayınla') + '</button>' : '')
+    +   '</div></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+    +   '<input id="trs-q" class="inp" placeholder="' + _L('Search training, brand, provider…','Eğitim, marka, sağlayıcı ara…') + '" value="' + escHtml(TR_F.q) + '" style="flex:2;min-width:200px;font-size:13px">'
+    +   '<select id="trs-brand" style="' + sel + '"><option value="">' + _L('All brands','Tüm markalar') + '</option>' + Object.keys(brands).sort().map(function(b){ return '<option' + (TR_F.brand === b ? ' selected' : '') + '>' + escHtml(b) + '</option>'; }).join('') + '</select>'
+    +   '<select id="trs-fmt" style="' + sel + '"><option value="">' + _L('Any format','Tüm biçimler') + '</option>' + Object.keys(TR_FMT).map(function(k){ return '<option value="' + k + '"' + (TR_F.fmt === k ? ' selected' : '') + '>' + _trL(TR_FMT,k) + '</option>'; }).join('') + '</select>'
+    +   '<select id="trs-kind" style="' + sel + '"><option value="">' + _L('Any type','Tüm türler') + '</option><option value="open"' + (TR_F.kind === 'open' ? ' selected' : '') + '>' + _L('Scheduled class','Takvimli sınıf') + '</option><option value="private"' + (TR_F.kind === 'private' ? ' selected' : '') + '>' + _L('Private class','Kuruma özel') + '</option></select>'
+    +   '<select id="trs-price" style="' + sel + '"><option value="">' + _L('Any price','Tüm ücretler') + '</option><option value="free"' + (TR_F.price === 'free' ? ' selected' : '') + '>' + _L('Free','Ücretsiz') + '</option><option value="paid"' + (TR_F.price === 'paid' ? ' selected' : '') + '>' + _L('Paid','Ücretli') + '</option></select>'
+    + '</div>'
+    + '<div id="trs-count" style="font-size:12px;color:var(--text-muted);margin-bottom:10px"></div>'
+    + '<div id="trs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:26px"></div>'
+    + (pools.length ? '<h3 style="font-size:16px;font-weight:800;margin:0 0 4px">🙋 ' + _L('Demand pools','Talep havuzları') + '</h3>'
+        + '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:10px">' + _L('Trainings people are waiting for. Join to help a class open.','Kişilerin beklediği eğitimler. Katılırsanız sınıfın açılmasına katkı sağlarsınız.') + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:20px">'
+        + pools.map(function(p){
+            return '<div style="border:1px dashed var(--border);border-radius:10px;padding:12px 13px;background:var(--bg-surface)">'
+              + '<div style="font-size:11px;color:#2563eb;font-weight:700">' + escHtml(p.brand||'') + '</div>'
+              + '<div style="font-size:13.5px;font-weight:800;margin:2px 0 4px">' + escHtml(p.topic ? displayProductName(p.topic) : _L('General training','Genel eğitim')) + '</div>'
+              + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' + (p.city ? escHtml(p.city) : _L('Remote','Uzaktan')) + ' · <b style="color:var(--text-primary)">' + (p.count||0) + '</b> ' + _L('people interested','kişi ilgileniyor') + ' · ' + (p.seats||0) + ' ' + _L('seats','koltuk') + '</div>'
+              + '<button type="button" class="btn-g btn-sm trs-join" data-b="' + escHtml(p.brand||'') + '" data-t="' + escHtml(p.topic||'') + '">' + _L('I want this too','Ben de istiyorum') + '</button></div>';
+          }).join('') + '</div>' : '')
+    + '</div>';
+  function paint(){
+    var q = TR_F.q.toLowerCase();
+    var R = list.filter(function(t){
+      if(TR_F.brand && t.brand !== TR_F.brand) return false;
+      if(TR_F.fmt && (t.formats||[]).indexOf(TR_F.fmt) < 0) return false;
+      if(TR_F.kind === 'open' && !(t.offersOpen && trUpcoming(t).length)) return false;
+      if(TR_F.kind === 'private' && !t.offersPrivate) return false;
+      if(TR_F.price === 'free' && t.priceType !== 'free') return false;
+      if(TR_F.price === 'paid' && t.priceType === 'free') return false;
+      if(q && [t.title, t.brand, t.family, t.providerName, t.summary].join(' ').toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    }).sort(function(a,b){ var na = (trUpcoming(a)[0]||{}).start || '9999', nb = (trUpcoming(b)[0]||{}).start || '9999'; return na < nb ? -1 : na > nb ? 1 : 0; });
+    scr.querySelector('#trs-count').textContent = R.length + ' ' + _L('trainings','eğitim');
+    scr.querySelector('#trs-grid').innerHTML = R.length ? R.map(trCardHtml).join('')
+      : '<div style="grid-column:1/-1;text-align:center;padding:30px 10px;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:10px">'
+        + _L('No training matches yet. Register your interest — providers are notified when there is enough demand.','Henüz eşleşen eğitim yok. İlgi bildirin — yeterli talep oluşunca eğitim verenlere bildirilir.') + '</div>';
+  }
+  paint();
+  scr.querySelector('#trs-grid').addEventListener('click', function(e){
+    var c = e.target.closest('.tr-card'); if(!c) return;
+    var t = list.filter(function(x){ return x.id === c.dataset.id; })[0]; if(t) openTrainingDetail(t);
+  });
+  var tm = null;
+  scr.querySelector('#trs-q').addEventListener('input', function(){ var v = this.value; clearTimeout(tm); tm = setTimeout(function(){ TR_F.q = v.trim(); paint(); }, 200); });
+  [['#trs-brand','brand'],['#trs-fmt','fmt'],['#trs-kind','kind'],['#trs-price','price']].forEach(function(p){ scr.querySelector(p[0]).addEventListener('change', function(){ TR_F[p[1]] = this.value; paint(); }); });
+  scr.querySelector('#trs-int').addEventListener('click', function(){ openTrainingInterest({}); });
+  var pb = scr.querySelector('#trs-pub'); if(pb) pb.addEventListener('click', function(){ CUR_VEND_TAB = 'trainings'; go('vendor'); setTimeout(function(){ document.querySelectorAll('#scr-vendor .si').forEach(function(x){ x.classList.toggle('on', x.dataset.t === 'trainings'); }); }, 60); });
+  scr.querySelectorAll('.trs-join').forEach(function(b){ b.addEventListener('click', function(){ openTrainingInterest({ brand:this.dataset.b, topic:this.dataset.t }); }); });
+}
+
+// ── Ürün / aile penceresi, marka sayfası, vendor profili ────────────
+async function trAppendForBrand(host, brand, family, title){
+  if(!host || !brand) return;
+  try {
+    var list = trForBrand(await getActiveTrainings(), brand, family);
+    var box = document.createElement('div');
+    box.innerHTML = trMiniListHtml(list, title)
+      + '<div style="font-size:12px;margin:-6px 0 14px"><a href="#" class="tr-int-link" style="color:#2563eb;font-weight:700;text-decoration:none">🎓 ' + _L('Request a training for this product →','Bu ürün için eğitim talep et →') + '</a></div>';
+    host.appendChild(box);
+    trBindMini(box);
+    box.querySelector('.tr-int-link').addEventListener('click', function(e){ e.preventDefault(); openTrainingInterest({ brand:brand, topic:family||'' }); });
+  } catch(e){}
+}
+async function trAppendVendorProfile(scr, vendor){
+  if(!scr || !vendor) return;
+  try {
+    var mine = (await getActiveTrainings()).filter(function(t){ return t.providerId === vendor.uid || (t.trainers||[]).some(function(x){ return x.uid && x.uid === vendor.uid; }); });
+    var creds = (vendor.trainerCredentials||[]).filter(Boolean);
+    if(!mine.length && !creds.length) return;
+    var w = scr.querySelector('.wrap') || scr;
+    var box = document.createElement('div');
+    box.style.cssText = 'margin:18px 0';
+    box.innerHTML = (creds.length ? '<div class="card" style="padding:14px 16px;margin-bottom:12px"><div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:#2563eb;margin-bottom:8px">🏅 ' + _L('CREDENTIALS','SERTİFİKALAR VE YETKİNLİKLER') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap">' + creds.map(function(c){ return trChip(escHtml(c),'green'); }).join('') + '</div>'
+        + (vendor.vendorStatus === 'admin_verified' ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:8px">' + _L('Declared by the trainer; not yet verified by PoCHub.','Eğitmenin beyanıdır; PoCHub tarafından henüz doğrulanmadı.') + '</div>') + '</div>' : '')
+      + (mine.length ? '<div class="card" style="padding:14px 16px"><h3 style="font-size:16px;font-weight:700;margin:0 0 10px">🎓 ' + _L('Trainings','Eğitimler') + ' (' + mine.length + ')</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">' + mine.map(trCardHtml).join('') + '</div></div>' : '');
+    w.appendChild(box);
+    box.querySelectorAll('.tr-card').forEach(function(c){ c.addEventListener('click', function(){ var t = mine.filter(function(x){ return x.id === c.dataset.id; })[0]; if(t) openTrainingDetail(t); }); });
+  } catch(e){}
+}
+
+// ── Vendor paneli: Eğitimlerim ──────────────────────────────────────
+async function _trMyPackage(){
+  var tier = (CUR_PROFILE && CUR_PROFILE.subscriptionTier) || 'free', pkg = null;
+  try { var s = await getDocs(collection(db,'pochub_packages')); s.docs.forEach(function(d){ var p = d.data()||{}; if(!pkg && p.tier === tier) pkg = p; }); } catch(e){}
+  return pkg || {};
+}
+async function vendTrainings(m){
+  var uid = CUR_USER && CUR_USER.uid; if(!uid){ m.innerHTML = ''; return; }
+  var cfg = await trCfg(true), mine = [], regs = [], pools = [], unlocks = [];
+  try { var a = await getDocs(query(collection(db,'trainings'), where('providerId','==',uid))); mine = a.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); } catch(e){}
+  try { var b = await getDocs(query(collection(db,'training_regs'), where('providerId','==',uid))); regs = b.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); } catch(e){}
+  try { var c = await getDocs(query(collection(db,'training_pools'), orderBy('count','desc'), limit(200))); pools = c.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); } catch(e){}
+  try { var u = await getDocs(query(collection(db,'training_unlocks'), where('providerId','==',uid))); unlocks = u.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); } catch(e){}
+  regs.sort(function(x,y){ return ((y.createdAt&&y.createdAt.seconds)||0) - ((x.createdAt&&x.createdAt.seconds)||0); });
+  var myBrands = Object.create(null);
+  [].concat(CUR_PROFILE && CUR_PROFILE.brands || []).forEach(function(b){ myBrands[_normBrand(b)] = 1; });
+  mine.forEach(function(t){ if(t.brandNorm) myBrands[t.brandNorm] = 1; });
+  var relPools = pools.filter(function(p){ return myBrands[p.brandNorm]; });
+  var unlockBy = Object.create(null); unlocks.forEach(function(x){ unlockBy[x.poolKey] = x; });
+  var active = mine.filter(function(t){ return t.status !== 'archived'; }).length;
+  var limitTxt = '';
+  if(cfg.quotaEnabled){ var pk = await _trMyPackage(); var lim = (pk.trainingLimit === undefined || pk.trainingLimit === null) ? -1 : Number(pk.trainingLimit); limitTxt = active + ' / ' + (lim < 0 ? '∞' : lim) + ' ' + _L('listings used','ilan kullanımı'); m._trLimit = lim; } else m._trLimit = -1;
+  var stB = function(s){ return s === 'active' ? trChip(_L('Live','Yayında'),'green') : s === 'pending' ? trChip(_L('Awaiting approval','Onay bekliyor'),'amber') : s === 'rejected' ? trChip(_L('Rejected','Reddedildi')) : trChip(_L('Archived','Arşiv')); };
+  var regSt = { new:_L('New','Yeni'), contacted:_L('Contacted','İletişime geçildi'), confirmed:_L('Confirmed','Kesinleşti'), cancelled:_L('Cancelled','İptal') };
+  var newRegs = regs.filter(function(r){ return r.status === 'new'; }).length;
+  m.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:14px">'
+    + '<div><h3 class="fs15-fw7">🎓 ' + _L('My Trainings','Eğitimlerim') + '</h3><div style="font-size:12px;color:var(--text-muted);margin-top:2px">'
+    +   _L('Scheduled classes and private trainings you offer. New listings go live after admin approval; edits by verified providers stay live.','Sunduğunuz takvimli sınıflar ve kuruma özel eğitimler. Yeni ilanlar admin onayından sonra yayına girer; doğrulanmış sağlayıcının düzenlemesi yayında kalır.')
+    +   (limitTxt ? ' · <b>' + limitTxt + '</b>' : '') + '</div></div>'
+    + '<button type="button" class="btn-p btn-sm" id="vt-new">+ ' + _L('New training','Yeni eğitim') + '</button></div>'
+    + (mine.length ? '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">' + mine.map(function(t){
+        var next = trUpcoming(t)[0];
+        return '<div class="card" style="padding:11px 13px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+          + '<div style="min-width:0"><div style="font-size:13.5px;font-weight:700">' + escHtml(t.title) + ' ' + stB(t.status) + '</div>'
+          + '<div style="font-size:11.5px;color:var(--text-muted)">' + escHtml(t.brand||'') + ' · ' + trPriceText(t) + (next ? ' · ' + trFmtDate(next.start) : '') + (t.offersOpen && t.capacity ? ' · ' + (t.registeredSeats||0) + '/' + t.capacity : '') + (t.rejectReason ? ' · ' + escHtml(t.rejectReason) : '') + '</div></div>'
+          + '<div style="display:flex;gap:6px"><button type="button" class="btn-g btn-sm vt-edit" data-id="' + t.id + '">✎ ' + _L('Edit','Düzenle') + '</button>'
+          + (t.status !== 'archived' ? '<button type="button" class="btn-g btn-sm vt-arc" data-id="' + t.id + '">' + _L('Archive','Arşivle') + '</button>' : '') + '</div></div>';
+      }).join('') + '</div>'
+      : '<div class="card" style="text-align:center;padding:22px;color:var(--text-muted);font-size:13px;margin-bottom:20px">' + _L('No trainings yet.','Henüz eğitim eklemediniz.') + '</div>')
+    + '<h3 class="fs15-fw7" style="margin-bottom:8px">📥 ' + _L('Registrations & requests','Kayıtlar ve talepler') + (newRegs ? ' <span class="bdg" style="background:#dc2626;color:#fff">' + newRegs + '</span>' : '') + '</h3>'
+    + (regs.length ? '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">' + regs.slice(0,100).map(function(r){
+        return '<div class="card" style="padding:10px 12px;font-size:12.5px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">'
+          + '<div style="min-width:0"><b>' + escHtml(r.name||'') + '</b>' + (r.company ? ' · ' + escHtml(r.company) : '') + ' · ' + (r.kind === 'private' ? trChip(_L('Private','Kuruma özel'),'amber') : trChip(_L('Registration','Kayıt'),'blue'))
+          + '<div style="color:var(--text-muted)">' + escHtml(r.trainingTitle||'') + ' · ' + (r.seats||1) + ' ' + _L('people','kişi') + (r.session ? ' · ' + escHtml(trSessionText(r.session)) : '') + (r.city ? ' · ' + escHtml(r.city) : '') + '</div>'
+          + '<div>✉ <a href="mailto:' + escHtml(r.email||'') + '">' + escHtml(r.email||'') + '</a>' + (r.phone ? ' · ☎ ' + escHtml(r.phone) : '') + (r.note ? '<div style="color:var(--text-secondary)">“' + escHtml(r.note) + '”</div>' : '') + '</div></div>'
+          + '<select class="inp vt-rst" data-id="' + r.id + '" style="font-size:12px;padding:5px 8px;width:auto">' + Object.keys(regSt).map(function(k){ return '<option value="' + k + '"' + (r.status === k ? ' selected' : '') + '>' + regSt[k] + '</option>'; }).join('') + '</select></div>';
+      }).join('') + '</div>'
+      : '<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:20px">' + _L('No registrations yet.','Henüz kayıt yok.') + '</div>')
+    + '<h3 class="fs15-fw7" style="margin-bottom:4px">🙋 ' + _L('Demand pools for your brands','Markalarınız için talep havuzları') + '</h3>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">'
+    +   (cfg.leadMode === 'paid' && Number(cfg.leadPrice) > 0
+          ? _L('Contact details are shared after approval; a fee of ','İletişim bilgileri onaydan sonra paylaşılır; kişi başı ') + Number(cfg.leadPrice).toLocaleString('tr-TR') + ' TRY ' + _L('per contact is invoiced monthly.','ücret aylık faturalanır.')
+          : _L('Request the contact details of interested people; they are shared after PoCHub approval.','İlgilenen kişilerin iletişim bilgilerini isteyin; PoCHub onayından sonra paylaşılır.')) + '</div>'
+    + (relPools.length ? '<div style="display:flex;flex-direction:column;gap:6px">' + relPools.map(function(p){
+        var u = unlockBy[p.poolKey || p.id], got = u && u.contacts ? u.contacts.length : 0, newer = Number(p.count||0) > got;
+        var act = !u ? '<button type="button" class="btn-p btn-sm vt-unl" data-k="' + escHtml(p.poolKey||p.id) + '">' + _L('Request contacts','İletişim bilgilerini iste') + '</button>'
+          : u.status === 'requested' ? trChip(_L('Awaiting approval','Onay bekliyor'),'amber')
+          : u.status === 'rejected' ? trChip(_L('Rejected','Reddedildi')) + (newer ? ' <button type="button" class="btn-g btn-sm vt-unl" data-k="' + escHtml(p.poolKey||p.id) + '">' + _L('Request again','Yeniden iste') + '</button>' : '')
+          : (newer ? '<button type="button" class="btn-g btn-sm vt-unl" data-k="' + escHtml(p.poolKey||p.id) + '">' + _L('Request new contacts','Yenileri iste') + ' (+' + (p.count - got) + ')</button>' : '');
+        return '<div class="card" style="padding:10px 12px;font-size:12.5px">'
+          + '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><b>' + escHtml(p.brand) + '</b> · ' + escHtml(p.topic ? displayProductName(p.topic) : _L('General','Genel')) + ' · ' + escHtml(p.city || _L('Remote','Uzaktan'))
+          + ' · <b>' + (p.count||0) + '</b> ' + _L('people','kişi') + ' / ' + (p.seats||0) + ' ' + _L('seats','koltuk') + '</div><div>' + act + '</div></div>'
+          + (u && u.status === 'approved' && got ? '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' + u.contacts.map(function(c){
+              return '<div style="padding:3px 0">' + escHtml(c.name||'') + (c.company ? ' · ' + escHtml(c.company) : '') + ' · ' + (c.seats||1) + ' ' + _L('people','kişi') + ' · <a href="mailto:' + escHtml(c.email||'') + '">' + escHtml(c.email||'') + '</a>' + (c.phone ? ' · ' + escHtml(c.phone) : '') + (c.note ? ' · “' + escHtml(c.note) + '”' : '') + '</div>'; }).join('') + '</div>' : '')
+          + '</div>';
+      }).join('') + '</div>'
+      : '<div style="font-size:12.5px;color:var(--text-muted)">' + _L('No demand pools for your brands yet.','Markalarınız için henüz talep havuzu yok.') + '</div>');
+  m.querySelector('#vt-new').addEventListener('click', function(){
+    if(m._trLimit >= 0 && active >= m._trLimit){ showToast(_L('Your package listing limit is reached. Upgrade under Subscription.','Paketinizin ilan limiti doldu. Aboneliğim bölümünden yükseltebilirsiniz.'), 'err'); return; }
+    openTrainingForm(null, function(){ vendTrainings(m); });
+  });
+  m.querySelectorAll('.vt-edit').forEach(function(b){ b.addEventListener('click', function(){ var t = mine.filter(function(x){ return x.id === b.dataset.id; })[0]; openTrainingForm(t, function(){ vendTrainings(m); }); }); });
+  m.querySelectorAll('.vt-arc').forEach(function(b){ b.addEventListener('click', async function(){
+    if(!confirm(_L('Archive this training? It will no longer be listed.','Bu eğitim arşivlensin mi? Artık listelenmez.'))) return;
+    try { await updateDoc(doc(db,'trainings', b.dataset.id), { status:'archived', updatedAt:serverTimestamp() }); invalidateTrainings(); vendTrainings(m); } catch(e){ showToast(_L('Failed: ','Başarısız: ') + (e && (e.code||e.message)), 'err'); }
+  }); });
+  m.querySelectorAll('.vt-rst').forEach(function(s){ s.addEventListener('change', async function(){
+    try { await updateDoc(doc(db,'training_regs', this.dataset.id), { status:this.value, updatedAt:serverTimestamp() }); showToast(_L('Updated','Güncellendi'), 'ok'); } catch(e){ showToast(_L('Failed: ','Başarısız: ') + (e && (e.code||e.message)), 'err'); }
+  }); });
+  m.querySelectorAll('.vt-unl').forEach(function(b){ b.addEventListener('click', async function(){
+    var key = b.dataset.k, p = relPools.filter(function(x){ return (x.poolKey||x.id) === key; })[0] || {}, u = unlockBy[key];
+    var feeTxt = cfg.leadMode === 'paid' && Number(cfg.leadPrice) > 0 ? '\n' + _L('Fee per contact: ','Kişi başı ücret: ') + Number(cfg.leadPrice).toLocaleString('tr-TR') + ' TRY (' + _L('invoiced monthly','aylık faturalanır') + ')' : '';
+    if(!confirm(_L('Request the contact details for this pool?','Bu havuzun iletişim bilgileri istensin mi?') + feeTxt)) return;
+    b.disabled = true;
+    var data = { poolKey:key, providerId:uid, providerName:(CUR_PROFILE && (CUR_PROFILE.company||CUR_PROFILE.displayName)) || '', status:'requested', requestedAt:serverTimestamp(),
+      priceMode:cfg.leadMode === 'paid' ? 'paid' : 'free', priceEach:cfg.leadMode === 'paid' ? Number(cfg.leadPrice)||0 : 0,
+      poolSnapshot:{ brand:p.brand||'', topic:p.topic||'', city:p.city||'', count:Number(p.count||0) } };
+    try {
+      if(u) await updateDoc(doc(db,'training_unlocks', key + '__' + uid), { status:'requested', requestedAt:serverTimestamp(), priceMode:data.priceMode, priceEach:data.priceEach, poolSnapshot:data.poolSnapshot });
+      else await setDoc(doc(db,'training_unlocks', key + '__' + uid), data);
+      notifyAdmins({ type:'training_unlock', title:_L('Contact request: ','İletişim talebi: ') + (p.brand||''), message:data.providerName + ' · ' + (p.topic||'') + ' · ' + (p.count||0) + ' ' + _L('people','kişi'), relatedId:key });
+      showToast(_L('Request sent to PoCHub.','Talebiniz PoCHub’a iletildi.'), 'ok'); vendTrainings(m);
+    } catch(e){ b.disabled = false; showToast(_L('Failed: ','Başarısız: ') + (e && (e.code||e.message)), 'err'); }
+  }); });
+}
+
+// ── Eğitim ekleme / düzenleme formu ─────────────────────────────────
+async function openTrainingForm(t, done){
+  t = t || {};
+  var isNew = !t.id, inp = 'width:100%;font-size:13px;margin-bottom:8px';
+  var trainersPool = [];
+  try { trainersPool = (await getVendorsPublic()).filter(function(v){ return v.vendorType === 'egitmen'; }); } catch(e){}
+  var sesRows = (t.sessions && t.sessions.length ? t.sessions : [{}]);
+  var sesRowHtml = function(s){ s = s || {}; return '<div class="tf-ses" style="display:grid;grid-template-columns:1fr 1fr 1fr 32px;gap:6px;margin-bottom:6px">'
+    + '<input type="date" class="inp tf-s1" value="' + escHtml(s.start||'') + '" style="font-size:12.5px"><input type="date" class="inp tf-s2" value="' + escHtml(s.end||'') + '" style="font-size:12.5px">'
+    + '<input class="inp tf-s3" placeholder="09:30-17:00" value="' + escHtml(s.time||'') + '" style="font-size:12.5px"><button type="button" class="btn-g btn-sm tf-sdel" title="' + _L('Remove','Kaldır') + '">×</button></div>'; };
+  var chk = function(id, on, lbl){ return '<label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '>' + lbl + '</label>'; };
+  var md = _trModal(
+      '<h3 style="margin:0 0 12px;font-size:17px;font-weight:800">' + (isNew ? _L('New training','Yeni eğitim') : _L('Edit training','Eğitimi düzenle')) + '</h3>'
+    + '<label class="lbl">' + _L('Title','Başlık') + ' *</label><input id="tf-title" class="inp" style="' + inp + '" maxlength="160" value="' + escHtml(t.title||'') + '" placeholder="' + _L('e.g. FortiGate Administration','ör. FortiGate Yönetimi') + '">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +   '<div><label class="lbl">' + _L('Brand','Marka') + ' *</label><div style="position:relative"><input id="tf-brand" class="inp" autocomplete="off" style="' + inp + '" value="' + escHtml(t.brand||'') + '"><div id="tf-sug" style="position:absolute;z-index:5;left:0;right:0;top:40px;background:var(--bg-surface,#fff);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12)"></div></div></div>'
+    +   '<div><label class="lbl">' + _L('Product family','Ürün ailesi') + '</label><select id="tf-fam" class="inp" style="' + inp + '"></select></div>'
+    + '</div>'
+    + '<label class="lbl">' + _L('Short description','Kısa açıklama') + ' *</label><textarea id="tf-sum" class="inp" rows="3" maxlength="900" style="' + inp + '">' + escHtml(t.summary||'') + '</textarea>'
+    + '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 10px">'
+    +   chk('tf-open', t.offersOpen !== false, _L('Scheduled class (dates & seats)','Takvimli sınıf (tarih ve kontenjan)'))
+    +   chk('tf-priv', !!t.offersPrivate, _L('Can be delivered privately for an organisation','Kuruma özel verilebilir'))
+    + '</div>'
+    + '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:0 0 10px">' + Object.keys(TR_FMT).map(function(k){ return chk('tf-f-' + k, (t.formats||['online']).indexOf(k) >= 0, _trL(TR_FMT,k)); }).join('') + '</div>'
+    + '<div id="tf-openbox"><label class="lbl">' + _L('Sessions (start, end, hours)','Oturumlar (başlangıç, bitiş, saat)') + '</label><div id="tf-sesl">' + sesRows.map(sesRowHtml).join('') + '</div>'
+    +   '<button type="button" class="btn-g btn-sm" id="tf-sadd" style="margin-bottom:10px">+ ' + _L('Add session','Oturum ekle') + '</button>'
+    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="lbl">' + _L('Capacity','Kontenjan') + '</label><input id="tf-cap" type="number" min="1" max="500" class="inp" style="' + inp + '" value="' + escHtml(t.capacity||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Venue / address (on-site)','Mekân / adres (yerinde)') + '</label><input id="tf-venue" class="inp" style="' + inp + '" value="' + escHtml(t.venue||'') + '"></div></div></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+    +   '<div><label class="lbl">' + _L('Days','Gün') + '</label><input id="tf-days" type="number" min="0" max="60" class="inp" style="' + inp + '" value="' + escHtml(t.durationDays||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Total hours','Toplam saat') + '</label><input id="tf-hours" type="number" min="0" max="500" class="inp" style="' + inp + '" value="' + escHtml(t.durationHours||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('City','Şehir') + '</label><input id="tf-city" class="inp" style="' + inp + '" value="' + escHtml(t.city||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Level','Seviye') + '</label><select id="tf-level" class="inp" style="' + inp + '"><option value="">—</option>' + Object.keys(TR_LEVEL).map(function(k){ return '<option value="' + k + '"' + (t.level === k ? ' selected' : '') + '>' + _trL(TR_LEVEL,k) + '</option>'; }).join('') + '</select></div>'
+    +   '<div><label class="lbl">' + _L('Language','Dil') + '</label><input id="tf-lang" class="inp" style="' + inp + '" value="' + escHtml(t.language||'Türkçe') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Pricing','Ücretlendirme') + '</label><select id="tf-ptype" class="inp" style="' + inp + '">' + Object.keys(TR_PRICE).map(function(k){ return '<option value="' + k + '"' + ((t.priceType||'person') === k ? ' selected' : '') + '>' + _trL(TR_PRICE,k) + '</option>'; }).join('') + '</select></div>'
+    +   '<div><label class="lbl">' + _L('Price','Fiyat') + '</label><input id="tf-price" type="number" min="0" class="inp" style="' + inp + '" value="' + escHtml(t.price||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Currency','Para birimi') + '</label><select id="tf-cur" class="inp" style="' + inp + '">' + ['TRY','USD','EUR'].map(function(c){ return '<option' + ((t.currency||'TRY') === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></div>'
+    +   '<div style="display:flex;align-items:flex-end;padding-bottom:12px">' + chk('tf-off', !!t.officialCurriculum, _L('Official curriculum','Resmi müfredat')) + '</div>'
+    + '</div>'
+    + '<label class="lbl">' + _L('Trainer(s)','Eğitmen(ler)') + ' <span style="font-weight:400;color:var(--text-muted)">' + _L('comma separated; registered trainers are linked','virgülle ayırın; kayıtlı eğitmenler profiline bağlanır') + '</span></label>'
+    +   '<input id="tf-trn" class="inp" list="tf-trn-dl" style="' + inp + '" value="' + escHtml((t.trainers||[]).map(function(x){ return x.name; }).join(', ')) + '">'
+    +   '<datalist id="tf-trn-dl">' + trainersPool.map(function(v){ return '<option value="' + escHtml(v.company||v.displayName||'') + '">'; }).join('') + '</datalist>'
+    + '<label class="lbl">' + _L('Syllabus','Müfredat') + '</label><textarea id="tf-syl" class="inp" rows="5" maxlength="6000" style="' + inp + '" placeholder="' + _L('One topic per line','Her satıra bir konu') + '">' + escHtml(t.syllabus||'') + '</textarea>'
+    + '<label class="lbl">' + _L('Prerequisites','Ön koşullar') + '</label><input id="tf-pre" class="inp" maxlength="500" style="' + inp + '" value="' + escHtml(t.prerequisites||'') + '">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +   '<div><label class="lbl">' + _L('Certification / exam','Sertifika / sınav') + '</label><input id="tf-cert" class="inp" maxlength="300" style="' + inp + '" value="' + escHtml(t.certification||'') + '"></div>'
+    +   '<div><label class="lbl">' + _L('Lab environment','Lab ortamı') + '</label><input id="tf-lab" class="inp" maxlength="300" style="' + inp + '" value="' + escHtml(t.lab||'') + '" placeholder="' + _L('e.g. remote lab per participant','ör. katılımcı başına uzaktan lab') + '"></div>'
+    + '</div>'
+    + '<div id="tf-msg" style="font-size:12px;color:#dc2626;min-height:16px;margin-bottom:6px"></div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn-g btn-sm" id="tf-c">' + _L('Cancel','Vazgeç') + '</button><button type="button" class="btn-p btn-sm" id="tf-go">' + (isNew ? _L('Submit for approval','Onaya gönder') : _L('Save','Kaydet')) + '</button></div>', 720);
+  var q = function(s){ return md.querySelector(s); };
+  _trFillFamilies(q('#tf-fam'), t.brand, t.family);
+  _trBrandSuggest(q('#tf-brand'), q('#tf-sug'), function(v){ _trFillFamilies(q('#tf-fam'), v, ''); });
+  q('#tf-brand').addEventListener('change', function(){ _trFillFamilies(q('#tf-fam'), this.value, ''); });
+  var syncOpen = function(){ q('#tf-openbox').style.display = q('#tf-open').checked ? '' : 'none'; };
+  q('#tf-open').addEventListener('change', syncOpen); syncOpen();
+  q('#tf-sadd').addEventListener('click', function(){ if(md.querySelectorAll('.tf-ses').length < 12) q('#tf-sesl').insertAdjacentHTML('beforeend', sesRowHtml({})); });
+  q('#tf-sesl').addEventListener('click', function(e){ var b = e.target.closest('.tf-sdel'); if(b && md.querySelectorAll('.tf-ses').length > 1) b.closest('.tf-ses').remove(); });
+  q('#tf-c').addEventListener('click', function(){ md.remove(); });
+  q('#tf-go').addEventListener('click', async function(){
+    var g = function(s){ var e = q(s); return e ? String(e.value||'').trim() : ''; }, msg = q('#tf-msg'), btn = this;
+    var brand = g('#tf-brand');
+    try { var canon = _brandCanonMap(); if(canon[_normBrand(brand)]) brand = canon[_normBrand(brand)]; } catch(e){}
+    var fams = Object.keys(TR_FMT).filter(function(k){ return q('#tf-f-' + k).checked; });
+    var sessions = Array.prototype.map.call(md.querySelectorAll('.tf-ses'), function(r){ return { start:r.querySelector('.tf-s1').value, end:r.querySelector('.tf-s2').value || '', time:r.querySelector('.tf-s3').value.trim().slice(0,40) }; })
+      .filter(function(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s.start); });
+    var offersOpen = q('#tf-open').checked, offersPrivate = q('#tf-priv').checked;
+    if(!g('#tf-title') || !brand || !g('#tf-sum')){ msg.textContent = _L('Title, brand and description are required.','Başlık, marka ve açıklama zorunlu.'); return; }
+    if(!offersOpen && !offersPrivate){ msg.textContent = _L('Choose scheduled class and/or private delivery.','Takvimli sınıf ve/veya kuruma özel seçin.'); return; }
+    if(!fams.length){ msg.textContent = _L('Choose at least one format.','En az bir biçim seçin.'); return; }
+    if(offersOpen && !sessions.length){ msg.textContent = _L('Add at least one session date for a scheduled class.','Takvimli sınıf için en az bir oturum tarihi girin.'); return; }
+    var famSel = q('#tf-fam'), famOpt = famSel.options[famSel.selectedIndex];
+    var trn = g('#tf-trn').split(',').map(function(x){ return x.trim(); }).filter(Boolean).slice(0,8).map(function(nm){
+      var hit = trainersPool.filter(function(v){ return _normBrand(v.company||v.displayName||'') === _normBrand(nm); })[0];
+      return hit ? { name:nm, uid:hit.id || hit.vendorId || '', slug:hit.slug || '' } : { name:nm };
+    });
+    var verified = CUR_PROFILE && CUR_PROFILE.vendorStatus === 'admin_verified';
+    var data = { title:g('#tf-title').slice(0,160), brand:brand.slice(0,120), brandNorm:_normBrand(brand), family:famSel.value || '', category:famOpt ? (famOpt.getAttribute('data-cat')||'') : '',
+      summary:g('#tf-sum').slice(0,900), offersOpen:offersOpen, offersPrivate:offersPrivate, formats:fams, sessions:offersOpen ? sessions.slice(0,12) : [],
+      capacity:offersOpen ? (parseInt(g('#tf-cap'),10) || 0) : 0, venue:g('#tf-venue').slice(0,200), city:g('#tf-city').slice(0,60),
+      durationDays:parseInt(g('#tf-days'),10) || 0, durationHours:parseInt(g('#tf-hours'),10) || 0, level:g('#tf-level'), language:g('#tf-lang').slice(0,40),
+      priceType:g('#tf-ptype'), price:g('#tf-ptype') === 'free' ? 0 : (parseFloat(g('#tf-price')) || 0), currency:g('#tf-cur'), officialCurriculum:q('#tf-off').checked,
+      trainers:trn, syllabus:g('#tf-syl').slice(0,6000), prerequisites:g('#tf-pre').slice(0,500), certification:g('#tf-cert').slice(0,300), lab:g('#tf-lab').slice(0,300),
+      providerId:CUR_USER.uid, providerName:(CUR_PROFILE && (CUR_PROFILE.company||CUR_PROFILE.displayName)) || '', providerType:(CUR_PROFILE && CUR_PROFILE.vendorType) || '',
+      providerSlug:(CUR_PROFILE && CUR_PROFILE.slug) || '', providerVerified:!!verified, source:'pochub', updatedAt:serverTimestamp() };
+    // Doğrulanmış sağlayıcının düzenlemesi yayında kalır; diğerleri onaya düşer (kural da aynısını uygular)
+    data.status = (!isNew && t.status === 'active' && verified) ? 'active' : 'pending';
+    btn.disabled = true;
+    try {
+      if(isNew){ data.createdAt = serverTimestamp(); data.registeredSeats = 0; var ref = await addDoc(collection(db,'trainings'), data);
+        notifyAdmins({ type:'training_pending', title:_L('New training awaiting approval','Onay bekleyen yeni eğitim'), message:data.providerName + ' · ' + data.title, relatedId:ref.id }); }
+      else await updateDoc(doc(db,'trainings', t.id), data);
+      invalidateTrainings(); md.remove();
+      showToast(data.status === 'active' ? _L('Saved — still live.','Kaydedildi — yayında.') : _L('Sent for admin approval.','Admin onayına gönderildi.'), 'ok');
+      if(done) done();
+    } catch(e){ btn.disabled = false; msg.textContent = _L('Could not save: ','Kaydedilemedi: ') + ((e && (e.code||e.message)) || ''); }
+  });
+}
+
+// ── Admin: Eğitimler ────────────────────────────────────────────────
+async function admTrainings(m){
+  m.innerHTML = '<div class="loading"><div class="spinner"></div>' + _L('Loading…','Yükleniyor…') + '</div>';
+  var all = [], pools = [], unl = [], cfg = await trCfg(true);
+  try { var a = await getDocs(collection(db,'trainings')); all = a.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); } catch(e){}
+  try { var b = await getDocs(collection(db,'training_pools')); pools = b.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); } catch(e){}
+  try { var c = await getDocs(collection(db,'training_unlocks')); unl = c.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; }); } catch(e){}
+  pools.sort(function(x,y){ return (y.count||0) - (x.count||0); });
+  var tab = m._trTab || 'pending';
+  var pend = all.filter(function(t){ return t.status === 'pending'; }), reqs = unl.filter(function(u){ return u.status === 'requested'; });
+  var tb = function(k, l, n){ return '<button type="button" class="btn-sm at-tab ' + (tab === k ? 'btn-p' : 'btn-g') + '" data-t="' + k + '">' + l + (n ? ' (' + n + ')' : '') + '</button>'; };
+  var html = '<div style="margin-bottom:12px"><h2 class="fs18-fw7" style="margin:0 0 4px">🎓 ' + _L('Trainings','Eğitimler') + '</h2>'
+    + '<div style="font-size:12.5px;color:var(--text-secondary)">' + all.filter(function(t){ return t.status === 'active'; }).length + ' ' + _L('live','yayında') + ' · ' + pend.length + ' ' + _L('awaiting approval','onay bekliyor') + ' · ' + pools.length + ' ' + _L('demand pools','talep havuzu') + ' · ' + reqs.length + ' ' + _L('contact requests','iletişim talebi') + '</div></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">' + tb('pending', _L('Approval','Onay'), pend.length) + tb('all', _L('All','Tümü')) + tb('pools', _L('Demand pools','Talep havuzları'), pools.length) + tb('unlocks', _L('Contact requests','İletişim talepleri'), reqs.length) + tb('invoice', _L('Invoice report','Fatura raporu')) + tb('settings', _L('Settings','Ayarlar')) + '</div>';
+  var stB = function(s){ return s === 'active' ? trChip(_L('Live','Yayında'),'green') : s === 'pending' ? trChip(_L('Pending','Bekliyor'),'amber') : trChip(escHtml(s||'')); };
+  if(tab === 'pending' || tab === 'all'){
+    var L = tab === 'pending' ? pend : all.slice().sort(function(x,y){ return ((y.createdAt&&y.createdAt.seconds)||0) - ((x.createdAt&&x.createdAt.seconds)||0); });
+    html += (tab === 'pending' && L.length ? '<div style="margin-bottom:8px"><button type="button" class="btn-sm" id="at-apall" style="background:#16a34a;color:#fff;border:1px solid #16a34a;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer">✓ ' + _L('Approve all','Hepsini onayla') + ' (' + L.length + ')</button></div>' : '')
+      + (L.length ? '<table><thead><tr><th>' + _L('Training','Eğitim') + '</th><th>' + _L('Provider','Sağlayıcı') + '</th><th>' + _L('Type','Tür') + '</th><th>' + _L('Status','Durum') + '</th><th></th></tr></thead><tbody>'
+        + L.map(function(t){ return '<tr><td style="font-size:13px"><a href="#" class="at-view" data-id="' + t.id + '" style="font-weight:700;color:inherit">' + escHtml(t.title) + '</a><div style="font-size:11px;color:var(--text-muted)">' + escHtml(t.brand||'') + ' · ' + trPriceText(t) + '</div></td>'
+            + '<td style="font-size:12px">' + escHtml(t.providerName||'') + '<div style="font-size:11px;color:var(--text-muted)">' + trTypeLabel(t.providerType) + (t.providerVerified ? ' ✓' : '') + '</div></td>'
+            + '<td style="font-size:11.5px">' + [t.offersOpen ? _L('Scheduled','Takvimli') : '', t.offersPrivate ? _L('Private','Kuruma özel') : ''].filter(Boolean).join(' + ') + '</td><td>' + stB(t.status) + '</td>'
+            + '<td style="white-space:nowrap">' + (t.status !== 'active' ? '<button type="button" class="btn-sm at-ap" data-id="' + t.id + '" style="background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">✓ ' + _L('Approve','Onayla') + '</button> ' : '')
+            + (t.status !== 'rejected' ? '<button type="button" class="btn-sm at-rj" data-id="' + t.id + '" style="background:rgba(220,38,38,.10);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">✕</button>' : '') + '</td></tr>'; }).join('')
+        + '</tbody></table>' : '<div class="empty" style="padding:22px">' + _L('Nothing here.','Kayıt yok.') + '</div>');
+  } else if(tab === 'pools'){
+    html += pools.length ? '<table><thead><tr><th>' + _L('Brand / topic','Marka / konu') + '</th><th>' + _L('City','Şehir') + '</th><th>' + _L('People','Kişi') + '</th><th>' + _L('Seats','Koltuk') + '</th><th>' + _L('Remote / on-site / either','Uzaktan / yerinde / farketmez') + '</th></tr></thead><tbody>'
+      + pools.map(function(p){ return '<tr><td style="font-size:13px"><b>' + escHtml(p.brand||'') + '</b> · ' + escHtml(p.topic ? displayProductName(p.topic) : _L('General','Genel')) + '</td><td style="font-size:12px">' + escHtml(p.city || _L('Remote','Uzaktan')) + '</td><td><b>' + (p.count||0) + '</b></td><td>' + (p.seats||0) + '</td><td style="font-size:12px">' + (p.fmtOnline||0) + ' / ' + (p.fmtOnsite||0) + ' / ' + (p.fmtAny||0) + '</td></tr>'; }).join('')
+      + '</tbody></table>' : '<div class="empty" style="padding:22px">' + _L('No demand yet.','Henüz talep yok.') + '</div>';
+  } else if(tab === 'unlocks'){
+    var U = unl.slice().sort(function(x,y){ return (x.status === 'requested' ? 0 : 1) - (y.status === 'requested' ? 0 : 1); });
+    html += U.length ? '<table><thead><tr><th>' + _L('Provider','Sağlayıcı') + '</th><th>' + _L('Pool','Havuz') + '</th><th>' + _L('Mode','Mod') + '</th><th>' + _L('Status','Durum') + '</th><th></th></tr></thead><tbody>'
+      + U.map(function(u){ var s = u.poolSnapshot || {}; return '<tr><td style="font-size:12.5px"><b>' + escHtml(u.providerName||'') + '</b></td><td style="font-size:12px">' + escHtml(s.brand||'') + ' · ' + escHtml(s.topic ? displayProductName(s.topic) : '') + ' · ' + escHtml(s.city || _L('Remote','Uzaktan')) + ' · ' + (s.count||0) + ' ' + _L('people','kişi') + (u.contacts ? '<div style="font-size:11px;color:var(--text-muted)">' + u.contacts.length + ' ' + _L('already shared','paylaşıldı') + '</div>' : '') + '</td>'
+          + '<td style="font-size:12px">' + (u.priceMode === 'paid' ? _L('Paid','Ücretli') + ' · ' + (u.priceEach||0) + ' TRY' : _L('Free','Ücretsiz')) + '</td><td>' + (u.status === 'requested' ? trChip(_L('Requested','Talep edildi'),'amber') : u.status === 'approved' ? trChip(_L('Approved','Onaylandı'),'green') : trChip(_L('Rejected','Reddedildi'))) + '</td>'
+          + '<td style="white-space:nowrap">' + (u.status === 'requested' ? '<button type="button" class="btn-sm at-uap" data-id="' + escHtml(u.id) + '" style="background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">✓ ' + _L('Approve & share','Onayla ve paylaş') + '</button> <button type="button" class="btn-sm at-urj" data-id="' + escHtml(u.id) + '" style="background:rgba(220,38,38,.10);color:#dc2626;border:1px solid rgba(220,38,38,.3);border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">✕</button>' : '') + '</td></tr>'; }).join('')
+      + '</tbody></table>' : '<div class="empty" style="padding:22px">' + _L('No requests yet.','Henüz talep yok.') + '</div>';
+  } else if(tab === 'invoice'){
+    var rows = [];
+    unl.forEach(function(u){ (u.charges||[]).forEach(function(c){ if(Number(c.amount) > 0) rows.push({ provider:u.providerName||u.providerId, providerId:u.providerId, month:c.month, count:c.count, amount:Number(c.amount), pool:(u.poolSnapshot||{}).brand + ' · ' + ((u.poolSnapshot||{}).topic||'') }); }); });
+    var byKey = Object.create(null);
+    rows.forEach(function(r){ var k = r.month + '|' + r.providerId; var x = byKey[k] || (byKey[k] = { month:r.month, provider:r.provider, count:0, amount:0 }); x.count += r.count; x.amount += r.amount; });
+    var G = Object.values(byKey).sort(function(a,b){ return a.month < b.month ? 1 : a.month > b.month ? -1 : String(a.provider).localeCompare(String(b.provider),'tr'); });
+    html += '<div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:10px">' + _L('Paid contact shares grouped by provider and month — invoice outside the platform.','Ücretli iletişim paylaşımları, sağlayıcı ve aya göre — fatura platform dışında kesilir.') + '</div>'
+      + (G.length ? '<button type="button" class="btn-g btn-sm" id="at-csv" style="margin-bottom:8px">⬇ CSV</button><table><thead><tr><th>' + _L('Month','Ay') + '</th><th>' + _L('Provider','Sağlayıcı') + '</th><th>' + _L('Contacts','Kişi') + '</th><th>' + _L('Amount (TRY)','Tutar (TRY)') + '</th></tr></thead><tbody>'
+        + G.map(function(g){ return '<tr><td>' + escHtml(g.month) + '</td><td>' + escHtml(g.provider) + '</td><td>' + g.count + '</td><td><b>' + g.amount.toLocaleString('tr-TR') + '</b></td></tr>'; }).join('') + '</tbody></table>'
+        : '<div class="empty" style="padding:22px">' + _L('No paid shares yet.','Henüz ücretli paylaşım yok.') + '</div>');
+    m._trInv = G;
+  } else if(tab === 'settings'){
+    html += '<div class="card" style="padding:16px 18px;max-width:620px">'
+      + '<label class="lbl">' + _L('Demand pool threshold (people)','Talep havuzu eşiği (kişi)') + '</label><input id="as-th" type="number" min="1" class="inp" value="' + escHtml(cfg.threshold||5) + '" style="width:120px;margin-bottom:4px"><div style="font-size:11.5px;color:var(--text-muted);margin-bottom:12px">' + _L('Providers are notified at this count and every multiple of it.','Bu sayıya ve her katına ulaşıldığında sağlayıcılara bildirim gider.') + '</div>'
+      + '<label class="lbl">' + _L('Contact sharing','İletişim bilgisi paylaşımı') + '</label><select id="as-lm" class="inp" style="margin-bottom:8px"><option value="free"' + (cfg.leadMode !== 'paid' ? ' selected' : '') + '>' + _L('Free (admin approval)','Ücretsiz (admin onayıyla)') + '</option><option value="paid"' + (cfg.leadMode === 'paid' ? ' selected' : '') + '>' + _L('Paid per contact (invoiced monthly)','Kişi başı ücretli (aylık fatura)') + '</option></select>'
+      + '<label class="lbl">' + _L('Fee per contact (TRY)','Kişi başı ücret (TRY)') + '</label><input id="as-lp" type="number" min="0" class="inp" value="' + escHtml(cfg.leadPrice||0) + '" style="width:160px;margin-bottom:12px">'
+      + '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:4px"><input type="checkbox" id="as-q"' + (cfg.quotaEnabled ? ' checked' : '') + '>' + _L('Apply package listing limits','Paket ilan limitlerini uygula') + '</label>'
+      + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px">' + _L('Limits are set per package under Packages (Training listing limit, -1 = unlimited).','Limitler Paketler ekranında her paket için ayarlanır (Eğitim ilanı limiti, -1 = sınırsız).') + '</div>'
+      + '<button type="button" class="btn-p btn-sm" id="as-save">' + _L('Save','Kaydet') + '</button></div>';
+  }
+  m.innerHTML = html;
+  m.querySelectorAll('.at-tab').forEach(function(b){ b.addEventListener('click', function(){ m._trTab = this.dataset.t; admTrainings(m); }); });
+  var byId = Object.create(null); all.forEach(function(t){ byId[t.id] = t; });
+  m.querySelectorAll('.at-view').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); var t = byId[this.dataset.id]; if(t) openTrainingDetail(t); }); });
+  async function approve(ids){
+    for(var i = 0; i < ids.length; i += 400){ var bt = writeBatch(db); ids.slice(i, i+400).forEach(function(id){ bt.update(doc(db,'trainings', id), { status:'active', approvedAt:serverTimestamp(), approvedBy:CUR_USER.uid, rejectReason:'' }); }); await bt.commit(); }
+    var byP = Object.create(null); ids.forEach(function(id){ var t = byId[id]; if(t) (byP[t.providerId] = byP[t.providerId] || []).push(t.title); });
+    for(const pid of Object.keys(byP)){ await _trNotify(pid, byP[pid].length + ' ' + _L('training(s) approved 🎉','eğitiminiz onaylandı 🎉'), byP[pid].slice(0,5).join(', '), null, 'training_approved'); }
+    invalidateTrainings(); showToast(ids.length + ' ' + _L('approved','onaylandı'), 'ok'); admTrainings(m);
+  }
+  m.querySelectorAll('.at-ap').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; approve([b.dataset.id]).catch(function(e){ showToast(String(e && (e.code||e.message)), 'err'); }); }); });
+  var apAll = m.querySelector('#at-apall'); if(apAll) apAll.addEventListener('click', function(){ if(confirm(pend.length + ' ' + _L('trainings will be approved. Continue?','eğitim onaylanacak. Devam?'))){ apAll.disabled = true; approve(pend.map(function(t){ return t.id; })).catch(function(e){ showToast(String(e && (e.code||e.message)), 'err'); }); } });
+  m.querySelectorAll('.at-rj').forEach(function(b){ b.addEventListener('click', async function(){
+    var r = prompt(_L('Reason (sent to the provider):','Gerekçe (sağlayıcıya iletilir):')); if(r === null) return;
+    try { var t = byId[b.dataset.id]; await updateDoc(doc(db,'trainings', b.dataset.id), { status:'rejected', rejectReason:String(r).slice(0,300), updatedAt:serverTimestamp() });
+      _trNotify(t.providerId, _L('Training not approved','Eğitim onaylanmadı'), t.title + (r ? ' — ' + r : ''), b.dataset.id, 'training_rejected'); invalidateTrainings(); admTrainings(m); }
+    catch(e){ showToast(String(e && (e.code||e.message)), 'err'); }
+  }); });
+  var uById = Object.create(null); unl.forEach(function(u){ uById[u.id] = u; });
+  m.querySelectorAll('.at-uap').forEach(function(b){ b.addEventListener('click', async function(){
+    var u = uById[b.dataset.id]; b.disabled = true;
+    try {
+      var s = await getDocs(query(collection(db,'training_interest'), where('poolKey','==',u.poolKey)));
+      var contacts = s.docs.map(function(d){ var x = d.data(); return { id:d.id, name:x.name||'', company:x.company||'', email:x.email||'', phone:x.phone||'', seats:x.seats||1, format:x.format||'', city:x.city||'', timeframe:x.timeframe||'', note:x.note||'' }; })
+        .filter(function(c){ return c.email; });
+      var prev = (u.contacts||[]).map(function(c){ return c.id; }), fresh = contacts.filter(function(c){ return prev.indexOf(c.id) < 0; }).length;
+      // Ücret vendor'un yazdığı değerden değil, onay anındaki ayardan hesaplanır (vendor priceEach'i 0 yazamasın)
+      var cfgNow = await trCfg(true), paid = cfgNow.leadMode === 'paid' && Number(cfgNow.leadPrice) > 0, pe = paid ? Number(cfgNow.leadPrice) : 0;
+      var month = new Date().toISOString().slice(0,7), amount = fresh * pe;
+      var charges = (u.charges||[]).concat(fresh ? [{ month:month, count:fresh, amount:amount, at:Date.now() }] : []);
+      await updateDoc(doc(db,'training_unlocks', u.id), { status:'approved', contacts:contacts, charges:charges, priceMode:paid ? 'paid' : 'free', priceEach:pe, approvedAt:serverTimestamp(), approvedBy:CUR_USER.uid });
+      _trNotify(u.providerId, _L('Contacts shared','İletişim bilgileri paylaşıldı'), ((u.poolSnapshot||{}).brand||'') + ' · ' + contacts.length + ' ' + _L('people — see Vendor Panel › My Trainings.','kişi — Vendor Paneli › Eğitimlerim.'), u.poolKey, 'training_unlock');
+      showToast(contacts.length + ' ' + _L('contacts shared','kişi paylaşıldı') + (amount ? ' · ' + amount.toLocaleString('tr-TR') + ' TRY' : ''), 'ok'); admTrainings(m);
+    } catch(e){ b.disabled = false; showToast(String(e && (e.code||e.message)), 'err'); }
+  }); });
+  m.querySelectorAll('.at-urj').forEach(function(b){ b.addEventListener('click', async function(){
+    var u = uById[b.dataset.id];
+    try { await updateDoc(doc(db,'training_unlocks', u.id), { status:'rejected', decidedAt:serverTimestamp() }); _trNotify(u.providerId, _L('Contact request declined','İletişim talebi reddedildi'), (u.poolSnapshot||{}).brand || '', u.poolKey, 'training_unlock'); admTrainings(m); }
+    catch(e){ showToast(String(e && (e.code||e.message)), 'err'); }
+  }); });
+  var csv = m.querySelector('#at-csv'); if(csv) csv.addEventListener('click', function(){
+    var lines = [['Ay','Saglayici','Kisi','Tutar_TRY']].concat((m._trInv||[]).map(function(g){ return [g.month, g.provider, g.count, g.amount]; }));
+    var txt = '﻿' + lines.map(function(r){ return r.map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(';'); }).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type:'text/csv;charset=utf-8' })); a.download = 'pochub-egitim-fatura-' + new Date().toISOString().slice(0,7) + '.csv';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  });
+  var sv = m.querySelector('#as-save'); if(sv) sv.addEventListener('click', async function(){
+    var d = { threshold:Math.max(1, parseInt(m.querySelector('#as-th').value,10) || 5), leadMode:m.querySelector('#as-lm').value === 'paid' ? 'paid' : 'free',
+      leadPrice:Math.max(0, parseFloat(m.querySelector('#as-lp').value) || 0), quotaEnabled:m.querySelector('#as-q').checked, updatedAt:serverTimestamp(), updatedBy:CUR_USER.uid };
+    try { await setDoc(doc(db,'pochub_config','training'), d, { merge:true }); _trCfgCache = null; showToast(_L('Saved','Kaydedildi'), 'ok'); } catch(e){ showToast(String(e && (e.code||e.message)), 'err'); }
+  });
+}
+
+// ── Admin: doğrulama durumunu aynaya taşı (v1.10.5 sonrası vendor yapamıyor) ──
+async function trMirrorVendorStatus(uid, status){
+  try { await setDoc(doc(db,'vendor_public', uid), { vendorStatus:status, updatedAt:serverTimestamp() }, { merge:true }); invalidateVendorPublicCache(); } catch(e){ console.warn('[v10.09] ayna durum', e && (e.code||e.message)); }
+}
+async function trHealVendorStatusOnce(){
+  if(!CUR_USER || CUR_PROFILE?.role !== 'admin') return;
+  try {
+    var cs = await getDoc(doc(db,'pochub_config','vstatus_heal'));
+    if(cs.exists() && cs.data().v === 'v10.09') return;
+    var r = await Promise.all([ getDocs(query(collection(db,'users'), where('role','==','vendor'))), getDocs(collection(db,'vendor_public')) ]);
+    var vp = Object.create(null); r[1].docs.forEach(function(d){ vp[d.id] = d.data(); });
+    var fix = r[0].docs.filter(function(d){ var u = d.data(); return vp[d.id] && ((vp[d.id].vendorStatus || '') !== (u.vendorStatus || '') || !!vp[d.id].isVerified !== !!u.isVerified); });
+    for(var i = 0; i < fix.length; i += 400){ var bt = writeBatch(db); fix.slice(i, i+400).forEach(function(d){ bt.set(doc(db,'vendor_public', d.id), { vendorStatus:d.data().vendorStatus || 'auto_approved', isVerified:!!d.data().isVerified }, { merge:true }); }); await bt.commit(); }
+    await setDoc(doc(db,'pochub_config','vstatus_heal'), { v:'v10.09', fixed:fix.length, at:serverTimestamp() });
+    if(fix.length){ invalidateVendorPublicCache(); console.info('[v10.09] vendor_public dogrulama durumu esitlendi', fix.length); }
+  } catch(e){ console.warn('[v10.09] durum esitleme', e && (e.code||e.message)); }
+}
+
 // ══ v10.08: KATEGORI KATMANI ═══════════════════════════════════════════
 // Katalogda ~16.200 urun ailesi sablonu var; yalniz vendor urunu olan
 // ~330'unun kendine ozel aciklamasi var. 16 bini tek tek yazmak hem
@@ -73114,6 +73949,7 @@ async function openFamilyInfoModal(o){
   var pb = md.querySelector('.fim-poc'); if(pb) pb.addEventListener('click', function(){ md.remove(); o.onPoc(); });
   var bl = md.querySelector('.ci-brandlink'); if(bl) bl.addEventListener('click', function(){ md.remove(); });
   var fb = md.querySelector('.fim-brand'); if(fb) fb.addEventListener('click', function(){ md.remove(); });   // v10.08
+  try { trAppendForBrand(md.querySelector('.modal').children[1], o.brand, o.name); } catch(_tr){}   // v10.09
 }
 
 // ── ADMIN: Katalog Bilgileri ─────────────────────────────────────────────
@@ -73606,7 +74442,7 @@ async function renderBrandPage(bn){
   } catch(e){}
   try {
     vends=(await getVendorsPublic())   // v9.64: ayna
-      .filter(function(v){ return (v.brands||[]).some(function(x){ return _normBrand(x)===norm; }); });
+      .filter(function(v){ return v.vendorType!=='egitmen' && (v.brands||[]).some(function(x){ return _normBrand(x)===norm; }); });   // v10.09: egitmen temsilci degil
   } catch(e){}
   try {
     var rs=await getDocs(query(collection(db,'brand_relations'), where('brandNorm','==',norm)));
@@ -73614,7 +74450,7 @@ async function renderBrandPage(bn){
   } catch(e){}
 
   var covered={}; prods.forEach(function(p){ fams.forEach(function(f){ if(_normCat(p.category||'')===_normCat(f.category||'')) covered[f.id]=1; }); });
-  var vtypeLbl={ureticid:_L('Manufacturer','Üretici'),distributor:_L('Distributor','Distribütör'),integrator:_L('Integrator','Entegratör')};
+  var vtypeLbl={ureticid:_L('Manufacturer','Üretici'),distributor:_L('Distributor','Distribütör'),integrator:_L('Integrator','Entegratör'),egitmen:_L('Trainer','Eğitmen')};
   var vtypeOrder={ureticid:0,distributor:1,integrator:2};
   vends.sort(function(a,b){ return (rels[b.id]?1:0)-(rels[a.id]?1:0) || (vtypeOrder[a.vendorType]||9)-(vtypeOrder[b.vendorType]||9); });
 
@@ -73684,6 +74520,7 @@ async function renderBrandPage(bn){
     var offers=prods.filter(function(p){ var pn=_normBrand(p.name||''), pb=_normBrand(famBaseName(p.name||'')); return pn===nn || pb===nb || pn===nb || pb===nn; });
     openFamilyInfoModal({ brand:brand.name, name:nm, category:ct, offers:offers, onPoc:function(){ _poc(nm, ct); } });
   }); });
+  try { trAppendForBrand(c.querySelector('.wrap'), brand.name, '', _L('TRAININGS FOR THIS BRAND','BU MARKANIN EĞİTİMLERİ')); } catch(_tr){}   // v10.09
   try { updatePageSEO && updatePageSEO(brand.name+' — PoCHub', (brand.name)+' '+_L('product families, catalog products and authorized vendors in Türkiye.','ürün aileleri, katalog ürünleri ve Türkiye temsilcileri.')); } catch(e){}
 }
 async function renderVendorPublic(slug) {
@@ -73731,10 +74568,10 @@ async function renderVendorPublic(slug) {
     // Vendor type label
     var typeLabel = vendor.vendorType === 'ureticid' ? t('vtype.ureticid','Üretici')
                   : vendor.vendorType === 'distributor' ? t('vtype.distributor','Distribütör')
-                  : vendor.vendorType === 'integrator' ? t('vtype.integrator','Entegratör') : 'Vendor';
+                  : vendor.vendorType === 'integrator' ? t('vtype.integrator','Entegratör') : vendor.vendorType === 'egitmen' ? _L('Trainer','Eğitmen') : 'Vendor';
     var typeIcon = vendor.vendorType === 'ureticid' ? '🏭'
                   : vendor.vendorType === 'distributor' ? '🚚'
-                  : vendor.vendorType === 'integrator' ? '🔧' : '💼';
+                  : vendor.vendorType === 'integrator' ? '🔧' : vendor.vendorType === 'egitmen' ? '🎓' : '💼';
 
     // Doğrulanmış rozeti
     var verifiedBadge = vendor.vendorStatus === 'admin_verified'
@@ -73974,6 +74811,7 @@ async function renderVendorPublic(slug) {
         window.location.hash = '#catalog';
       });
     });
+    try { trAppendVendorProfile(scr, vendor); } catch(_tr){}   // v10.09
     ['vp-signup-cta', 'vp-signup-cta-2'].forEach(function(id){
       var btn = el(id);
       if (btn) btn.addEventListener('click', function(){
@@ -74021,6 +74859,7 @@ function updatePageSEO(screen) {
     home:    'PoCHub — Türkiye\'nin IT PoC Pazaryeri | Vendor & Müşteri Buluşma Noktası',
     catalog: 'Ürün Kataloğu | PoCHub IT Çözümleri',
     events:  'PoC Etkinlikleri | PoCHub',
+    trainings: 'Ürün Eğitimleri | PoCHub — Sınıf, Uzaktan ve Kuruma Özel',
     demo:    '15 Dakikalık Ücretsiz Demo | PoCHub',
     help:    'Yardım & SSS | PoCHub — Sık Sorulan Sorular',
     vendor:  'Vendor Paneli | PoCHub',
@@ -74033,6 +74872,7 @@ function updatePageSEO(screen) {
     home:    'Türkiye\'nin IT PoC pazaryeri. Müşteriler PoC açar, vendor\'lar teklif gönderir. Süreç hızlanır, zaman ve maliyet tasarrufu.',
     catalog: 'IT vendor\'larından çeşitli ürün ve çözümler. Üreticiler, distribütörler, entegratörler tek pazarda.',
     events:  'PoC etkinlikleri, vendor demoları ve buluşmalar. Kurumsal IT için canlı etkinlik takvimi.',
+    trainings: 'Üretici, distribütör, entegratör ve bağımsız uzmanlardan IT ürün eğitimleri. Takvimli sınıflar, uzaktan eğitimler ve kurumunuza özel eğitim talepleri.',
     demo:    'PoCHub ekibiyle 15 dakikalık ücretsiz demo. Vendor olarak nasıl başlayacağınızı öğrenin.',
     help:    'PoCHub kullanım rehberi. Vendor ve müşteri için sık sorulan sorular, paketler, ödeme, davet sistemi.',
     about:   'PoCHub kimdir? Misyonumuz, vizyonumuz ve ilkelerimiz. IT satın alma kararını sezgiden kanıta taşıyan bağımsız PoC platformu.',
@@ -74807,7 +75647,7 @@ function parseAndNavigate(hash) {
     return;
   }
 
-  if (!['home','events','catalog','leaderboard','vendors','about','customer','vendor','admin','demo','help'].includes(screen)) return;
+  if (!['home','events','trainings','catalog','leaderboard','vendors','about','customer','vendor','admin','demo','help'].includes(screen)) return;
   if (screen !== CUR_SCREEN) { CUR_SCREEN = screen; buildNav(); renderScreen(screen); }
   setTimeout(function() {
     if (screen === 'vendor'   && tab !== CUR_VEND_TAB) { CUR_VEND_TAB = tab; loadVendTab(); }
